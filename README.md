@@ -30,6 +30,8 @@
 │   │       │   └── 📁 Sources
 │   │       └── 📁 Presentation
 │   │           └── 📁 Sources
+│   │               └── 📁 Feature
+│   │               └── 📁 View
 │   └── 📁 Map
 │       └── 📁 Sources
 │           ├── 📁 Data
@@ -38,6 +40,8 @@
 │           │   └── 📁 Sources
 │           └── 📁 Presentation
 │               └── 📁 Sources
+│                   └── 📁 Feature
+│                   └── 📁 View
 └── 📁 Shared
     └── 📁 DesignSystem
         ├── 📁 Resources

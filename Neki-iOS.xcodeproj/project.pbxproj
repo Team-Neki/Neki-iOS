@@ -35,16 +35,6 @@
 			path = "Neki-iOS";
 			sourceTree = "<group>";
 		};
-		6C4998ED2EF7EF64006BE1DB /* Neki-iOSTests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Neki-iOSTests";
-			sourceTree = "<group>";
-		};
-		6C4998F72EF7EF64006BE1DB /* Neki-iOSUITests */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = "Neki-iOSUITests";
-			sourceTree = "<group>";
-		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,8 +66,6 @@
 			isa = PBXGroup;
 			children = (
 				6C4998DF2EF7EF62006BE1DB /* Neki-iOS */,
-				6C4998ED2EF7EF64006BE1DB /* Neki-iOSTests */,
-				6C4998F72EF7EF64006BE1DB /* Neki-iOSUITests */,
 				6C4998DE2EF7EF62006BE1DB /* Products */,
 			);
 			sourceTree = "<group>";
@@ -130,9 +118,6 @@
 			dependencies = (
 				6C4998EC2EF7EF64006BE1DB /* PBXTargetDependency */,
 			);
-			fileSystemSynchronizedGroups = (
-				6C4998ED2EF7EF64006BE1DB /* Neki-iOSTests */,
-			);
 			name = "Neki-iOSTests";
 			packageProductDependencies = (
 			);
@@ -152,9 +137,6 @@
 			);
 			dependencies = (
 				6C4998F62EF7EF64006BE1DB /* PBXTargetDependency */,
-			);
-			fileSystemSynchronizedGroups = (
-				6C4998F72EF7EF64006BE1DB /* Neki-iOSUITests */,
 			);
 			name = "Neki-iOSUITests";
 			packageProductDependencies = (

@@ -26,15 +26,6 @@ public enum FontStyle: CaseIterable {
         }
     }
     
-    var fontWeight: Font.Weight {
-        switch self {
-        case .title24Bold, .title20Bold, .title18Bold: .bold
-        case .title24SemiBold, .title20SemiBold, .title18SemiBold, .body16SemiBold, .body14SemiBold, .caption12SemiBold: .semibold
-        case .title20Medium, .title18Medium, .body16Medium, .body14Medium, .caption12Medium: .medium
-        case .title18Regular, .body16Regular, .body14Regular, .caption12Regular: .regular
-        }
-    }
-    
     var textStyle: Font.TextStyle {
         switch self {
         case .title24Bold, .title24SemiBold, .title20Bold, .title20SemiBold, .title20Medium, .title18Bold, .title18SemiBold, .title18Medium, .title18Regular: .title
@@ -78,7 +69,6 @@ struct FontStyleModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .font(.custom(style.fontName, size: style.fontSize, relativeTo: style.textStyle))
-            .fontWeight(style.fontWeight)
             .lineSpacing(calculatedLineSpacing)
             .tracking(calculatedTracking)
     }
@@ -98,6 +88,6 @@ public extension Font {
     ///     * 줄간격
     ///     * 자간
     static func neki(_ style: FontStyle) -> Self {
-        .custom(style.fontName, size: style.fontSize, relativeTo: style.textStyle).weight(style.fontWeight)
+        .custom(style.fontName, size: style.fontSize, relativeTo: style.textStyle)
     }
 }

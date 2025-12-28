@@ -8,40 +8,48 @@
 import SwiftUI
 
 public enum FontStyle: CaseIterable {
-    case doubleExtraLargeBold, doubleExtraLargeSemiBold
-    case extraLargeMedium, extraLargeSemiBold
-    case largeSemiBold, largeMedium, largeRegular
-    case baseSemiBold, baseMedium, baseRegular
-    case smallSemiBold, smallMedium, smallRegular
-    case extraSmallSemiBold, extraSmallMedium, extraSmallRegular
+    case title24Bold, title24SemiBold
+    case title20Bold, title20SemiBold, title20Medium
+    case title18bold, title18SemiBold, title18Medium, title18Regular
+    case body16SemiBold, body16Medium, body16Regular
+    case body14SemiBold, body14Medium, body14Regular
+    case caption12SemiBold, caption12Medium, caption12Regular
     
     var fontSize: CGFloat {
         switch self {
-        case .doubleExtraLargeBold, .doubleExtraLargeSemiBold: 24
-        case .extraLargeMedium, .extraLargeSemiBold: 20
-        case .largeSemiBold, .largeMedium, .largeRegular: 18
-        case .baseSemiBold, .baseMedium, .baseRegular: 16
-        case .smallSemiBold, .smallMedium, .smallRegular: 14
-        case .extraSmallSemiBold, .extraSmallMedium, .extraSmallRegular: 12
+        case .title24Bold, .title24SemiBold: 24
+        case .title20Bold, .title20SemiBold, .title20Medium: 20
+        case .title18bold, .title18SemiBold, .title18Medium, .title18Regular: 18
+        case .body16SemiBold, .body16Medium, .body16Regular: 16
+        case .body14SemiBold, .body14Medium, .body14Regular: 14
+        case .caption12SemiBold, .caption12Medium, .caption12Regular: 12
         }
     }
     
     var fontWeight: Font.Weight {
         switch self {
-        case .doubleExtraLargeBold: .bold
-        case .doubleExtraLargeSemiBold, .extraSmallSemiBold, .extraLargeSemiBold, .smallSemiBold, .largeSemiBold, .baseSemiBold: .semibold
-        case .extraSmallMedium, .extraLargeMedium, .smallMedium, .largeMedium, .baseMedium: .medium
-        case .extraSmallRegular, .smallRegular, .largeRegular, .baseRegular: .regular
+        case .title24Bold, .title20Bold, .title18bold: .bold
+        case .title24SemiBold, .title20SemiBold, .title18SemiBold, .body16SemiBold, .body14SemiBold, .caption12SemiBold: .semibold
+        case .title20Medium, .title18Medium, .body16Medium, .body14Medium, .caption12Medium: .medium
+        case .title18Regular, .body16Regular, .body14Regular, .caption12Regular: .regular
+        }
+    }
+    
+    var textStyle: Font.TextStyle {
+        switch self {
+        case .title24Bold, .title24SemiBold, .title20Bold, .title20SemiBold, .title20Medium, .title18bold, .title18SemiBold, .title18Medium, .title18Regular: .title
+        case .body16SemiBold, .body16Medium, .body16Regular, .body14SemiBold, .body14Medium, .body14Regular: .body
+        case .caption12SemiBold, .caption12Medium, .caption12Regular: .caption
         }
     }
     
     var lineHeight: CGFloat {
         switch self {
-        case .doubleExtraLargeBold, .doubleExtraLargeSemiBold: 36
-        case .extraLargeMedium, .extraLargeSemiBold, .largeSemiBold, .largeMedium, .largeRegular: 28
-        case .baseSemiBold, .baseMedium, .baseRegular: 24
-        case .smallSemiBold, .smallMedium, .smallRegular: 20
-        case .extraSmallMedium, .extraSmallRegular, .extraSmallSemiBold: 16
+        case .title24Bold, .title24SemiBold: 36
+        case .title20Bold, .title20SemiBold, .title20Medium, .title18bold, .title18SemiBold, .title18Medium, .title18Regular: 28
+        case .body16SemiBold, .body16Medium, .body16Regular: 24
+        case .body14SemiBold, .body14Medium, .body14Regular: 20
+        case .caption12SemiBold, .caption12Medium, .caption12Regular: 16
         }
     }
     
@@ -49,10 +57,10 @@ public enum FontStyle: CaseIterable {
     
     var fontName: String {
         switch self {
-        case .doubleExtraLargeBold: "Pretendard-Bold"
-        case .baseSemiBold, .largeSemiBold, .smallSemiBold, .extraLargeSemiBold, .extraSmallSemiBold, .doubleExtraLargeSemiBold: "Pretendard-SemiBold"
-        case .baseMedium, .largeMedium, .smallMedium, .extraLargeMedium, .extraSmallMedium: "Pretendard-Medium"
-        case .baseRegular, .largeRegular, .smallRegular, .extraSmallRegular: "Pretendard-Regular"
+        case .title24Bold, .title20Bold, .title18bold: "Pretendard-Bold"
+        case .title24SemiBold, .title20SemiBold, .title18SemiBold, .body16SemiBold, .body14SemiBold, .caption12SemiBold: "Pretendard-SemiBold"
+        case .title20Medium, .title18Medium, .body16Medium, .body14Medium, .caption12Medium: "Pretendard-Medium"
+        case .title18Regular, .body16Regular, .body14Regular, .caption12Regular: "Pretendard-Regular"
         }
     }
 }
@@ -69,7 +77,7 @@ struct FontStyleModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .font(.custom(style.fontName, size: style.fontSize))
+            .font(.custom(style.fontName, size: style.fontSize, relativeTo: style.textStyle))
             .fontWeight(style.fontWeight)
             .lineSpacing(calculatedLineSpacing)
             .tracking(calculatedTracking)
@@ -90,6 +98,6 @@ public extension Font {
     ///     * 줄간격
     ///     * 자간
     static func neki(_ style: FontStyle) -> Self {
-        .custom(style.fontName, size: style.fontSize).weight(style.fontWeight)
+        .custom(style.fontName, size: style.fontSize, relativeTo: style.textStyle).weight(style.fontWeight)
     }
 }

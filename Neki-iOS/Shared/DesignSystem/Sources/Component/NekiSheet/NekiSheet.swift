@@ -9,11 +9,11 @@ import SwiftUI
 
 public struct NekiSheet<Content: View>: View {
     @Environment(\.sheetConfiguration) private var configuration
-    @Binding var selection: Detent
+    @Binding var selection: NekiSheetDetent
     @State private var translation: CGFloat = .zero
     @State private var scrollOffset: CGFloat = .zero
     
-    let content: (Binding<CGFloat>) -> Content
+    let content: () -> Content
     
     public var body: some View {
         GeometryReader { proxy in
@@ -22,7 +22,7 @@ public struct NekiSheet<Content: View>: View {
             VStack(spacing: .zero) {
                 indicator
                 
-                content($scrollOffset)
+                content()
             }
             .frame(width: proxy.size.width, height: layout.maxHeight, alignment: .top)
             .background(configuration.backgroundColor)
@@ -120,8 +120,8 @@ public extension View {
     ///     - selection: 시트 높이 상태 바인딩
     ///     - content: 시트 내부 컨텐츠
     func nekiSheet<Content: View>(
-        selection: Binding<Detent>,
-        @ViewBuilder content: @escaping (Binding<CGFloat>) -> Content
+        selection: Binding<NekiSheetDetent>,
+        @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         ZStack {
             self

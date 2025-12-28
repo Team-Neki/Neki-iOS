@@ -74,7 +74,7 @@ struct FontStyleModifier: ViewModifier {
     }
 }
 
-public extension View where Self == Text {
+public extension View {
     /// Neki 폰트 스타일을 적용합니다.
     func nekiFont(_ style: FontStyle) -> some View {
         modifier(FontStyleModifier(style: style))

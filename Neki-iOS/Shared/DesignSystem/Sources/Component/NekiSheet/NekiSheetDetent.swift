@@ -1,5 +1,5 @@
 //
-//  Detent.swift
+//  NekiSheetDetent.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 12/28/25.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum Detent: Hashable {
+public enum NekiSheetDetent: Hashable {
     /// 화면 높이의 비율
     case fraction(CGFloat)
     /// 절대 높이

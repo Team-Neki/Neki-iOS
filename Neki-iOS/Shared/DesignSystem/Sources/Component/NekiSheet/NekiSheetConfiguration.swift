@@ -1,5 +1,5 @@
 //
-//  SheetConfiguration.swift
+//  NekiSheetConfiguration.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 12/28/25.
@@ -7,8 +7,8 @@
 
 import SwiftUI
 
-struct SheetConfiguration: Equatable {
-    var detents: Set<Detent>
+struct NekiSheetConfiguration: Equatable {
+    var detents: Set<NekiSheetDetent>
     var cornerRadius: CGFloat
     var indicatorSize: CGSize
     var indicatorColor: Color
@@ -18,7 +18,7 @@ struct SheetConfiguration: Equatable {
     var animation: Animation
     
     init(
-        detents: Set<Detent> = [.absolute(100), .medium, .fraction(0.9)],
+        detents: Set<NekiSheetDetent> = [.absolute(100), .medium, .fraction(0.9)],
         cornerRadius: CGFloat = 20,
         indicatorSize: CGSize = .init(width: 40, height: 5),
         indicatorColor: Color = .gray.opacity(0.4),
@@ -38,15 +38,15 @@ struct SheetConfiguration: Equatable {
     }
 }
 
-struct SheetConfigurationKey: EnvironmentKey {
-    typealias Value = SheetConfiguration
+struct NekiSheetConfigurationKey: EnvironmentKey {
+    typealias Value = NekiSheetConfiguration
     
     static let defaultValue: Value = .init()
 }
 
 extension EnvironmentValues {
-    var sheetConfiguration: SheetConfiguration {
-        get { self[SheetConfigurationKey.self] }
-        set { self[SheetConfigurationKey.self] = newValue }
+    var sheetConfiguration: NekiSheetConfiguration {
+        get { self[NekiSheetConfigurationKey.self] }
+        set { self[NekiSheetConfigurationKey.self] = newValue }
     }
 }

@@ -129,15 +129,15 @@ public extension View {
         }
     }
     
-    func sheetDetents(_ detents: Set<Detent>) -> some View {
+    func nekiSheetDetents(_ detents: Set<NekiSheetDetent>) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.detents = detents }
     }
     
-    func sheetCornerRadius(_ radius: CGFloat) -> some View {
+    func nekiSheetCornerRadius(_ radius: CGFloat) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.cornerRadius = radius }
     }
     
-    func sheetBackgroundColor(_ color: Color) -> some View {
+    func nekiSheetBackgroundColor(_ color: Color) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.backgroundColor = color }
     }
 }

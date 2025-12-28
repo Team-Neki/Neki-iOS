@@ -117,7 +117,7 @@ public extension View {
     /// 뷰 계층에 NekiSheet를 추가합니다.
     ///
     /// - Parameters:
-    ///     - isPresented: 시트 표시 여부를 제어할 수 있는 Bool 바인딩
+    ///     - selection: 시트 높이 상태 바인딩
     ///     - content: 시트 내부 컨텐츠
     func nekiSheet<Content: View>(
         selection: Binding<Detent>,

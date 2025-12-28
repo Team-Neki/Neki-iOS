@@ -43,7 +43,9 @@ public struct NekiSheet<Content: View>: View {
                         let predictedHeight = layout.currentHeight - value.translation.height
                         let closestHeight = layout.sortedHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
                         
-                        guard let newDetent = configuration.detents.first(where: { $0.resolve(in: proxy.size.height) == closestHeight }) else { return }
+                        guard let newDetent = configuration.detents.first(where: { $0.resolve(in: proxy.size.height) == closestHeight }) else {
+                            return withAnimation(configuration.animation) { translation = .zero }
+                        }
                         withAnimation(configuration.animation) {
                             selection = newDetent
                             translation = .zero

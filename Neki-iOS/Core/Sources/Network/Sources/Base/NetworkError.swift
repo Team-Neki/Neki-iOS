@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum NetworkError: Error {
+public enum NetworkError: LocalizedError {
     case apiError(message: String)
     case requestEncodingError
     case responseDecodingError
@@ -17,8 +17,10 @@ public enum NetworkError: Error {
     case networkFail
     case unknownError
     case invalidURLError
+    case badRequestError
+    case unauthorizedError
     
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .apiError(let message): return message
         case .requestEncodingError: return "요청 인코딩에 실패했습니다."
@@ -29,6 +31,8 @@ public enum NetworkError: Error {
         case .networkFail: return "네트워크 연결에 실패했습니다"
         case .unknownError: return "알 수 없는 오류가 발생했습니다."
         case .invalidURLError: return "잘못된 URL입니다"
+        case .badRequestError: return "잘못된 요청입니다"
+        case .unauthorizedError: return "인증이 필요합니다"
         }
     }
 }

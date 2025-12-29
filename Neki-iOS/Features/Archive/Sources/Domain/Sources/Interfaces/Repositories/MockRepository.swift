@@ -8,5 +8,5 @@
 import Foundation
 
 public protocol MockRepository {
-    func fetchNotices() async throws -> [MockEntity]
+    func fetchMockList(page: Int, category: String) async throws -> MockEntity
 }

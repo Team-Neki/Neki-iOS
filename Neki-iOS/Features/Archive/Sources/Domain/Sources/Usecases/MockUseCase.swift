@@ -6,3 +6,7 @@
 //
 
 import Foundation
+
+public protocol MockUseCase {
+    func executeFetch() async throws -> [MockEntity]
+}

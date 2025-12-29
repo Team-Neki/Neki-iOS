@@ -10,6 +10,9 @@ import Foundation
 public enum HTTPMethodType {
     case get
     case post
+    case delete
+    case put
+    case patch
     
     var key: String {
         switch self {
@@ -17,6 +20,12 @@ public enum HTTPMethodType {
             "GET"
         case .post:
             "POST"
+        case .delete:
+            "DELETE"
+        case .put:
+            "PUT"
+        case .patch:
+            "PATCH"
         }
     }
 }

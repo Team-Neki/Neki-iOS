@@ -16,6 +16,7 @@ public enum NetworkError: Error {
     case internalServerError
     case networkFail
     case unknownError
+    case invalidURLError
     
     var errorDescription: String? {
         switch self {
@@ -27,6 +28,7 @@ public enum NetworkError: Error {
         case .internalServerError: return "서버 내부 오류가 발생했습니다"
         case .networkFail: return "네트워크 연결에 실패했습니다"
         case .unknownError: return "알 수 없는 오류가 발생했습니다."
+        case .invalidURLError: return "잘못된 URL입니다"
         }
     }
 }

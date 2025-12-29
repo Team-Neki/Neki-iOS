@@ -31,7 +31,7 @@ extension BaseTargetType {
         return urlString
     }
     
-    func makeURLRequest() throws -> URLRequest {
+    func asURLRequest() throws -> URLRequest {
         // URLComponents를 이용한 초기 URL 생성
         guard let url = URL(string: baseURL)?.appending(path: path),
               var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else { throw NetworkError.invalidURLError }

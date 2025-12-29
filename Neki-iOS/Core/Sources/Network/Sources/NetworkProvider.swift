@@ -17,6 +17,10 @@ public final class NetworkProvider: NetworkProviderProtocol {
         Logger(subsystem: Bundle.main.bundleIdentifier ?? "Neki", category: "NetworkProvider")
     }
     
+    /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
+    ///
+    /// voidResponse를 수행합니다.
+    /// HTTP 200~299 상태 코드는 Void 값을 반환합니다.
     public func request(endpoint: Endpoint) async throws -> Void {
         guard let url = makeURL(endpoint: endpoint) else {
             throw NetworkError.invalidURLError
@@ -47,6 +51,10 @@ public final class NetworkProvider: NetworkProviderProtocol {
         }
     }
     
+    /// 네트워크 요청을 수행하고 제네릭 타입으로 응답 데이터를 디코딩합니다.
+    ///
+    /// decodableResponse를 수행합니다.
+    /// HTTP 200~299 상태 코드는 `JSONDecoder`를 통해 `T` 타입으로 디코딩하여 반환합니다.
     public func request<T: Decodable>(endpoint: Endpoint) async throws -> T {
         guard let url = makeURL(endpoint: endpoint) else {
             throw NetworkError.invalidURLError
@@ -124,9 +132,7 @@ private extension NetworkProvider {
         
         // 헤더 설정
         let allHeaders = makeHeaders(endpoint: endpoint)
-        for (key, value) in allHeaders {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
+        request.allHTTPHeaderFields = allHeaders
         
         // Body 인코딩
         if let body = endpoint.body {

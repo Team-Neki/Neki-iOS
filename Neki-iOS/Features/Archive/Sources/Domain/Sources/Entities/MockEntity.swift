@@ -8,23 +8,11 @@
 import Foundation
 
 public struct MockEntity: Equatable, Identifiable {
-    public let id: Int
-    public let title: String
-    public let content: String
-    public let imageURL: String?
-    public let createdAt: Date
+    public let id: UUID
+    public let titles: [String]
     
-    public init(
-        id: Int,
-        title: String,
-        content: String,
-        imageURL: String?,
-        createdAt: Date
-    ) {
+    public init(id: UUID = UUID(), titles: [String]) {
         self.id = id
-        self.title = title
-        self.content = content
-        self.imageURL = imageURL
-        self.createdAt = createdAt
+        self.titles = titles
     }
 }

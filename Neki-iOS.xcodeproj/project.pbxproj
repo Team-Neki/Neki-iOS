@@ -42,7 +42,6 @@
 				Features/Archive/Sources/Presentation/Sources/Feature/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/View/.gitkeep,
 				Features/Map/Sources/Data/Sources/.gitkeep,
-				Features/Map/Sources/Domain/Sources/.gitkeep,
 				Features/Map/Sources/Presentation/Sources/Feature/.gitkeep,
 				Features/Map/Sources/Presentation/Sources/View/.gitkeep,
 				Info.plist,

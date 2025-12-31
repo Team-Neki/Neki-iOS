@@ -10,6 +10,12 @@ import os
 
 public final class DefaultNetworkProvider: NetworkProvider {
     
+    private let session: URLSessionProtocol
+    
+    public init(session: URLSessionProtocol = URLSession.shared) {
+        self.session = session
+    }
+    
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
     ///
     /// voidResponse를 수행합니다.
@@ -35,7 +41,7 @@ public final class DefaultNetworkProvider: NetworkProvider {
         
         // 네트워크 요청
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request, delegate: nil)
             try voidResponse(data: data, response: response)
             return ()
         } catch {
@@ -69,7 +75,7 @@ public final class DefaultNetworkProvider: NetworkProvider {
         
         // 네트워크 요청
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request, delegate: nil)
             return try decodableResponse(data: data, response: response)
         } catch {
             Logger.network.error("❌ Network Error: \(error.localizedDescription)")

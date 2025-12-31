@@ -26,7 +26,7 @@ public protocol Endpoint {
 extension Endpoint {
     static var defaultEncoder: JSONEncoder {
         let encoder = JSONEncoder()
-        return encoder
+        return JSONEncoder()
     }
     
     var baseURL: String {
@@ -67,6 +67,8 @@ extension Endpoint {
         return request
     }
     
+    
+    // TODO: - "Content-Type"외 다양한 헤더를 추가할 수 있도록 하기
     func makeHeaders() -> [String: String] {
         var headers: [String: String] = [
             "Content-Type": "application/json"

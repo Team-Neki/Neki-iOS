@@ -1,5 +1,5 @@
 //
-//  NetworkProvider.swift
+//  DefaultNetworkProvider.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 12/30/25.
@@ -8,8 +8,8 @@
 import Foundation
 import os
 
-public final class NetworkProvider: NetworkProviderProtocol {
-    public static let shared = NetworkProvider()
+public final class DefaultNetworkProvider: NetworkProvider {
+    public static let shared = DefaultNetworkProvider()
     
     private init() {}
     
@@ -86,7 +86,7 @@ public final class NetworkProvider: NetworkProviderProtocol {
 
 }
 
-private extension NetworkProvider {
+private extension DefaultNetworkProvider {
     func makeURL(endpoint: Endpoint) -> URL? {
         // BASE URL 불러오기
         guard let baseURL = Bundle.main.infoDictionary?["BASE_URL"] as? String else {

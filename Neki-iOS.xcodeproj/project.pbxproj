@@ -29,9 +29,30 @@
 		6C4998F42EF7EF64006BE1DB /* Neki-iOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Neki-iOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				APP/Sources/Resources/.gitkeep,
+				Core/Sources/Coordinator/Sources/.gitkeep,
+				Features/Archive/Sources/Presentation/Sources/Feature/.gitkeep,
+				Features/Archive/Sources/Presentation/Sources/View/.gitkeep,
+				Features/Map/Sources/Data/Sources/.gitkeep,
+				Features/Map/Sources/Domain/Sources/.gitkeep,
+				Features/Map/Sources/Presentation/Sources/Feature/.gitkeep,
+				Features/Map/Sources/Presentation/Sources/View/.gitkeep,
+				Shared/DesignSystem/Sources/.gitkeep,
+			);
+			target = 6C4998DC2EF7EF62006BE1DB /* Neki-iOS */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6C4998DF2EF7EF62006BE1DB /* Neki-iOS */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */,
+			);
 			path = "Neki-iOS";
 			sourceTree = "<group>";
 		};

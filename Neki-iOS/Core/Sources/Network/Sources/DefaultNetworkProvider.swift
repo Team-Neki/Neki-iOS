@@ -25,7 +25,7 @@ public final class DefaultNetworkProvider: NetworkProvider {
     ///
     /// voidResponse를 수행합니다.
     /// HTTP 200~299 상태 코드는 Void 값을 반환합니다.
-    public func request(endpoint: Endpoint) async throws -> Void {
+    public func request(endpoint: Endpoint) async throws {
         let request = try endpoint.asURLRequest()
         
         // 네트워크 검증을 위한 request 로그 출력

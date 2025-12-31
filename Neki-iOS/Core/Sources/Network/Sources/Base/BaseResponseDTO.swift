@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct BaseResponseDTO<T: Decodable>: Decodable {
+public struct BaseResponseDTO<T: Decodable>: Decodable {
     let status: Int
     let message: String
     let data: T?

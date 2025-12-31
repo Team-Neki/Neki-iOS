@@ -11,9 +11,14 @@ import os
 public final class DefaultNetworkProvider: NetworkProvider {
     
     private let session: URLSessionProtocol
+    private let decoder: JSONDecoder
     
-    public init(session: URLSessionProtocol = URLSession.shared) {
+    public init(
+        session: URLSessionProtocol = URLSession.shared,
+        decoder: JSONDecoder = JSONDecoder()
+    ) {
         self.session = session
+        self.decoder = decoder
     }
     
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
@@ -117,7 +122,7 @@ private extension DefaultNetworkProvider {
         switch httpResponse.statusCode {
         case 200...299:
             do {
-                let decodedResponse = try JSONDecoder().decode(T.self, from: data)
+                let decodedResponse = try self.decoder.decode(T.self, from: data)
                 return decodedResponse
             } catch {
                 Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")

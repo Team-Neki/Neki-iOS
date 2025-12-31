@@ -24,6 +24,11 @@ public protocol Endpoint {
 }
 
 extension Endpoint {
+    static var defaultEncoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        return encoder
+    }
+    
     var baseURL: String {
         guard let urlString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
             fatalError("🚨Base URL을 찾을 수 없습니다🚨")
@@ -53,7 +58,7 @@ extension Endpoint {
         
         if let body = body {
             do {
-                request.httpBody = try JSONEncoder().encode(body)
+                request.httpBody = try Self.defaultEncoder.encode(body)
             } catch {
                 throw NetworkError.requestEncodingError
             }

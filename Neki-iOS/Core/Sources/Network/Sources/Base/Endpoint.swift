@@ -26,7 +26,7 @@ public protocol Endpoint {
 extension Endpoint {
     static var defaultEncoder: JSONEncoder {
         let encoder = JSONEncoder()
-        return JSONEncoder()
+        return encoder
     }
     
     var baseURL: String {

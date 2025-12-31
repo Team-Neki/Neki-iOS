@@ -29,12 +29,15 @@ public final class DefaultNetworkProvider: NetworkProvider {
         let request = try endpoint.asURLRequest()
         
         // 네트워크 검증을 위한 request 로그 출력
-        logRequest(request)
+        requestLog(request)
         
         // 네트워크 요청
         do {
             let (data, response) = try await session.data(for: request, delegate: nil)
-            try voidResponse(data: data, response: response)
+            
+            responseLog(data: data, response: response)
+            
+            try validateResponse(response: response)
         } catch {
             Logger.network.error("❌ Network Error: \(error.localizedDescription)")
             throw error
@@ -49,12 +52,17 @@ public final class DefaultNetworkProvider: NetworkProvider {
         let request = try endpoint.asURLRequest()
         
         // 네트워크 검증을 위한 request 로그 출력
-        logRequest(request)
+        requestLog(request)
         
         // 네트워크 요청
         do {
             let (data, response) = try await session.data(for: request, delegate: nil)
-            return try decodableResponse(data: data, response: response)
+            
+            responseLog(data: data, response: response)
+            
+            try validateResponse(response: response)
+            
+            return try decode(data: data)
         } catch {
             Logger.network.error("❌ Network Error: \(error.localizedDescription)")
             throw error
@@ -63,8 +71,46 @@ public final class DefaultNetworkProvider: NetworkProvider {
     
 }
 
+
+// MARK: - validate & decode
+
 private extension DefaultNetworkProvider {
-    func logRequest(_ request: URLRequest) {
+    func validateResponse(response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.responseError
+        }
+        
+        switch httpResponse.statusCode {
+        case 200...299:
+            return
+        case 400:
+            throw NetworkError.badRequestError
+        case 401:
+            throw NetworkError.unauthorizedError
+        case 404:
+            throw NetworkError.notFound
+        case 500...599:
+            throw NetworkError.internalServerError
+        default:
+            throw NetworkError.unknownError
+        }
+    }
+    
+    func decode<T: Decodable>(data: Data) throws -> T {
+        do {
+            return try self.decoder.decode(T.self, from: data)
+        } catch {
+            Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")
+            throw NetworkError.responseDecodingError
+        }
+    }
+}
+
+
+// MARK: - Request & Response Log
+
+private extension DefaultNetworkProvider {
+    func requestLog(_ request: URLRequest) {
         Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
         if let headers = request.allHTTPHeaderFields {
             Logger.network.debug("🧾 Headers: \(headers.description)")
@@ -75,70 +121,13 @@ private extension DefaultNetworkProvider {
         }
     }
     
-    func voidResponse(data: Data, response: URLResponse) throws {
-        // response 검증 및 확인
-        guard let httpResponse = response as? HTTPURLResponse else {
-            Logger.network.error("❌ Invalid HTTPURLResponse")
-            throw NetworkError.responseError
-        }
+    func responseLog(data: Data, response: URLResponse) {
+        guard let httpResponse = response as? HTTPURLResponse else { return }
         
-        // response Statue Code 확인
         Logger.network.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
         
-        // responseBody 확인
         if let responseBody = String(data: data, encoding: .utf8) {
             Logger.network.debug("📨 Response Body: \(responseBody)")
-        }
-        
-        switch httpResponse.statusCode {
-        case 200...299:
-            return
-        case 400:
-            throw NetworkError.badRequestError
-        case 401:
-            throw NetworkError.unauthorizedError
-        case 500...599:
-            throw NetworkError.internalServerError
-        default:
-            throw NetworkError.unknownError
-        }
-    }
-    
-    func decodableResponse<T: Decodable>(data: Data, response: URLResponse) throws -> T {
-        // response 검증 및 확인
-        guard let httpResponse = response as? HTTPURLResponse else {
-            Logger.network.error("❌ Invalid HTTPURLResponse")
-            throw NetworkError.responseError
-        }
-        
-        // response Statue Code 확인
-        Logger.network.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
-        
-        // responseBody 확인
-        if let responseBody = String(data: data, encoding: .utf8) {
-            Logger.network.debug("📨 Response Body: \(responseBody)")
-        }
-        
-        switch httpResponse.statusCode {
-        case 200...299:
-            do {
-                let decodedResponse = try self.decoder.decode(T.self, from: data)
-                return decodedResponse
-            } catch {
-                Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")
-                if let raw = String(data: data, encoding: .utf8) {
-                    Logger.network.error("📨 Raw Response Data: \(raw)")
-                }
-                throw NetworkError.responseDecodingError
-            }
-        case 400:
-            throw NetworkError.badRequestError
-        case 401:
-            throw NetworkError.unauthorizedError
-        case 500...599:
-            throw NetworkError.internalServerError
-        default:
-            throw NetworkError.unknownError
         }
     }
 }

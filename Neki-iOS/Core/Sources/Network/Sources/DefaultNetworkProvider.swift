@@ -10,10 +10,6 @@ import os
 
 public final class DefaultNetworkProvider: NetworkProvider {
     
-    private static var logger: Logger {
-        Logger(subsystem: Bundle.main.bundleIdentifier ?? "Neki", category: "NetworkProvider")
-    }
-    
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
     ///
     /// voidResponse를 수행합니다.
@@ -27,13 +23,13 @@ public final class DefaultNetworkProvider: NetworkProvider {
         
         
         // 네트워크 검증을 위한 request 로그 출력
-        Self.logger.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+        Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
         if let headers = request.allHTTPHeaderFields {
-            Self.logger.debug("🧾 Headers: \(headers.description)")
+            Logger.network.debug("🧾 Headers: \(headers.description)")
         }
         if let body = request.httpBody,
            let bodyString = String(data: body, encoding: .utf8) {
-            Self.logger.debug("📦 Body: \(bodyString)")
+            Logger.network.debug("📦 Body: \(bodyString)")
         }
         
         
@@ -43,7 +39,7 @@ public final class DefaultNetworkProvider: NetworkProvider {
             try voidResponse(data: data, response: response)
             return ()
         } catch {
-            Self.logger.error("❌ Network Error: \(error.localizedDescription)")
+            Logger.network.error("❌ Network Error: \(error.localizedDescription)")
             throw NetworkError.networkFail
         }
     }
@@ -61,13 +57,13 @@ public final class DefaultNetworkProvider: NetworkProvider {
         
         
         // 네트워크 검증을 위한 request 로그 출력
-        Self.logger.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+        Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
         if let headers = request.allHTTPHeaderFields {
-            Self.logger.debug("🧾 Headers: \(headers.description)")
+            Logger.network.debug("🧾 Headers: \(headers.description)")
         }
         if let body = request.httpBody,
            let bodyString = String(data: body, encoding: .utf8) {
-            Self.logger.debug("📦 Body: \(bodyString)")
+            Logger.network.debug("📦 Body: \(bodyString)")
         }
         
         
@@ -76,7 +72,7 @@ public final class DefaultNetworkProvider: NetworkProvider {
             let (data, response) = try await URLSession.shared.data(for: request)
             return try decodableResponse(data: data, response: response)
         } catch {
-            Self.logger.error("❌ Network Error: \(error.localizedDescription)")
+            Logger.network.error("❌ Network Error: \(error.localizedDescription)")
             throw NetworkError.networkFail
         }
     }
@@ -147,16 +143,16 @@ private extension DefaultNetworkProvider {
     func voidResponse(data: Data, response: URLResponse) throws {
         // response 검증 및 확인
         guard let httpResponse = response as? HTTPURLResponse else {
-            Self.logger.error("❌ Invalid HTTPURLResponse")
+            Logger.network.error("❌ Invalid HTTPURLResponse")
             throw NetworkError.responseError
         }
         
         // response Statue Code 확인
-        Self.logger.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
+        Logger.network.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
         
         // responseBody 확인
         if let responseBody = String(data: data, encoding: .utf8) {
-            Self.logger.debug("📨 Response Body: \(responseBody)")
+            Logger.network.debug("📨 Response Body: \(responseBody)")
         }
         
         switch httpResponse.statusCode {
@@ -176,16 +172,16 @@ private extension DefaultNetworkProvider {
     func decodableResponse<T: Decodable>(data: Data, response: URLResponse) throws -> T {
         // response 검증 및 확인
         guard let httpResponse = response as? HTTPURLResponse else {
-            Self.logger.error("❌ Invalid HTTPURLResponse")
+            Logger.network.error("❌ Invalid HTTPURLResponse")
             throw NetworkError.responseError
         }
         
         // response Statue Code 확인
-        Self.logger.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
+        Logger.network.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
         
         // responseBody 확인
         if let responseBody = String(data: data, encoding: .utf8) {
-            Self.logger.debug("📨 Response Body: \(responseBody)")
+            Logger.network.debug("📨 Response Body: \(responseBody)")
         }
         
         switch httpResponse.statusCode {
@@ -194,9 +190,9 @@ private extension DefaultNetworkProvider {
                 let decodedResponse = try JSONDecoder().decode(T.self, from: data)
                 return decodedResponse
             } catch {
-                Self.logger.error("❌ Decoding Error: \(error.localizedDescription)")
+                Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")
                 if let raw = String(data: data, encoding: .utf8) {
-                    Self.logger.error("📨 Raw Response Data: \(raw)")
+                    Logger.network.error("📨 Raw Response Data: \(raw)")
                 }
                 throw NetworkError.responseDecodingError
             }

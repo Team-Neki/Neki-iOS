@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct GeographicCoordinate: Hashable {
+public struct GeographicCoordinate: Hashable, Sendable {
     /// 위도 (가로선)
     public let latitude: Double
     /// 경도 (세로선)

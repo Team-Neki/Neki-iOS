@@ -8,7 +8,7 @@
 import Foundation
 
 /// 포토부스 지점 정보
-public struct PhotoBooth: Identifiable {
+public struct PhotoBooth: Identifiable, Sendable {
     public let id: UUID
     public let brand: PhotoBoothBrand
     public let name: String

@@ -8,7 +8,7 @@
 import Foundation
 
 /// 포토부스 브랜드의 종류입니다.
-public enum PhotoBoothBrand: CaseIterable {
+public enum PhotoBoothBrand: CaseIterable, Sendable {
     case life4cut
     case photoism
     case photogray
@@ -17,6 +17,7 @@ public enum PhotoBoothBrand: CaseIterable {
     case monomansion
     case theFilm
     case insphoto
+    case unknown
     
     public var displayName: String {
         switch self {
@@ -28,6 +29,7 @@ public enum PhotoBoothBrand: CaseIterable {
         case .monomansion: "모노맨션"
         case .theFilm: "더필름"
         case .insphoto: "인스포토"
+        case .unknown: "비지원 브랜드"
         }
     }
 }

@@ -7,13 +7,17 @@
 
 import Foundation
 
-protocol MockServiceProtocol {
+protocol MockService {
     func fetchMockData(page: Int, category: String) async throws -> MockResponseDTO
 }
 
-final class MockService: MockServiceProtocol {
+final class DefaultMockService: MockService {
     
-    private let provider = DefaultNetworkProvider.shared
+    private let provider: NetworkProvider
+    
+    init(provider: NetworkProvider) {
+        self.provider = provider
+    }
     
     func fetchMockData(page: Int, category: String) async throws -> MockResponseDTO {
         return try await provider.request(endpoint: MockAPI.getTest(page: page, category: category))

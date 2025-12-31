@@ -9,9 +9,6 @@ import Foundation
 import os
 
 public final class DefaultNetworkProvider: NetworkProvider {
-    public static let shared = DefaultNetworkProvider()
-    
-    private init() {}
     
     private static var logger: Logger {
         Logger(subsystem: Bundle.main.bundleIdentifier ?? "Neki", category: "NetworkProvider")

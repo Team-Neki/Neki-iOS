@@ -10,9 +10,9 @@ import Foundation
 
 public final class DefaultMockRepository: MockRepository {
     
-    private let service: MockServiceProtocol
+    private let service: MockService
     
-    init(service: MockServiceProtocol) {
+    init(service: MockService) {
         self.service = service
     }
     

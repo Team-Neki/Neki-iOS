@@ -7,13 +7,13 @@
 
 import SwiftUI
 
-public typealias Hex = UInt
+public typealias ColorHexCode = UInt
 
 
 // MARK: - Color + Hex
 
 extension Color {
-    init(hex: Hex, opacity: Double = 1.0) {
+    init(hex: ColorHexCode, opacity: Double = 1.0) {
         self.init(
             .sRGB,
             red: Double((hex >> 16) & 0xff) / 255,
@@ -28,7 +28,7 @@ extension Color {
 // MARK: - UIColor + Hex
 
 extension UIColor {
-    convenience init(hex: Hex, alpha: CGFloat = 1.0) {
+    convenience init(hex: ColorHexCode, alpha: CGFloat = 1.0) {
         self.init(
             red: CGFloat((hex >> 16) & 0xff) / 255,
             green: CGFloat((hex >> 08) & 0xff) / 255,
@@ -39,7 +39,7 @@ extension UIColor {
 }
 
 /// Neki 컬러 팔레트
-public enum NekiColor: Hex {
+public enum NekiColor: ColorHexCode {
     // MARK: Grayscale
     /// Gray 25
     /// - Hex: 0xF9FAFA
@@ -171,5 +171,5 @@ public extension ShapeStyle where Self == Color {
     // MARK: - Utils
     /// 동적으로 색상을 선택해야 하거나 Hex 코드를 써야 할 때만 함수 사용
     static func neki(_ type: NekiColor) -> Color { type.color }
-    static func hex(_ code: Hex) -> Color { Color(hex: code) }
+    static func hex(_ code: ColorHexCode) -> Color { Color(hex: code) }
 }

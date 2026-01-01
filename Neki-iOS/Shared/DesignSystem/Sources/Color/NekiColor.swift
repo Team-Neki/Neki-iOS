@@ -138,3 +138,38 @@ public enum NekiColor: Hex {
 }
 
 
+// MARK: - Color + NekiColor
+
+public extension ShapeStyle where Self == Color {
+    // MARK: - Grayscale
+    static var nekiGray25: Color { NekiColor.gray25.color }
+    static var nekiGray50: Color { NekiColor.gray50.color }
+    static var nekiGray75: Color { NekiColor.gray75.color }
+    static var nekiGray100: Color { NekiColor.gray100.color }
+    static var nekiGray200: Color { NekiColor.gray200.color }
+    static var nekiGray300: Color { NekiColor.gray300.color }
+    static var nekiGray400: Color { NekiColor.gray400.color }
+    static var nekiGray500: Color { NekiColor.gray500.color }
+    static var nekiGray600: Color { NekiColor.gray600.color }
+    static var nekiGray700: Color { NekiColor.gray700.color }
+    static var nekiGray800: Color { NekiColor.gray800.color }
+    static var nekiGray900: Color { NekiColor.gray900.color }
+    
+    // MARK: - Primary
+    static var nekiPrimary25: Color { NekiColor.primary25.color }
+    static var nekiPrimary50: Color { NekiColor.primary50.color }
+    static var nekiPrimary100: Color { NekiColor.primary100.color }
+    static var nekiPrimary200: Color { NekiColor.primary200.color }
+    static var nekiPrimary300: Color { NekiColor.primary300.color }
+    static var nekiPrimary400: Color { NekiColor.primary400.color }
+    static var nekiPrimary500: Color { NekiColor.primary500.color }
+    static var nekiPrimary600: Color { NekiColor.primary600.color }
+    static var nekiPrimary700: Color { NekiColor.primary700.color }
+    static var nekiPrimary800: Color { NekiColor.primary800.color }
+    static var nekiPrimary900: Color { NekiColor.primary900.color }
+    
+    // MARK: - Utils
+    /// 동적으로 색상을 선택해야 하거나 Hex 코드를 써야 할 때만 함수 사용
+    static func neki(_ type: NekiColor) -> Color { type.color }
+    static func hex(_ code: Hex) -> Color { Color(hex: code) }
+}

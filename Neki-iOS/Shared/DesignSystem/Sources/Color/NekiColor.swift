@@ -134,7 +134,7 @@ public enum NekiColor: ColorHexCode {
     /// - Hex: 0x7A0A00
     case primary900 = 0x7A0A00
     
-    var color: Color { Color(hex: rawValue) }
+    public var color: Color { Color(hex: rawValue) }
 }
 
 

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct GeographicBoundingBox: Equatable {
+public struct GeographicBoundingBox: Equatable, Sendable {
     let minLatitude: Double
     let minLongitude: Double
     let maxLatitude: Double

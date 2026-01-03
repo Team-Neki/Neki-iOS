@@ -18,10 +18,10 @@ public struct NekiCTAButtonStyle: ButtonStyle {
         configuration.label
             .nekiFont(.body16SemiBold)
             .frame(maxWidth: .infinity)
-            .frame(height: NekiMetric.ctaButtonHeight)
+            .frame(height: 52)
             .background(backgroundColor)
             .foregroundStyle(foregroundColor)
-            .clipShape(RoundedRectangle(cornerRadius: NekiMetric.radius12))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
             .animation(.easeInOut, value: configuration.isPressed)
     }

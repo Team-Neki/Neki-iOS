@@ -30,7 +30,7 @@ public struct NekiTextButtonStyle: ButtonStyle {
             }
         }
         .nekiFont(variant == .normal ? .body16SemiBold : .body14SemiBold)
-        .padding(.vertical, NekiMetric.padding10)
+        .padding(.vertical, 10)
         .foregroundStyle(foregroundColor)
         .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
         .animation(.easeInOut, value: configuration.isPressed)

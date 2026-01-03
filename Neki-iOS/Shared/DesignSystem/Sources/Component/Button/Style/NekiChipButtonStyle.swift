@@ -20,7 +20,7 @@ public struct NekiChipButtonStyle: ButtonStyle {
     let shape: Shape
     
     public func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: NekiMetric.spacing4) {
+        HStack(spacing: 4) {
             configuration.label
             
             if case .dropdown = variant {
@@ -28,12 +28,12 @@ public struct NekiChipButtonStyle: ButtonStyle {
             }
         }
         .nekiFont(isHighlighted ? .body14SemiBold : .body14Medium)
-        .padding(.leading, NekiMetric.padding12)
-        .padding(.trailing, variant == .dropdown ? NekiMetric.padding8 : NekiMetric.padding12)
-        .padding(.vertical, NekiMetric.padding12)
+        .padding(.leading, 12)
+        .padding(.trailing, variant == .dropdown ? 8 : 12)
+        .padding(.vertical, 12)
         .background(isHighlighted ? .gray800 : .gray50)
         .foregroundStyle(isHighlighted ? .white : .gray700)
-        .clipShape(RoundedRectangle(cornerRadius: shape == .roundedRectangle ? NekiMetric.radius12 : NekiMetric.radius999))
+        .clipShape(RoundedRectangle(cornerRadius: shape == .roundedRectangle ? 12 : 999))
     }
 }
 

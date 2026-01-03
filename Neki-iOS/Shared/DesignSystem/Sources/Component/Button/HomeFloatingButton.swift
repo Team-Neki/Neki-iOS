@@ -25,7 +25,7 @@ struct MenuFloaterModifier<Menu: View>: ViewModifier {
         ZStack(alignment: .bottomTrailing) {
             content
             
-            VStack(alignment: .trailing, spacing: NekiMetric.spacing12) {
+            VStack(alignment: .trailing, spacing: 12) {
                 if isMenuShowing { menu }
                 floatingButton
             }
@@ -35,7 +35,7 @@ struct MenuFloaterModifier<Menu: View>: ViewModifier {
     
     private var menu: some View {
         menuContent()
-            .clipShape(RoundedRectangle(cornerRadius: NekiMetric.radius12))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .transition(.scale(scale: menuTransitionScale, anchor: .bottomTrailing).combined(with: .opacity))
             .shadow(color: .black.opacity(shadowOpacity), radius: shadowRadius, x: shadowPositionX, y: shadowPositionY)
     }

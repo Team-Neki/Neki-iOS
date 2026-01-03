@@ -36,16 +36,16 @@ public struct ChipFloatingButton: View {
         Button {
             action()
         } label: {
-            HStack(spacing: NekiMetric.spacing8) {
+            HStack(spacing: 8) {
                 icon
                 title
             }
-            .padding(.horizontal, NekiMetric.padding12)
-            .padding(.vertical, NekiMetric.padding8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .nekiFont(.title18SemiBold)
             .foregroundStyle(.white)
             .background(
-                RoundedRectangle(cornerRadius: NekiMetric.radius999)
+                RoundedRectangle(cornerRadius: 999)
                     .fill(.gray800)
                     
             )

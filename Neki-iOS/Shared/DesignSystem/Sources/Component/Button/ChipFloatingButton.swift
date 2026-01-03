@@ -8,21 +8,31 @@
 import SwiftUI
 
 public struct ChipFloatingButton: View {
-    public enum Style { case map, randomPose }
+    public enum Style {
+        case map, randomPose
+        
+        var icon: ImageResource {
+            switch self {
+            case .map: return .iconPin
+            case .randomPose: return .iconRepeat
+            }
+        }
+        
+        var title: String {
+            switch self {
+            case .map: return "지도로"
+            case .randomPose: return "랜덤포즈 추천"
+            }
+        }
+    }
     
     private let icon: Image
     private let title: Text
     private let action: () -> Void
     
     public init(_ style: Style, action: @escaping () -> Void) {
-        switch style {
-        case .map:
-            icon = Image(.iconPin)
-            title = Text("지도로")
-        case .randomPose:
-            icon = Image(.iconRepeat)
-            title = Text("랜덤포즈 추천")
-        }
+        self.icon = Image(style.icon)
+        self.title = Text(style.title)
         self.action = action
     }
     

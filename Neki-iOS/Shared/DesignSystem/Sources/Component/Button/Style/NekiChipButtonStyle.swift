@@ -8,10 +8,6 @@
 import SwiftUI
 
 public struct NekiChipButtonStyle: ButtonStyle {
-    private enum Constants {
-        static let dropdownIcon: String = "chevron.down"
-    }
-    
     public enum Style { case normal, dropdown }
     public enum Shape { case roundedRectangle, capsule }
     
@@ -24,7 +20,8 @@ public struct NekiChipButtonStyle: ButtonStyle {
             configuration.label
             
             if case .dropdown = style {
-                Image(systemName: Constants.dropdownIcon)
+                Image(.iconChevronDown)
+                    .foregroundStyle(.gray500)
             }
         }
         .nekiFont(isHighlighted ? .body14SemiBold : .body14Medium)

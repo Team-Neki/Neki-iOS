@@ -8,10 +8,6 @@
 import SwiftUI
 
 public struct NekiTextButtonStyle: ButtonStyle {
-    private enum Constants {
-        static let dropdownIcon: String = "chevron.down"
-    }
-    
     public enum Role { case secondary, primary }
     public enum Style { case normal, dropdown }
     
@@ -25,7 +21,7 @@ public struct NekiTextButtonStyle: ButtonStyle {
             configuration.label
             
             if case .dropdown = style {
-                Image(systemName: Constants.dropdownIcon)
+                Image(.iconChevronDown)
                     .foregroundStyle(.gray300)
             }
         }

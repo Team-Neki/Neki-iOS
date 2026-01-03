@@ -12,7 +12,7 @@ public struct NekiSelectionToggleStyle: ToggleStyle {
         Button {
             configuration.isOn.toggle()
         } label: {
-            HStack(spacing: NekiMetric.spacing12) {
+            HStack(spacing: 12) {
                 if configuration.isOn {
                     Image(.iconCheckmark)
                         .foregroundStyle(.primary400)
@@ -24,7 +24,7 @@ public struct NekiSelectionToggleStyle: ToggleStyle {
                 
                 Spacer()
             }
-            .padding(.vertical, NekiMetric.padding12)
+            .padding(.vertical, 12)
         }
     }
 }

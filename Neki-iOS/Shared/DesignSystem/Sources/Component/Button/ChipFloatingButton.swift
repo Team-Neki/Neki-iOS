@@ -51,7 +51,6 @@ public struct ChipFloatingButton: View {
             .background(
                 RoundedRectangle(cornerRadius: 999)
                     .fill(.gray800)
-                    
             )
         }
     }

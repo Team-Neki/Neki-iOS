@@ -93,6 +93,7 @@ public struct NekiAlertModal: View {
 // MARK: - Sub Views
 
 extension NekiAlertModal {
+    @ViewBuilder
     private var cancelButton: some View {
         Button {
             onCancel()
@@ -103,6 +104,7 @@ extension NekiAlertModal {
         .disabled(isProcessing)
     }
     
+    @ViewBuilder
     private var confirmButton: some View {
         Button {
             confirmOnce()

@@ -14,30 +14,28 @@ public struct NekiAlertModal: View {
         case cancelable
     }
     
-    // MARK: - Property Wrappers
-    
-    @State private var isProcessing: Bool = false
-    
     // MARK: - Properties
     
     let style: AlertStyle
-    let onConfirm: () async -> Void
+    let onConfirm: () -> Void
     let onCancel: () -> Void
     let titleMessage: String
     let subTitleMessage: String
     let confirmText: String
     var cancelText: String? = nil
+    let isProcessing: Bool
     
     //MARK: - init
     
     public init(
         style: AlertStyle,
-        onConfirm: @escaping () async -> Void,
+        onConfirm: @escaping () -> Void = {},
         onCancel: @escaping () -> Void = {},
         titleMessage: String,
         subTitleMessage: String,
         confirmText: String,
-        cancelText: String? = nil
+        cancelText: String? = nil,
+        isProcessing: Bool = false
     ) {
         self.style = style
         self.onConfirm = onConfirm
@@ -46,6 +44,7 @@ public struct NekiAlertModal: View {
         self.subTitleMessage = subTitleMessage
         self.confirmText = confirmText
         self.cancelText = cancelText
+        self.isProcessing = isProcessing
     }
     
     // MARK: - Main Body
@@ -107,7 +106,7 @@ extension NekiAlertModal {
     @ViewBuilder
     private var confirmButton: some View {
         Button {
-            confirmOnce()
+            onConfirm()
         } label: {
             Text(confirmText)
         }
@@ -116,16 +115,12 @@ extension NekiAlertModal {
     }
 }
 
-// MARK: - Private Func
-
-extension NekiAlertModal {
-    private func confirmOnce() {
-        guard !isProcessing else { return }
-        isProcessing = true
-        
-        Task {
-            await onConfirm()
-            isProcessing = false
-        }
-    }
+#Preview {
+    NekiAlertModal(
+        style: .plain,
+        onConfirm: {},
+        titleMessage: "asd",
+        subTitleMessage: "asd",
+        confirmText: "asd"
+    )
 }

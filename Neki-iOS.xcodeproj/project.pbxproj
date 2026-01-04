@@ -39,10 +39,6 @@
 			membershipExceptions = (
 				APP/Sources/Resources/.gitkeep,
 				Core/Sources/Coordinator/Sources/.gitkeep,
-				Core/Sources/Logger/Sources/.gitkeep,
-				Core/Sources/Network/Sources/.gitkeep,
-				Features/Archive/Sources/Data/Sources/.gitkeep,
-				Features/Archive/Sources/Domain/Sources/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/Feature/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/View/.gitkeep,
 				Features/Map/Sources/Data/Sources/.gitkeep,

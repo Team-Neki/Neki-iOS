@@ -1,5 +1,5 @@
 //
-//  WarningModal.swift
+//  NekiWarningModal.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/4/26.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct WarningModal: View {
+struct NekiWarningModal: View {
     
     // MARK: - Properties
     

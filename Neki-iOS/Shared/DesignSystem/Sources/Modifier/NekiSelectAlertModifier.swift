@@ -1,5 +1,5 @@
 //
-//  NekiWarningAlertModifier.swift
+//  NekiSelectAlertModifier.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/5/26.
@@ -7,11 +7,13 @@
 
 import SwiftUI
 
-struct NekiWarningAlertModifier: ViewModifier {
+struct NekiSelectAlertModifier: ViewModifier {
     @Binding var isPresented: Bool
     
-    let titleMessage: String
-    let onExit: (() -> Void)
+    let style: NekiSelectModal.AlertStyle
+    let items: [String]?
+    let onExit: () -> Void
+    let onSelect: (Int) -> Void
     
     func body(content: Content) -> some View {
         ZStack {
@@ -23,10 +25,14 @@ struct NekiWarningAlertModifier: ViewModifier {
                     .ignoresSafeArea()
                     .zIndex(1)
                 
-                NekiWarningModal(
-                    titleMessage: titleMessage,
+                NekiSelectModal(
+                    style: style,
+                    items: items,
                     onExit: {
                         onExit()
+                    },
+                    onSelect: { index in
+                        onSelect(index)
                     }
                 )
                 .padding(.horizontal, 28)
@@ -39,15 +45,19 @@ struct NekiWarningAlertModifier: ViewModifier {
 }
 
 public extension View {
-    func nekiWarningAlert(
+    func nekiSelectAlert(
         isPresented: Binding<Bool>,
-        titleMessage: String,
-        onExit: @escaping (() -> Void)
+        style: NekiSelectModal.AlertStyle,
+        items: [String]? = nil,
+        onExit: @escaping () -> Void,
+        onSelect: @escaping (Int) -> Void
     ) -> some View {
-        self.modifier(NekiWarningAlertModifier(
+        self.modifier(NekiSelectAlertModifier(
             isPresented: isPresented,
-            titleMessage: titleMessage,
-            onExit: onExit
+            style: style,
+            items: items,
+            onExit: onExit,
+            onSelect: onSelect
         ))
     }
 }

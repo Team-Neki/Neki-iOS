@@ -1,5 +1,5 @@
 //
-//  NekiAlert.swift
+//  NekiAlertModal.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/4/26.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public struct NekiAlert: View {
+public struct NekiAlertModal: View {
     
     public enum AlertStyle {
         case plain
@@ -93,7 +93,7 @@ public struct NekiAlert: View {
 
 // MARK: - Sub Views
 
-extension NekiAlert {
+extension NekiAlertModal {
     private var cancelButton: some View {
         Button {
             onCancel()
@@ -117,7 +117,7 @@ extension NekiAlert {
 
 // MARK: - Private Func
 
-extension NekiAlert {
+extension NekiAlertModal {
     private func confirmOnce() {
         guard !isProcessing else { return }
         isProcessing = true

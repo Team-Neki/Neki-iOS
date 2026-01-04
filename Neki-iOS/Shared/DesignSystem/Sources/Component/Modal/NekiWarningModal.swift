@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct NekiWarningModal: View {
+public struct NekiWarningModal: View {
     
     // MARK: - Properties
     
@@ -16,7 +16,7 @@ struct NekiWarningModal: View {
     
     //MARK: - init
 
-    init(
+    public init(
         titleMessage: String,
         onExit: @escaping () -> Void
     ) {
@@ -26,7 +26,7 @@ struct NekiWarningModal: View {
     
     // MARK: - Main Body
 
-    var body: some View {
+    public var body: some View {
         VStack(alignment: .center, spacing: 0) {
             Image(.iconCircleAlertFill)
                 .padding(.top, 20)

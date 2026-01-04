@@ -14,6 +14,7 @@ public enum FontStyle: CaseIterable {
     case body16SemiBold, body16Medium, body16Regular
     case body14SemiBold, body14Medium, body14Regular
     case caption12SemiBold, caption12Medium, caption12Regular
+    case caption11SemiBold, caption11Medium
     
     var fontSize: CGFloat {
         switch self {
@@ -23,6 +24,7 @@ public enum FontStyle: CaseIterable {
         case .body16SemiBold, .body16Medium, .body16Regular: 16
         case .body14SemiBold, .body14Medium, .body14Regular: 14
         case .caption12SemiBold, .caption12Medium, .caption12Regular: 12
+        case .caption11SemiBold, .caption11Medium: 11
         }
     }
     
@@ -30,7 +32,7 @@ public enum FontStyle: CaseIterable {
         switch self {
         case .title24Bold, .title24SemiBold, .title20Bold, .title20SemiBold, .title20Medium, .title18Bold, .title18SemiBold, .title18Medium, .title18Regular: .title
         case .body16SemiBold, .body16Medium, .body16Regular, .body14SemiBold, .body14Medium, .body14Regular: .body
-        case .caption12SemiBold, .caption12Medium, .caption12Regular: .caption
+        case .caption12SemiBold, .caption12Medium, .caption12Regular, .caption11SemiBold, .caption11Medium: .caption
         }
     }
     
@@ -40,7 +42,7 @@ public enum FontStyle: CaseIterable {
         case .title20Bold, .title20SemiBold, .title20Medium, .title18Bold, .title18SemiBold, .title18Medium, .title18Regular: 28
         case .body16SemiBold, .body16Medium, .body16Regular: 24
         case .body14SemiBold, .body14Medium, .body14Regular: 20
-        case .caption12SemiBold, .caption12Medium, .caption12Regular: 16
+        case .caption12SemiBold, .caption12Medium, .caption12Regular, .caption11SemiBold, .caption11Medium: 16
         }
     }
     
@@ -49,8 +51,8 @@ public enum FontStyle: CaseIterable {
     var fontName: String {
         switch self {
         case .title24Bold, .title20Bold, .title18Bold: "Pretendard-Bold"
-        case .title24SemiBold, .title20SemiBold, .title18SemiBold, .body16SemiBold, .body14SemiBold, .caption12SemiBold: "Pretendard-SemiBold"
-        case .title20Medium, .title18Medium, .body16Medium, .body14Medium, .caption12Medium: "Pretendard-Medium"
+        case .title24SemiBold, .title20SemiBold, .title18SemiBold, .body16SemiBold, .body14SemiBold, .caption12SemiBold, .caption11SemiBold: "Pretendard-SemiBold"
+        case .title20Medium, .title18Medium, .body16Medium, .body14Medium, .caption12Medium, .caption11Medium: "Pretendard-Medium"
         case .title18Regular, .body16Regular, .body14Regular, .caption12Regular: "Pretendard-Regular"
         }
     }

@@ -59,14 +59,13 @@ public struct NekiAlertModal: View {
             Text(titleMessage)
                 .nekiFont(.title18Bold)
                 .foregroundStyle(.gray900)
-                .frame(height: 28)
+                .multilineTextAlignment(.center)
                 .padding(.top, 12)
             
             Text(subTitleMessage)
                 .nekiFont(.body14Regular)
                 .foregroundStyle(.gray500)
                 .multilineTextAlignment(.center)
-                .frame(height: 20)
                 .padding(.top, 2)
             
             Group {

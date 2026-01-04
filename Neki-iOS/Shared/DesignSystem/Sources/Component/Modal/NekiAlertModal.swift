@@ -55,17 +55,20 @@ public struct NekiAlertModal: View {
             Image(.iconCircleAlertFill)
                 .padding(.top, 20)
             
-            Text(titleMessage)
-                .nekiFont(.title18Bold)
-                .foregroundStyle(.gray900)
-                .multilineTextAlignment(.center)
-                .padding(.top, 12)
-            
-            Text(subTitleMessage)
-                .nekiFont(.body14Regular)
-                .foregroundStyle(.gray500)
-                .multilineTextAlignment(.center)
-                .padding(.top, 2)
+            Group {
+                Text(titleMessage)
+                    .nekiFont(.title18Bold)
+                    .foregroundStyle(.gray900)
+                    .frame(height: 28)
+                    .padding(.top, 12)
+                
+                Text(subTitleMessage)
+                    .nekiFont(.body14Regular)
+                    .foregroundStyle(.gray500)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 2)
+            }
+            .padding(.horizontal, 12)
             
             Group {
                 if style == .cancelable {
@@ -113,14 +116,4 @@ extension NekiAlertModal {
         .buttonStyle(.nekiCTA(.primary))
         .disabled(isProcessing)
     }
-}
-
-#Preview {
-    NekiAlertModal(
-        style: .plain,
-        onConfirm: {},
-        titleMessage: "asd",
-        subTitleMessage: "asd",
-        confirmText: "asd"
-    )
 }

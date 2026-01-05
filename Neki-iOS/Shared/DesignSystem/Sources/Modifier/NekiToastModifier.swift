@@ -22,10 +22,13 @@ struct NekiToastModifier: ViewModifier {
     private func nekiToastView(_ item: NekiToastItem) -> some View {
         NekiToastView(item: item) { withAnimation { self.item = nil } }
             .padding(.horizontal, 20)
+            .id(item.id)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .zIndex(1000)
             .task(id: item.id) {
-                try? await Task.sleep(for: .seconds(item.duration))
+                do {
+                    try await Task.sleep(for: .seconds(item.duration))
+                } catch { }
                 withAnimation { self.item = nil }
             }
     }

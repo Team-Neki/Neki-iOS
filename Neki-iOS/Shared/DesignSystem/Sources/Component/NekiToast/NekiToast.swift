@@ -29,10 +29,10 @@ public enum NekiToastStyle {
     }
 }
 
-public struct NekiToastItem: Equatable {
+public struct NekiToastItem: Identifiable {
     public typealias Interaction = () -> Void
     
-    let id: UUID = UUID()
+    public let id: UUID = UUID()
     let message: String
     let style: NekiToastStyle
     let duration: Double
@@ -51,13 +51,6 @@ public struct NekiToastItem: Equatable {
         self.duration = duration
         self.buttonTitle = buttonTitle
         self.action = action
-    }
-    
-    public static func == (lhs: NekiToastItem, rhs: NekiToastItem) -> Bool {
-        lhs.id == rhs.id &&
-        lhs.message == rhs.message &&
-        lhs.style == rhs.style &&
-        lhs.buttonTitle == rhs.buttonTitle
     }
 }
 

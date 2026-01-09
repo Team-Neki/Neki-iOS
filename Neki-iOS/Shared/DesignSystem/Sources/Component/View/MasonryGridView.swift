@@ -9,11 +9,23 @@ import SwiftUI
 
 public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
     
+    //MARK: - Properties
+
     let items: [Item]
     let columns: Int
     let horizontalSpacing: CGFloat
     let verticalSpacing: CGFloat
     let content: (Item) -> ItemView
+    
+    private var columnItems: [[Item]] {
+        var result = Array(repeating: [Item](), count: columns)
+        for (index, item) in items.enumerated() {
+            result[index % columns].append(item)
+        }
+        return result
+    }
+    
+    //MARK: - init
     
     public init(
         items: [Item],
@@ -29,14 +41,8 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         self.content = content
     }
     
-    private var columnItems: [[Item]] {
-        var result = Array(repeating: [Item](), count: columns)
-        for (index, item) in items.enumerated() {
-            result[index % columns].append(item)
-        }
-        return result
-    }
-    
+    //MARK: - Main Body
+
     public var body: some View {
         HStack(alignment: .top, spacing: horizontalSpacing) {
             ForEach(0..<columns, id: \.self) { columnIndex in

@@ -113,7 +113,7 @@ private extension NekiSheet {
 }
 
 
-// MARK: - NekiSheet + ViewModifier
+// MARK: - NekiSheet + Accessor
 
 public extension View {
     /// 뷰 계층에 NekiSheet를 추가합니다.

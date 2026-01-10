@@ -24,10 +24,14 @@ public struct NekiSheet<Content: View>: View {
                 
                 content()
             }
-            .frame(width: proxy.size.width, height: layout.maxHeight, alignment: .top)
+            .frame(width: proxy.size.width, height: layout.maxHeight)
             .background(configuration.backgroundColor)
             .clipShape(PresentationCornerShape(radius: configuration.cornerRadius, corners: [.topLeft, .topRight]))
-            .shadow(color: configuration.shadowColor, radius: configuration.shadowRadius)
+            .shadow(
+                color: selection == .hidden ? .clear : configuration.shadowColor,
+                radius: selection == .hidden ? .zero : configuration.shadowRadius
+            )
+            .padding(.bottom, selection == .hidden ? 0 : configuration.bottomInset)
             .frame(height: proxy.size.height, alignment: .bottom)
             .offset(y: max(.zero, layout.dragOffset))
             .gesture(
@@ -40,19 +44,25 @@ public struct NekiSheet<Content: View>: View {
                         translation = value.translation.height
                     }
                     .onEnded { value in
+                        let inset = configuration.bottomInset
                         let predictedHeight = layout.currentHeight - value.translation.height
-                        let closestHeight = layout.sortedHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
+                        let interactiveDetents = configuration.detents.filter { $0 != .hidden }
+                        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxy.size.height, inset: inset) }
+                        let closestHeight = interactiveHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
                         
-                        guard let newDetent = configuration.detents.first(where: { $0.resolve(in: proxy.size.height) == closestHeight }) else {
+                        guard let newDetent = interactiveDetents.first(where: { abs($0.resolve(in: proxy.size.height, inset: inset) - closestHeight) < 1.0 }) else {
                             return withAnimation(configuration.animation) { translation = .zero }
                         }
+                        
                         withAnimation(configuration.animation) {
                             selection = newDetent
                             translation = .zero
                         }
                     }
             )
+            .allowsHitTesting(selection != .hidden)
         }
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 }
 
@@ -95,11 +105,11 @@ private extension NekiSheet {
 
 private extension NekiSheet {
     func layout(in totalHeight: CGFloat) -> SheetLayout {
-        let sortedHeights = configuration.detents.map { $0.resolve(in: totalHeight) }.sorted()
-        let targetHeight = selection.resolve(in: totalHeight)
+        let inset = configuration.bottomInset
+        let sortedHeights = configuration.detents.map { $0.resolve(in: totalHeight, inset: inset) }.sorted()
+        let targetHeight = selection.resolve(in: totalHeight, inset: inset)
         let currentHeight = sortedHeights.min(by: { abs($0 - targetHeight) < abs($1 - targetHeight) }) ?? targetHeight
         let maxHeight = sortedHeights.last ?? totalHeight
-        
         let baseOffset = maxHeight - currentHeight
         let dragOffset = baseOffset + translation
         
@@ -131,15 +141,26 @@ public extension View {
         }
     }
     
-    func nekiSheetDetents(_ detents: Set<NekiSheetDetent>) -> some View {
-        transformEnvironment(\.sheetConfiguration) { $0.detents = detents }
+    /// 시트 하단에 여백을 추가합니다.
+    ///
+    /// - Parameter height: 띄울 높이 (기본값: 현재 디바이스의 탭바 높이)
+    func nekiSheetBottomInset(_ height: CGFloat = .screenTabBarHeight) -> some View {
+        transformEnvironment(\.sheetConfiguration) { $0.bottomInset = height }
     }
-    
-    func nekiSheetCornerRadius(_ radius: CGFloat) -> some View {
-        transformEnvironment(\.sheetConfiguration) { $0.cornerRadius = radius }
-    }
-    
-    func nekiSheetBackgroundColor(_ color: Color) -> some View {
-        transformEnvironment(\.sheetConfiguration) { $0.backgroundColor = color }
+}
+
+
+// MARK: - CGFloat + TabBar Height
+
+public extension CGFloat {
+    /// 현재 디바이스 기준 탭바의 총 높이 (표준 높이 49 + 하단 Safe Area)
+    static var screenTabBarHeight: CGFloat {
+        let window = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
+        
+        // 탭바 순수 높이(49) + 하단 Safe Area
+        return 49 + (window?.safeAreaInsets.bottom ?? 0)
     }
 }

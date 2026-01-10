@@ -35,7 +35,7 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         @ViewBuilder content: @escaping (Item) -> ItemView
     ) {
         self.items = items
-        self.columns = columns
+        self.columns = max(1, columns)
         self.horizontalSpacing = horizontalSpacing
         self.verticalSpacing = verticalSpacing
         self.content = content

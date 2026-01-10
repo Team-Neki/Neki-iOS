@@ -15,63 +15,26 @@ public struct PhotoBoothClient {
 }
 
 
-// MARK: - PhotoBoothClient + Logic Implementation
-
-extension PhotoBoothClient {
-    static func liveImplementation(bounds: GeographicBoundingBox) async throws -> [PhotoBooth] {
-        // TODO: 추후 Repository 및 서버 연결하여 실질 코드로 변경해야 합니다.
-        // 1. 네트워크 지연 시나리오를 모방함 (0.5 ~ 1.5초)
-        try await Task.sleep(nanoseconds: UInt64(Double.random(in: 0.5...1.5) * 1_000_000_000))
-        
-        // 2. 랜덤 데이터 생성 설정
-        let count = Int.random(in: 20...50) // 20~50개 가짜 POI 생성
-        var mockData: [PhotoBooth] = []
-        
-        // 3. 요청된 범위(Bounds) 내에서 랜덤 좌표 생성
-        for i in 0..<count {
-            let randomLatitude = Double.random(in: bounds.minLatitude...bounds.maxLatitude)
-            let randomLongitude = Double.random(in: bounds.minLongitude...bounds.maxLongitude)
-            
-            // 랜덤 브랜드 선택
-            let randomBrand = PhotoBoothBrand.allCases.randomElement() ?? .unknown
-            
-            let booth = PhotoBooth(
-                id: UUID(),
-                brand: randomBrand,
-                name: "\(randomBrand.displayName) 강남 \(i)호점",
-                coordinate: GeographicCoordinate(latitude: randomLatitude, longitude: randomLongitude),
-                address: "서울특별시 강남구 테헤란로 \(Int.random(in: 100...999))",
-                detailInformationURL: URL(string: "https://map.kakao.com")
-            )
-            
-            mockData.append(booth)
-        }
-        
-        return mockData
-    }
-    
-    static func previewImplementation(bounds: GeographicBoundingBox) async throws -> [PhotoBooth] {
-        [
-            PhotoBooth(
-                id: UUID(),
-                brand: .photogray,
-                name: "강남 1호점",
-                coordinate: .init(latitude: 37.498095, longitude: 127.027610),
-                address: "서울특별시 강남구 역삼동 821-1"
-            )
-        ]
-    }
-}
-
-
 // MARK: - PhotoBoothClient + DependencyKey
 
 extension PhotoBoothClient: DependencyKey {
-    public static let liveValue = Self(fetchPhotoBooths: liveImplementation)
+    public static let liveValue = Self { bounds in
+        try await Task.sleep(nanoseconds: 500_000_000)
+        
+        let filteredBooths = fixedMockBooths.filter { booth in
+            bounds.contains(booth.coordinate)
+        }
+        
+        return filteredBooths
+    }
     
     public static let testValue = Self()
     
-    public static let previewValue = Self(fetchPhotoBooths: previewImplementation)
+    public static let previewValue = Self { bounds in
+        return fixedMockBooths.filter { booth in
+            bounds.contains(booth.coordinate)
+        }
+    }
 }
 
 
@@ -82,4 +45,19 @@ public extension DependencyValues {
         get { self[PhotoBoothClient.self] }
         set { self[PhotoBoothClient.self] = newValue }
     }
+}
+
+
+// MARK: - PhotoBoothClient + Mock
+
+extension PhotoBoothClient {
+    private static let fixedMockBooths: [PhotoBooth] = [
+        .init(id: UUID(), brand: .life4cut, name: "인생네컷 강남점", coordinate: .init(latitude: 37.4981, longitude: 127.0276), address: "서울 강남구 1"),
+        .init(id: UUID(), brand: .harufilm, name: "하루필름 역삼점", coordinate: .init(latitude: 37.4991, longitude: 127.0286), address: "서울 강남구 2"),
+        .init(id: UUID(), brand: .photoism, name: "포토이즘 강남CGV점", coordinate: .init(latitude: 37.5015, longitude: 127.0260), address: "서울 강남구 3"),
+        .init(id: UUID(), brand: .photogray, name: "포토그레이 신논현점", coordinate: .init(latitude: 37.5038, longitude: 127.0241), address: "서울 강남구 4"),
+        .init(id: UUID(), brand: .planBStudio, name: "플랜비 강남역점", coordinate: .init(latitude: 37.4970, longitude: 127.0250), address: "서울 강남구 5"),
+        .init(id: UUID(), brand: .life4cut, name: "인생네컷 서초점", coordinate: .init(latitude: 37.4950, longitude: 127.0290), address: "서울 서초구 1"),
+        .init(id: UUID(), brand: .photosignature, name: "포토시그니처 뱅뱅사거리점", coordinate: .init(latitude: 37.4890, longitude: 127.0300), address: "서울 강남구 6")
+    ]
 }

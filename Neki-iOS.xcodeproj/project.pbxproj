@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 592F2C5D2F0508FE00802BB7 /* ComposableArchitecture */; };
+		592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */ = {isa = PBXBuildFile; productRef = 592F345B2F0E1F1700802BB7 /* NMapsMap */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -37,13 +38,10 @@
 		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				APP/Sources/Resources/.gitkeep,
 				Core/Sources/Coordinator/Sources/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/Feature/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/View/.gitkeep,
 				Features/Map/Sources/Data/Sources/.gitkeep,
-				Features/Map/Sources/Presentation/Sources/Feature/.gitkeep,
-				Features/Map/Sources/Presentation/Sources/View/.gitkeep,
 				Info.plist,
 			);
 			target = 6C4998DC2EF7EF62006BE1DB /* Neki-iOS */;
@@ -67,6 +65,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */,
+				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -126,6 +125,7 @@
 			name = "Neki-iOS";
 			packageProductDependencies = (
 				592F2C5D2F0508FE00802BB7 /* ComposableArchitecture */,
+				592F345B2F0E1F1700802BB7 /* NMapsMap */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -206,6 +206,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				592F2C5C2F0508FE00802BB7 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
+				592F345A2F0E1F1700802BB7 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6C4998DE2EF7EF62006BE1DB /* Products */;
@@ -404,12 +405,17 @@
 		};
 		6C4998FF2EF7EF64006BE1DB /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/DefaultConfiguration.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = P85DW78LYM;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
@@ -426,6 +432,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = debug_neki;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -442,12 +450,17 @@
 		};
 		6C4999002EF7EF64006BE1DB /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/DefaultConfiguration.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = P85DW78LYM;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
@@ -464,6 +477,8 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = release_neki;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -617,6 +632,14 @@
 				minimumVersion = 1.23.1;
 			};
 		};
+		592F345A2F0E1F1700802BB7 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/navermaps/SPM-NMapsMap";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 3.23.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -624,6 +647,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 592F2C5C2F0508FE00802BB7 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */;
 			productName = ComposableArchitecture;
+		};
+		592F345B2F0E1F1700802BB7 /* NMapsMap */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 592F345A2F0E1F1700802BB7 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */;
+			productName = NMapsMap;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

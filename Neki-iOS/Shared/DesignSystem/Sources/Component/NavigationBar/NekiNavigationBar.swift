@@ -7,11 +7,11 @@
 
 import SwiftUI
 
-struct NekiNavigationBar: View {
+public struct NekiNavigationBar: View {
     
     // MARK: - Enums
     
-    enum LeftItem {
+    public enum LeftItem {
         case none
         case back(action: () -> Void)
         case close(action: () -> Void)
@@ -19,12 +19,12 @@ struct NekiNavigationBar: View {
         case icon(UIImage, action: (() -> Void)?)
     }
     
-    enum CenterItem {
+    public enum CenterItem {
         case none
         case text(String)
     }
     
-    enum RightItem {
+    public enum RightItem {
         case none
         case text(String, action: () -> Void)
         case icon(UIImage, action: () -> Void)
@@ -39,7 +39,7 @@ struct NekiNavigationBar: View {
         
     // MARK: - Body
     
-    var body: some View {
+    public var body: some View {
         ZStack(alignment: .center) {
             HStack(alignment: .center, spacing: 0) {
                 leftView

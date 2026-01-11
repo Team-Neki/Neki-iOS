@@ -7,33 +7,45 @@
 
 import SwiftUI
 
-public struct NekiSheet<Content: View>: View {
+public struct NekiSheet<Content: View, Controllers: View>: View {
     @Environment(\.sheetConfiguration) private var configuration
     @Binding var selection: NekiSheetDetent
     @State private var translation: CGFloat = .zero
     @State private var scrollOffset: CGFloat = .zero
+    @State private var controllerHeight: CGFloat = .zero
     
+    let controllers: () -> Controllers
     let content: () -> Content
+    
+    private let defaultSpacing: CGFloat = 20
+    
+    var isControllersVisible: Bool { selection == MapFeature.SheetStage.first.detent || selection == MapFeature.SheetStage.second.detent }
     
     public var body: some View {
         GeometryReader { proxy in
             let layout = layout(in: proxy.size.height)
             
-            VStack(spacing: .zero) {
-                indicator
+            VStack(spacing: defaultSpacing) {
+                if isControllersVisible {
+                    controllers()
+                        .measureHeight { controllerHeight = $0 }
+                }
                 
-                content()
+                VStack(spacing: .zero) {
+                    indicator
+                    content()
+                }
+                .background(configuration.backgroundColor)
+                .clipShape(PresentationCornerShape(radius: configuration.cornerRadius, corners: [.topLeft, .topRight]))
             }
             .frame(width: proxy.size.width, height: layout.maxHeight)
-            .background(configuration.backgroundColor)
-            .clipShape(PresentationCornerShape(radius: configuration.cornerRadius, corners: [.topLeft, .topRight]))
             .shadow(
                 color: selection == .hidden ? .clear : configuration.shadowColor,
                 radius: selection == .hidden ? .zero : configuration.shadowRadius
             )
             .padding(.bottom, selection == .hidden ? 0 : configuration.bottomInset)
             .frame(height: proxy.size.height, alignment: .bottom)
-            .offset(y: max(.zero, layout.dragOffset))
+            .offset(y: max(.zero, layout.dragOffset - (isControllersVisible ? (controllerHeight + defaultSpacing) : .zero)))
             .gesture(
                 DragGesture()
                     .onChanged { value in
@@ -131,13 +143,14 @@ public extension View {
     /// - Parameters:
     ///     - selection: 시트 높이 상태 바인딩
     ///     - content: 시트 내부 컨텐츠
-    func nekiSheet<Content: View>(
+    func nekiSheet<Content: View, Controllers: View>(
         selection: Binding<NekiSheetDetent>,
-        @ViewBuilder content: @escaping () -> Content
+        @ViewBuilder content: @escaping () -> Content,
+        @ViewBuilder controllers: @escaping () -> Controllers
     ) -> some View {
         ZStack {
             self
-            NekiSheet(selection: selection, content: content)
+            NekiSheet(selection: selection, controllers: controllers, content: content)
         }
     }
     
@@ -146,6 +159,19 @@ public extension View {
     /// - Parameter height: 띄울 높이 (기본값: 현재 디바이스의 탭바 높이)
     func nekiSheetBottomInset(_ height: CGFloat = .screenTabBarHeight) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.bottomInset = height }
+    }
+    
+    /// 뷰 영역의 높이를 확인합니다.
+    func measureHeight(perform action: @escaping (CGFloat) -> Void) -> some View {
+        self.background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { action(proxy.size.height) }
+                    .onChange(of: proxy.size.height) { _, newValue in
+                        action(newValue)
+                    }
+            }
+        )
     }
 }
 

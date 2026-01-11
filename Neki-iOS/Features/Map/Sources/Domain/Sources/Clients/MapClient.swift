@@ -132,6 +132,12 @@ extension MapClient: DependencyKey {
                     sharedDelegate.authStatusContinuation = continuation
                     continuation.yield(sharedDelegate.locationManager.authorizationStatus)
                 }
+                
+                continuation.onTermination = { _ in
+                    Task { @MainActor in
+                        sharedDelegate.authStatusContinuation = nil
+                    }
+                }
             }
         } requestLocationAuthorization: {
             await Task { @MainActor in
@@ -140,7 +146,15 @@ extension MapClient: DependencyKey {
         } checkSDKAuthorizationStatus: {
             AsyncStream { continuation in
                 Task { @MainActor in
+                    guard case .authorized = NMFAuthManager.shared().authState else { continuation.yield(false); return }
                     sharedDelegate.sdkAuthStatusContinuation = continuation
+                    continuation.yield(true)
+                }
+                
+                continuation.onTermination = { _ in
+                    Task { @MainActor in
+                        sharedDelegate.sdkAuthStatusContinuation = nil
+                    }
                 }
             }
         } getCurrentLocation: {

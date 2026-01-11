@@ -27,7 +27,7 @@ public struct MapFeature {
     
     @ObservableState
     public struct State {
-        var isSDKAuthSuccessful: Bool = true
+        var isSDKAuthSuccessful: Bool = false
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
         var isUserTrackingMode: Bool = false
@@ -75,7 +75,6 @@ public struct MapFeature {
     
     private enum CancelID {
         case photoBoothFetch
-        case tapMarker
     }
     
     @Dependency(\.mapClient) private var mapClient

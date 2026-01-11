@@ -146,9 +146,13 @@ extension MapClient: DependencyKey {
         } checkSDKAuthorizationStatus: {
             AsyncStream { continuation in
                 Task { @MainActor in
-                    guard case .authorized = NMFAuthManager.shared().authState else { continuation.yield(false); return }
                     sharedDelegate.sdkAuthStatusContinuation = continuation
-                    continuation.yield(true)
+                    if case .authorized = NMFAuthManager.shared().authState {
+                        continuation.yield(true)
+                    } else {
+                        continuation.yield(false)
+                        continuation.finish()
+                    }
                 }
                 
                 continuation.onTermination = { _ in

@@ -35,9 +35,13 @@ public struct MapFeature {
         
         var detent: NekiSheetDetent = SheetStage.first.detent
         var selectedBooth: PhotoBooth?
-        var isSheetPresented: Bool { selectedBooth == nil }
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        
+        var isDirectionOnCenter: Bool {
+            guard let coordinate = userLocation?.coordinate, let cameraPosition = cameraPosition else { return false }
+            return cameraPosition == GeographicCoordinate(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        }
         
         var photoBoothListState = PhotoBoothListFeature.State()
     }
@@ -69,6 +73,7 @@ public struct MapFeature {
     
     private enum CancelID {
         case photoBoothFetch
+        case tapMarker
     }
     
     @Dependency(\.mapClient) private var mapClient
@@ -113,15 +118,15 @@ public struct MapFeature {
                 
             case .didTapGoBackToMapButton:
                 resetToMapMode(&state, for: .first)
-                return .none.animation()
+                return .none
                 
             case .didTapBooth(let photoBooth):
                 selectPhotoBooth(&state, photoBooth: photoBooth)
-                return .none.animation()
+                return .none
                 
             case .didTapCloseDetail:
                 resetToMapMode(&state, for: .second)
-                return .none.animation()
+                return .none
                 
             case .didTapCurrentLocationButton:
                 // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
@@ -205,11 +210,13 @@ private extension MapFeature {
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {
         state.selectedBooth = nil
         state.detent = stage.detent
+        state.cameraPosition = nil
     }
     
     func selectPhotoBooth(_ state: inout State, photoBooth: PhotoBooth) {
         state.selectedBooth = photoBooth
         state.detent = SheetStage.photoBoothSelected.detent
+        state.cameraPosition = photoBooth.coordinate
     }
     
     func handleFilterOptionChanged(_ state: inout State) {

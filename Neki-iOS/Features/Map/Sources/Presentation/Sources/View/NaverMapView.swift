@@ -36,6 +36,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
     }
     
     @Bindable var store: StoreOf<MapFeature>
+    @State private var lastCameraPosition: GeographicCoordinate?
     let isLocationAuthorized: Bool
     
     func makeCoordinator() -> Coordinator {
@@ -53,10 +54,13 @@ struct NaverMapRepresentable: UIViewRepresentable {
         view.showIndoorLevelPicker = false
         view.mapView.minZoomLevel = 5.0
         view.mapView.maxZoomLevel = 18.0
+        view.mapView.mapType = .basic
         
         // 초기 카메라 이동
         let startPosition = store.cameraPosition.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) } ?? Constants.defaultInitialPosition
         let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition)
+        cameraUpdate.animation = .fly
+        cameraUpdate.animationDuration = 0.3
         view.mapView.moveCamera(cameraUpdate)
         
         // 델리게이트 연결
@@ -71,11 +75,13 @@ struct NaverMapRepresentable: UIViewRepresentable {
         uiView.mapView.positionMode = isLocationAuthorized ? .normal : .disabled
         
         // State 변경 시 카메라 이동
-        if let cameraPosition = store.cameraPosition {
+        if let cameraPosition = store.cameraPosition, cameraPosition != lastCameraPosition {
             let nmapCameraPosition = NMGLatLng(lat: cameraPosition.latitude, lng: cameraPosition.longitude)
             let cameraUpdate = NMFCameraUpdate(scrollTo: nmapCameraPosition)
             cameraUpdate.animation = .linear
+            cameraUpdate.animationDuration = 0.3
             uiView.mapView.moveCamera(cameraUpdate)
+            lastCameraPosition = cameraPosition
         }
         
         // 마커 업데이트
@@ -84,6 +90,9 @@ struct NaverMapRepresentable: UIViewRepresentable {
             photoBooths: store.visiblePhotoBooths,
             selectedBoothID: store.selectedBooth?.id
         )
+        
+        let sheetHeight = store.detent.resolve(in: UIScreen.main.bounds.height, inset: .screenTabBarHeight)
+        uiView.mapView.contentInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
     }
 }
 
@@ -219,7 +228,7 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
 
 extension NaverMapRepresentable.Coordinator: NMFMapViewTouchDelegate {
     func mapView(_ mapView: NMFMapView, didTapMap latlng: NMGLatLng, point: CGPoint) {
-        parent.store.send(.didTapCloseDetail)
+        return withAnimation { parent.store.send(.didTapCloseDetail) }
     }
 }
 
@@ -231,19 +240,30 @@ public struct NaverMapView: View {
     }
     
     public var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             mapLayer
+            
+            if let selectedBooth = store.selectedBooth {
+                detailCardLayer(selectedBooth)
+            }
+            
+            permissionLayer
         }
         .onAppear { store.send(.onAppear) }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
+                .scrollDisabled(store.detent != .large)
+        } controllers: {
+            mapControllers
         }
         .nekiSheetBottomInset()
         .overlay(alignment: .bottom) {
             if case .large = store.detent {
-                ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton) }.safeAreaPadding()
+                ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton, animation: .default) }.safeAreaPadding()
             }
         }
+        .animation(.easeInOut, value: store.detent)
+        .animation(.easeInOut, value: store.selectedBooth?.id)
     }
 }
 
@@ -283,6 +303,77 @@ private extension NaverMapView {
                 Text("설정 앱으로 이동")
             }
         }
+    }
+    
+    func detailCardLayer(_ photoBooth: PhotoBooth) -> some View {
+        VStack {
+            mapControllers
+            
+            HStack(spacing: 16) {
+                Image(photoBooth.brand.logoImageResource)
+                    .resizable()
+                    .frame(width: 64, height: 64)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 4) {
+                        Text("인생네컷") // TODO: 실제 지점 정보를 표시해야 합니다.
+                            .nekiFont(.title20SemiBold)
+                            .foregroundStyle(.gray900)
+                        
+                        Text("사당역점") // TODO: 실제 지점 정보를 표시해야 합니다.
+                            .nekiFont(.body14Medium)
+                            .foregroundStyle(.gray600)
+                    }
+                    
+                    Text("300m") // TODO: 실제 거리 값을 표시해야 합니다
+                        .nekiFont(.body14Medium)
+                        .foregroundStyle(.gray400)
+                }
+                
+                Spacer()
+                
+                Button {
+                    
+                } label: {
+                    Image(.iconDirections)
+                }
+            }
+            .padding(16)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .shadow(color: .gray400, radius: 8, y: 4)
+            .padding([.horizontal, .bottom])
+        }
+        .transition(.move(edge: .bottom))
+    }
+    
+    var mapControllers: some View {
+        HStack {
+            Button {
+                store.send(.didTapCurrentLocationButton)
+            } label: {
+                Image(store.isDirectionOnCenter ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
+                    .padding(8)
+                    .background(.white)
+                    .clipShape(.circle)
+            }
+            
+            Spacer()
+            
+            if store.selectedBooth != nil {
+                Button {
+                    store.send(.didTapCloseDetail, animation: .default)
+                } label: {
+                    Image(.iconXmarkBlack)
+                        .padding(8)
+                        .background(.white)
+                        .clipShape(.circle)
+                }
+            }
+        }
+        .padding(.horizontal, 20)
+        .shadow(color: .gray400, radius: 8, y: 4)
     }
 }
 

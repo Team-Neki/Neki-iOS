@@ -98,7 +98,13 @@ struct NaverMapRepresentable: UIViewRepresentable {
         )
         
         let sheetHeight = store.detent.resolve(in: UIScreen.main.bounds.height, inset: .screenTabBarHeight)
-        uiView.mapView.contentInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
+        let targetInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
+        if uiView.mapView.contentInset != targetInset {
+            UIView.animate(withDuration: 0.3, delay: .zero) {
+                uiView.mapView.contentInset = targetInset
+                uiView.layoutIfNeeded()
+            }
+        }
     }
 }
 

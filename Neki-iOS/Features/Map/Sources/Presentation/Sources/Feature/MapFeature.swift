@@ -28,8 +28,9 @@ public struct MapFeature {
     @ObservableState
     public struct State {
         var isSDKAuthSuccessful: Bool = true
-        var isLocationAuthorized: Bool = false
+        var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
+        var isUserTrackingMode: Bool = false
         var cameraPosition: GeographicCoordinate?
         var currentBounds: GeographicBoundingBox?
         
@@ -38,10 +39,7 @@ public struct MapFeature {
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
         
-        var isDirectionOnCenter: Bool {
-            guard let coordinate = userLocation?.coordinate, let cameraPosition = cameraPosition else { return false }
-            return cameraPosition == GeographicCoordinate(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        }
+        var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
         
         var photoBoothListState = PhotoBoothListFeature.State()
     }
@@ -59,7 +57,8 @@ public struct MapFeature {
         // Internal Actions
         case updateLocationAuthorization(CLAuthorizationStatus)
         case updateSDKAuthStatus(Bool)
-        case updateUserLocation(CLLocation)
+        case updateUserLocation(Result<CLLocation, Error>)
+        case didDetectMapInteraction
         case fetchPhotoBoothInBounds(Result<[PhotoBooth], Error>)
         case cameraMotionStarted
         case cameraMotionEnded(GeographicBoundingBox)
@@ -101,8 +100,8 @@ public struct MapFeature {
                     },
                     .run { _ in await mapClient.requestLocationAuthorization() },
                     .run { send in
-                        for await currentLocation in await mapClient.userLocation() {
-                            await send(.updateUserLocation(currentLocation))
+                        for await location in await mapClient.trackingLocation() {
+                            await send(.updateUserLocation(.success(location)))
                         }
                     }
                 )
@@ -111,6 +110,7 @@ public struct MapFeature {
                 return .run { _ in await mapClient.requestLocationAuthorization() }
                 
             case .openAppSettings:
+                // TODO: 설정 앱 동작 전에 안내문구 따위를 보여주도록 해야하는데 디자인 가이드가 없습니다.
                 return .run { _ in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)
@@ -121,6 +121,7 @@ public struct MapFeature {
                 return .none
                 
             case .didTapBooth(let photoBooth):
+                state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 return .none
                 
@@ -130,19 +131,76 @@ public struct MapFeature {
                 
             case .didTapCurrentLocationButton:
                 // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
-                guard let location = state.userLocation else { return .send(.requestPermission) }
-                state.cameraPosition = .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
-                return .none
+                state.isUserTrackingMode = true
+                
+                switch state.locationAuthorizationStatus {
+                case .authorizedAlways, .authorizedWhenInUse:
+                    return .run { send in
+                        print("현위치 정보 요청")
+                        do {
+                            let location = try await mapClient.getCurrentLocation()
+                            print("위치 정보 확보")
+                            await send(.updateUserLocation(.success(location)))
+                        } catch {
+                            print("현재 위치 정보를 가져오지 못했습니다. \(error)")
+                            await send(.updateUserLocation(.failure(error)))
+                        }
+                    }
+                    
+                case .notDetermined:
+                    return .send(.requestPermission)
+                    
+                case .denied, .restricted:
+                    return .send(.openAppSettings)
+                    
+                @unknown default:
+                    return .none
+                }
+                
+                return .run { send in
+                    do {
+                        let location = try await mapClient.getCurrentLocation()
+                        await send(.updateUserLocation(.success(location)))
+                    } catch {
+                        await send(.updateUserLocation(.failure(error)))
+                    }
+                }
                 
             case .updateLocationAuthorization(let status):
-                return updateLocationAuthorization(&state, status: status)
+                state.locationAuthorizationStatus = status
+                switch status {
+                case .authorizedAlways, .authorizedWhenInUse:
+                    guard state.userLocation == nil else { return .none }
+                    return .send(.didTapCurrentLocationButton)
+                    
+                case .notDetermined:
+                    return .send(.requestPermission)
+                    
+                default:
+                    return .none
+                }
                 
             case .updateSDKAuthStatus(let isAuthorized):
                 state.isSDKAuthSuccessful = isAuthorized
                 return .none
                 
-            case let .updateUserLocation(currentLocation):
-                state.userLocation = currentLocation
+            case let .updateUserLocation(result):
+                switch result {
+                case let .success(location):
+                    state.userLocation = location
+                    
+                    guard state.isUserTrackingMode else { return .none }
+                    updateCameraPosition(&state, to: .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude))
+                    return .none
+                    
+                case let .failure(error):
+                    // TODO: 에러 핸들링 로직이나 로그 찍기
+                    print(error.localizedDescription)
+                    return .none
+                }
+                
+            case .didDetectMapInteraction:
+                state.isUserTrackingMode = false
                 return .none
                 
             case let .fetchPhotoBoothInBounds(.success(photoBooths)):
@@ -190,22 +248,6 @@ public struct MapFeature {
 // MARK: - MapFeature + Effect Handlers
 
 private extension MapFeature {
-    func updateLocationAuthorization(_ state: inout State, status: CLAuthorizationStatus) -> Effect<Action> {
-        switch status {
-        case .authorizedAlways, .authorizedWhenInUse:
-            state.isLocationAuthorized = true
-            return .none
-            
-        case .notDetermined:
-            state.isLocationAuthorized = false
-            return .send(.requestPermission)
-            
-        default:
-            state.isLocationAuthorized = false
-            return .none
-        }
-    }
-    
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {
         state.selectedBooth = nil
         state.detent = stage.detent
@@ -227,5 +269,9 @@ private extension MapFeature {
         }
         
         state.photoBoothListState.photoBooths = state.visiblePhotoBooths
+    }
+    
+    func updateCameraPosition(_ state: inout State, to location: GeographicCoordinate) {
+        state.cameraPosition = .init(latitude: location.latitude, longitude: location.longitude)
     }
 }

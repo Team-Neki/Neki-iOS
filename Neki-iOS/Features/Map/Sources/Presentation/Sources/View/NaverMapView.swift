@@ -71,7 +71,14 @@ struct NaverMapRepresentable: UIViewRepresentable {
     
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
         // 현위치 모드 업데이트
-        uiView.mapView.positionMode = isLocationAuthorized ? .normal : .disabled
+        if isLocationAuthorized {
+            let mode: NMFMyPositionMode = store.isUserTrackingMode ? .direction : .normal
+            
+            guard uiView.mapView.positionMode != mode else { return }
+            uiView.mapView.positionMode = mode
+        } else {
+            uiView.mapView.positionMode = .disabled
+        }
         
         // State 변경 시 카메라 이동
         if let cameraPosition = store.cameraPosition, cameraPosition != context.coordinator.lastCameraPosition {
@@ -215,6 +222,9 @@ private extension NaverMapRepresentable.Coordinator {
 
 extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     func mapView(_ mapView: NMFMapView, cameraWillChangeByReason reason: Int, animated: Bool) {
+        if reason == NMFMapChangedByGesture {
+            parent.store.send(.didDetectMapInteraction)
+        }
         parent.store.send(.cameraMotionStarted)
     }
     
@@ -354,7 +364,7 @@ private extension NaverMapView {
             Button {
                 store.send(.didTapCurrentLocationButton)
             } label: {
-                Image(store.isDirectionOnCenter ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
+                Image(store.isUserTrackingMode ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
                     .padding(8)
                     .background(.white)
                     .clipShape(.circle)

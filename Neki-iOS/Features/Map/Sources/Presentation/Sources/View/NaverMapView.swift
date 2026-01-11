@@ -301,7 +301,7 @@ private extension NaverMapView {
     
     @ViewBuilder
     var permissionLayer: some View {
-        if store.isLocationAuthorized && store.isSDKAuthSuccessful {
+        if store.isLocationAuthorized == false && store.isSDKAuthSuccessful {
             permissionDeniedLayer
         }
     }

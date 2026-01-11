@@ -98,7 +98,6 @@ public struct MapFeature {
                             await send(.updateSDKAuthStatus(isAuthorized))
                         }
                     },
-                    .run { _ in await mapClient.requestLocationAuthorization() },
                     .run { send in
                         for await location in await mapClient.trackingLocation() {
                             await send(.updateUserLocation(.success(location)))
@@ -133,13 +132,13 @@ public struct MapFeature {
                 switch state.locationAuthorizationStatus {
                 case .authorizedAlways, .authorizedWhenInUse:
                     // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
-                    state.isUserTrackingMode = true
-                    
                     return .run { send in
                         do {
                             let location = try await mapClient.getCurrentLocation()
+                            state.isUserTrackingMode = true
                             await send(.updateUserLocation(.success(location)))
                         } catch {
+                            state.isUserTrackingMode = false
                             await send(.updateUserLocation(.failure(error)))
                         }
                     }

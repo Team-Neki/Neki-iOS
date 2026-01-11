@@ -116,7 +116,7 @@ extension NaverMapRepresentable {
     final class Coordinator: NSObject {
         fileprivate typealias MarkerImageResources = NaverMapRepresentable.MarkerImageResources
         
-        @State var lastCameraPosition: GeographicCoordinate?
+        var lastCameraPosition: GeographicCoordinate?
         
         private var markers: [UUID: NMFMarker] = [:]
         private var updateTask: Task<Void, Never>?

@@ -39,7 +39,8 @@ public struct PhotoBoothListFeature {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .selectFilterOption(brand):
-                return toggleFilterOptionSelection(&state, brand: brand)
+                toggleFilterOptionSelection(&state, brand: brand)
+                return .none
                 
             case .showWarningAlert:
                 state.isWarningAlertPresented = true
@@ -64,12 +65,11 @@ public struct PhotoBoothListFeature {
 // MARK: - PhotoBoothListFeature + Effect Handlers
 
 private extension PhotoBoothListFeature {
-    func toggleFilterOptionSelection(_ state: inout State, brand: PhotoBoothBrand) -> Effect<Action> {
+    func toggleFilterOptionSelection(_ state: inout State, brand: PhotoBoothBrand) {
         if state.filteredBrands.contains(brand) {
             state.filteredBrands.remove(brand)
         } else {
             state.filteredBrands.insert(brand)
         }
-        return .none
     }
 }

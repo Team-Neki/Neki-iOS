@@ -18,7 +18,7 @@ struct FeedImageView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            KFImage(URL(string: item.imageUrl))
+            KFImage(item.imageURL)
                 .resizable()
                 .placeholder {
                     placeholderView

@@ -36,6 +36,14 @@ public struct NekiNavigationBar: View {
     let leftItem: LeftItem
     let centerItem: CenterItem
     let rightItem: RightItem
+    
+    // MARK: - init
+    
+    public init(leftItem: LeftItem, centerItem: CenterItem, rightItem: RightItem) {
+        self.leftItem = leftItem
+        self.centerItem = centerItem
+        self.rightItem = rightItem
+    }
         
     // MARK: - Body
     

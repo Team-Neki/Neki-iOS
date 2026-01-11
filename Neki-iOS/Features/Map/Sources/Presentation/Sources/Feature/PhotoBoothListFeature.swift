@@ -50,10 +50,6 @@ public struct PhotoBoothListFeature {
                 state.isWarningAlertPresented = false
                 return .none
                 
-            case .binding(\.isWarningAlertPresented):
-                state.isWarningAlertPresented.toggle()
-                return .none
-                
             default:
                 return .none
             }

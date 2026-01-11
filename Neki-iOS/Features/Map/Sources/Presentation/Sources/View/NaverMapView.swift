@@ -74,8 +74,9 @@ struct NaverMapRepresentable: UIViewRepresentable {
         if isLocationAuthorized {
             let mode: NMFMyPositionMode = store.isUserTrackingMode ? .direction : .normal
             
-            guard uiView.mapView.positionMode != mode else { return }
-            uiView.mapView.positionMode = mode
+            if uiView.mapView.positionMode != mode {
+                uiView.mapView.positionMode = mode
+            }
         } else {
             uiView.mapView.positionMode = .disabled
         }
@@ -307,7 +308,7 @@ private extension NaverMapView {
     }
     
     var errorLayer: some View {
-        ContentUnavailableView("지도 로드 실패", image: "excalmationmark.triangle", description: Text("네이버 지도 인증에 실패했습니다."))
+        ContentUnavailableView("지도 로드 실패", image: "exclamationmark.triangle", description: Text("네이버 지도 인증에 실패했습니다."))
     }
     
     var permissionDeniedLayer: some View {

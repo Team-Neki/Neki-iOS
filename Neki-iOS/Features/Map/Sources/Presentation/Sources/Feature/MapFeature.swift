@@ -177,8 +177,7 @@ public struct MapFeature {
                 return .none
                 
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
-                // TODO: 가까운순 목록 내 셀을 탭했을 때 상세정보 표시
-                return .none
+                return .send(.didTapBooth(photoBooth))
                 
             default:
                 return .none

@@ -18,7 +18,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
     fileprivate enum MarkerImageResources {
         static let harufilm = NMFOverlayImage(image: .imgHarufilmPin)
         static let life4cut = NMFOverlayImage(image: .imgLife4CutPin)
-        static let photogray = NMFOverlayImage(image: .imgPhotoismPin)
+        static let photogray = NMFOverlayImage(image: .imgPhotograyPin)
         static let photoism = NMFOverlayImage(image: .imgPhotoismPin)
         static let photosignature = NMFOverlayImage(image: .imgPhotosignaturePin)
         static let planBStudio = NMFOverlayImage(image: .imgPlanBStudioPin)

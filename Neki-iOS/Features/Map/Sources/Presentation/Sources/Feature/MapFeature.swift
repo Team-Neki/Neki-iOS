@@ -197,8 +197,7 @@ public struct MapFeature {
             case let .fetchPhotoBoothInBounds(.success(photoBooths)):
                 let photoBooths = IdentifiedArray(uniqueElements: photoBooths)
                 state.photoBooths = photoBooths
-                state.visiblePhotoBooths = photoBooths
-                state.photoBoothListState.photoBooths = photoBooths
+                handleFilterOptionChanged(&state)
                 return .none
                 
             case let .fetchPhotoBoothInBounds(.failure(error)):

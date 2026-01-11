@@ -130,40 +130,31 @@ public struct MapFeature {
                 return .none
                 
             case .didTapCurrentLocationButton:
-                // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
-                state.isUserTrackingMode = true
-                
                 switch state.locationAuthorizationStatus {
                 case .authorizedAlways, .authorizedWhenInUse:
+                    // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
+                    state.isUserTrackingMode = true
+                    
                     return .run { send in
-                        print("현위치 정보 요청")
                         do {
                             let location = try await mapClient.getCurrentLocation()
-                            print("위치 정보 확보")
                             await send(.updateUserLocation(.success(location)))
                         } catch {
-                            print("현재 위치 정보를 가져오지 못했습니다. \(error)")
                             await send(.updateUserLocation(.failure(error)))
                         }
                     }
                     
                 case .notDetermined:
+                    state.isUserTrackingMode = false
                     return .send(.requestPermission)
                     
                 case .denied, .restricted:
+                    state.isUserTrackingMode = false
                     return .send(.openAppSettings)
                     
                 @unknown default:
+                    state.isUserTrackingMode = false
                     return .none
-                }
-                
-                return .run { send in
-                    do {
-                        let location = try await mapClient.getCurrentLocation()
-                        await send(.updateUserLocation(.success(location)))
-                    } catch {
-                        await send(.updateUserLocation(.failure(error)))
-                    }
                 }
                 
             case .updateLocationAuthorization(let status):

@@ -1,5 +1,5 @@
 //
-//  NekiNavigationBar.swift
+//  NekiToolBar.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/10/26.
@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-public struct NekiNavigationBar: View {
+public struct NekiToolBar: View {
     
     // MARK: - Enums
     
@@ -36,15 +36,22 @@ public struct NekiNavigationBar: View {
     let leftItem: LeftItem
     let centerItem: CenterItem
     let rightItem: RightItem
+    let backgroundColor: Color
     
     // MARK: - init
     
-    public init(leftItem: LeftItem, centerItem: CenterItem, rightItem: RightItem) {
+    public init(
+        leftItem: LeftItem,
+        centerItem: CenterItem,
+        rightItem: RightItem,
+        backgroundColor: Color = .white
+    ) {
         self.leftItem = leftItem
         self.centerItem = centerItem
         self.rightItem = rightItem
+        self.backgroundColor = backgroundColor
     }
-        
+    
     // MARK: - Body
     
     public var body: some View {
@@ -59,7 +66,7 @@ public struct NekiNavigationBar: View {
             
             centerView
         }
-        .background(.white)
+        .background(backgroundColor)
         .frame(height: 54)
     }
     
@@ -68,7 +75,7 @@ public struct NekiNavigationBar: View {
 
 // MARK: - Subviews
 
-private extension NekiNavigationBar {
+private extension NekiToolBar {
     @ViewBuilder
     var leftView: some View {
         switch leftItem {
@@ -160,4 +167,3 @@ private extension NekiNavigationBar {
         }
     }
 }
-

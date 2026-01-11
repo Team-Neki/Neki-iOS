@@ -4,7 +4,7 @@
 <dict>
 	<key>NMFNcpKeyId</key>
 	<string>${NAVER_MAPS_CLIENT_ID}</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>${NSLocationWhenInUseUsageDescription}</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>

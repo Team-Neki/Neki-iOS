@@ -58,6 +58,7 @@ public struct MapFeature {
         case updateLocationAuthorization(CLAuthorizationStatus)
         case updateSDKAuthStatus(Bool)
         case updateUserLocation(Result<CLLocation, Error>)
+        case setUserTrackingMode(Bool)
         case didDetectMapInteraction
         case fetchPhotoBoothInBounds(Result<[PhotoBooth], Error>)
         case cameraMotionStarted
@@ -133,12 +134,13 @@ public struct MapFeature {
                 case .authorizedAlways, .authorizedWhenInUse:
                     // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
                     return .run { send in
+                        await send(.setUserTrackingMode(true))
+                        
                         do {
                             let location = try await mapClient.getCurrentLocation()
-                            state.isUserTrackingMode = true
                             await send(.updateUserLocation(.success(location)))
                         } catch {
-                            state.isUserTrackingMode = false
+                            await send(.setUserTrackingMode(false))
                             await send(.updateUserLocation(.failure(error)))
                         }
                     }
@@ -188,6 +190,10 @@ public struct MapFeature {
                     print(error.localizedDescription)
                     return .none
                 }
+                
+            case let .setUserTrackingMode(isUserTrackingMode):
+                state.isUserTrackingMode = isUserTrackingMode
+                return .none
                 
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false

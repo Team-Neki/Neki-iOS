@@ -36,7 +36,6 @@ struct NaverMapRepresentable: UIViewRepresentable {
     }
     
     @Bindable var store: StoreOf<MapFeature>
-    @State private var lastCameraPosition: GeographicCoordinate?
     let isLocationAuthorized: Bool
     
     func makeCoordinator() -> Coordinator {
@@ -75,13 +74,13 @@ struct NaverMapRepresentable: UIViewRepresentable {
         uiView.mapView.positionMode = isLocationAuthorized ? .normal : .disabled
         
         // State 변경 시 카메라 이동
-        if let cameraPosition = store.cameraPosition, cameraPosition != lastCameraPosition {
+        if let cameraPosition = store.cameraPosition, cameraPosition != context.coordinator.lastCameraPosition {
             let nmapCameraPosition = NMGLatLng(lat: cameraPosition.latitude, lng: cameraPosition.longitude)
             let cameraUpdate = NMFCameraUpdate(scrollTo: nmapCameraPosition)
             cameraUpdate.animation = .linear
             cameraUpdate.animationDuration = 0.3
             uiView.mapView.moveCamera(cameraUpdate)
-            lastCameraPosition = cameraPosition
+            context.coordinator.lastCameraPosition = cameraPosition
         }
         
         // 마커 업데이트
@@ -103,6 +102,8 @@ extension NaverMapRepresentable {
     @MainActor
     final class Coordinator: NSObject {
         fileprivate typealias MarkerImageResources = NaverMapRepresentable.MarkerImageResources
+        
+        @State var lastCameraPosition: GeographicCoordinate?
         
         private var markers: [UUID: NMFMarker] = [:]
         private var updateTask: Task<Void, Never>?

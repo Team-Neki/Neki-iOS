@@ -268,6 +268,9 @@ public struct NaverMapView: View {
             permissionLayer
         }
         .onAppear { store.send(.onAppear) }
+        .sheet(isPresented: $store.isDirectionSheetPresented) {
+            DirectionAppsSheet()
+        }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
                 .scrollDisabled(store.detent != .large)
@@ -311,6 +314,7 @@ private extension NaverMapView {
         ContentUnavailableView("지도 로드 실패", image: "exclamationmark.triangle", description: Text("네이버 지도 인증에 실패했습니다."))
     }
     
+    // TODO: 디자인 시안 나오면 작업
     var permissionDeniedLayer: some View {
         VStack {
             Text("위치 권한 확보 필요!!")
@@ -352,7 +356,7 @@ private extension NaverMapView {
                 Spacer()
                 
                 Button {
-                    
+                    store.send(.didTapDirectionAppsButton)
                 } label: {
                     Image(.iconDirections)
                 }

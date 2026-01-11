@@ -38,6 +38,7 @@ public struct MapFeature {
         var selectedBooth: PhotoBooth?
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var isDirectionSheetPresented: Bool = false
         
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
         
@@ -53,6 +54,7 @@ public struct MapFeature {
         case didTapBooth(PhotoBooth)
         case didTapCloseDetail
         case didTapCurrentLocationButton
+        case didTapDirectionAppsButton
         
         // Internal Actions
         case updateLocationAuthorization(CLAuthorizationStatus)
@@ -157,6 +159,10 @@ public struct MapFeature {
                     state.isUserTrackingMode = false
                     return .none
                 }
+                
+            case .didTapDirectionAppsButton:
+                state.isDirectionSheetPresented = true
+                return .none
                 
             case .updateLocationAuthorization(let status):
                 state.locationAuthorizationStatus = status

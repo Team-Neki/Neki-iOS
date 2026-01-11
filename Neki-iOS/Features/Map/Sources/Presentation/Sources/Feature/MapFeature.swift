@@ -40,6 +40,7 @@ public struct MapFeature {
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var isDirectionSheetPresented: Bool = false
         
+        var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
         
         var photoBoothListState = PhotoBoothListFeature.State()
@@ -48,6 +49,7 @@ public struct MapFeature {
     public enum Action: BindableAction {
         // View Actions
         case onAppear
+        case onDisappear
         case requestPermission
         case openAppSettings
         case didTapGoBackToMapButton
@@ -75,6 +77,9 @@ public struct MapFeature {
     
     private enum CancelID {
         case photoBoothFetch
+        case locationAuhorizationStream
+        case sdkAuthorizationStream
+        case locationStream
     }
     
     @Dependency(\.mapClient) private var mapClient
@@ -106,8 +111,20 @@ public struct MapFeature {
                         }
                     }
                 )
+                .cancellable(id: CancelID.locationAuthorizationStream, cancelInFlight: true)
+                .cancellable(id: CancelID.sdkAuthorizationStream, cancelInFlight: true)
+                .cancellable(id: CancelID.locationStream, cancelInFlight: true)
+                
+            case .onDisappear:
+                return .merge(
+                    .cancel(id: CancelID.locationAuthorizationStream),
+                    .cancel(id: CancelID.sdkAuthorizationStream),
+                    .cancel(id: CancelID.locationStream)
+                    .cancel(id: CancelID.photoBoothFetch)
+                )
                 
             case .requestPermission:
+                state.locationAuthorizationNeeded = true
                 return .run { _ in await mapClient.requestLocationAuthorization() }
                 
             case .openAppSettings:
@@ -171,6 +188,7 @@ public struct MapFeature {
                     return .send(.didTapCurrentLocationButton)
                     
                 case .notDetermined:
+                    guard state.locationAuthorizationNeeded == true else { return .none }
                     return .send(.requestPermission)
                     
                 default:

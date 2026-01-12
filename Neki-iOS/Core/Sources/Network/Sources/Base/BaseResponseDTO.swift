@@ -21,3 +21,9 @@ public struct BaseResponseDTO<T: Decodable>: Decodable {
 }
 
 public struct EmptyData: Decodable {}
+
+public struct BaseFailedResponseDTO: Decodable {
+    let status: Int
+    let message: String
+    let timestamp: String
+}

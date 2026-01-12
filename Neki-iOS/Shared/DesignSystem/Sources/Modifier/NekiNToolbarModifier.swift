@@ -16,6 +16,7 @@ struct NekiNToolbarModifier: ViewModifier {
             content
                 .overlay(alignment: .top) {
                     toolbar
+                        .zIndex(9)
                 }
         } else {
             content
@@ -38,6 +39,7 @@ extension View {
         isOverlay: Bool = false
     ) -> some View {
         self
+            .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .modifier(

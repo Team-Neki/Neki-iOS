@@ -7,18 +7,32 @@
 
 import Foundation
 
-public enum HeaderType {
-    case noneHeader
-    case accessTokenHeader
-    case refreshTokenHeader
+/// 인증 타입
+public enum AuthorizationType {
+    /// 별도의 인증이 필요하지 않은 경우
+    case none
+    /// Authorization-Bearer
+    case bearer
+    /// 토큰 재발급
+    ///
+    /// - Important: 토큰 재발급이라는 특수한 용도를 위한 설정입니다. 일반적인 요청에 사용하는 것은 권장하지 않습니다.
+    /// - Authors: SwainYun
+    case reissue
+}
+
+/// Content-Type 종류
+public enum HTTPContentType {
+    case json
+    case multipart(boundary: String)
 }
 
 public protocol Endpoint {
-    var headerType: HeaderType { get }
+    var authorizationType: AuthorizationType { get }
+    var contentType: HTTPContentType { get }
+    var baseURL: String { get }
     var path: String { get }
     var method: HTTPMethodType { get }
     var body: Encodable? { get }
-    var query: [URLQueryItem]? { get }
     
     func asURLRequest() throws -> URLRequest
 }
@@ -29,62 +43,37 @@ extension Endpoint {
         return encoder
     }
     
-    var baseURL: String {
-        guard let urlString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
-            fatalError("🚨Base URL을 찾을 수 없습니다🚨")
-        }
-        return urlString
-    }
-    
     public func asURLRequest() throws -> URLRequest {
-        guard let url = URL(string: baseURL)?.appending(path: path),
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
+        guard let url = URL(string: baseURL)?.appending(path: path) else {
             throw NetworkError.invalidURLError
         }
         
-        if let query = query {
-            components.queryItems = query
-        }
-        
-        guard let finalURL = components.url else {
-            throw NetworkError.invalidURLError
-        }
-        
-        var request = URLRequest(url: finalURL)
+        var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         
-        let allHeaders = makeHeaders()
-        request.allHTTPHeaderFields = allHeaders
+        switch contentType {
+        case .json:
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            
+        case .multipart(let boundary):
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        }
         
-        if let body = body {
-            do {
+        if let body {
+            switch contentType {
+            case .json:
                 request.httpBody = try Self.defaultEncoder.encode(body)
-            } catch {
-                throw NetworkError.requestEncodingError
+                
+            case .multipart(let boundary):
+                // TODO: MultipartBuilder 구현..
+                if let data = body as? Data {
+                    request.httpBody = data
+                } else {
+                    throw NetworkError.requestEncodingError
+                }
             }
         }
         
         return request
-    }
-    
-    
-    // TODO: - "Content-Type"외 다양한 헤더를 추가할 수 있도록 하기
-    func makeHeaders() -> [String: String] {
-        var headers: [String: String] = [
-            "Content-Type": "application/json"
-        ]
-        
-        switch headerType {
-        case .noneHeader:
-            break
-        case .accessTokenHeader:
-            // TODO: - 여기에 토큰 가져오는 로직 추가 (토큰매니저나 키체인매니저 등)
-            break
-        case .refreshTokenHeader:
-            // TODO: - 리프레시 토큰 로직 추가
-            break
-        }
-        
-        return headers
     }
 }

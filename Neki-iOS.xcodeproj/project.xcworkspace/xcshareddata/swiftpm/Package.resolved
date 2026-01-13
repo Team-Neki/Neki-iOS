@@ -1,5 +1,5 @@
 {
-  "originHash" : "3c4b611f981c72c157ae05aec9f60bac065ede586d3a2f32953db6a5fae5aba1",
+  "originHash" : "23666e5dbc3004a74abe5b8f404623bc762ba78ee9887f86cdbe1f3580fa9389",
   "pins" : [
     {
       "identity" : "combine-schedulers",
@@ -11,12 +11,21 @@
       }
     },
     {
-      "identity" : "kingfisher",
+      "identity" : "spm-nmapsgeometry",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/onevcat/Kingfisher.git",
+      "location" : "https://github.com/navermaps/SPM-NMapsGeometry.git",
       "state" : {
-        "revision" : "d30a5fad881137e2267f96a8e3fc35c58999bb94",
-        "version" : "8.6.2"
+        "revision" : "436d5e2e684f557faf5ef5862fd6633a42d7af11",
+        "version" : "1.0.2"
+      }
+    },
+    {
+      "identity" : "spm-nmapsmap",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/navermaps/SPM-NMapsMap",
+      "state" : {
+        "revision" : "fb4eef37db9904c0a0dcdf7a828c892e13782cfa",
+        "version" : "3.23.0"
       }
     },
     {

@@ -2,6 +2,16 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NMFNcpKeyId</key>
+	<string>${NAVER_MAPS_CLIENT_ID}</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>${NSLocationWhenInUseUsageDescription}</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>nmap</string>
+		<string>kakaomap</string>
+		<string>comgooglemaps</string>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Pretendard-Bold.otf</string>

@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 592F2C5D2F0508FE00802BB7 /* ComposableArchitecture */; };
 		592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */ = {isa = PBXBuildFile; productRef = 592F345B2F0E1F1700802BB7 /* NMapsMap */; };
+		59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 59D1D21A2F168EE800F50EB5 /* Kingfisher */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -38,6 +39,7 @@
 		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				APP/Sources/Resources/.gitkeep,
 				Core/Sources/Coordinator/Sources/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/Feature/.gitkeep,
 				Features/Archive/Sources/Presentation/Sources/View/.gitkeep,
@@ -64,6 +66,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */,
 				592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */,
 				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 			);
@@ -126,6 +129,7 @@
 			packageProductDependencies = (
 				592F2C5D2F0508FE00802BB7 /* ComposableArchitecture */,
 				592F345B2F0E1F1700802BB7 /* NMapsMap */,
+				59D1D21A2F168EE800F50EB5 /* Kingfisher */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -207,6 +211,7 @@
 			packageReferences = (
 				592F2C5C2F0508FE00802BB7 /* XCRemoteSwiftPackageReference "swift-composable-architecture" */,
 				592F345A2F0E1F1700802BB7 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */,
+				59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6C4998DE2EF7EF62006BE1DB /* Products */;
@@ -406,7 +411,7 @@
 		6C4998FF2EF7EF64006BE1DB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
-			baseConfigurationReferenceRelativePath = APP/Sources/Resources/DefaultConfiguration.xcconfig;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/AppSecret.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -451,7 +456,7 @@
 		6C4999002EF7EF64006BE1DB /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
-			baseConfigurationReferenceRelativePath = APP/Sources/Resources/DefaultConfiguration.xcconfig;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/AppSecret.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -640,6 +645,14 @@
 				minimumVersion = 3.23.0;
 			};
 		};
+		59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.6.2;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -652,6 +665,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 592F345A2F0E1F1700802BB7 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */;
 			productName = NMapsMap;
+		};
+		59D1D21A2F168EE800F50EB5 /* Kingfisher */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */;
+			productName = Kingfisher;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

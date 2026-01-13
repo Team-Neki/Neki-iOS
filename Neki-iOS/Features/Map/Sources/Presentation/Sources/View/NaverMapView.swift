@@ -268,8 +268,8 @@ public struct NaverMapView: View {
             permissionLayer
         }
         .onAppear { store.send(.onAppear) }
-        .sheet(isPresented: $store.isDirectionSheetPresented) {
-            DirectionAppsSheet()
+        .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
+            DirectionAppsSheet(photoBooth: photoBooth)
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))

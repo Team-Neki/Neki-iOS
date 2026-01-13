@@ -76,7 +76,7 @@ public struct MapFeature {
     
     private enum CancelID {
         case photoBoothFetch
-        case locationAuhorizationStream
+        case locationAuthorizationStream
         case sdkAuthorizationStream
         case locationStream
     }
@@ -98,27 +98,27 @@ public struct MapFeature {
                         for await status in await mapClient.locationAuthorizationStatus() {
                             await send(.updateLocationAuthorization(status))
                         }
-                    },
+                    }
+                        .cancellable(id: CancelID.locationAuthorizationStream, cancelInFlight: true),
                     .run { send in
                         for await isAuthorized in await mapClient.checkSDKAuthorizationStatus() {
                             await send(.updateSDKAuthStatus(isAuthorized))
                         }
-                    },
+                    }
+                        .cancellable(id: CancelID.sdkAuthorizationStream, cancelInFlight: true),
                     .run { send in
                         for await location in await mapClient.trackingLocation() {
                             await send(.updateUserLocation(.success(location)))
                         }
                     }
+                        .cancellable(id: CancelID.locationStream, cancelInFlight: true)
                 )
-                .cancellable(id: CancelID.locationAuthorizationStream, cancelInFlight: true)
-                .cancellable(id: CancelID.sdkAuthorizationStream, cancelInFlight: true)
-                .cancellable(id: CancelID.locationStream, cancelInFlight: true)
                 
             case .onDisappear:
                 return .merge(
                     .cancel(id: CancelID.locationAuthorizationStream),
                     .cancel(id: CancelID.sdkAuthorizationStream),
-                    .cancel(id: CancelID.locationStream)
+                    .cancel(id: CancelID.locationStream),
                     .cancel(id: CancelID.photoBoothFetch)
                 )
                 

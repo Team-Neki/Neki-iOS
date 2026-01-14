@@ -137,6 +137,7 @@ private extension DefaultNetworkProvider {
         }
         
         try await performTokenRefresh()
+        return try await processRequest(endpoint: endpoint, retryCount: retryCount - 1)
     }
     
     func performTokenRefresh() async throws {

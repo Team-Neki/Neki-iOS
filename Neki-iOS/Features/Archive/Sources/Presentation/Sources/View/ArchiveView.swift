@@ -27,8 +27,8 @@ struct ArchiveView: View {
             .padding(.bottom, 128)
         }
         .scrollIndicators(.never)
-        .onAppear {
-            store.send(.onAppear)
+        .task {
+            await store.send(.onAppear).finish()
         }
     }
 }

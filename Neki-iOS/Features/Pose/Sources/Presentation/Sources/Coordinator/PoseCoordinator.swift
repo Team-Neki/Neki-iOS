@@ -69,7 +69,9 @@ struct PoseCoordinator {
         }
         .forEach(\.path, action: \.path)
     }
-    
+}
+
+extension PoseCoordinator {
     @Reducer
     enum Path {
         case detail(PoseDetailFeature)

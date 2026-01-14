@@ -62,7 +62,9 @@ struct ArchiveCoordinator {
         }
         .forEach(\.path, action: \.path)
     }
-    
+}
+
+extension ArchiveCoordinator {
     @Reducer
     enum Path {
         case detail(ArchiveDetailFeature)

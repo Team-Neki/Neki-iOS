@@ -151,7 +151,6 @@ extension MapClient: DependencyKey {
                         continuation.yield(true)
                     } else {
                         continuation.yield(false)
-                        continuation.finish()
                     }
                 }
                 

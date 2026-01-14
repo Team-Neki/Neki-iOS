@@ -37,7 +37,7 @@ public struct MapFeature {
         var selectedBooth: PhotoBooth?
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
-        var isDirectionSheetPresented: Bool = false
+        var directionSheetPhotoBooth: PhotoBooth?
         
         var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
@@ -176,7 +176,7 @@ public struct MapFeature {
                 }
                 
             case .didTapDirectionAppsButton:
-                state.isDirectionSheetPresented = true
+                state.directionSheetPhotoBooth = state.selectedBooth
                 return .none
                 
             case .updateLocationAuthorization(let status):

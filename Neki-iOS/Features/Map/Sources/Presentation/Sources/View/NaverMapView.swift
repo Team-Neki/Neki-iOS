@@ -268,8 +268,8 @@ public struct NaverMapView: View {
             permissionLayer
         }
         .onAppear { store.send(.onAppear) }
-        .sheet(isPresented: $store.isDirectionSheetPresented) {
-            DirectionAppsSheet()
+        .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
+            DirectionAppsSheet(photoBooth: photoBooth)
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
@@ -293,14 +293,8 @@ public struct NaverMapView: View {
 
 private extension NaverMapView {
     var mapLayer: some View {
-        Group {
-            if store.isSDKAuthSuccessful {
-                NaverMapRepresentable(store: store, isLocationAuthorized: store.isLocationAuthorized)
-                    .ignoresSafeArea(.container, edges: .top)
-            } else {
-                errorLayer
-            }
-        }
+        NaverMapRepresentable(store: store, isLocationAuthorized: store.isLocationAuthorized)
+            .ignoresSafeArea(.container, edges: .top)
     }
     
     @ViewBuilder
@@ -308,10 +302,6 @@ private extension NaverMapView {
         if store.isLocationAuthorized == false && store.isSDKAuthSuccessful {
             permissionDeniedLayer
         }
-    }
-    
-    var errorLayer: some View {
-        ContentUnavailableView("지도 로드 실패", image: "exclamationmark.triangle", description: Text("네이버 지도 인증에 실패했습니다."))
     }
     
     // TODO: 디자인 시안 나오면 작업

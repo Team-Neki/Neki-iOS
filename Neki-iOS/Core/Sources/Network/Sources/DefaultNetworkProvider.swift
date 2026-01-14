@@ -88,17 +88,20 @@ private extension DefaultNetworkProvider {
         
         switch endpoint.authorizationType {
         case .none: break
-        case .bearer: try appendBearerToken(to: &request)
-        case .reissue: try appendRefreshToken(to: &request)
+        case .bearer: request = try appendBearerToken(to: request)
+        case .reissue: request = try appendRefreshToken(to: request)
         }
         
         return request
     }
     
-    func appendBearerToken(to request: inout URLRequest) throws {
+    func appendBearerToken(to request: URLRequest) throws -> URLRequest {
+        var request = request
+        
         do {
             let tokens = try tokenStorage.fetch()
             request.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
+            return request
         } catch TokenStorageError.notFound {
             throw NetworkError.unauthorizedError
         } catch {
@@ -107,15 +110,18 @@ private extension DefaultNetworkProvider {
         }
     }
     
-    func appendRefreshToken(to request: inout URLRequest) throws {
+    func appendRefreshToken(to request: URLRequest) throws -> URLRequest {
+        var request = request
+        
         do {
             let tokens = try tokenStorage.fetch()
             let body = ["refreshToken": tokens.refreshToken]
             request.httpBody = try JSONEncoder().encode(body)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            return request
         } catch TokenStorageError.notFound {
             throw NetworkError.unauthorizedError
-        } catch is EncodingError {
+        } catch let error as EncodingError {
             Logger.network.error("❌ Encoding Error: \(error.localizedDescription)")
             throw error
         } catch {

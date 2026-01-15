@@ -14,7 +14,9 @@ struct PoseDetailFeature {
     struct State: Equatable {
         var items: IdentifiedArrayOf<FeedImageItem>
         var selectedID: UUID
-        var isScrapped: Bool = false
+        var isScrapped: Bool {
+            items[id: selectedID]?.isScrapped ?? false
+        }
     }
     
     enum Action {
@@ -30,7 +32,9 @@ struct PoseDetailFeature {
         Reduce { state, action in
             switch action {
             case .onTapScrap:
-                state.isScrapped.toggle()
+                if state.items[id: state.selectedID] != nil {
+                    state.items[id: state.selectedID]?.isScrapped.toggle()
+                }
                 return .none
                 
             case let .pageChanged(newID):

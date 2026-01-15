@@ -103,11 +103,17 @@ private extension PoseView {
     @ViewBuilder
     var filterBar: some View {
         HStack(alignment: .center, spacing: 6) {
-            Button("인원수") {
+            Button(store.state.selectedPeopleCount ?? "인원수") {
                 store.send(.onTapFilter)
                 isSheetVisible = true
             }
-            .buttonStyle(.nekiChip(isHighlighted: false, shape: .capsule, style: .dropdown))
+            .buttonStyle(
+                .nekiChip(
+                    isHighlighted: store.state.selectedPeopleCount != nil,
+                    shape: .capsule,
+                    style: .dropdown
+                )
+            )
             
             Button("스크랩") {
                 store.send(.onTapScrap)

@@ -24,7 +24,6 @@ struct PoseCoordinator {
         case routeToDetail(FeedImageItem)
         
         case delegate(Delegate)
-        
         enum Delegate {
             case logout
         }

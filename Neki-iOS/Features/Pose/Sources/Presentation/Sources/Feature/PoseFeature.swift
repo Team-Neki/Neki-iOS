@@ -17,11 +17,15 @@ struct PoseFeature {
     }
     
     enum Action {
+        case onTapFilter
+        case onTapScrap
+        
         // View Life Cycle Action
         case onAppear
         
         // Navigation Action
         case imageTapped(FeedImageItem)
+        case onTapRandomPoseRecommend
     }
     
     var body: some ReducerOf<Self> {

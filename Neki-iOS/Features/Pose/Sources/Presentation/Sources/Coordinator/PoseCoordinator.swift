@@ -40,8 +40,8 @@ struct PoseCoordinator {
                 // 포즈 피드에서 이미지 클릭해서 상세 보기
             case let .root(.imageTapped(item)):
                 state.path.append(.detail(PoseDetailFeature.State(
-                    items: state.root.items, // 전체 리스트 전달
-                    selectedID: item.id      // 클릭한 아이템의 ID 전달
+                    items: state.root.filteredItems,
+                    selectedID: item.id
                 )))
                 return .none
                 

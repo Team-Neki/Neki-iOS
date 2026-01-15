@@ -60,10 +60,8 @@ struct PoseView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 4)
                 .padding(.bottom, 12)
-                .background(.white)                         // 뒷 배경 불투명
-//                .background(.white.opacity(0.5))          // 뒷 배경 반투명
-                .offset(y: isFilterBarVisible ? 0 : -100)   // 화면 위로 올라가며 사라지는 애니메이션
-//                .opacity(isFilterBarVisible ? 1 : 0)      // 투명화하며 사라지는 애니메이션
+                .background(.white)
+                .offset(y: isFilterBarVisible ? 0 : -100)
             
             VStack {
                 Spacer()

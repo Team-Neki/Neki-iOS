@@ -19,6 +19,7 @@ struct PoseFeature {
     }
     
     enum Action {
+        // User Action
         case onTapFilter
         case onTapScrap
         case selectPeopleCount(String)

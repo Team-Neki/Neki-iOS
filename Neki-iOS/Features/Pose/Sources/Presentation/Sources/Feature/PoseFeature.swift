@@ -15,6 +15,7 @@ struct PoseFeature {
     struct State: Equatable {
         var items: IdentifiedArrayOf<FeedImageItem> = []
         var selectedPeopleCount: String? = nil
+        var isSelectedScrap: Bool = false
     }
     
     enum Action {
@@ -47,8 +48,13 @@ struct PoseFeature {
                 } else {
                     state.selectedPeopleCount = count
                 }
+                state.isSelectedScrap = false
                 return .none
                 
+            case .onTapScrap:
+                state.selectedPeopleCount = nil
+                state.isSelectedScrap.toggle()
+                return .none
                 
             default:
                 return .none

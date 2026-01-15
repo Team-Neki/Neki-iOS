@@ -118,7 +118,13 @@ private extension PoseView {
             Button("스크랩") {
                 store.send(.onTapScrap)
             }
-            .buttonStyle(.nekiChip(isHighlighted: false, shape: .capsule, style: .normal))
+            .buttonStyle(
+                .nekiChip(
+                    isHighlighted: store.state.isSelectedScrap,
+                    shape: .capsule,
+                    style: .normal
+                )
+            )
             
             Spacer()
         }

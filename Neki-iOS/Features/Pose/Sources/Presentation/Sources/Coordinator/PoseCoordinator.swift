@@ -48,6 +48,11 @@ struct PoseCoordinator {
                 state.path.append(.detail(PoseDetailFeature.State(item: item)))
                 return .none
                 
+            case .path(.element(id: _, action: .detail(.didTapBackButton))):
+                state.path.removeLast()
+                return .none
+                
+                
             default:
                 return .none
             }

@@ -14,11 +14,13 @@ struct PoseFeature {
     @ObservableState
     struct State: Equatable {
         var items: IdentifiedArrayOf<FeedImageItem> = []
+        var selectedPeopleCount: String? = nil
     }
     
     enum Action {
         case onTapFilter
         case onTapScrap
+        case selectPeopleCount(String)
         
         // View Life Cycle Action
         case onAppear
@@ -38,6 +40,11 @@ struct PoseFeature {
                     state.items = IdentifiedArray(uniqueElements: dummyList)
                 }
                 return .none
+                
+            case let .selectPeopleCount(count):
+                state.selectedPeopleCount = count
+                return .none
+                
                 
             default:
                 return .none

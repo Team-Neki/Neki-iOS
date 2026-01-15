@@ -14,20 +14,22 @@ struct PoseDetailView: View {
     @Bindable var store: StoreOf<PoseDetailFeature>
     
     var body: some View {
-        VStack(alignment: .center, spacing: 0) {
-            KFImage(store.item.imageURL)
-                .resizable()
-                .placeholder {
-                    ProgressView()
+        VStack(spacing: 0) {
+            TabView(selection: $store.selectedID.sending(\.pageChanged)) {
+                ForEach(store.items) { item in
+                    KFImage(item.imageURL)
+                        .resizable()
+                        .placeholder {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .retry(maxCount: 3, interval: .seconds(5))
+                        .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .tag(item.id)
                 }
-                .retry(maxCount: 3, interval: .seconds(5))
-                .onFailure { error in
-                    Logger.presentation.error("이미지 로드 실패: \(error)")
-                    Logger.presentation.error("실패한 이미지 id: \(store.item.id)")
-                }
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
             
             VStack(alignment: .leading, spacing: 0) {
                 Divider()
@@ -42,8 +44,9 @@ struct PoseDetailView: View {
                 .padding()
             }
             .frame(height: 68)
+            .background(.white)
         }
-        .nekiToolbar(left: .back(action: {store.send(.didTapBackButton)}), center: .text("포즈 상세"))
+        .nekiToolbar(left: .back(action: { store.send(.didTapBackButton) }), center: .text("포즈 상세"))
         .background(.white)
     }
 }

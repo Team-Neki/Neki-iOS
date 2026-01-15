@@ -12,13 +12,15 @@ import ComposableArchitecture
 struct PoseDetailFeature {
     @ObservableState
     struct State: Equatable {
-        let item: FeedImageItem
+        var items: IdentifiedArrayOf<FeedImageItem>
+        var selectedID: UUID
         var isScrapped: Bool = false
     }
     
     enum Action {
         // User Action
         case onTapScrap
+        case pageChanged(UUID)
         
         // Navigation Action
         case didTapBackButton
@@ -29,6 +31,10 @@ struct PoseDetailFeature {
             switch action {
             case .onTapScrap:
                 state.isScrapped.toggle()
+                return .none
+                
+            case let .pageChanged(newID):
+                state.selectedID = newID
                 return .none
                 
             default:

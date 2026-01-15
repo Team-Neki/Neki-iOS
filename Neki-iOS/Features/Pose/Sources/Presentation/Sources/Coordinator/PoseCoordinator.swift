@@ -39,13 +39,19 @@ struct PoseCoordinator {
             switch action {
                 // 포즈 피드에서 이미지 클릭해서 상세 보기
             case let .root(.imageTapped(item)):
-                state.path.append(.detail(PoseDetailFeature.State(item: item)))
+                state.path.append(.detail(PoseDetailFeature.State(
+                    items: state.root.items, // 전체 리스트 전달
+                    selectedID: item.id      // 클릭한 아이템의 ID 전달
+                )))
                 return .none
                 
             case let .routeToDetail(item):
                 // 기존 스택을 비우고 싶다면: state.path.removeAll()
                 // 포즈 외부에서 이미지 디테일 뷰로 이동 (Feature간 전환)
-                state.path.append(.detail(PoseDetailFeature.State(item: item)))
+                state.path.append(.detail(PoseDetailFeature.State(
+                    items: state.root.items, // 전체 리스트 전달
+                    selectedID: item.id      // 클릭한 아이템의 ID 전달
+                )))
                 return .none
                 
             case .path(.element(id: _, action: .detail(.didTapBackButton))):

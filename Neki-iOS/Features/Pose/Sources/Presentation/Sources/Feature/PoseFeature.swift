@@ -42,7 +42,11 @@ struct PoseFeature {
                 return .none
                 
             case let .selectPeopleCount(count):
-                state.selectedPeopleCount = count
+                if state.selectedPeopleCount == count {
+                    state.selectedPeopleCount = nil
+                } else {
+                    state.selectedPeopleCount = count
+                }
                 return .none
                 
                 

@@ -18,8 +18,8 @@ struct PoseCoordinatorView: View {
             switch store.case {
             case .detail(let store):
                 PoseDetailView(store: store)
-            case .deepDetail(let store):
-                PoseDeepDetailView(store: store)
+                    .toolbar(.hidden, for: .tabBar)
+
             }
         }
     }

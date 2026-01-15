@@ -16,6 +16,15 @@ struct PoseFeature {
         var items: IdentifiedArrayOf<FeedImageItem> = []
         var selectedPeopleCount: String? = nil
         var isSelectedScrap: Bool = false
+        
+        var filteredItems: IdentifiedArrayOf<FeedImageItem> {
+            if isSelectedScrap {
+                return items.filter { $0.isScrapped }
+            } else {
+                // TODO: - 인원수 필터 로직 추가
+                return items
+            }
+        }
     }
     
     enum Action {

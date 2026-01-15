@@ -63,7 +63,7 @@ private extension PoseView {
     var masonryView: some View {
         ScrollView {
             MasonryGridView(
-                items: Array(store.items),
+                items: Array(store.filteredItems),
                 columns: 2
             ) { item in
                 FeedImageView(item: item)

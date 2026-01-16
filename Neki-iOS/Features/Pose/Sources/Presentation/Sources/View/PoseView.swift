@@ -83,13 +83,7 @@ private extension PoseView {
                     let diff = currentPoint - lastDragPoint
                     
                     withAnimation(.smooth) {
-                        if diff < 0 {
-                            // 아래로 스크롤
-                            isFilterBarVisible = false
-                        } else {
-                            // 위로 스크롤
-                            isFilterBarVisible = true
-                        }
+                        isFilterBarVisible = diff < 0 ? false : true
                     }
                     
                     lastDragPoint = currentPoint

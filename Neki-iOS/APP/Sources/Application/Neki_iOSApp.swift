@@ -6,12 +6,28 @@
 //
 
 import SwiftUI
+import ComposableArchitecture
 
 @main
 struct Neki_iOSApp: App {
+    let store = Store(initialState: AppCoordinator.State.splash(SplashFeature.State())) {
+        AppCoordinator()
+            ._printChanges()
+    }
+    
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppCoordinatorView(store: store)
         }
     }
+}
+
+#Preview("앱 시작 (Splash)") {
+    AppCoordinatorView(
+        store: Store(
+            initialState: AppCoordinator.State.splash(SplashFeature.State())
+        ) {
+            AppCoordinator()
+        }
+    )
 }

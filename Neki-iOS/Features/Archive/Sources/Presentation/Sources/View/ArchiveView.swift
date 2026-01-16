@@ -1,5 +1,5 @@
 //
-//  PoseView.swift
+//  ArchiveView.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/7/26.
@@ -8,9 +8,9 @@
 import SwiftUI
 import ComposableArchitecture
 
-struct PoseView: View {
+struct ArchiveView: View {
     
-    let store: StoreOf<PoseFeature>
+    let store: StoreOf<ArchiveFeature>
     
     var body: some View {
         ScrollView {
@@ -18,7 +18,7 @@ struct PoseView: View {
                 items: Array(store.items),
                 columns: 2
             ) { item in
-                FeedImageView(item: item)
+                ArchiveImageView(item: item)
                     .onTapGesture {
                         store.send(.imageTapped(item))
                     }

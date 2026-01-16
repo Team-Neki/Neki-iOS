@@ -14,8 +14,7 @@ struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
     
     var body: some View {
-        TabView(selection: $store.selectedTab.sending(\.tabSelected)) {
-            
+        TabView(selection: $store.selectedTab) {
             // Pose Tab
             PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
                 .tabItem {

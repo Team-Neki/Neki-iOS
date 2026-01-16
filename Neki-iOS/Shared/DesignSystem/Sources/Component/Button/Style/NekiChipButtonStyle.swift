@@ -21,13 +21,13 @@ public struct NekiChipButtonStyle: ButtonStyle {
             
             if case .dropdown = style {
                 Image(.iconChevronDown)
-                    .foregroundStyle(.gray500)
             }
         }
-        .nekiFont(isHighlighted ? .body14SemiBold : .body14Medium)
+        .frame(height: 20)
+        .nekiFont(.body14Medium)
         .padding(.leading, 12)
         .padding(.trailing, style == .dropdown ? 8 : 12)
-        .padding(.vertical, 12)
+        .padding(.vertical, 7)
         .background(isHighlighted ? .gray800 : .gray50)
         .foregroundStyle(isHighlighted ? .white : .gray700)
         .clipShape(RoundedRectangle(cornerRadius: shape == .roundedRectangle ? 12 : 999))

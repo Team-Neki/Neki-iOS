@@ -13,15 +13,23 @@ struct ArchiveFeature {
     
     @ObservableState
     struct State: Equatable {
-        var items: IdentifiedArrayOf<ArchiveImageItem> = []
+        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+        var albums: IdentifiedArrayOf<AlbumItem> = []
+        var showTooltip: Bool = true
     }
     
     enum Action {
+        // User Action
+        case tapAllPhotos
+        case tapAddButton
+        case closeTooltip
+        
         // View Life Cycle Action
         case onAppear
         
         // Navigation Action
         case imageTapped(ArchiveImageItem)
+        case albumTapped(AlbumItem)
     }
     
     var body: some ReducerOf<Self> {
@@ -29,9 +37,11 @@ struct ArchiveFeature {
             /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
             case .onAppear:
-                if state.items.isEmpty {
-                    let dummyList = ArchiveImageItem.dummyData()
-                    state.items = IdentifiedArray(uniqueElements: dummyList)
+                if state.albums.isEmpty {
+                    state.albums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
+                }
+                if state.photos.isEmpty {
+                    state.photos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
                 }
                 return .none
                 
@@ -41,3 +51,4 @@ struct ArchiveFeature {
         }
     }
 }
+

@@ -32,9 +32,10 @@ struct QRCodeScannerView: View {
                 title
                 
                 ScannerAreaView(frameSize: scanFrameSize, cornerRadius: frameCornerRadius)
-                    .padding(.vertical, 40)
+                    .padding(.top, 32)
                 
                 footer
+                    .padding(.top, 40)
                 
                 Spacer()
             }

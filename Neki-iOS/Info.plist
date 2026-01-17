@@ -6,6 +6,8 @@
 	<string>${NAVER_MAPS_CLIENT_ID}</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>${NSLocationWhenInUseUsageDescription}</string>
+	<key>NSCameraUsageDescription</key>
+	<string>$(NSCameraUsageDescription)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>

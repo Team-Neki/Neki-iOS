@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct BaseSucceededResponseDTO<T: Decodable>: Decodable {
+public struct BaseResponseDTO<T: Decodable>: Decodable {
     let status: Int
     let message: String
     let isSuccess: Bool
@@ -21,9 +21,3 @@ public struct BaseSucceededResponseDTO<T: Decodable>: Decodable {
 }
 
 public struct EmptyData: Decodable {}
-
-public struct BaseFailedResponseDTO: Decodable {
-    let status: Int
-    let message: String
-    let timestamp: String
-}

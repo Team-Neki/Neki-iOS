@@ -24,7 +24,6 @@ struct PoseCoordinator {
         case routeToDetail(FeedImageItem)
         
         case delegate(Delegate)
-        
         enum Delegate {
             case logout
         }
@@ -40,28 +39,25 @@ struct PoseCoordinator {
             switch action {
                 // 포즈 피드에서 이미지 클릭해서 상세 보기
             case let .root(.imageTapped(item)):
-                state.path.append(.detail(PoseDetailFeature.State(item: item)))
-                return .none
-                
-                // 포즈 상세에서 더 자세히 보기 클릭
-            case let .path(.element(id: _, action: .detail(.didTapDeepLinkButton(item)))):
-                state.path.append(.deepDetail(PoseDeepDetailFeature.State(item: item)))
-                return .none
-                
-                // [DeepDetail -> Root] 한 번에 이동
-            case .path(.element(id: _, action: .deepDetail(.didTapPopToRoot))):
-                state.path.removeAll()
+                state.path.append(.detail(PoseDetailFeature.State(
+                    items: state.root.filteredItems,
+                    selectedID: item.id
+                )))
                 return .none
                 
             case let .routeToDetail(item):
                 // 기존 스택을 비우고 싶다면: state.path.removeAll()
                 // 포즈 외부에서 이미지 디테일 뷰로 이동 (Feature간 전환)
-                state.path.append(.detail(PoseDetailFeature.State(item: item)))
+                state.path.append(.detail(PoseDetailFeature.State(
+                    items: state.root.items, // 전체 리스트 전달
+                    selectedID: item.id      // 클릭한 아이템의 ID 전달
+                )))
                 return .none
                 
-            case .path(.element(id: _, action: .deepDetail(.delegate(.logout)))):
-                // 상위(MainTab)로 토스
-                return .send(.delegate(.logout))
+            case .path(.element(id: _, action: .detail(.didTapBackButton))):
+                state.path.removeLast()
+                return .none
+                
                 
             default:
                 return .none
@@ -75,6 +71,5 @@ extension PoseCoordinator {
     @Reducer
     enum Path {
         case detail(PoseDetailFeature)
-        case deepDetail(PoseDeepDetailFeature)
     }
 }

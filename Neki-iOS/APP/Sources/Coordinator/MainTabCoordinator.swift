@@ -22,8 +22,8 @@ struct MainTabCoordinator {
         var archive = ArchiveCoordinator.State()
     }
     
-    enum Action {
-        case tabSelected(Tab)
+    enum Action: BindableAction {
+        case binding(BindingAction<State>)
         
         case pose(PoseCoordinator.Action)
         case archive(ArchiveCoordinator.Action)
@@ -41,6 +41,8 @@ struct MainTabCoordinator {
     }
     
     var body: some ReducerOf<Self> {
+        BindingReducer()
+        
         Scope(state: \.pose, action: \.pose) {
             PoseCoordinator()
         }
@@ -51,8 +53,7 @@ struct MainTabCoordinator {
         
         Reduce { state, action in
             switch action {
-            case let .tabSelected(tab):
-                state.selectedTab = tab
+            case .binding:
                 return .none
                 
                 // 아카이브 내부 뷰에서 포즈 내부 뷰로 변경 (피쳐간 이동)

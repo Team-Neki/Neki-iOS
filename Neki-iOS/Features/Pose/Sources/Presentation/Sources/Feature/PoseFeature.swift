@@ -14,14 +14,31 @@ struct PoseFeature {
     @ObservableState
     struct State: Equatable {
         var items: IdentifiedArrayOf<FeedImageItem> = []
+        var selectedPeopleCount: String? = nil
+        var isSelectedScrap: Bool = false
+        
+        var filteredItems: IdentifiedArrayOf<FeedImageItem> {
+            if isSelectedScrap {
+                return items.filter { $0.isScrapped }
+            } else {
+                // TODO: - 인원수 필터 로직 추가
+                return items
+            }
+        }
     }
     
     enum Action {
+        // User Action
+        case onTapFilter
+        case onTapScrap
+        case selectPeopleCount(String)
+        
         // View Life Cycle Action
         case onAppear
         
         // Navigation Action
         case imageTapped(FeedImageItem)
+        case onTapRandomPoseRecommend
     }
     
     var body: some ReducerOf<Self> {
@@ -33,6 +50,20 @@ struct PoseFeature {
                     let dummyList = FeedImageItem.dummyData()
                     state.items = IdentifiedArray(uniqueElements: dummyList)
                 }
+                return .none
+                
+            case let .selectPeopleCount(count):
+                if state.selectedPeopleCount == count {
+                    state.selectedPeopleCount = nil
+                } else {
+                    state.selectedPeopleCount = count
+                }
+                state.isSelectedScrap = false
+                return .none
+                
+            case .onTapScrap:
+                state.selectedPeopleCount = nil
+                state.isSelectedScrap.toggle()
                 return .none
                 
             default:

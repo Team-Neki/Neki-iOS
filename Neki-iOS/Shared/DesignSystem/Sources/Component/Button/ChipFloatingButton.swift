@@ -40,11 +40,12 @@ public struct ChipFloatingButton: View {
         Button {
             action()
         } label: {
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 icon
                 title
             }
-            .padding(.horizontal, 12)
+            .frame(height: 28)
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .nekiFont(.title18SemiBold)
             .foregroundStyle(.white)

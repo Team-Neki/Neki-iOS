@@ -35,3 +35,10 @@ struct MainTabCoordinatorView: View {
         .tint(.black)
     }
 }
+
+#Preview {
+    MainTabCoordinatorView(store: Store(initialState: MainTabCoordinator.State()) {
+        MainTabCoordinator()
+    }
+    )
+}

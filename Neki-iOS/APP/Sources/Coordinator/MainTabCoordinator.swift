@@ -15,7 +15,7 @@ struct MainTabCoordinator {
     
     @ObservableState
     struct State {
-        var selectedTab: Tab = .pose
+        var selectedTab: Tab = .archive
         
         // 하위 코디네이터들의 State를 보유
         var pose = PoseCoordinator.State()

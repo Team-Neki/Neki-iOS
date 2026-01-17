@@ -14,7 +14,6 @@ struct ArchiveCoordinatorView: View {
     var body: some View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             ArchiveView(store: store.scope(state: \.root, action: \.root))
-                .navigationTitle("아카이빙")
         } destination: { store in
             switch store.case {
             case .detail(let store):

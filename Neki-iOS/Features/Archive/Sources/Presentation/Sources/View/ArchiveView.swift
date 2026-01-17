@@ -11,23 +11,43 @@ import Kingfisher
 
 struct ArchiveView: View {
     
+    @State var showDropDownMenu: Bool = false
+    @State var showTooltip: Bool = true          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
+    
     let store: StoreOf<ArchiveFeature>
     
     var body: some View {
-        ScrollView {
+        ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
-                albumSection
-                    .padding(.bottom, 28)
+                header
+                    .zIndex(9)
                 
-                recentPhotoSection
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        albumSection
+                            .padding(.bottom, 28)
+                        
+                        recentPhotoSection
+                    }
+                }
+                .scrollIndicators(.never)
+            }
+
+            // 툴팁이 보여져 있을 경우 화면 어디든 누르면 사라지게
+            if showTooltip {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        showTooltip = false
+                    }
+            }
+            
+            if showDropDownMenu {
+                dropDownMenu
+                    .padding(.top, 42)
+                    .padding(.trailing, 60)
             }
         }
-        .scrollIndicators(.never)
-        .nekiToolbar(
-            left: .icon(.iconLogo, action: nil),
-            // TODO: - 이미지 추가 액션과 알림 확인 액션 추가
-            right: .both([.icon(.iconPlusRed, action: {}), .icon(.iconBellFill, action: {})])
-        )
         .task {
             await store.send(.onAppear).finish()
         }
@@ -38,8 +58,89 @@ struct ArchiveView: View {
 // MARK: - Subviews
 
 private extension ArchiveView {
+    var header: some View {
+        HStack(alignment: .center, spacing: 0) {
+            Image(.iconLogo)
+            
+            Spacer()
+            
+            HStack(alignment: .center, spacing: 12) {
+                Button {
+                    withAnimation() {
+                        showDropDownMenu.toggle()
+                    }
+                } label: {
+                    Image(.iconPlusRed)
+                }
+                .nekiTooltip(
+                    isPresented: $showTooltip,
+                    "버튼을 눌러 네컷을 추가할 수 있어요",
+                    position: .bottom,
+                    style: .dark,
+                    showDismiss: false
+                )
+                
+                Button {
+                    // TODO: - 알림 이벤트
+                } label: {
+                    Image(.iconBellFill)
+                }
+            }
+        }
+        .frame(height: 54)
+        .padding(.horizontal, 20)
+    }
     
-    // 앨범 섹션
+    var dropDownMenu: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
+                store.send(.onTapQRScan)
+            }
+            
+            dropDownMenuButton(title: "갤러리에서 추가", icon: .iconRoundAddPhotoAlternate) {
+                store.send(.onTapAddFromGallery)
+            }
+            
+            Divider()
+                .background(.gray50)
+                .padding(.vertical, 4)
+            
+            dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
+                store.send(.onTapAddNewAlbum)
+            }
+        }
+        .padding(.vertical, 5)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(content: {
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(.gray.opacity(0.5), lineWidth: 1)
+                .shadow(color: .gray.opacity(0.5), radius: 2)
+        })
+        .frame(width: 158, height: 130)
+    }
+    
+    func dropDownMenuButton(
+        title: String,
+        icon: UIImage,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 6) {
+                Image(uiImage: icon)
+                
+                Text(title)
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+                
+                Spacer()
+            }
+            .padding(.leading, 12)
+            .padding(.vertical, 5)
+            .frame(height: 34)
+        }
+    }
+    
     var albumSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 0) {
@@ -79,7 +180,6 @@ private extension ArchiveView {
         }
     }
     
-    // 최근 사진 섹션
     var recentPhotoSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -90,7 +190,7 @@ private extension ArchiveView {
                 Spacer()
                 
                 Button {
-                    store.send(.tapAllPhotos)
+                    store.send(.onTapAllPhotos)
                 } label: {
                     HStack(alignment: .center, spacing: 0) {
                         Text("모든 사진")

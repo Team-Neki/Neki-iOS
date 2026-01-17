@@ -7,15 +7,13 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>${NSLocationWhenInUseUsageDescription}</string>
 	<key>NSCameraUsageDescription</key>
-	<string>$(NSCameraUsageDescription)</string>
+	<string>${NSCameraUsageDescription}</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
 		<string>kakaomap</string>
 		<string>comgooglemaps</string>
 	</array>
-	<key>NMFNcpKeyId</key>
-	<string>${NAVER_MAPS_CLIENT_ID}</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Pretendard-Bold.otf</string>

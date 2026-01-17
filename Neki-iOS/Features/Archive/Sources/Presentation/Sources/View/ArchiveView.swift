@@ -181,27 +181,48 @@ private extension ArchiveView {
                     .padding(.bottom, 18)
             }
             
-            HStack(alignment: .center, spacing: 12) {
-                Button("취소") {
-                    store.send(.onTapCancelAddAlbum)
-                    addAlbumSheetPresented = false
-                }
-                .buttonStyle(.nekiCTA(.secondary))
+            GeometryReader { proxy in
+                // 버튼 사이 간격
+                let spacing: CGFloat = 12
                 
-                Button {
-                    store.send(.onTapConfirmAddAlbum)
-                    addAlbumSheetPresented = false
-                } label: {
-                    Text("추가하기")
-                        .nekiFont(.body16SemiBold)
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(store.isConfirmButtonEnabled ? .primary400 : .primary400.opacity(0.4))                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                // 전체 너비에서 간격을 뺀 실제 버튼들의 너비
+                let totalWidth = proxy.size.width - spacing
+                
+                // 비율 3:7
+                let cancelWidth = totalWidth * 0.3
+                let addWidth = totalWidth * 0.7
+                
+                HStack(alignment: .center, spacing: spacing) {
+                    Button {
+                        store.send(.onTapCancelAddAlbum)
+                        addAlbumSheetPresented = false
+                    } label: {
+                        Text("취소")
+                            .nekiFont(.body16SemiBold)
+                            .foregroundStyle(.gray300)
+                            .frame(width: cancelWidth)
+                            .frame(height: 52)
+                            .background(.gray50)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    
+                    Button {
+                        store.send(.onTapConfirmAddAlbum)
+                        addAlbumSheetPresented = false
+                    } label: {
+                        Text("추가하기")
+                            .nekiFont(.body16SemiBold)
+                            .foregroundStyle(.white)
+                            .frame(width: addWidth)
+                            .frame(height: 52)
+                            .background(store.isConfirmButtonEnabled ? .primary400 : .primary400.opacity(0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(!store.isConfirmButtonEnabled)
                 }
-                .disabled(!store.isConfirmButtonEnabled)
             }
-            
+            .frame(height: 52)
+
         }
         .padding(.bottom, 34)
         .padding(.horizontal, 20)

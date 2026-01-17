@@ -38,7 +38,6 @@ struct QRCodeScanFeature {
     }
     
     @Dependency(\.dismiss) private var dismiss
-    @Dependency(\.qrScannerClient) private var scannerClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -56,7 +55,7 @@ struct QRCodeScanFeature {
                 return .run { send in await send(.codeDidScan(URL(string: urlString))) }
                 
             case .codeDidScan(let url):
-                print(url)
+                // TODO: 확보한 URL로 파싱
                 return .none
                 
             default:

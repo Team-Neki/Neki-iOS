@@ -26,4 +26,11 @@ public struct GeographicBoundingBox: Equatable, Sendable {
         self.maxLatitude = maxLatitude
         self.maxLongitude = maxLongitude
     }
+    
+    func contains(_ coordinate: GeographicCoordinate) -> Bool {
+        return coordinate.latitude >= minLatitude &&
+               coordinate.latitude <= maxLatitude &&
+               coordinate.longitude >= minLongitude &&
+               coordinate.longitude <= maxLongitude
+    }
 }

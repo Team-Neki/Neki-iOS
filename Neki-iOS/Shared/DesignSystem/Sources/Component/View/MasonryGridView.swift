@@ -16,14 +16,7 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
     let horizontalSpacing: CGFloat
     let verticalSpacing: CGFloat
     let content: (Item) -> ItemView
-    
-    private var columnItems: [[Item]] {
-        var result = Array(repeating: [Item](), count: columns)
-        for (index, item) in items.enumerated() {
-            result[index % columns].append(item)
-        }
-        return result
-    }
+    let columnItems: [[Item]]
     
     //MARK: - init
     
@@ -39,6 +32,12 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         self.horizontalSpacing = horizontalSpacing
         self.verticalSpacing = verticalSpacing
         self.content = content
+        
+        var result = Array(repeating: [Item](), count: self.columns)
+        for (index, item) in items.enumerated() {
+            result[index % self.columns].append(item)
+        }
+        self.columnItems = result
     }
     
     //MARK: - Main Body

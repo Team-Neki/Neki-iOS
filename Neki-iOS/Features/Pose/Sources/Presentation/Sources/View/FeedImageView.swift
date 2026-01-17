@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Kingfisher
+import os
 
 struct FeedImageView: View {
     
@@ -18,32 +19,17 @@ struct FeedImageView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            KFImage(URL(string: item.imageUrl))
+            KFImage(item.imageURL)
                 .resizable()
-                .placeholder {
-                    placeholderView
-                }
+                .fade(duration: 0.25)
                 .retry(maxCount: 3, interval: .seconds(5))
                 .onFailure { error in
-                    print("이미지 로드 실패: \(error)")
+                    Logger.presentation.error("이미지 로드 실패: \(error)")
+                    Logger.presentation.error("실패한 이미지 id: \(item.id)")
                 }
                 .aspectRatio(contentMode: .fit)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()
-    }
-}
-
-
-//MARK: - Sub View
-
-extension FeedImageView {
-    private var placeholderView: some View {
-        RoundedRectangle(cornerRadius: 12)
-            .fill(.gray100)
-            .frame(height: 180)
-            .overlay {
-                ProgressView()
-            }
     }
 }

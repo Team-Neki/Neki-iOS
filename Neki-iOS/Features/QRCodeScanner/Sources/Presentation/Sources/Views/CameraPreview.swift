@@ -73,7 +73,11 @@ struct CameraPreview: UIViewRepresentable {
     
     func makeUIView(context: Context) -> CameraView {
         let cameraView = CameraView()
-        Task { await context.coordinator.setupCamera(in: cameraView) }
+        Task.detached(priority: .userInitiated) { [coordinator = context.coordinator] in
+            guard let (session, device) = coordinator.makeSession() else { return }
+            await cameraView.setupPreviewLayer(session: session, device: device)
+            coordinator.startSession(session)
+        }
         return cameraView
     }
     
@@ -97,14 +101,14 @@ extension CameraPreview {
         
         init(parent: CameraPreview) { self.parent = parent }
         
-        func setupCamera(in view: CameraView) async {
+        nonisolated func makeSession() -> (AVCaptureSession, AVCaptureDevice)? {
             let session = AVCaptureSession()
             session.beginConfiguration()
             
             guard let device = AVCaptureDevice.default(for: .video) else {
                 Logger.presentation.error("No video device available")
                 session.commitConfiguration()
-                return
+                return nil
             }
             
             do {
@@ -124,12 +128,17 @@ extension CameraPreview {
                 }
                 
                 session.commitConfiguration()
-                await view.setupPreviewLayer(session: session, device: device)
-                session.startRunning()
+                return (session, device)
             } catch {
                 session.commitConfiguration()
                 Logger.presentation.error("Camera setup failed: \(error)")
+                return nil
             }
+        }
+        
+        nonisolated func startSession(_ session: AVCaptureSession) {
+            guard session.isRunning == false else { return }
+            session.startRunning()
         }
     }
 }

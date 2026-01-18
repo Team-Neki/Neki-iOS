@@ -8,7 +8,7 @@
 import Foundation
 
 public enum NetworkError: LocalizedError {
-    case apiError(message: String)
+    case apiError(BaseFailedResponseDTO)
     case requestEncodingError
     case responseDecodingError
     case responseError
@@ -22,7 +22,7 @@ public enum NetworkError: LocalizedError {
     
     public var errorDescription: String? {
         switch self {
-        case .apiError(let message): return message
+        case .apiError(let dto): return dto.message
         case .requestEncodingError: return "요청 인코딩에 실패했습니다."
         case .responseDecodingError: return "응답 디코딩에 실패했습니다."
         case .responseError: return "응답 오류가 발생했습니다."

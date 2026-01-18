@@ -7,84 +7,100 @@
 
 import Foundation
 
-public enum HeaderType {
-    case noneHeader
-    case accessTokenHeader
-    case refreshTokenHeader
+/// 인증 타입
+public enum AuthorizationType {
+    /// 별도의 인증이 필요하지 않은 경우
+    case none
+    /// Authorization-Bearer
+    case bearer
+    /// 토큰 재발급
+    ///
+    /// - Important: 토큰 재발급이라는 특수한 용도를 위한 설정입니다. 일반적인 요청에 사용하는 것은 권장하지 않습니다.
+    /// - Authors: SwainYun
+    case reissue
+}
+
+/// Content-Type 종류
+public enum HTTPContentType {
+    case json
+    case multipart(boundary: String)
+    case raw
 }
 
 public protocol Endpoint {
-    var headerType: HeaderType { get }
+    var authorizationType: AuthorizationType { get }
+    var contentType: HTTPContentType { get }
+    var baseURL: String { get }
     var path: String { get }
     var method: HTTPMethodType { get }
+    var queryParameters: [String: String]? { get }
     var body: Encodable? { get }
-    var query: [URLQueryItem]? { get }
+    var multipartItems: [MultipartItem]? { get }
     
     func asURLRequest() throws -> URLRequest
 }
 
 extension Endpoint {
-    static var defaultEncoder: JSONEncoder {
-        let encoder = JSONEncoder()
-        return encoder
-    }
+    public var queryParameters: [String: String]? { nil }
     
-    var baseURL: String {
-        guard let urlString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
-            fatalError("🚨Base URL을 찾을 수 없습니다🚨")
-        }
-        return urlString
-    }
+    public var multipartItems: [MultipartItem]? { nil }
+    
+    static let defaultEncoder: JSONEncoder = JSONEncoder()
     
     public func asURLRequest() throws -> URLRequest {
-        guard let url = URL(string: baseURL)?.appending(path: path),
-              var components = URLComponents(url: url, resolvingAgainstBaseURL: true) else {
+        let encoder = Self.defaultEncoder
+        
+        guard var urlComponents = URLComponents(string: baseURL) else {
             throw NetworkError.invalidURLError
         }
         
-        if let query = query {
-            components.queryItems = query
+        let currentPath = urlComponents.path
+        urlComponents.path = currentPath + path
+        
+        if let queryParameters = queryParameters, !queryParameters.isEmpty {
+            urlComponents.queryItems = queryParameters.map { URLQueryItem(name: $0.key, value: $0.value) }
         }
         
-        guard let finalURL = components.url else {
+        guard let url = urlComponents.url else {
             throw NetworkError.invalidURLError
         }
         
-        var request = URLRequest(url: finalURL)
+        var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         
-        let allHeaders = makeHeaders()
-        request.allHTTPHeaderFields = allHeaders
-        
-        if let body = body {
-            do {
-                request.httpBody = try Self.defaultEncoder.encode(body)
-            } catch {
-                throw NetworkError.requestEncodingError
+        switch contentType {
+        case .json:
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            if let body = body { request.httpBody = try encoder.encode(body) }
+            
+        case .multipart(let boundary):
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            var builder = MultipartItemBuilder(boundary: boundary)
+            
+            if let items = multipartItems {
+                for item in items { try item.append(to: &builder) }
             }
+            
+            if let body = body {
+                let data = try encoder.encode(body)
+                guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw MultipartError.invalidBody
+                }
+                
+                for (key, value) in dict {
+                    let field = MultipartFormField(name: key, value: value)
+                    try field.append(to: &builder)
+                }
+            }
+            
+            request.httpBody = try builder.finalize()
+            
+        case .raw:
+            request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+            guard let body = body as? Data else { throw MultipartError.invalidBody }
+            request.httpBody = body
         }
         
         return request
-    }
-    
-    
-    // TODO: - "Content-Type"외 다양한 헤더를 추가할 수 있도록 하기
-    func makeHeaders() -> [String: String] {
-        var headers: [String: String] = [
-            "Content-Type": "application/json"
-        ]
-        
-        switch headerType {
-        case .noneHeader:
-            break
-        case .accessTokenHeader:
-            // TODO: - 여기에 토큰 가져오는 로직 추가 (토큰매니저나 키체인매니저 등)
-            break
-        case .refreshTokenHeader:
-            // TODO: - 리프레시 토큰 로직 추가
-            break
-        }
-        
-        return headers
     }
 }

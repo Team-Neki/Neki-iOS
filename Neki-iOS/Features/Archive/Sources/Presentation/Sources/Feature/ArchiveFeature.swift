@@ -74,6 +74,7 @@ struct ArchiveFeature {
                 
             case .onTapCancelAddAlbum:
                 state.newAlbumTitle = ""
+                state.albumTitleErrorMessage = nil
                 return .none
                 
             case .onTapConfirmAddAlbum:

@@ -155,8 +155,7 @@ private extension ArchiveView {
             dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
                 withAnimation { showDropDownMenu = false }
                 addAlbumSheetPresented = true
-                store.state.newAlbumTitle = ""
-                store.albumTitleErrorMessage = nil
+                store.send(.onTapCancelAddAlbum)
             }
         }
         .padding(.vertical, 5)

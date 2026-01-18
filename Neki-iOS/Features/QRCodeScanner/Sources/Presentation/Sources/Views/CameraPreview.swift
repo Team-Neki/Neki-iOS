@@ -100,9 +100,12 @@ extension CameraPreview {
         func setupCamera(in view: CameraView) async {
             let session = AVCaptureSession()
             session.beginConfiguration()
-            defer { session.commitConfiguration() }
             
-            guard let device = AVCaptureDevice.default(for: .video) else { Logger.presentation.error("No video device available"); return }
+            guard let device = AVCaptureDevice.default(for: .video) else {
+                Logger.presentation.error("No video device available")
+                session.commitConfiguration()
+                return
+            }
             
             do {
                 try device.lockForConfiguration()
@@ -120,9 +123,11 @@ extension CameraPreview {
                     output.metadataObjectTypes = output.availableMetadataObjectTypes.filter { $0 == .qr }
                 }
                 
+                session.commitConfiguration()
                 await view.setupPreviewLayer(session: session, device: device)
                 session.startRunning()
             } catch {
+                session.commitConfiguration()
                 Logger.presentation.error("Camera setup failed: \(error)")
             }
         }

@@ -49,9 +49,7 @@ final class CameraView: UIView {
     }
     
     func toggleTorch(on: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video),
-              device.hasTorch
-        else { return }
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
         
         do {
             try device.lockForConfiguration()
@@ -75,7 +73,7 @@ struct CameraPreview: UIViewRepresentable {
     
     func makeUIView(context: Context) -> CameraView {
         let cameraView = CameraView()
-        context.coordinator.setupCamera(in: cameraView)
+        Task { await context.coordinator.setupCamera(in: cameraView) }
         return cameraView
     }
     
@@ -99,35 +97,33 @@ extension CameraPreview {
         
         init(parent: CameraPreview) { self.parent = parent }
         
-        func setupCamera(in view: CameraView) {
-            Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
+        func setupCamera(in view: CameraView) async {
+            let session = AVCaptureSession()
+            session.beginConfiguration()
+            
+            guard let device = AVCaptureDevice.default(for: .video) else { return }
+            
+            do {
+                try device.lockForConfiguration()
+                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+                if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
+                device.unlockForConfiguration()
                 
-                let session = AVCaptureSession()
-                session.beginConfiguration()
-                
-                // Input
-                guard let device = AVCaptureDevice.default(for: .video),
-                      let input = try? AVCaptureDeviceInput(device: device),
-                      session.canAddInput(input)
-                else { return }
-                
-                session.addInput(input)
-                
-                // Output
+                let input = try AVCaptureDeviceInput(device: device)
+                if session.canAddInput(input) { session.addInput(input) }
                 let output = AVCaptureMetadataOutput()
-                guard session.canAddOutput(output) else { return }
-                
-                session.addOutput(output)
-                
-                output.setMetadataObjectsDelegate(self, queue: queue)
-                output.metadataObjectTypes = [.qr, .microQR]
+                if session.canAddOutput(output) {
+                    session.addOutput(output)
+                    output.setMetadataObjectsDelegate(self, queue: queue)
+                    output.metadataObjectTypes = output.availableMetadataObjectTypes.filter { $0 == .qr }
+                }
                 
                 session.commitConfiguration()
-                
-                await MainActor.run { view.setupPreviewLayer(session: session, device: device) }
-                
+                await view.setupPreviewLayer(session: session, device: device)
                 session.startRunning()
+            } catch {
+                Logger.presentation.error("Camera setup failed: \(error)")
             }
         }
     }

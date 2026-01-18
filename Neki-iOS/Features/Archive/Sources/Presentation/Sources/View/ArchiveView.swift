@@ -15,6 +15,8 @@ struct ArchiveView: View {
     @State var showTooltip: Bool = false          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
     @State var addAlbumSheetPresented: Bool = false
     
+    @State var showScrollToTopButton: Bool = false
+    
     @Bindable var store: StoreOf<ArchiveFeature>
     
     
@@ -24,15 +26,49 @@ struct ArchiveView: View {
                 header
                     .zIndex(9)
                 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 0) {
-                        albumSection
-                            .padding(.bottom, 28)
+                ScrollViewReader { proxy in
+                    ZStack(alignment: .bottomTrailing) {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                Color.clear
+                                    .frame(height: 0)
+                                    .id("SCROLL_TO_TOP")
+
+                                albumSection
+                                    .padding(.bottom, 28)
+
+                                recentPhotoSection
+                            }
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear
+                                        .preference(
+                                            key: ScrollOffsetKey.self,
+                                            value: geo.frame(in: .named("ARCHIVE_SCROLL")).minY
+                                        )
+                                }
+                            )
+                        }
+                        .scrollIndicators(.never)
+                        .coordinateSpace(name: "ARCHIVE_SCROLL")
                         
-                        recentPhotoSection
+                        if showScrollToTopButton {
+                            Button {
+                                withAnimation {
+                                    proxy.scrollTo("SCROLL_TO_TOP", anchor: .top)
+                                }
+                            } label: {
+                                Image(.btnFloatingArchive)
+                            }
+                            .padding()
+                        }
+                    }
+                    .onPreferenceChange(ScrollOffsetKey.self) { value in
+                        withAnimation {
+                            showScrollToTopButton = value < -20
+                        }
                     }
                 }
-                .scrollIndicators(.never)
             }
             
             // 툴팁이 보여져 있을 경우 화면 어디든 누르면 사라지게
@@ -49,6 +85,7 @@ struct ArchiveView: View {
                     .padding(.top, 42)
                     .padding(.trailing, 60)
             }
+            
         }
         .sheet(isPresented: $addAlbumSheetPresented) {
             addAlbumSheet
@@ -223,7 +260,7 @@ private extension ArchiveView {
                 }
             }
             .frame(height: 52)
-
+            
         }
         .padding(.bottom, 34)
         .padding(.horizontal, 20)
@@ -328,6 +365,17 @@ private extension ArchiveView {
     }
 }
 
+private extension ArchiveView {
+    struct ScrollOffsetKey: PreferenceKey {
+        static var defaultValue: CGFloat = 0
+        static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+            value += nextValue()
+        }
+    }
+}
+
+// MARK: - 텍스트필드 글자 수 제한 extension
+
 private extension TextField {
     ///글자 수 제한
     func maxLength(_ length: Int, text: Binding<String>) -> some View {
@@ -339,3 +387,5 @@ private extension TextField {
             }
     }
 }
+
+

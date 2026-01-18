@@ -29,7 +29,11 @@ public enum NekiToastStyle {
     }
 }
 
-public struct NekiToastItem: Identifiable {
+public struct NekiToastItem: Identifiable, Equatable {
+    public static func == (lhs: NekiToastItem, rhs: NekiToastItem) -> Bool {
+        lhs.id == rhs.id
+    }
+    
     public typealias Interaction = () -> Void
     
     public let id: UUID = UUID()

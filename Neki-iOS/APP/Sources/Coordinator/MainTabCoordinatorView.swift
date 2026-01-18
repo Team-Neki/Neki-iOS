@@ -14,25 +14,28 @@ struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
     
     var body: some View {
-        TabView(selection: $store.selectedTab) {
-            // Pose Tab
-            PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
-                .tabItem {
-                    Label("포즈", systemImage: "figure.stand")
+        ZStack(alignment: .bottom) {
+            TabView(selection: $store.selectedTab) {
+                Group {
+                    // Pose Tab
+                    PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
+                        .tag(NekiTab.pose)
+                    
+                    // Archive Tab
+                    ArchiveCoordinatorView(store: store.scope(state: \.archive, action: \.archive))
+                        .tag(NekiTab.archive)
+                    
+                    // Map Tab
+                    // MyPage Tab
                 }
-                .tag(MainTabCoordinator.Tab.pose)
+                .toolbar(!store.isTabbarHidden ? .visible : .hidden, for: .tabBar)
+            }
             
-            // Archive Tab
-            ArchiveCoordinatorView(store: store.scope(state: \.archive, action: \.archive))
-                .tabItem {
-                    Label("보관함", systemImage: "archivebox")
-                }
-                .tag(MainTabCoordinator.Tab.archive)
-            
-            // Map Tab
-            // MyPage Tab
+            if !store.isTabbarHidden {
+                NekiTabBar(selectedTab: $store.selectedTab)
+            }
         }
-        .tint(.black)
+        .nekiToast(item: $store.toast)
     }
 }
 

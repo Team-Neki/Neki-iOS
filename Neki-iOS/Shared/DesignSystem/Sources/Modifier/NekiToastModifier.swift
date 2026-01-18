@@ -22,6 +22,7 @@ struct NekiToastModifier: ViewModifier {
     private func nekiToastView(_ item: NekiToastItem) -> some View {
         NekiToastView(item: item) { withAnimation { self.item = nil } }
             .padding(.horizontal, 20)
+            .padding(.bottom, 26)
             .id(item.id)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .zIndex(1000)

@@ -41,6 +41,12 @@ struct ArchiveFeature {
         // Navigation Action
         case imageTapped(ArchiveImageItem)
         case albumTapped(AlbumItem)
+        
+        // Delegate Action
+        case delegate(DelegateAction)
+        enum DelegateAction {
+            case showToast(NekiToastItem)
+        }
     }
     
     var body: some ReducerOf<Self> {
@@ -89,7 +95,12 @@ struct ArchiveFeature {
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 
-                return .none
+                let toastItem = NekiToastItem(
+                    "새로운 앨범을 추가했어요",
+                    style: .success
+                )
+                
+                return .send(.delegate(.showToast(toastItem)))
                 
             case .binding(\.newAlbumTitle):
                 let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespaces)
@@ -100,7 +111,7 @@ struct ArchiveFeature {
                     state.albumTitleErrorMessage = nil
                 }
                 return .none
-
+                
                 
             default:
                 return .none

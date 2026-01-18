@@ -45,7 +45,7 @@ extension Endpoint {
     
     public var multipartItems: [MultipartItem]? { nil }
     
-    static let defaultEncoder: JSONEncoder = JSONEncoder()
+    static var defaultEncoder: JSONEncoder { JSONEncoder() }
     
     public func asURLRequest() throws -> URLRequest {
         let encoder = Self.defaultEncoder

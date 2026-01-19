@@ -73,6 +73,25 @@ struct MainTabCoordinator {
                 return .none
             }
         }
+        
+        /// 피그마 확인 결과 탭바가 사라지는 모든 case는 depth가 1 이상일 경우더라구요
+        /// 즉, 메인 홈 화면에서 depth가 추가되어 넘어가는 뷰들은 전부 탭바가 사라집니다.
+        /// 그래서 각 Feature의 state에서 path에 하나라도 추가될 경우 탭바를 가리게 설계했습니다.
+        /// 한 가지 문제는, 나중에 depth가 추가되어도 탭바가 보여져야 하는 경우가 생긴다면 다시 머리 싸매야함
+        Reduce { state, action in
+            switch state.selectedTab {
+            case .archive:
+                state.isTabbarHidden = !state.archive.path.isEmpty
+                
+            case .pose:
+                state.isTabbarHidden = !state.pose.path.isEmpty
+                
+            default:
+                state.isTabbarHidden = false
+            }
+            return .none
+        }
+        
     }
     
 }

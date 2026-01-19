@@ -11,15 +11,17 @@ struct ArchiveImageItem: Equatable, Identifiable {
     let id: UUID
     let imageURL: URL?
     var isScrapped: Bool
-    
-    init(id: UUID, imageURL: URL?, isScrapped: Bool = false) {
+    var isSelected: Bool = false
+
+    init(id: UUID, imageURL: URL?, isScrapped: Bool = false, isSelected: Bool = false) {
         self.id = id
         self.imageURL = imageURL
         self.isScrapped = isScrapped
+        self.isSelected = isSelected
     }
-    
-    init(id: UUID, imageURLString: String, isScrapped: Bool = false) {
-        self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped)
+
+    init(id: UUID, imageURLString: String, isScrapped: Bool = false, isSelected: Bool = false) {
+        self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped, isSelected: isSelected)
     }
 }
 
@@ -39,7 +41,4 @@ extension ArchiveImageItem {
         ]
     }
     
-    func toFeedImageItem() -> FeedImageItem {
-        return FeedImageItem(id: id, imageURL: imageURL!, isScrapped: isScrapped)
-    }
 }

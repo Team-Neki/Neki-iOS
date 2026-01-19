@@ -314,7 +314,7 @@ private extension ArchiveView {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(store.albums) { album in
-                        AlbumCardView(album: album)
+                        AlbumCard(album: album)
                             .onTapGesture {
                                 store.send(.albumTapped(album))
                             }
@@ -352,7 +352,7 @@ private extension ArchiveView {
                 items: Array(store.photos),
                 columns: 2
             ) { item in
-                ArchiveImageView(item: item)
+                ArchiveImageCard(item: item, isSelectionMode: false)
                     .onTapGesture {
                         store.send(.imageTapped(item))
                     }

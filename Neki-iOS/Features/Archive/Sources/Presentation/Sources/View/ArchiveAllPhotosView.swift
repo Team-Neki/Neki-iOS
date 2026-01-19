@@ -19,15 +19,35 @@ struct ArchiveAllPhotosView: View {
         ZStack(alignment: .top) {
             masonryView
             
-            filterBar
-                .padding(.horizontal, 20)
-                .padding(.vertical, 4)
-                .padding(.bottom, 12)
-                .background(.white)
-                .offset(y: isFilterBarVisible ? 0 : -100)
+            if !store.isSelectionMode {
+                filterBar
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 4)
+                    .padding(.bottom, 12)
+                    .background(.white)
+                    .offset(y: isFilterBarVisible ? 0 : -100)
+            }
+            
+            if store.isSelectionMode {
+                VStack {
+                    Spacer()
+                    ArchiveImageFooter(
+                        isEnabled: store.hasSelectedItems,
+                        onDownload: { store.send(.onTapDownloadButton) },
+                        onDelete: { store.send(.onTapDeleteButton) }
+                    )
+                }
+            }
+            
         }
         // TODO: - 툴바 액션 연결
-        .nekiToolbar(left: .back(action: { store.send(.onTapBackButton) }), center: .text("모든 사진"), right: .text("선택", action: { store.send(.onTapSelectButton) }))
+        .nekiToolbar(
+            left: .back(action: { store.send(.onTapBackButton) }),
+            center: .text("모든 사진"),
+            right: store.isSelectionMode ?
+                .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
+                    .text("선택", action: { store.send(.onTapSelectButton) })
+        )
         .navigationBarHidden(true)
         .background(.white)
     }
@@ -41,13 +61,12 @@ private extension ArchiveAllPhotosView {
                 items: Array(store.filteredItems),
                 columns: 2
             ) { item in
-                ArchiveImageView(item: item)
-                    .onTapGesture {
-                        store.send(.imageTapped(item))
-                    }
+                ArchiveImageCard(item: item, isSelectionMode: store.isSelectionMode)                    .onTapGesture {
+                    store.send(.imageTapped(item))
+                }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 54)
+            .padding(.top, store.isSelectionMode ? 8 : 54)
             .padding(.bottom, 76)
         }
         .scrollIndicators(.never)

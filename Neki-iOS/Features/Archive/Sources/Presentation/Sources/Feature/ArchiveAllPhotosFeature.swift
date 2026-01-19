@@ -19,6 +19,12 @@ struct ArchiveAllPhotosFeature {
         
         var selectedSortedTime: String = "최신순"
         var isSelectedFavorite: Bool = false
+        var isSelectionMode: Bool = true
+        
+        // 선택된 사진이 있는지 여부
+        var hasSelectedItems: Bool {
+            return photos.contains { $0.isSelected }
+        }
         
         var filteredItems: IdentifiedArrayOf<ArchiveImageItem> {
             if isSelectedFavorite {
@@ -34,7 +40,11 @@ struct ArchiveAllPhotosFeature {
         case binding(BindingAction<State>)
         
         case onTapBackButton
+        
         case onTapSelectButton
+        case onTapCancelSelectButton
+        case onTapDownloadButton
+        case onTapDeleteButton
         
         case onTapFilterNewest
         case onTapFilterOldest
@@ -54,7 +64,37 @@ struct ArchiveAllPhotosFeature {
                 return .run { _ in await dismiss() }
                 
             case .onTapSelectButton:
-                // TODO: 선택 모드 진입 로직 구현
+                state.isSelectionMode = true
+                return .none
+                
+            case .onTapCancelSelectButton:
+                state.isSelectionMode = false
+                // 선택 모드 해제 시 모든 선택 상태 초기화
+                for i in 0..<state.photos.count {
+                    state.photos[i].isSelected = false
+                }
+                return .none
+                
+            case let .imageTapped(item):
+                if state.isSelectionMode {
+                    if let index = state.photos.index(id: item.id) {
+                        state.photos[index].isSelected.toggle()
+                    }
+                } else {
+                    // 상세 화면으로 이동 (ArchiveCoordinator에서 처리)
+                }
+                return .none
+                
+            case .onTapDownloadButton:
+                // TODO: - 다운로드 로직 구현
+                let selectedItems = state.photos.filter { $0.isSelected }
+                print("다운로드할 항목: \(selectedItems.count)개")
+                return .none
+                
+            case .onTapDeleteButton:
+                // TODO: - 삭제 로직 구현 및 알림 표시
+                let selectedItems = state.photos.filter { $0.isSelected }
+                print("삭제할 항목: \(selectedItems.count)개")
                 return .none
                 
             case .onTapFilterNewest:

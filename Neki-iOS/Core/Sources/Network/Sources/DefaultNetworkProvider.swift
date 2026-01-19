@@ -186,9 +186,9 @@ private extension DefaultNetworkProvider {
         }
     }
     
-    func decode<T: Decodable>(data: Data) throws -> T {
+    func decode<T: Decodable>(data: Data) throws -> BaseResponseDTO<T> {
         do {
-            return try self.decoder.decode(T.self, from: data)
+            return try self.decoder.decode(BaseResponseDTO<T>.self, from: data)
         } catch {
             Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")
             throw NetworkError.responseDecodingError

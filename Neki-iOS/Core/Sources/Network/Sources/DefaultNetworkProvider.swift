@@ -32,18 +32,17 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
     ///
     /// voidResponse를 수행합니다.
-    /// HTTP 200~299 상태 코드는 Void 값을 반환합니다.
-    public func request(endpoint: Endpoint) async throws {
-        let _ = try await processRequest(endpoint: endpoint, retryCount: 1)
+    @discardableResult
+    public func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData> {
+        try await performRequest(endpoint: endpoint, retryCount: 1)
     }
     
     /// 네트워크 요청을 수행하고 제네릭 타입으로 응답 데이터를 디코딩합니다.
     ///
     /// decodableResponse를 수행합니다.
     /// HTTP 200~299 상태 코드는 `JSONDecoder`를 통해 `T` 타입으로 디코딩하여 반환합니다.
-    public func request<T: Decodable>(endpoint: Endpoint) async throws -> T {
-        let data = try await processRequest(endpoint: endpoint, retryCount: 1)
-        return try decode(data: data)
+    public func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
+        try await performRequest(endpoint: endpoint, retryCount: 1)
     }
 }
 
@@ -51,31 +50,27 @@ public final actor DefaultNetworkProvider: NetworkProvider {
 // MARK: - Core Logics
 
 private extension DefaultNetworkProvider {
-    func processRequest(endpoint: Endpoint, retryCount: Int) async throws -> Data {
+    func performRequest<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
         let request = try await buildRequest(for: endpoint)
-    
-        requestLog(request)
+        let (data, response) = try await executeSession(with: request)
         
-        let (data, response) = try await session.data(for: request, delegate: nil)
-        
-        responseLog(data: data, response: response)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.responseError
+        switch validateResponse(response) {
+        case .success: return try decode(data: data)
+        case .unauthorized: return try await retryWithTokenRefresh(endpoint: endpoint, retryCount: retryCount)
+        case .failure(let error): throw error
         }
-        
-        if (200..<300).contains(httpResponse.statusCode) { return data }
-        
-        return try await handleFailure(statusCode: httpResponse.statusCode, data: data, endpoint: endpoint, retryCount: retryCount)
     }
     
-    func handleFailure(statusCode: Int, data: Data, endpoint: Endpoint, retryCount: Int) async throws -> Data {
-        guard statusCode == 401 else {
-            try throwIfServerError(data: data)
-            throw mapError(statusCode: statusCode)
-        }
+    func executeSession(with request: URLRequest) async throws -> (Data, URLResponse) {
+        requestLog(request)
         
-        return try await handleUnauthorized(data: data, endpoint: endpoint, retryCount: retryCount)
+        do {
+            let (data, response) = try await session.data(for: request, delegate: nil)
+            responseLog(data: data, response: response)
+            return (data, response)
+        } catch {
+            throw NetworkError.unknownError(error)
+        }
     }
 }
 
@@ -96,34 +91,34 @@ private extension DefaultNetworkProvider {
     }
     
     func appendBearerToken(to request: URLRequest) throws -> URLRequest {
-        var request = request
+        var newRequest = request
         
         do {
             let tokens = try tokenStorage.fetch()
-            request.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
-            return request
+            newRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
+            return newRequest
         } catch TokenStorageError.notFound {
             throw NetworkError.unauthorizedError
         } catch {
-            Logger.network.error("Token Fetch Error: \(error.localizedDescription)")
+            Logger.network.error("❌ Token Fetch Error: \(error.localizedDescription)")
             throw error
         }
     }
     
     func appendRefreshToken(to request: URLRequest) throws -> URLRequest {
-        var request = request
+        var newRequest = request
         
         do {
             let tokens = try tokenStorage.fetch()
             let body = ["refreshToken": tokens.refreshToken]
-            request.httpBody = try JSONEncoder().encode(body)
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            return request
+            newRequest.httpBody = try JSONEncoder().encode(body)
+            newRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            return newRequest
         } catch TokenStorageError.notFound {
             throw NetworkError.unauthorizedError
         } catch let error as EncodingError {
             Logger.network.error("❌ Encoding Error: \(error.localizedDescription)")
-            throw error
+            throw NetworkError.requestEncodingError
         } catch {
             Logger.network.error("❌ Token Fetch Error: \(error.localizedDescription)")
             throw error
@@ -135,15 +130,14 @@ private extension DefaultNetworkProvider {
 // MARK: - Auth Retry Logic
 
 private extension DefaultNetworkProvider {
-    func handleUnauthorized(data: Data, endpoint: Endpoint, retryCount: Int) async throws -> Data {
-        if endpoint.authorizationType == .reissue || retryCount <= .zero {
-            try throwIfServerError(data: data)
+    func retryWithTokenRefresh<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
+        guard endpoint.authorizationType != .reissue, retryCount > .zero else {
             try? tokenStorage.delete()
             throw NetworkError.unauthorizedError
         }
         
         try await performTokenRefresh()
-        return try await processRequest(endpoint: endpoint, retryCount: retryCount - 1)
+        return try await performRequest(endpoint: endpoint, retryCount: retryCount - 1)
     }
     
     func performTokenRefresh() async throws {
@@ -153,12 +147,19 @@ private extension DefaultNetworkProvider {
             defer { refreshTask = nil }
             
             guard let refresher = tokenRefresher else { throw NetworkError.unauthorizedError }
-            let newTokens = try await refresher.refresh(provider: self)
-            try tokenStorage.store(newTokens)
+            
+            // TODO: 토큰 재발급 후 저장 로직 필요
+//            let newToken = try await refresher.refresh(provider: self)
+//            try tokenStorage.store(newToken)
         }
         
         refreshTask = task
-        try await task.value
+        
+        do {
+            try await task.value
+        } catch {
+            throw error
+        }
     }
 }
 
@@ -166,24 +167,28 @@ private extension DefaultNetworkProvider {
 // MARK: - Validate & Decode
 
 private extension DefaultNetworkProvider {
-    func throwIfServerError(data: Data) throws {
-        guard let failureDTO = try? decoder.decode(BaseFailedResponseDTO.self, from: data) else { return }
-        throw NetworkError.apiError(failureDTO)
+    enum ResponseStatus {
+        case success
+        case unauthorized
+        case failure(NetworkError)
     }
     
-    func mapError(statusCode: Int) -> NetworkError {
-        switch statusCode {
-        case 400: return .badRequestError
-        case 401: return .unauthorizedError
-        case 404: return .notFound
-        case 500..<600: return .internalServerError
-        default: return .unknownError
+    func validateResponse(_ response: URLResponse) -> ResponseStatus {
+        guard let httpResponse = response as? HTTPURLResponse else { return .failure(.responseError) }
+        
+        switch httpResponse.statusCode {
+        case 200..<300: return .success
+        case 400: return .failure(.badRequestError)
+        case 401: return .unauthorized
+        case 404: return .failure(.notFound)
+        case 500..<600: return .failure(.internalServerError)
+        default: return .failure(.networkFail)
         }
     }
     
-    func decode<T: Decodable>(data: Data) throws -> T {
+    func decode<T: Decodable>(data: Data) throws -> BaseResponseDTO<T> {
         do {
-            return try self.decoder.decode(T.self, from: data)
+            return try self.decoder.decode(BaseResponseDTO<T>.self, from: data)
         } catch {
             Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")
             throw NetworkError.responseDecodingError

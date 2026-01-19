@@ -45,6 +45,13 @@ struct ArchiveCoordinator {
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
                 
+            case .root(.onTapAllPhotos):
+                // 루트의 사진 데이터를 전달하며 이동
+                state.path.append(.allPhotos(
+                    ArchiveAllPhotosFeature.State(photos: state.root.photos)
+                ))
+                return .none
+                
                 // 아카이브 상세에서 더 자세히 보기 클릭
             case let .path(.element(id: _, action: .detail(.didTapDeepLinkButton(item)))):
                 state.path.append(.deepDetail(ArchiveDeepDetailFeature.State(item: item)))
@@ -73,5 +80,6 @@ extension ArchiveCoordinator {
     enum Path {
         case detail(ArchiveDetailFeature)
         case deepDetail(ArchiveDeepDetailFeature)
+        case allPhotos(ArchiveAllPhotosFeature)
     }
 }

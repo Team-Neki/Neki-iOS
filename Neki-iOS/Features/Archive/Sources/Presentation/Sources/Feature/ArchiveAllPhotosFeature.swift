@@ -69,10 +69,6 @@ struct ArchiveAllPhotosFeature {
                 state.isSelectedFavorite.toggle()
                 return .none
                 
-            case .imageTapped(let item):
-                // 상세 화면으로 이동하거나 선택 로직
-                return .none
-                
             default:
                 return .none
             }

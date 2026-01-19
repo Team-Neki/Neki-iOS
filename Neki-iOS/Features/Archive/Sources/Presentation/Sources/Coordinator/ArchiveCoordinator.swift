@@ -51,6 +51,10 @@ struct ArchiveCoordinator {
                 ))
                 return .none
                 
+            case let .path(.element(id: _, action: .allPhotos(.imageTapped(item)))):
+                state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+                return .none
+                
             default:
                 return .none
             }

@@ -15,11 +15,16 @@ struct MainTabCoordinator {
     
     @ObservableState
     struct State {
-        var selectedTab: Tab = .pose
+        var selectedTab: NekiTab = .archive
         
         // 하위 코디네이터들의 State를 보유
         var pose = PoseCoordinator.State()
         var archive = ArchiveCoordinator.State()
+        
+        var isTabbarHidden: Bool = false
+        
+        // 토스트메세지 상태
+        var toast: NekiToastItem? = nil
     }
     
     enum Action: BindableAction {
@@ -33,11 +38,6 @@ struct MainTabCoordinator {
         enum Delegate {
             case logout
         }
-    }
-    
-    enum Tab: Hashable {
-        case pose
-        case archive
     }
     
     var body: some ReducerOf<Self> {
@@ -60,6 +60,11 @@ struct MainTabCoordinator {
             case let .archive(.delegate(.requestJumpToPose(item))):
                 state.selectedTab = .pose
                 return .send(.pose(.routeToDetail(item)))
+                
+                // 아카이브뷰에서 토스트 메세지 띄움
+            case let .archive(.delegate(.showToast(item))):
+                state.toast = item
+                return .none
                 
             case .pose(.delegate(.logout)):
                 return .send(.delegate(.logout))

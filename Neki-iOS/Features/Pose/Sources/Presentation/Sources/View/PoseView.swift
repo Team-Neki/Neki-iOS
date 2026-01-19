@@ -170,10 +170,3 @@ private extension PoseView {
         .background(.white)
     }
 }
-
-#Preview {
-    MainTabCoordinatorView(store: Store(initialState: MainTabCoordinator.State()) {
-        MainTabCoordinator()
-    }
-    )
-}

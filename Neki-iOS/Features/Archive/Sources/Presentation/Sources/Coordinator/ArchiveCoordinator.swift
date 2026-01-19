@@ -25,6 +25,7 @@ struct ArchiveCoordinator {
         // 상위 코디네이터(MainTab)로 보낼 신호
         enum Delegate {
             case requestJumpToPose(FeedImageItem)
+            case showToast(NekiToastItem)
         }
     }
     
@@ -40,6 +41,9 @@ struct ArchiveCoordinator {
             case let .root(.imageTapped(item)):
                 state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
                 return .none
+                
+            case let .root(.delegate(.showToast(item))):
+                return .send(.delegate(.showToast(item)))
                 
                 // 아카이브 상세에서 더 자세히 보기 클릭
             case let .path(.element(id: _, action: .detail(.didTapDeepLinkButton(item)))):

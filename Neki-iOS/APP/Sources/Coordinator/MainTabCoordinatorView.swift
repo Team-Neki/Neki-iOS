@@ -14,24 +14,36 @@ struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
     
     var body: some View {
-        TabView(selection: $store.selectedTab) {
-            // Pose Tab
-            PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
-                .tabItem {
-                    Label("포즈", systemImage: "figure.stand")
+        ZStack(alignment: .bottom) {
+            Group {
+                switch store.selectedTab {
+                case .archive:
+                    ArchiveCoordinatorView(store: store.scope(state: \.archive, action: \.archive))
+                
+                case .pose:
+                    PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
+                    
+                case .map:
+                    EmptyView()     // TODO: - MapCoordinator뷰로 바꾸기
+
+                case .mypage:
+                    EmptyView()     // TODO: - MyPageCoordinator뷰로 바꾸기
                 }
-                .tag(MainTabCoordinator.Tab.pose)
+            }
             
-            // Archive Tab
-            ArchiveCoordinatorView(store: store.scope(state: \.archive, action: \.archive))
-                .tabItem {
-                    Label("보관함", systemImage: "archivebox")
-                }
-                .tag(MainTabCoordinator.Tab.archive)
-            
-            // Map Tab
-            // MyPage Tab
+            if !store.isTabbarHidden {
+                NekiTabBar(selectedTab: $store.selectedTab)
+            }
         }
-        .tint(.black)
+        .nekiToast(item: $store.toast)
+        
+        // TODO: - 탭 이동 시 화면 초기화 되는지 기디 물어보기. 그리고 탭 한 번 더 누르면 초기화면으로 가는지도
     }
+}
+
+#Preview {
+    MainTabCoordinatorView(store: Store(initialState: MainTabCoordinator.State()) {
+        MainTabCoordinator()
+    }
+    )
 }

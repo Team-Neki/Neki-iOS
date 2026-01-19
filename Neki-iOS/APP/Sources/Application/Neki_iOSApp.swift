@@ -21,13 +21,3 @@ struct Neki_iOSApp: App {
         }
     }
 }
-
-#Preview("앱 시작 (Splash)") {
-    AppCoordinatorView(
-        store: Store(
-            initialState: AppCoordinator.State.splash(SplashFeature.State())
-        ) {
-            AppCoordinator()
-        }
-    )
-}

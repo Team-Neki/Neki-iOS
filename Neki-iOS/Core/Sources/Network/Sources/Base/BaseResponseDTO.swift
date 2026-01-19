@@ -11,6 +11,11 @@ public struct BaseResponseDTO<T: Decodable>: Decodable {
     let status: Int
     let message: String
     let data: T?
+    
+    enum CodingKeys: String, CodingKey {
+        case message, data
+        case status = "resultCode"
+    }
 }
 
 public struct EmptyData: Decodable {}

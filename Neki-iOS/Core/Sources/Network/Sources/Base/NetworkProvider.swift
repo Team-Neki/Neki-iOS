@@ -8,6 +8,6 @@
 import Foundation
 
 public protocol NetworkProvider {
-    func request(endpoint: Endpoint) async throws -> Void 
-    func request<T: Decodable>(endpoint: Endpoint) async throws -> T
+    func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData>
+    func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T>
 }

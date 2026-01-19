@@ -18,7 +18,7 @@ struct QRCodeScanFeature {
     
     @ObservableState
     struct State {
-        var isTorchOn: Bool = false
+        var isLightOn: Bool = false
         var scannedURL: URL?
         
         var alert: ScannerAlert?
@@ -27,7 +27,7 @@ struct QRCodeScanFeature {
     enum Action: BindableAction {
         // View Actions
         case closeButtonTapped
-        case torchButtonTapped
+        case lightButtonTapped
         case codeScanned(String)
         
         // Internal Actions
@@ -47,8 +47,8 @@ struct QRCodeScanFeature {
             case .closeButtonTapped:
                 return .run { _ in await dismiss() }
                 
-            case .torchButtonTapped:
-                state.isTorchOn.toggle()
+            case .lightButtonTapped:
+                state.isLightOn.toggle()
                 return .none
                 
             case .codeScanned(let urlString):

@@ -17,7 +17,7 @@ struct QRCodeScannerView: View {
     
     var body: some View {
         ZStack {
-            CameraPreview(isTorchOn: $store.isTorchOn) { urlString in
+            CameraPreview(isTorchOn: $store.isLightOn) { urlString in
                 store.send(.codeScanned(urlString))
             }.ignoresSafeArea()
             
@@ -67,9 +67,9 @@ struct QRCodeScannerView: View {
     
     private var footer: some View {
         Button {
-            store.send(.torchButtonTapped)
+            store.send(.lightButtonTapped)
         } label: {
-            Image(.iconTorchOff) // TODO: 현재 토치 온오프 아이콘이 동일한데 에셋 필요, 버튼 디자인 변경 예정
+            Image(.iconLightOff) // TODO: 현재 토치 온오프 아이콘이 동일한데 에셋 필요, 버튼 디자인 변경 예정
                 .padding(.horizontal, 13.5)
                 .padding(.vertical, 15)
                 .background(.ultraThinMaterial)

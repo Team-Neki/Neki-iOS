@@ -12,16 +12,14 @@ struct ArchiveImageItem: Equatable, Identifiable {
     let imageURL: URL?
     var isScrapped: Bool
     
-    init(id: UUID, imageURLString: String, isScrapped: Bool = false) {
-        self.id = id
-        self.imageURL = URL(string: imageURLString)
-        self.isScrapped = isScrapped
-    }
-    
-    init(id: UUID, imageURL: URL, isScrapped: Bool = false) {
+    init(id: UUID, imageURL: URL?, isScrapped: Bool = false) {
         self.id = id
         self.imageURL = imageURL
         self.isScrapped = isScrapped
+    }
+    
+    init(id: UUID, imageURLString: String, isScrapped: Bool = false) {
+        self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped)
     }
 }
 

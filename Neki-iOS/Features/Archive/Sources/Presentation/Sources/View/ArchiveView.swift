@@ -352,7 +352,7 @@ private extension ArchiveView {
                 items: Array(store.photos),
                 columns: 2
             ) { item in
-                ArchiveImageCard(item: item, isSelectionMode: false)
+                ArchiveImageCard(item: item)
                     .onTapGesture {
                         store.send(.imageTapped(item))
                     }

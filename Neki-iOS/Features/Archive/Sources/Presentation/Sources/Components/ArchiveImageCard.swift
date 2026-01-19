@@ -15,6 +15,19 @@ struct ArchiveImageCard: View {
     
     let item: ArchiveImageItem
     let isSelectionMode: Bool
+    let isSelected: Bool
+    
+    //MARK: - Init
+
+    init(
+        item: ArchiveImageItem,
+        isSelectionMode: Bool = false,
+        isSelected: Bool = false
+    ) {
+        self.item = item
+        self.isSelectionMode = isSelectionMode
+        self.isSelected = isSelected
+    }
     
     //MARK: - Main Body
     
@@ -30,20 +43,20 @@ struct ArchiveImageCard: View {
                 }
                 .aspectRatio(contentMode: .fit)
                 .overlay(alignment: .topTrailing) {
-                    if item.isScrapped {
+                    if item.isFavorite {
                         Image(.iconHeart20)
                             .padding(10)
                     }
                 }
                 .overlay(alignment: .topLeading) {
                     if isSelectionMode {
-                        Image(systemName: item.isSelected ? "checkmark.circle.fill" : "circle")
+                        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                             .resizable()
                             .frame(width: 24, height: 24)
-                            .foregroundStyle(item.isSelected ? .primary400 : .white)
+                            .foregroundStyle(isSelected ? .primary400 : .white)
                             .background(
                                 Circle()
-                                    .fill(item.isSelected ? .white : .black.opacity(0.2))
+                                    .fill(isSelected ? .white : .black.opacity(0.2))
                                     .frame(width: 24, height: 24)
                             )
                             .padding(12)
@@ -51,7 +64,7 @@ struct ArchiveImageCard: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(item.isSelected ? .primary400 : .clear, lineWidth: 2)
+                        .stroke(isSelected ? .primary400 : .clear, lineWidth: 2)
                 )
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))

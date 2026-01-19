@@ -10,18 +10,16 @@ import Foundation
 struct ArchiveImageItem: Equatable, Identifiable {
     let id: UUID
     let imageURL: URL?
-    var isScrapped: Bool
-    var isSelected: Bool = false
+    var isFavorite: Bool
 
-    init(id: UUID, imageURL: URL?, isScrapped: Bool = false, isSelected: Bool = false) {
+    init(id: UUID, imageURL: URL?, isScrapped: Bool = false) {
         self.id = id
         self.imageURL = imageURL
-        self.isScrapped = isScrapped
-        self.isSelected = isSelected
+        self.isFavorite = isScrapped
     }
 
-    init(id: UUID, imageURLString: String, isScrapped: Bool = false, isSelected: Bool = false) {
-        self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped, isSelected: isSelected)
+    init(id: UUID, imageURLString: String, isScrapped: Bool = false) {
+        self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped)
     }
 }
 

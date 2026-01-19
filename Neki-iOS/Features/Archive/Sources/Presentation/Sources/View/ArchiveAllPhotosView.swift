@@ -60,7 +60,12 @@ private extension ArchiveAllPhotosView {
                 items: Array(store.filteredItems),
                 columns: 2
             ) { item in
-                ArchiveImageCard(item: item, isSelectionMode: store.isSelectionMode)                    .onTapGesture {
+                ArchiveImageCard(
+                    item: item,
+                    isSelectionMode: store.isSelectionMode,
+                    isSelected: store.selectedIDs.contains(item.id)
+                )
+                .onTapGesture {
                     store.send(.imageTapped(item))
                 }
             }

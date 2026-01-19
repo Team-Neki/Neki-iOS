@@ -14,6 +14,8 @@ struct ArchiveAllPhotosView: View {
     @State private var isFilterBarVisible: Bool = true
     @State private var lastDragPoint: CGFloat = 0
     @State var showDropDownMenu: Bool = false
+    @State var showDeleteAlert: Bool = false
+
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -34,7 +36,7 @@ struct ArchiveAllPhotosView: View {
                     ArchiveImageFooter(
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
-                        onDelete: { store.send(.onTapDeleteButton) }
+                        onDelete: { showDeleteAlert = true }
                     )
                 }
             }
@@ -46,6 +48,21 @@ struct ArchiveAllPhotosView: View {
             right: store.isSelectionMode ?
                 .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
                     .text("선택", action: { store.send(.onTapSelectButton) })
+        )
+        .nekiAlert(
+            isPresented: $showDeleteAlert,
+            style: .cancelable,
+            titleMessage: "사진을 삭제하시겠어요?",
+            subTitleMessage: "이 작업은 실행취소할 수 없어요",
+            confirmText: "삭제하기",
+            cancelText: "취소",
+            onConfirm: {
+                store.send(.onTapDeleteButton)
+                showDeleteAlert = false
+            },
+            onCancel: {
+                showDeleteAlert = false
+            }
         )
         .navigationBarHidden(true)
         .background(.white)

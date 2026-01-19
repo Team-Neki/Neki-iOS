@@ -40,22 +40,21 @@ struct ArchiveImageCard: View {
                         Image(systemName: item.isSelected ? "checkmark.circle.fill" : "circle")
                             .resizable()
                             .frame(width: 24, height: 24)
-                            .foregroundStyle(item.isSelected ? .orange : .white) // 색상 수정 필요 (.primary400 등)
+                            .foregroundStyle(item.isSelected ? .primary400 : .white)
                             .background(
                                 Circle()
-                                    .fill(item.isSelected ? .white : .black.opacity(0.2)) // 배경 추가로 시인성 확보
-                                    .frame(width: 20, height: 20)
+                                    .fill(item.isSelected ? .white : .black.opacity(0.2))
+                                    .frame(width: 24, height: 24)
                             )
-                            .padding(10)
+                            .padding(12)
                     }
                 }
-            // ✨ 선택된 항목 테두리 강조
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(item.isSelected ? .orange : .clear, lineWidth: 3) // 색상 수정 필요
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(item.isSelected ? .primary400 : .clear, lineWidth: 2)
                 )
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .clipped()
     }
 }

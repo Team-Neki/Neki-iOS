@@ -71,7 +71,7 @@ struct AlbumCardView: View {
 }
 
 
-// MARK: - 익성님이 공유해준 앨범 커버 만드는 로직
+// MARK: - 앨범 커버 만드는 로직
 
 private extension AlbumCardView {
     struct UnionShape: Shape {

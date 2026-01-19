@@ -40,7 +40,6 @@ struct ArchiveAllPhotosView: View {
             }
             
         }
-        // TODO: - 툴바 액션 연결
         .nekiToolbar(
             left: .back(action: { store.send(.onTapBackButton) }),
             center: .text("모든 사진"),

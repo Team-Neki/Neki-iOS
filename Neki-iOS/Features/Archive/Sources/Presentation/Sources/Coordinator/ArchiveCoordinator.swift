@@ -44,6 +44,9 @@ struct ArchiveCoordinator {
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
                 
+            case let .path(.element(id: _, action: .allPhotos(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
+                
             case .root(.onTapAllPhotos):
                 // 루트의 사진 데이터를 전달하며 이동
                 state.path.append(.allPhotos(

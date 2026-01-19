@@ -20,7 +20,7 @@ struct ArchiveAllPhotosFeature {
         
         var selectedSortedTime: String = "최신순"
         var isSelectedFavorite: Bool = false
-        var isSelectionMode: Bool = true
+        var isSelectionMode: Bool = false
         
         // 선택된 사진이 있는지 여부
         var hasSelectedItems: Bool {
@@ -52,6 +52,11 @@ struct ArchiveAllPhotosFeature {
         case onTapFavoriteButton
         
         case imageTapped(ArchiveImageItem)
+        
+        case delegate(Delegate)
+        enum Delegate {
+            case showToast(NekiToastItem)
+        }
     }
     
     @Dependency(\.dismiss) var dismiss
@@ -90,13 +95,15 @@ struct ArchiveAllPhotosFeature {
                 // TODO: - 다운로드 로직 구현
                 let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
                 print("다운로드할 항목: \(selectedItems.count)개")
-                return .none
+                let toast = NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success)
+                return .send(.delegate(.showToast(toast)))
                 
             case .onTapDeleteButton:
                 // TODO: - 삭제 로직 구현 및 알림 표시
                 let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
                 print("삭제할 항목: \(selectedItems.count)개")
-                return .none
+                let toast = NekiToastItem("사진을 삭제했어요", style: .success)
+                return .send(.delegate(.showToast(toast)))
                 
             case .onTapFilterNewest:
                 state.selectedSortedTime = "최신순"

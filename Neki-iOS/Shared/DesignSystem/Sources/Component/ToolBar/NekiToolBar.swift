@@ -29,7 +29,6 @@ public struct NekiToolBar: View {
         case text(String, action: () -> Void)
         case icon(UIImage, action: () -> Void)
         case both([RightItem])
-        case custom(AnyView)
     }
     
     // MARK: - Properties
@@ -147,9 +146,6 @@ private extension NekiToolBar {
                     makeRightItem(items[index])
                 }
             }
-            
-        case .custom(let view):
-            view
         }
     }
     
@@ -166,8 +162,6 @@ private extension NekiToolBar {
             Button(action: action) {
                 Image(uiImage: image)
             }
-        case .custom(let view):
-            view
         default:
             EmptyView()
         }

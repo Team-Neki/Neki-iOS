@@ -21,7 +21,7 @@ struct ArchiveFeature {
         var albumTitleErrorMessage: String? = nil
         
         var isConfirmButtonEnabled: Bool {
-            return !newAlbumTitle.isEmpty && albumTitleErrorMessage == nil
+            return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
     }
     

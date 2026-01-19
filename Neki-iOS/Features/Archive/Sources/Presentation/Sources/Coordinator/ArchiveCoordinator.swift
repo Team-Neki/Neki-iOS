@@ -24,7 +24,6 @@ struct ArchiveCoordinator {
         
         // 상위 코디네이터(MainTab)로 보낼 신호
         enum Delegate {
-            case requestJumpToPose(FeedImageItem)
             case showToast(NekiToastItem)
         }
     }
@@ -52,21 +51,6 @@ struct ArchiveCoordinator {
                 ))
                 return .none
                 
-                // 아카이브 상세에서 더 자세히 보기 클릭
-            case let .path(.element(id: _, action: .detail(.didTapDeepLinkButton(item)))):
-                state.path.append(.deepDetail(ArchiveDeepDetailFeature.State(item: item)))
-                return .none
-                
-                // [DeepDetail -> Root] 한 번에 이동
-            case .path(.element(id: _, action: .deepDetail(.didTapPopToRoot))):
-                state.path.removeAll()
-                return .none
-                
-                // 아카이브에서 포즈의 특정 사진 디테일 화면으로 이동 (Feature간 이동)
-            case .path(.element(id: _, action: .deepDetail(.didTapJumpToPose))):
-                guard case let .deepDetail(deepState) = state.path.last else { return .none }
-                return .send(.delegate(.requestJumpToPose(deepState.item.toFeedImageItem())))
-                
             default:
                 return .none
             }
@@ -79,7 +63,6 @@ extension ArchiveCoordinator {
     @Reducer
     enum Path {
         case detail(ArchiveDetailFeature)
-        case deepDetail(ArchiveDeepDetailFeature)
         case allPhotos(ArchiveAllPhotosFeature)
     }
 }

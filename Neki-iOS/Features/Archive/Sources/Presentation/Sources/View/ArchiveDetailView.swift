@@ -24,10 +24,6 @@ struct ArchiveDetailView: View {
             Text("이미지 ID: \(store.item.id)")
                 .font(.headline)
             
-            Button("더 자세히 보기 (Next)") {
-                store.send(.didTapDeepLinkButton(store.item))
-            }
-            
             Spacer()
         }
         .navigationTitle("Archive 상세 보기")

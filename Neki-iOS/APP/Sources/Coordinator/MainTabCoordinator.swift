@@ -56,11 +56,6 @@ struct MainTabCoordinator {
             case .binding:
                 return .none
                 
-                // 아카이브 내부 뷰에서 포즈 내부 뷰로 변경 (피쳐간 이동)
-            case let .archive(.delegate(.requestJumpToPose(item))):
-                state.selectedTab = .pose
-                return .send(.pose(.routeToDetail(item)))
-                
                 // 아카이브뷰에서 토스트 메세지 띄움
             case let .archive(.delegate(.showToast(item))):
                 state.toast = item

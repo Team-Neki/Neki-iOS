@@ -18,7 +18,6 @@ struct ArchiveDetailFeature {
     enum Action {
         // Navigation Action
         case didTapBackButton
-        case didTapDeepLinkButton(ArchiveImageItem)
     }
     
     var body: some ReducerOf<Self> {

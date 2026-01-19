@@ -12,7 +12,7 @@ import os
 struct ArchiveImageView: View {
     
     //MARK: - Properties
-
+    
     let item: ArchiveImageItem
     
     //MARK: - Main Body
@@ -28,6 +28,12 @@ struct ArchiveImageView: View {
                     Logger.presentation.error("실패한 이미지 id: \(item.id)")
                 }
                 .aspectRatio(contentMode: .fit)
+                .overlay(alignment: .topTrailing) {
+                    if item.isScrapped {
+                        Image(.icHeart)
+                            .padding(10)
+                    }
+                }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()

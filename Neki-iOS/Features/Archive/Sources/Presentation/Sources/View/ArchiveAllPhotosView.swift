@@ -186,15 +186,3 @@ private extension ArchiveAllPhotosView {
     }
     
 }
-
-#Preview {
-    ArchiveAllPhotosView(
-        store: Store(
-            initialState: ArchiveAllPhotosFeature.State(
-                photos: IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
-            )
-        ) {
-            ArchiveAllPhotosFeature()
-        }
-    )
-}

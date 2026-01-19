@@ -96,6 +96,8 @@ struct ArchiveAllPhotosFeature {
                 let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
                 print("다운로드할 항목: \(selectedItems.count)개")
                 let toast = NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success)
+                state.isSelectionMode = false
+                state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(toast)))
                 
             case .onTapDeleteButton:
@@ -103,6 +105,8 @@ struct ArchiveAllPhotosFeature {
                 let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
                 print("삭제할 항목: \(selectedItems.count)개")
                 let toast = NekiToastItem("사진을 삭제했어요", style: .success)
+                state.isSelectionMode = false
+                state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(toast)))
                 
             case .onTapFilterNewest:

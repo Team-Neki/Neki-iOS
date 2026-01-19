@@ -54,8 +54,13 @@ struct ArchiveCoordinator {
                 ))
                 return .none
                 
-            case let .path(.element(id: _, action: .allPhotos(.imageTapped(item)))):
-                state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+            case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):
+                guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
+
+                if !allPhotosState.isSelectionMode {
+                    state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+                }
+                
                 return .none
                 
             default:

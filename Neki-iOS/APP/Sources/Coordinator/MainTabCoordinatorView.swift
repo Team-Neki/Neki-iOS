@@ -15,20 +15,20 @@ struct MainTabCoordinatorView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            TabView(selection: $store.selectedTab) {
-                Group {
-                    // Pose Tab
-                    PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
-                        .tag(NekiTab.pose)
-                    
-                    // Archive Tab
+            Group {
+                switch store.selectedTab {
+                case .archive:
                     ArchiveCoordinatorView(store: store.scope(state: \.archive, action: \.archive))
-                        .tag(NekiTab.archive)
+                
+                case .pose:
+                    PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
                     
-                    // Map Tab
-                    // MyPage Tab
+                case .map:
+                    EmptyView()     // TODO: - MapCoordinator뷰로 바꾸기
+
+                case .mypage:
+                    EmptyView()     // TODO: - MyPageCoordinator뷰로 바꾸기
                 }
-                .toolbar(!store.isTabbarHidden ? .visible : .hidden, for: .tabBar)
             }
             
             if !store.isTabbarHidden {
@@ -36,6 +36,8 @@ struct MainTabCoordinatorView: View {
             }
         }
         .nekiToast(item: $store.toast)
+        
+        // TODO: - 탭 이동 시 화면 초기화 되는지 기디 물어보기. 그리고 탭 한 번 더 누르면 초기화면으로 가는지도
     }
 }
 

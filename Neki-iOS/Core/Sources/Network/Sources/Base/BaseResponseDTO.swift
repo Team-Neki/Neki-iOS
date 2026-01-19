@@ -10,13 +10,11 @@ import Foundation
 public struct BaseResponseDTO<T: Decodable>: Decodable {
     let status: Int
     let message: String
-    let isSuccess: Bool
     let data: T?
     
     enum CodingKeys: String, CodingKey {
         case message, data
         case status = "resultCode"
-        case isSuccess = "success"
     }
 }
 

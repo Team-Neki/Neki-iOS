@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-enum NekiTab: CaseIterable, Hashable {
+enum NekiTab: CaseIterable {
     case pose, archive, map, mypage
     
     var title: String {
@@ -23,29 +23,12 @@ enum NekiTab: CaseIterable, Hashable {
         }
     }
     
-    var defaultIcon: UIImage {
+    func icon(isSelected: Bool) -> UIImage {
         switch self {
-        case .archive:
-            return .iconTabArchive
-        case .pose:
-            return .iconTabPose
-        case .map:
-            return .iconTabMap
-        case .mypage:
-            return .iconTabMypage
-        }
-    }
-    
-    var selectedIcon: UIImage {
-        switch self {
-        case .archive:
-            return .iconTabArchiveFill
-        case .pose:
-            return .iconTabPoseFill
-        case .map:
-            return .iconTabMapFill
-        case .mypage:
-            return .iconTabMypageFill
+        case .archive: return isSelected ? .iconTabArchiveFill : .iconTabArchive
+        case .pose:    return isSelected ? .iconTabPoseFill    : .iconTabPose
+        case .map:     return isSelected ? .iconTabMapFill     : .iconTabMap
+        case .mypage:  return isSelected ? .iconTabMypageFill  : .iconTabMypage
         }
     }
 }
@@ -60,7 +43,8 @@ struct NekiTabBar: View {
                     selectedTab = tab
                 } label: {
                     VStack(alignment: .center, spacing: 1) {
-                        Image(uiImage: selectedTab == tab ? tab.selectedIcon : tab.defaultIcon)
+                        Image(uiImage: tab.icon(isSelected: selectedTab == tab))
+                        
                         Text(tab.title)
                             .nekiFont(.caption11Medium)
                             .foregroundColor(selectedTab == tab ? .gray800 : .gray500)

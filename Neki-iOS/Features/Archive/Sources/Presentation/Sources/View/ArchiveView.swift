@@ -14,7 +14,6 @@ struct ArchiveView: View {
     @State var showDropDownMenu: Bool = false
     @State var showTooltip: Bool = false          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
     @State var addAlbumSheetPresented: Bool = false
-    
     @State var showScrollToTopButton: Bool = false
     
     @Bindable var store: StoreOf<ArchiveFeature>

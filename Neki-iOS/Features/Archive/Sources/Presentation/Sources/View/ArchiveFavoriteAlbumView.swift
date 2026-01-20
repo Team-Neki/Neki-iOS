@@ -15,7 +15,11 @@ struct ArchiveFavoriteAlbumView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            masonryView
+            if store.filteredItems.isEmpty {
+                ArchiveEmptyView()
+            } else {
+                masonryView
+            }
             
             if store.isSelectionMode {
                 VStack {
@@ -31,7 +35,7 @@ struct ArchiveFavoriteAlbumView: View {
         .nekiToolbar(
             left: .back(action: { store.send(.onTapBackButton) }),
             center: .text(store.album.title),
-            right: store.isSelectionMode ?
+            right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
                 .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
                 .text("선택", action: { store.send(.onTapSelectButton) })
         )

@@ -84,8 +84,6 @@ struct ArchiveFeature {
             case .onTapConfirmAddAlbum:
                 guard state.isConfirmButtonEnabled else { return .none }
                 
-                print("새 앨범 추가됨: \(state.newAlbumTitle)")
-                
                 let newAlbum = AlbumItem(
                     title: state.newAlbumTitle,
                     count: 0,

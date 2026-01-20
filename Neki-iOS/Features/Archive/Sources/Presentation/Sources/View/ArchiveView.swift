@@ -88,10 +88,22 @@ struct ArchiveView: View {
             
         }
         .sheet(isPresented: $addAlbumSheetPresented) {
-            addAlbumSheet
-                .presentationDetents([.height(266)])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(20)
+            ArchiveAddAlbumSheet(
+                text: $store.newAlbumTitle,
+                errorMessage: store.albumTitleErrorMessage,
+                isConfirmEnabled: store.isConfirmButtonEnabled,
+                onCancel: {
+                    store.send(.onTapCancelAddAlbum)
+                    addAlbumSheetPresented = false
+                },
+                onConfirm: {
+                    store.send(.onTapConfirmAddAlbum)
+                    addAlbumSheetPresented = false
+                }
+            )
+            .presentationDetents([.height(266)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
         }
         .task {
             await store.send(.onAppear).finish()
@@ -167,103 +179,6 @@ private extension ArchiveView {
                 .shadow(color: .gray.opacity(0.5), radius: 2)
         })
         .frame(width: 158, height: 130)
-    }
-    
-    var addAlbumSheet: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("새 앨범 추가")
-                .nekiFont(.title20SemiBold)
-                .foregroundStyle(.gray900)
-                .frame(height: 28)
-                .padding(.top, 24)
-                .padding(.bottom, 2)
-            
-            Text("네컷사진을 모을 앨범명을 입력하세요")
-                .nekiFont(.body14Regular)
-                .foregroundStyle(.gray700)
-                .frame(height: 20)
-                .padding(.bottom, 16)
-            
-            HStack(alignment: .center, spacing: 0) {
-                TextField("앨범명을 입력하세요", text: $store.newAlbumTitle)
-                    .maxLength(16, text: $store.newAlbumTitle)
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray900)
-                    .frame(height: 50)
-                
-                Spacer()
-                
-                Text("\(store.newAlbumTitle.count)/16")
-                    .nekiFont(.caption12Regular)
-                    .foregroundStyle(.gray300)
-            }
-            .padding(.horizontal, 16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(store.albumTitleErrorMessage != nil ? .primary600 : .gray75,
-                            lineWidth: 1)
-            )
-            .padding(.bottom, 6)
-            
-            if let errorMessage = store.albumTitleErrorMessage {
-                Text(errorMessage)
-                    .frame(height: 16)
-                    .nekiFont(.caption12Regular)
-                    .foregroundStyle(.primary600)
-                    .padding(.leading, 2)
-                    .padding(.bottom, 18)
-            } else {
-                Color.clear
-                    .frame(height: 16)
-                    .padding(.bottom, 18)
-            }
-            
-            GeometryReader { proxy in
-                // 버튼 사이 간격
-                let spacing: CGFloat = 12
-                
-                // 전체 너비에서 간격을 뺀 실제 버튼들의 너비
-                let totalWidth = proxy.size.width - spacing
-                
-                // 비율 3:7
-                let cancelWidth = totalWidth * 0.3
-                let addWidth = totalWidth * 0.7
-                
-                HStack(alignment: .center, spacing: spacing) {
-                    Button {
-                        store.send(.onTapCancelAddAlbum)
-                        addAlbumSheetPresented = false
-                    } label: {
-                        Text("취소")
-                            .nekiFont(.body16SemiBold)
-                            .foregroundStyle(.gray300)
-                            .frame(width: cancelWidth)
-                            .frame(height: 52)
-                            .background(.gray50)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    
-                    Button {
-                        store.send(.onTapConfirmAddAlbum)
-                        addAlbumSheetPresented = false
-                    } label: {
-                        Text("추가하기")
-                            .nekiFont(.body16SemiBold)
-                            .foregroundStyle(.white)
-                            .frame(width: addWidth)
-                            .frame(height: 52)
-                            .background(store.isConfirmButtonEnabled ? .primary400 : .primary400.opacity(0.4))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                    .disabled(!store.isConfirmButtonEnabled)
-                }
-            }
-            .frame(height: 52)
-            
-        }
-        .padding(.bottom, 34)
-        .padding(.horizontal, 20)
-        .background(.white)
     }
     
     func dropDownMenuButton(

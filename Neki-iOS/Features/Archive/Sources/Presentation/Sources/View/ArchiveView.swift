@@ -60,6 +60,7 @@ struct ArchiveView: View {
                                 Image(.btnFloatingArchive)
                             }
                             .padding()
+                            .padding(.bottom, 52)
                         }
                     }
                     .onPreferenceChange(ScrollOffsetKey.self) { value in

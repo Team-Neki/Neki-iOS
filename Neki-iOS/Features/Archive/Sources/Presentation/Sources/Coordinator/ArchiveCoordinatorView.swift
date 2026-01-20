@@ -24,7 +24,10 @@ struct ArchiveCoordinatorView: View {
             case .allPhotos(let store):
                 ArchiveAllPhotosView(store: store)
                     .navigationBarBackButtonHidden()
-
+                
+            case .allAlbums(let store):
+                ArchiveAllAlbumsView(store: store)
+                    .navigationBarBackButtonHidden()
             }
         }
     }

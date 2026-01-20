@@ -32,10 +32,10 @@ struct ArchiveView: View {
                                 Color.clear
                                     .frame(height: 0)
                                     .id("SCROLL_TO_TOP")
-
+                                
                                 albumSection
                                     .padding(.bottom, 28)
-
+                                
                                 recentPhotoSection
                             }
                             .background(
@@ -297,8 +297,7 @@ private extension ArchiveView {
                 Spacer()
                 
                 Button {
-                    // TODO: - 전체 앨범 이동
-                    print("전체 앨범 이동 클릭")
+                    store.send(.onTapAllAlbums)
                 } label: {
                     HStack(alignment: .center, spacing: 0) {
                         Text("전체 앨범")

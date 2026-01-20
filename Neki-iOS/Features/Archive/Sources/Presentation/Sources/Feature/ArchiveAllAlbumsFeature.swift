@@ -1,82 +1,82 @@
 //
-//  ArchiveFeature.swift
+//  ArchiveAllAlbumsFeature.swift
 //  Neki-iOS
 //
-//  Created by OneTen on 1/7/26.
+//  Created by OneTen on 1/20/26.
 //
 
-import SwiftUI
 import ComposableArchitecture
+import Foundation
 
 @Reducer
-struct ArchiveFeature {
+struct ArchiveAllAlbumsFeature {
     
     @ObservableState
     struct State {
-        @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
-        @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
+        // 앨범 목록 데이터
+        @Shared var albums: IdentifiedArrayOf<AlbumItem>
         
+        // 앨범 생성 시트 표시 여부
+        var isAddAlbumSheetPresented: Bool = false
+        // 새 앨범 제목 입력
         var newAlbumTitle: String = ""
-        
+        // 앨범 제목 유효성 에러 메시지
         var albumTitleErrorMessage: String? = nil
         
+        // 생성 버튼 활성화 조건 확인
         var isConfirmButtonEnabled: Bool {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
-
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         
-        // User Action
-        case onTapAllPhotos
-        case onTapAllAlbums
-        case onTapQRScan
-        case onTapAddFromGallery
+        // 네비게이션바 액션
+        case onTapBackButton
+        case onTapCreateButton
+        
+        // 앨범 리스트 액션
+        case onTapAlbum(AlbumItem) // 앨범 상세 진입
+        case onTapDeleteAlbum(AlbumItem) // 앨범 삭제 메뉴 클릭
+        
+        // 앨범 생성 시트 액션
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
         
-        // View Life Cycle Action
-        case onAppear
-        
-        // Navigation Action
-        case imageTapped(ArchiveImageItem)
-        case albumTapped(AlbumItem)
-        
-        // Delegate Action
-        case delegate(DelegateAction)
-        enum DelegateAction {
+        // Delegate (부모 코디네이터로 전달)
+        case delegate(Delegate)
+        enum Delegate {
             case showToast(NekiToastItem)
         }
     }
+    
+    @Dependency(\.dismiss) var dismiss
     
     var body: some ReducerOf<Self> {
         BindingReducer()
         
         Reduce { state, action in
-            /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
-            case .onAppear:
-                if state.albums.isEmpty {
-                    let loadedAlbums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
-                    state.$albums.withLock { $0 = loadedAlbums }
-                }
-                if state.photos.isEmpty {
-                    let loadedPhotos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
-                    state.$photos.withLock { $0 = loadedPhotos }
-                }
+            case .onTapBackButton:
+                return .run { _ in await dismiss() }
+                
+            case .onTapCreateButton:
+                state.isAddAlbumSheetPresented = true
                 return .none
                 
-            case .onTapQRScan:
-                print("QR 인식")
-                return .none
+            case let .onTapDeleteAlbum(album):
+                state.$albums.withLock { _ = $0.remove(id: album.id) }
                 
-            case .onTapAddFromGallery:
-                print("갤러리에서 추가")
-                return .none
+                let toastItem = NekiToastItem(
+                    "앨범을 삭제했어요",
+                    style: .success
+                )
+                
+                return .send(.delegate(.showToast(toastItem)))
                 
             case .onTapCancelAddAlbum:
+                state.isAddAlbumSheetPresented = false
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 return .none
@@ -109,8 +109,8 @@ struct ArchiveFeature {
                 return .send(.delegate(.showToast(toastItem)))
                 
             case .binding(\.newAlbumTitle):
+                // 앨범 제목 중복 검사 로직 예시
                 let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespaces)
-                
                 if state.albums.contains(where: { $0.title == inputTitle }) {
                     state.albumTitleErrorMessage = "이미 사용 중인 앨범명이에요."
                 } else {
@@ -118,11 +118,9 @@ struct ArchiveFeature {
                 }
                 return .none
                 
-                
             default:
                 return .none
             }
         }
     }
 }
-

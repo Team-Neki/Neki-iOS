@@ -14,8 +14,7 @@ struct ArchiveAllPhotosFeature {
     
     @ObservableState
     struct State {
-        
-        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
         var selectedIDs: Set<UUID> = []
         
         var selectedSortedTime: String = "최신순"
@@ -107,8 +106,9 @@ struct ArchiveAllPhotosFeature {
                 
             case .onTapDeleteButton:
                 // TODO: - 삭제 로직 구현 및 알림 표시
-                let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
-                print("삭제할 항목: \(selectedItems.count)개")
+                state.$photos.withLock {
+                    $0.removeAll { state.selectedIDs.contains($0.id) }
+                }
                 let toast = NekiToastItem("사진을 삭제했어요", style: .success)
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()

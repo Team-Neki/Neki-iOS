@@ -12,7 +12,13 @@ import ComposableArchitecture
 struct ArchivePhotoDetailFeature {
     @ObservableState
     struct State {
-        var item: ArchiveImageItem
+        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
+        let itemID: UUID
+        
+        var item: ArchiveImageItem {
+            get { photos[id: itemID] ?? ArchiveImageItem(id: itemID, imageURL: nil, date: Date()) }
+            set { $photos.withLock { $0[id: itemID] = newValue } }
+        }
         
         var formattedDate: String {
             let formatter = DateFormatter()
@@ -31,7 +37,6 @@ struct ArchivePhotoDetailFeature {
         
         case delegate(Delegate)
         enum Delegate {
-            case didDelete(ArchiveImageItem)
             case showToast(NekiToastItem)
         }
     }
@@ -56,8 +61,8 @@ struct ArchivePhotoDetailFeature {
                 return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
                 
             case .onTapDelete:
-                return .run { [item = state.item] send in
-                    await send(.delegate(.didDelete(item)))
+                state.$photos.withLock { _ = $0.remove(id: state.itemID) }
+                return .run { send in
                     await send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                     await dismiss()
                 }

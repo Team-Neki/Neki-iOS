@@ -25,9 +25,7 @@ struct ArchivePhotoDetailView: View {
                 .retry(maxCount: 3, interval: .seconds(5))
                 .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-//            Spacer()
-            
+                        
             ArchiveImageFooter(
                 isEnabled: true,
                 isFavorite: store.item.isFavorite,

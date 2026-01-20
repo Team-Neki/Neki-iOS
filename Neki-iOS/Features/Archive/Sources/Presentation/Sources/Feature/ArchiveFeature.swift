@@ -1,5 +1,5 @@
 //
-//  ArchiveFeedFeature.swift
+//  ArchiveFeature.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/7/26.
@@ -12,8 +12,8 @@ import ComposableArchitecture
 struct ArchiveFeature {
     
     @ObservableState
-    struct State: Equatable {
-        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+    struct State {
+        @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         var albums: IdentifiedArrayOf<AlbumItem> = []
         
         var newAlbumTitle: String = ""
@@ -23,6 +23,7 @@ struct ArchiveFeature {
         var isConfirmButtonEnabled: Bool {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
+
     }
     
     enum Action: BindableAction {
@@ -60,7 +61,8 @@ struct ArchiveFeature {
                     state.albums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
                 }
                 if state.photos.isEmpty {
-                    state.photos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
+                    let loadedPhotos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
+                    state.$photos.withLock { $0 = loadedPhotos }
                 }
                 return .none
                 

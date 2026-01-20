@@ -7,16 +7,26 @@
 
 import SwiftUI
 
-struct ArchiveDeleteSheet: View {
-    enum ArchiveDeleteOption {
-        case withPhotos  // 사진까지 함께 삭제
-        case albumOnly   // 사진은 유지하고 앨범만 삭제
-    }
+enum ArchiveAlbumDeleteOption: Equatable {
+    case withPhotos  // 사진까지 함께 삭제
+    case albumOnly   // 사진은 유지하고 앨범만 삭제
+}
+
+enum ArchivePhotoDeleteOption: Equatable {
+    case fromAlbumOnly // 앨범에서만 제거
+    case everywhere    // 모든 위치에서 사진 제거
+}
+
+struct ArchiveDeleteSheet<T: Equatable>: View {
     
     // MARK: - Properties
     
-    @Binding var selectedOption: ArchiveDeleteOption
+    @Binding var selectedOption: T
     
+    let title: String
+    let firstOption: (value: T, text: String)
+    let secondOption: (value: T, text: String)
+        
     let onCancel: () -> Void
     let onConfirm: () -> Void
     
@@ -24,24 +34,25 @@ struct ArchiveDeleteSheet: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("앨범을 삭제하시겠어요?")
+            
+            Text(title)
                 .nekiFont(.title20SemiBold)
                 .foregroundStyle(.gray900)
                 .frame(height: 28)
                 .padding(.top, 24)
-                .padding(.bottom, 16)
+                .padding(.bottom, 24)
             
             optionRow(
-                option: .withPhotos,
-                title: "사진까지 함께 삭제"
+                option: firstOption.value,
+                title: firstOption.text
             )
             
             optionRow(
-                option: .albumOnly,
-                title: "사진은 유지하고 앨범만 삭제"
+                option: secondOption.value,
+                title: secondOption.text
             )
             .padding(.bottom, 16)
-            
+
             GeometryReader { proxy in
                 let spacing: CGFloat = 12
                 let totalWidth = proxy.size.width - spacing
@@ -73,8 +84,8 @@ struct ArchiveDeleteSheet: View {
             .frame(height: 52)
             
         }
-        .padding(.horizontal, 20)
         .padding(.bottom, 34)
+        .padding(.horizontal, 20)
         .background(.white)
     }
 }
@@ -84,7 +95,7 @@ struct ArchiveDeleteSheet: View {
 
 private extension ArchiveDeleteSheet {
     @ViewBuilder
-    func optionRow(option: ArchiveDeleteOption, title: String) -> some View {
+    func optionRow(option: T, title: String) -> some View {
         Button {
             withAnimation {
                 selectedOption = option

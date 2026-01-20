@@ -17,7 +17,7 @@ struct ArchiveAllAlbumsFeature {
         
         var isDeleteMode: Bool = false
         var selectedAlbumIDs: Set<UUID> = []
-        var deleteOption: ArchiveDeleteSheet.ArchiveDeleteOption = .withPhotos
+        var deleteOption: ArchiveAlbumDeleteOption = .withPhotos
                 
         var newAlbumTitle: String = ""
         var albumTitleErrorMessage: String? = nil

@@ -17,6 +17,7 @@ struct ArchiveAllAlbumsFeature {
         
         var isDeleteMode: Bool = false
         var selectedAlbumIDs: Set<UUID> = []
+        var deleteOption: ArchiveDeleteSheet.ArchiveDeleteOption = .withPhotos
                 
         var newAlbumTitle: String = ""
         var albumTitleErrorMessage: String? = nil
@@ -87,6 +88,8 @@ struct ArchiveAllAlbumsFeature {
                 guard !state.selectedAlbumIDs.isEmpty else {
                     return .send(.onTapExitDeleteMode)
                 }
+                
+                // TODO: - 삭제 옵션에 따라 앨범만 삭제하고 이미지들은 유지 혹은 앨범과 이미지 모두 삭제 로직
                                 
                 state.$albums.withLock { albums in
                     albums.removeAll { state.selectedAlbumIDs.contains($0.id) }

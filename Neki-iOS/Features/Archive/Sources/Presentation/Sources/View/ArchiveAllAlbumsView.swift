@@ -76,6 +76,20 @@ struct ArchiveAllAlbumsView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
         }
+        .sheet(isPresented: $deleteAlbumSheetPresented) {
+            ArchiveDeleteSheet(
+                selectedOption: $store.deleteOption,
+                onCancel: {
+                    deleteAlbumSheetPresented = false
+                },
+                onConfirm: {
+                    store.send(.onTapExecuteDelete)
+                    deleteAlbumSheetPresented = false
+                }
+            )
+            .presentationDetents([.height(280)])
+            .presentationCornerRadius(20)
+        }
     }
 }
 
@@ -94,7 +108,7 @@ private extension ArchiveAllAlbumsView {
                 HStack(alignment: .center, spacing: 12) {
                     if store.isDeleteMode {
                         Button {
-                            store.send(.onTapExecuteDelete)
+                            deleteAlbumSheetPresented = true
                         } label: {
                             Text("삭제")
                                 .nekiFont(.body16SemiBold)

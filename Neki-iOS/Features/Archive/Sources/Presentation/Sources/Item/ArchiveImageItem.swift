@@ -10,14 +10,14 @@ import Foundation
 struct ArchiveImageItem: Equatable, Identifiable {
     let id: UUID
     let imageURL: URL?
-    var isScrapped: Bool
-    
+    var isFavorite: Bool
+
     init(id: UUID, imageURL: URL?, isScrapped: Bool = false) {
         self.id = id
         self.imageURL = imageURL
-        self.isScrapped = isScrapped
+        self.isFavorite = isScrapped
     }
-    
+
     init(id: UUID, imageURLString: String, isScrapped: Bool = false) {
         self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped)
     }
@@ -39,7 +39,4 @@ extension ArchiveImageItem {
         ]
     }
     
-    func toFeedImageItem() -> FeedImageItem {
-        return FeedImageItem(id: id, imageURL: imageURL!, isScrapped: isScrapped)
-    }
 }

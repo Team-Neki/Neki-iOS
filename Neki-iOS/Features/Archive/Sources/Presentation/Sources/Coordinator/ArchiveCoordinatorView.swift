@@ -18,8 +18,9 @@ struct ArchiveCoordinatorView: View {
             switch store.case {
             case .detail(let store):
                 ArchiveDetailView(store: store)
-            case .deepDetail(let store):
-                ArchiveDeepDetailView(store: store)
+                
+            case .allPhotos(let store):
+                ArchiveAllPhotosView(store: store)
             }
         }
     }

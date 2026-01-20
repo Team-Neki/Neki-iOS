@@ -24,7 +24,6 @@ struct ArchiveCoordinator {
         
         // 상위 코디네이터(MainTab)로 보낼 신호
         enum Delegate {
-            case requestJumpToPose(FeedImageItem)
             case showToast(NekiToastItem)
         }
     }
@@ -45,20 +44,24 @@ struct ArchiveCoordinator {
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
                 
-                // 아카이브 상세에서 더 자세히 보기 클릭
-            case let .path(.element(id: _, action: .detail(.didTapDeepLinkButton(item)))):
-                state.path.append(.deepDetail(ArchiveDeepDetailFeature.State(item: item)))
+            case let .path(.element(id: _, action: .allPhotos(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
+                
+            case .root(.onTapAllPhotos):
+                // 루트의 사진 데이터를 전달하며 이동
+                state.path.append(.allPhotos(
+                    ArchiveAllPhotosFeature.State(photos: state.root.photos)
+                ))
                 return .none
                 
-                // [DeepDetail -> Root] 한 번에 이동
-            case .path(.element(id: _, action: .deepDetail(.didTapPopToRoot))):
-                state.path.removeAll()
-                return .none
+            case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):
+                guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
+
+                if !allPhotosState.isSelectionMode {
+                    state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+                }
                 
-                // 아카이브에서 포즈의 특정 사진 디테일 화면으로 이동 (Feature간 이동)
-            case .path(.element(id: _, action: .deepDetail(.didTapJumpToPose))):
-                guard case let .deepDetail(deepState) = state.path.last else { return .none }
-                return .send(.delegate(.requestJumpToPose(deepState.item.toFeedImageItem())))
+                return .none
                 
             default:
                 return .none
@@ -72,6 +75,6 @@ extension ArchiveCoordinator {
     @Reducer
     enum Path {
         case detail(ArchiveDetailFeature)
-        case deepDetail(ArchiveDeepDetailFeature)
+        case allPhotos(ArchiveAllPhotosFeature)
     }
 }

@@ -38,13 +38,16 @@ struct ArchiveCoordinator {
             switch action {
                 // 아카이브 피드에서 이미지 클릭해서 상세 보기
             case let .root(.imageTapped(item)):
-                state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+                state.path.append(.detail(ArchivePhotoDetailFeature.State(item: item)))
                 return .none
                 
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
                 
             case let .path(.element(id: _, action: .allPhotos(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
+                
+            case let .path(.element(id: _, action: .detail(.delegate(.showToast(item))))):
                 return .send(.delegate(.showToast(item)))
                 
             case .root(.onTapAllPhotos):
@@ -58,7 +61,7 @@ struct ArchiveCoordinator {
                 guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
 
                 if !allPhotosState.isSelectionMode {
-                    state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+                    state.path.append(.detail(ArchivePhotoDetailFeature.State(item: item)))
                 }
                 
                 return .none
@@ -74,7 +77,7 @@ struct ArchiveCoordinator {
 extension ArchiveCoordinator {
     @Reducer
     enum Path {
-        case detail(ArchiveDetailFeature)
+        case detail(ArchivePhotoDetailFeature)
         case allPhotos(ArchiveAllPhotosFeature)
     }
 }

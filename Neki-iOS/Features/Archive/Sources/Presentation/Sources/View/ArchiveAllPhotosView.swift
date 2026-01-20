@@ -64,7 +64,6 @@ struct ArchiveAllPhotosView: View {
                 showDeleteAlert = false
             }
         )
-        .navigationBarHidden(true)
         .background(.white)
     }
 }

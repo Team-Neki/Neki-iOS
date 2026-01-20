@@ -23,7 +23,18 @@ struct ArchiveAllAlbumsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         ForEach(store.albums) { album in
-                            AlbumRowTile(album: album)
+                            AlbumRowTile(
+                                album: album,
+                                isDeleteMode: store.isDeleteMode,
+                                isSelected: store.selectedAlbumIDs.contains(album.id)
+                            )
+                            .onTapGesture {
+                                if store.isDeleteMode {
+                                    store.send(.onTapToggleSelection(album))
+                                } else {
+                                    store.send(.onTapAlbum(album))
+                                }
+                            }
                         }
                     }
                     .scrollIndicators(.hidden)
@@ -33,7 +44,7 @@ struct ArchiveAllAlbumsView: View {
                 
             }
             
-            if showDropDownButton {
+            if showDropDownButton && !store.isDeleteMode {
                 // TODO: - 삭제하기 드롭다운버튼이 나타나 있을 경우 다른 이벤트 가능한지 여부 물어보기
                 Color.clear
                     .contentShape(Rectangle())
@@ -81,20 +92,29 @@ private extension ArchiveAllAlbumsView {
                 Spacer()
                 
                 HStack(alignment: .center, spacing: 12) {
-                    Button {
-                        addAlbumSheetPresented = true
-                    } label: {
-                        Text("생성")
-                            .nekiFont(.body16SemiBold)
-                            .foregroundStyle(.primary500)
-                    }
-                    
-                    Button {
-                        withAnimation {
-                            showDropDownButton.toggle()
+                    if store.isDeleteMode {
+                        Button {
+                            store.send(.onTapExecuteDelete)
+                        } label: {
+                            Text("삭제")
+                                .nekiFont(.body16SemiBold)
+                                .foregroundStyle(store.selectedAlbumIDs.isEmpty ? .gray200 : .primary500)
                         }
-                    } label: {
-                        Image(.iconEllipsis)
+                        .disabled(store.selectedAlbumIDs.isEmpty)
+                    } else {
+                        Button {
+                            addAlbumSheetPresented = true
+                        } label: {
+                            Text("생성")
+                                .nekiFont(.body16SemiBold)
+                                .foregroundStyle(.primary500)
+                        }
+                        
+                        Button {
+                            withAnimation { showDropDownButton.toggle() }
+                        } label: {
+                            Image(.iconEllipsis)
+                        }
                     }
                 }
             }
@@ -109,6 +129,7 @@ private extension ArchiveAllAlbumsView {
     
     var dropDownButton: some View {
         Button {
+            store.send(.onTapEnterDeleteMode)
             withAnimation { showDropDownButton = false }
         } label: {
             Text("삭제하기")

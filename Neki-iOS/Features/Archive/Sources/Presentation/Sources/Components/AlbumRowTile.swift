@@ -10,6 +10,8 @@ import Kingfisher
 
 struct AlbumRowTile: View {
     let album: AlbumItem
+    let isDeleteMode: Bool
+    let isSelected: Bool
     
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
@@ -32,6 +34,10 @@ struct AlbumRowTile: View {
             }
             
             Spacer()
+            
+            if isDeleteMode {
+                selectionIndicator
+            }
         }
     }
 }
@@ -48,6 +54,22 @@ private extension AlbumRowTile {
                     .font(.system(size: 24))
                     .shadow(color: .black.opacity(0.2), radius: 2)
             }
+        }
+    }
+    
+    @ViewBuilder
+    var selectionIndicator: some View {
+        if !album.isFavorite {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .resizable()
+                .frame(width: 24, height: 24)
+                .foregroundStyle(isSelected ? .primary400 : .white)
+                .background(
+                    Circle()
+                        .fill(isSelected ? .white : .clear)
+                        .stroke(isSelected ? .primary400 : .gray75, lineWidth: 2)
+                        .frame(width: 24, height: 24)
+                )
         }
     }
 }

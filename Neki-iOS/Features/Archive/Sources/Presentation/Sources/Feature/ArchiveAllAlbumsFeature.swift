@@ -14,6 +14,9 @@ struct ArchiveAllAlbumsFeature {
     @ObservableState
     struct State {
         @Shared var albums: IdentifiedArrayOf<AlbumItem>
+        
+        var isDeleteMode: Bool = false
+        var selectedAlbumIDs: Set<UUID> = []
                 
         var newAlbumTitle: String = ""
         var albumTitleErrorMessage: String? = nil
@@ -29,7 +32,11 @@ struct ArchiveAllAlbumsFeature {
         case onTapBackButton
         
         case onTapAlbum(AlbumItem)
-        case onTapDeleteAlbum(AlbumItem)
+        
+        case onTapEnterDeleteMode
+        case onTapExitDeleteMode
+        case onTapToggleSelection(AlbumItem)
+        case onTapExecuteDelete
         
         // 앨범 생성 시트 액션
         case onTapCancelAddAlbum
@@ -50,16 +57,45 @@ struct ArchiveAllAlbumsFeature {
         Reduce { state, action in
             switch action {
             case .onTapBackButton:
-                return .run { _ in await dismiss() }
+                if state.isDeleteMode {
+                    return .send(.onTapExitDeleteMode)
+                } else {
+                    return .run { _ in await dismiss() }
+                }
                 
-            case let .onTapDeleteAlbum(album):
-                state.$albums.withLock { _ = $0.remove(id: album.id) }
+            case .onTapEnterDeleteMode:
+                state.isDeleteMode = true
+                state.selectedAlbumIDs.removeAll()
+                return .none
+                            
+            case .onTapExitDeleteMode:
+                state.isDeleteMode = false
+                state.selectedAlbumIDs.removeAll()
+                return .none
                 
-                let toastItem = NekiToastItem(
-                    "앨범을 삭제했어요",
-                    style: .success
-                )
+            case let .onTapToggleSelection(album):
+                guard !album.isFavorite else { return .none }
                 
+                if state.selectedAlbumIDs.contains(album.id) {
+                    state.selectedAlbumIDs.remove(album.id)
+                } else {
+                    state.selectedAlbumIDs.insert(album.id)
+                }
+                return .none
+                
+            case .onTapExecuteDelete:
+                guard !state.selectedAlbumIDs.isEmpty else {
+                    return .send(.onTapExitDeleteMode)
+                }
+                                
+                state.$albums.withLock { albums in
+                    albums.removeAll { state.selectedAlbumIDs.contains($0.id) }
+                }
+                
+                state.isDeleteMode = false
+                state.selectedAlbumIDs.removeAll()
+                
+                let toastItem = NekiToastItem("앨범을 삭제했어요", style: .success)
                 return .send(.delegate(.showToast(toastItem)))
                 
             case .onTapCancelAddAlbum:

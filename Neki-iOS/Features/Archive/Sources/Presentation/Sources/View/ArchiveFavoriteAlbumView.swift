@@ -15,8 +15,10 @@ struct ArchiveFavoriteAlbumView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            if store.filteredItems.isEmpty {
+//            if store.filteredItems.isEmpty {
+            if store.album.count == 0 {
                 ArchiveEmptyView()
+                    .padding(.bottom, 54)
             } else {
                 masonryView
             }

@@ -18,13 +18,16 @@ struct ArchiveAlbumDetailView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            if store.filteredItems.isEmpty {
+//            if store.filteredItems.isEmpty {
+            if store.album.count == 0 {
                 ArchiveEmptyView()
+                    .padding(.bottom, 54)
             } else {
                 masonryView
             }
             
-            if !store.filteredItems.isEmpty && !store.isSelectionMode {
+//            if !store.filteredItems.isEmpty && !store.isSelectionMode {
+            if (store.album.count != 0) && !store.isSelectionMode {
                 filterBar
                     .padding(.horizontal, 20)
                     .padding(.vertical, 4)
@@ -47,7 +50,8 @@ struct ArchiveAlbumDetailView: View {
         .nekiToolbar(
             left: .back(action: { store.send(.onTapBackButton) }),
             center: .text(store.album.title),
-            right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
+//            right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
+            right: (store.album.count == 0) ? .none : store.isSelectionMode ?
                 .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
                 .text("선택", action: { store.send(.onTapSelectButton) })
         )

@@ -28,12 +28,17 @@ struct ArchiveAllPhotosFeature {
         }
         
         var filteredItems: IdentifiedArrayOf<ArchiveImageItem> {
-            if isSelectedFavorite {
-                return photos.filter { $0.isFavorite }
-            } else {
-                // TODO: - 최신순 오래된 순 정렬 로직 추가
-                return photos
+            let filtered = isSelectedFavorite ? photos.filter { $0.isFavorite } : photos
+            
+            let sorted = filtered.sorted { item1, item2 in
+                if selectedSortedTime == "최신순" {
+                    return item1.date > item2.date
+                } else {
+                    return item1.date < item2.date
+                }
             }
+            
+            return IdentifiedArray(uniqueElements: sorted)
         }
     }
     

@@ -26,7 +26,7 @@ struct ArchivePhotoDetailView: View {
                 .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             
-            Spacer()
+//            Spacer()
             
             ArchiveImageFooter(
                 isEnabled: true,
@@ -54,17 +54,4 @@ struct ArchivePhotoDetailView: View {
             }
         )
     }
-}
-
-#Preview {
-    ArchivePhotoDetailView(
-        store: Store(
-            initialState: ArchivePhotoDetailFeature.State(
-                // 더미 데이터 중 첫 번째 아이템 사용
-                item: ArchiveImageItem.dummyData()[0]
-            )
-        ) {
-            ArchivePhotoDetailFeature()
-        }
-    )
 }

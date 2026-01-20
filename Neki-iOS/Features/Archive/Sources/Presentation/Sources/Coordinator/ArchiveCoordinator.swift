@@ -55,12 +55,50 @@ struct ArchiveCoordinator {
                 ))
                 return .none
                 
+            case let .root(.albumTapped(album)):
+                let isFirstAlbum = state.root.albums.first?.id == album.id
+                
+                if isFirstAlbum {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                } else {
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                }
+                return .none
+                
                 
                 // path action
             case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):
                 guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
                 
                 if !allPhotosState.isSelectionMode {
+                    state.path.append(.detail(
+                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ))
+                }
+                return .none
+                
+            case let .path(.element(id: _, action: .allAlbums(.onTapAlbum(album)))):
+                let isFirstAlbum = state.root.albums.first?.id == album.id
+                
+                if isFirstAlbum {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                } else {
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                }
+                return .none
+                
+            case let .path(.element(id: id, action: .albumDetail(.imageTapped(item)))):
+                guard case let .albumDetail(albumDetailState) = state.path[id: id] else { return .none }
+                
+                if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
                         ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
                     ))
@@ -81,6 +119,12 @@ struct ArchiveCoordinator {
             case let .path(.element(id: _, action: .allAlbums(.delegate(.showToast(item))))):
                 return .send(.delegate(.showToast(item)))
                 
+            case let .path(.element(id: _, action: .albumDetail(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
+                
+            case let .path(.element(id: _, action: .favoriteAlbum(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
+                
             default:
                 return .none
             }
@@ -95,5 +139,7 @@ extension ArchiveCoordinator {
         case detail(ArchivePhotoDetailFeature)
         case allPhotos(ArchiveAllPhotosFeature)
         case allAlbums(ArchiveAllAlbumsFeature)
+        case albumDetail(ArchiveAlbumDetailFeature)
+        case favoriteAlbum(ArchiveFavoriteAlbumFeature)
     }
 }

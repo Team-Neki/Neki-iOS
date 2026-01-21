@@ -77,6 +77,8 @@ private extension DeviceAuthorizationPreferenceView {
                     .foregroundStyle(.gray300)
             }
         }
+        .contentShape(.rect)
+        .onTapGesture(perform: onTap)
     }
 }
 

@@ -36,32 +36,104 @@ struct ArchiveCoordinator {
         Reduce { state, action in
             /// 화면전환과 관련된 액션 case만 사용하고 나머지는 default를 이용해 무시
             switch action {
-                // 아카이브 피드에서 이미지 클릭해서 상세 보기
+                // root action
             case let .root(.imageTapped(item)):
-                state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
+                state.path.append(.detail(
+                    ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                ))
                 return .none
                 
+            case .root(.onTapAllPhotos):
+                state.path.append(.allPhotos(
+                    ArchiveAllPhotosFeature.State(photos: state.root.$photos)
+                ))
+                return .none
+                
+            case .root(.onTapAllAlbums):
+                state.path.append(.allAlbums(
+                    ArchiveAllAlbumsFeature.State(albums: state.root.$albums)
+                ))
+                return .none
+                
+            case let .root(.albumTapped(album)):
+                let isFirstAlbum = state.root.albums.first?.id == album.id
+                
+                if isFirstAlbum {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                } else {
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                }
+                return .none
+                
+                
+                // path action
+            case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):
+                guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
+                
+                if !allPhotosState.isSelectionMode {
+                    state.path.append(.detail(
+                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ))
+                }
+                return .none
+                
+            case let .path(.element(id: _, action: .allAlbums(.onTapAlbum(album)))):
+                let isFirstAlbum = state.root.albums.first?.id == album.id
+                
+                if isFirstAlbum {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                } else {
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                }
+                return .none
+                
+            case let .path(.element(id: id, action: .albumDetail(.imageTapped(item)))):
+                guard case let .albumDetail(albumDetailState) = state.path[id: id] else { return .none }
+                
+                if !albumDetailState.isSelectionMode {
+                    state.path.append(.detail(
+                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ))
+                }
+                return .none
+                
+            case let .path(.element(id: id, action: .favoriteAlbum(.imageTapped(item)))):
+                guard case let .favoriteAlbum(albumDetailState) = state.path[id: id] else { return .none }
+                
+                if !albumDetailState.isSelectionMode {
+                    state.path.append(.detail(
+                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ))
+                }
+                return .none
+                
+                
+                // toast action
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
                 
             case let .path(.element(id: _, action: .allPhotos(.delegate(.showToast(item))))):
                 return .send(.delegate(.showToast(item)))
                 
-            case .root(.onTapAllPhotos):
-                // 루트의 사진 데이터를 전달하며 이동
-                state.path.append(.allPhotos(
-                    ArchiveAllPhotosFeature.State(photos: state.root.photos)
-                ))
-                return .none
+            case let .path(.element(id: _, action: .detail(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
                 
-            case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):
-                guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
-
-                if !allPhotosState.isSelectionMode {
-                    state.path.append(.detail(ArchiveDetailFeature.State(item: item)))
-                }
+            case let .path(.element(id: _, action: .allAlbums(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
                 
-                return .none
+            case let .path(.element(id: _, action: .albumDetail(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
+                
+            case let .path(.element(id: _, action: .favoriteAlbum(.delegate(.showToast(item))))):
+                return .send(.delegate(.showToast(item)))
                 
             default:
                 return .none
@@ -74,7 +146,10 @@ struct ArchiveCoordinator {
 extension ArchiveCoordinator {
     @Reducer
     enum Path {
-        case detail(ArchiveDetailFeature)
+        case detail(ArchivePhotoDetailFeature)
         case allPhotos(ArchiveAllPhotosFeature)
+        case allAlbums(ArchiveAllAlbumsFeature)
+        case albumDetail(ArchiveAlbumDetailFeature)
+        case favoriteAlbum(ArchiveFavoriteAlbumFeature)
     }
 }

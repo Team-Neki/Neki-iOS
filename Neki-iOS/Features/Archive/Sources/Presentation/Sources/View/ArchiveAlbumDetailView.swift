@@ -1,27 +1,33 @@
 //
-//  ArchiveAllPhotosView.swift
+//  ArchiveAlbumDetailView.swift
 //  Neki-iOS
 //
-//  Created by OneTen on 1/19/26.
+//  Created by OneTen on 1/21/26.
 //
 
 import SwiftUI
 import ComposableArchitecture
 
-struct ArchiveAllPhotosView: View {
-    @Bindable var store: StoreOf<ArchiveAllPhotosFeature>
+struct ArchiveAlbumDetailView: View {
+    @Bindable var store: StoreOf<ArchiveAlbumDetailFeature>
     
     @State private var isFilterBarVisible: Bool = true
     @State private var lastDragPoint: CGFloat = 0
     @State var showDropDownMenu: Bool = false
-    @State var showDeleteAlert: Bool = false
-
+    @State var deleteAlbumSheetPresented: Bool = false
     
     var body: some View {
         ZStack(alignment: .top) {
-            masonryView
+//            if store.filteredItems.isEmpty {
+            if store.album.count == 0 {
+                ArchiveEmptyView()
+                    .padding(.bottom, 54)
+            } else {
+                masonryView
+            }
             
-            if !store.isSelectionMode {
+//            if !store.filteredItems.isEmpty && !store.isSelectionMode {
+            if (store.album.count != 0) && !store.isSelectionMode {
                 filterBar
                     .padding(.horizontal, 20)
                     .padding(.vertical, 4)
@@ -36,39 +42,41 @@ struct ArchiveAllPhotosView: View {
                     ArchiveImageFooter(
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
-                        onDelete: { showDeleteAlert = true }
+                        onDelete: { deleteAlbumSheetPresented = true }
                     )
                 }
             }
-            
         }
         .nekiToolbar(
             left: .back(action: { store.send(.onTapBackButton) }),
-            center: .text("모든 사진"),
-            right: store.isSelectionMode ?
+            center: .text(store.album.title),
+//            right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
+            right: (store.album.count == 0) ? .none : store.isSelectionMode ?
                 .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
-                    .text("선택", action: { store.send(.onTapSelectButton) })
+                .text("선택", action: { store.send(.onTapSelectButton) })
         )
-        .nekiAlert(
-            isPresented: $showDeleteAlert,
-            style: .cancelable,
-            titleMessage: "사진을 삭제하시겠어요?",
-            subTitleMessage: "이 작업은 실행취소할 수 없어요",
-            confirmText: "삭제하기",
-            cancelText: "취소",
-            onConfirm: {
-                store.send(.onTapDeleteButton)
-                showDeleteAlert = false
-            },
-            onCancel: {
-                showDeleteAlert = false
-            }
-        )
+        .sheet(isPresented: $deleteAlbumSheetPresented) {
+            ArchiveDeleteSheet(
+                selectedOption: $store.deleteOption,
+                title: "사진을 삭제하시겠어요?",
+                firstOption: (.fromAlbumOnly, "앨범에서만 제거"),
+                secondOption: (.everywhere, "모든 위치에서 사진 제거"),
+                onCancel: {
+                    deleteAlbumSheetPresented = false
+                },
+                onConfirm: {
+                    store.send(.onTapDeleteButton)
+                    deleteAlbumSheetPresented = false
+                }
+            )
+            .presentationDetents([.height(280)])
+            .presentationCornerRadius(20)
+        }
         .background(.white)
     }
 }
 
-private extension ArchiveAllPhotosView {
+private extension ArchiveAlbumDetailView {
     @ViewBuilder
     var masonryView: some View {
         ScrollView {
@@ -95,18 +103,13 @@ private extension ArchiveAllPhotosView {
                 .onChanged { value in
                     let currentPoint = value.translation.height
                     let diff = currentPoint - lastDragPoint
-                    
                     withAnimation(.smooth) {
                         isFilterBarVisible = diff < 0 ? false : true
                     }
-                    
                     if showDropDownMenu { showDropDownMenu = false }
-                    
                     lastDragPoint = currentPoint
                 }
-                .onEnded {_ in
-                    lastDragPoint = 0
-                }
+                .onEnded { _ in lastDragPoint = 0 }
         )
     }
     
@@ -116,13 +119,7 @@ private extension ArchiveAllPhotosView {
             Button(store.state.selectedSortedTime) {
                 withAnimation { showDropDownMenu.toggle() }
             }
-            .buttonStyle(
-                .nekiChip(
-                    isHighlighted: false,
-                    shape: .capsule,
-                    style: .dropdown
-                )
-            )
+            .buttonStyle(.nekiChip(isHighlighted: false, shape: .capsule, style: .dropdown))
             .overlay(alignment: .top) {
                 if showDropDownMenu {
                     dropDownMenu
@@ -135,13 +132,7 @@ private extension ArchiveAllPhotosView {
                 store.send(.onTapFavoriteButton)
                 if showDropDownMenu { showDropDownMenu = false }
             }
-            .buttonStyle(
-                .nekiChip(
-                    isHighlighted: store.state.isSelectedFavorite,
-                    shape: .capsule,
-                    style: .normal
-                )
-            )
+            .buttonStyle(.nekiChip(isHighlighted: store.state.isSelectedFavorite, shape: .capsule, style: .normal))
             
             Spacer()
         }
@@ -154,7 +145,6 @@ private extension ArchiveAllPhotosView {
                 withAnimation { showDropDownMenu = false }
                 store.send(.onTapFilterNewest)
             }
-            
             dropDownMenuButton(title: "오래된순") {
                 withAnimation { showDropDownMenu = false }
                 store.send(.onTapFilterOldest)
@@ -164,17 +154,14 @@ private extension ArchiveAllPhotosView {
         .frame(width: 96, height: 72)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(content: {
+        .overlay(
             RoundedRectangle(cornerRadius: 8)
                 .stroke(.gray.opacity(0.5), lineWidth: 1)
                 .shadow(color: .gray.opacity(0.5), radius: 2)
-        })
+        )
     }
     
-    func dropDownMenuButton(
-        title: String,
-        action: @escaping () -> Void
-    ) -> some View {
+    func dropDownMenuButton(title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .nekiFont(.body14Medium)
@@ -183,5 +170,4 @@ private extension ArchiveAllPhotosView {
                 .padding(.vertical, 5)
         }
     }
-    
 }

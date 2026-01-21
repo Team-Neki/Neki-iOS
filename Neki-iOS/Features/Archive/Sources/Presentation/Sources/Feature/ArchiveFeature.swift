@@ -1,5 +1,5 @@
 //
-//  ArchiveFeedFeature.swift
+//  ArchiveFeature.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/7/26.
@@ -12,9 +12,9 @@ import ComposableArchitecture
 struct ArchiveFeature {
     
     @ObservableState
-    struct State: Equatable {
-        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
-        var albums: IdentifiedArrayOf<AlbumItem> = []
+    struct State {
+        @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+        @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
         
         var newAlbumTitle: String = ""
         
@@ -23,6 +23,7 @@ struct ArchiveFeature {
         var isConfirmButtonEnabled: Bool {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
+
     }
     
     enum Action: BindableAction {
@@ -30,6 +31,7 @@ struct ArchiveFeature {
         
         // User Action
         case onTapAllPhotos
+        case onTapAllAlbums
         case onTapQRScan
         case onTapAddFromGallery
         case onTapCancelAddAlbum
@@ -57,10 +59,12 @@ struct ArchiveFeature {
             switch action {
             case .onAppear:
                 if state.albums.isEmpty {
-                    state.albums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
+                    let loadedAlbums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
+                    state.$albums.withLock { $0 = loadedAlbums }
                 }
                 if state.photos.isEmpty {
-                    state.photos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
+                    let loadedPhotos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
+                    state.$photos.withLock { $0 = loadedPhotos }
                 }
                 return .none
                 
@@ -80,18 +84,17 @@ struct ArchiveFeature {
             case .onTapConfirmAddAlbum:
                 guard state.isConfirmButtonEnabled else { return .none }
                 
-                print("새 앨범 추가됨: \(state.newAlbumTitle)")
-                
                 let newAlbum = AlbumItem(
                     title: state.newAlbumTitle,
                     count: 0,
                     coverImageURL: nil,         // TODO: - 디자인에서 주는 브랜딩 이미지로 변경
                     isFavorite: false
                 )
-                
-                // 1번째 인덱스에 추가, 0번은 즐겨찾기
-                state.albums.insert(newAlbum, at: state.albums.count > 0 ? 1 : 0)
-                
+
+                state.$albums.withLock {
+                    _ = $0.insert(newAlbum, at: 1)
+                }
+                 
                 // 입력값 초기화
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil

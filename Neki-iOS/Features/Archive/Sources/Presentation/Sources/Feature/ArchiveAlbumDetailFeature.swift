@@ -1,42 +1,45 @@
 //
-//  ArchiveAllPhotosFeature.swift
+//  ArchiveAlbumDetailFeature.swift
 //  Neki-iOS
 //
-//  Created by OneTen on 1/19/26.
+//  Created by OneTen on 1/21/26.
 //
 
 import ComposableArchitecture
 import Foundation
-//import Core
 
 @Reducer
-struct ArchiveAllPhotosFeature {
+struct ArchiveAlbumDetailFeature {
     
     @ObservableState
     struct State {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
+        let album: AlbumItem
+        
         var selectedIDs: Set<UUID> = []
+        var deleteOption: ArchivePhotoDeleteOption = .fromAlbumOnly
         
         var selectedSortedTime: String = "최신순"
         var isSelectedFavorite: Bool = false
         var isSelectionMode: Bool = false
         
-        // 선택된 사진이 있는지 여부
-        var hasSelectedItems: Bool {
-            return !selectedIDs.isEmpty
-        }
+        var hasSelectedItems: Bool { !selectedIDs.isEmpty }
         
+        // 현재는 더미라 전체 photos 사용
         var filteredItems: IdentifiedArrayOf<ArchiveImageItem> {
-            let filtered = isSelectedFavorite ? photos.filter { $0.isFavorite } : photos
+            var items = photos // TODO: 여기서 앨범 ID로 1차 필터링 필요
             
-            let sorted = filtered.sorted { item1, item2 in
+            if isSelectedFavorite {
+                items = items.filter { $0.isFavorite }
+            }
+            
+            let sorted = items.sorted { item1, item2 in
                 if selectedSortedTime == "최신순" {
                     return item1.date > item2.date
                 } else {
                     return item1.date < item2.date
                 }
             }
-            
             return IdentifiedArray(uniqueElements: sorted)
         }
     }
@@ -45,16 +48,17 @@ struct ArchiveAllPhotosFeature {
         case binding(BindingAction<State>)
         
         case onTapBackButton
-        
         case onTapSelectButton
         case onTapCancelSelectButton
+        
+        // 기능 액션
         case onTapDownloadButton
         case onTapDeleteButton
-        
         case onTapFilterNewest
         case onTapFilterOldest
         case onTapFavoriteButton
         
+        // 네비게이션
         case imageTapped(ArchiveImageItem)
         
         case delegate(Delegate)
@@ -79,7 +83,6 @@ struct ArchiveAllPhotosFeature {
                 
             case .onTapCancelSelectButton:
                 state.isSelectionMode = false
-                // 선택 모드 해제 시 모든 선택 상태 초기화
                 state.selectedIDs.removeAll()
                 return .none
                 
@@ -90,29 +93,32 @@ struct ArchiveAllPhotosFeature {
                     } else {
                         state.selectedIDs.insert(item.id)
                     }
-                } else {
-                    // 상세 화면 이동 로직 (Coordinator에서 처리)
                 }
                 return .none
                 
             case .onTapDownloadButton:
-                // TODO: - 다운로드 로직 구현
-                let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
-                print("다운로드할 항목: \(selectedItems.count)개")
-                let toast = NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success)
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(toast)))
+                return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
                 
             case .onTapDeleteButton:
-                // TODO: - 삭제 로직 구현 및 알림 표시
-                state.$photos.withLock {
-                    $0.removeAll { state.selectedIDs.contains($0.id) }
+                switch state.deleteOption {
+                case .everywhere:
+                    // 모든 위치에서 제거 (원본 데이터 삭제)
+                    state.$photos.withLock { photos in
+                        photos.removeAll { state.selectedIDs.contains($0.id) }
+                    }
+                    
+                case .fromAlbumOnly:
+                    // 앨범에서만 제거
+                    print("앨범 매핑 해제")
                 }
-                let toast = NekiToastItem("사진을 삭제했어요", style: .success)
+                
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(toast)))
+                state.deleteOption = .fromAlbumOnly
+                
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
             case .onTapFilterNewest:
                 state.selectedSortedTime = "최신순"

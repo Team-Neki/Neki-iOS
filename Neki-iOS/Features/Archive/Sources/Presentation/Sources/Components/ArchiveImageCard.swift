@@ -64,7 +64,7 @@ struct ArchiveImageCard: View {
                 }
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(isSelected ? .primary400 : .clear, lineWidth: 2)
+                        .strokeBorder(isSelected ? .primary400 : .clear, lineWidth: 2)
                 )
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))

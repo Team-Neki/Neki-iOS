@@ -9,18 +9,19 @@ import SwiftUI
 
 public struct CharacterLimitTextField: View {
     @Binding var text: String
-    @FocusState private var isFocused: Bool
     
     let label: String?
     let limit: Int
     let errorMessage: String?
     let prompt: String?
+    let isFocused: FocusState<Bool>.Binding
     
     private let cornerRadius: CGFloat = 8
     
     public init(
         _ label: String?,
         text: Binding<String>,
+        isFocused: FocusState<Bool>.Binding,
         prompt: String? = "",
         limit: Int = 16,
         errorMessage: String? = nil
@@ -30,6 +31,7 @@ public struct CharacterLimitTextField: View {
         self.errorMessage = errorMessage
         self.prompt = prompt
         self._text = text
+        self.isFocused = isFocused
     }
     
     public var body: some View {
@@ -46,9 +48,13 @@ public struct CharacterLimitTextField: View {
                     text: $text,
                     prompt: Text(prompt ?? "").foregroundStyle(.gray300)
                 )
-                .focused($isFocused)
+                .focused(isFocused)
                 .nekiFont(text.isEmpty ? .body16Regular : .body16Medium)
                 .foregroundStyle(.gray900)
+                .onChange(of: text) { _, newValue in
+                    guard newValue.count > limit else { return }
+                    text = String(newValue.prefix(limit))
+                }
                 
                 Spacer()
                 
@@ -77,16 +83,7 @@ public struct CharacterLimitTextField: View {
     
     private var borderColor: Color {
         if hasError { return .primary600 }
-        if isFocused { return .gray700 }
+        if isFocused.wrappedValue { return .gray700 }
         return .gray300
-    }
-}
-
-#Preview {
-    ZStack {
-        Color.gray50
-        
-        CharacterLimitTextField("레이블", text: .constant(""), prompt: "플레이스 홀더", limit: 16, errorMessage: "에러메세지")
-            .padding()
     }
 }

@@ -134,7 +134,7 @@ struct ArchiveAllAlbumsFeature {
                 return .send(.delegate(.showToast(toastItem)))
                 
             case .binding(\.newAlbumTitle):
-                let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespaces)
+                let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 if state.albums.contains(where: { $0.title == inputTitle }) {
                     state.albumTitleErrorMessage = "이미 사용 중인 앨범명이에요."
                 } else {

@@ -66,7 +66,6 @@ private extension AlbumRowTile {
                 .foregroundStyle(isSelected ? .primary400 : .white)
                 .background(
                     Circle()
-                        .fill(isSelected ? .white : .clear)
                         .stroke(isSelected ? .primary400 : .gray75, lineWidth: 2)
                         .frame(width: 24, height: 24)
                 )

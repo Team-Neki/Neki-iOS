@@ -37,10 +37,10 @@ struct ArchiveAllAlbumsView: View {
                             }
                         }
                     }
-                    .scrollIndicators(.hidden)
                     .padding(.top, 8)
                     .padding(.horizontal, 20)
                 }
+                .scrollIndicators(.hidden)
                 
             }
             

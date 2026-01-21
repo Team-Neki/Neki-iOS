@@ -105,6 +105,16 @@ struct ArchiveCoordinator {
                 }
                 return .none
                 
+            case let .path(.element(id: id, action: .favoriteAlbum(.imageTapped(item)))):
+                guard case let .favoriteAlbum(albumDetailState) = state.path[id: id] else { return .none }
+                
+                if !albumDetailState.isSelectionMode {
+                    state.path.append(.detail(
+                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ))
+                }
+                return .none
+                
                 
                 // toast action
             case let .root(.delegate(.showToast(item))):

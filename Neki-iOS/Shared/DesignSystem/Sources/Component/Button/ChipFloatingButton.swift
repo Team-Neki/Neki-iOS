@@ -21,7 +21,7 @@ public struct ChipFloatingButton: View {
         var title: String {
             switch self {
             case .map: return "지도로"
-            case .randomPose: return "랜덤포즈 추천"
+            case .randomPose: return "랜덤 포즈 추천"
             }
         }
     }

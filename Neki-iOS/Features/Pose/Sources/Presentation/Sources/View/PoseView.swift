@@ -36,7 +36,7 @@ struct PoseView: View {
                 .offset(y: isFilterBarVisible ? 0 : -100)
             
             randomPoseButton
-                .padding(.bottom, 24)
+                .padding(.bottom, 76)
             
         }
         .nekiToolbar(

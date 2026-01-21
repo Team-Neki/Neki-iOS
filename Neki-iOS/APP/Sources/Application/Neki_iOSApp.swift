@@ -10,7 +10,9 @@ import ComposableArchitecture
 
 @main
 struct Neki_iOSApp: App {
-    let store = Store(initialState: AppCoordinator.State.splash(SplashFeature.State())) {
+    /// 지금은 개발편의성을 위해 시작점을 메인탭으로 설정
+    /// 추후 스플래쉬와 로그인 구현 시 변경
+    let store = Store(initialState: AppCoordinator.State.mainTab(MainTabCoordinator.State())) {
         AppCoordinator()
             ._printChanges()
     }

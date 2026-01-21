@@ -1,5 +1,5 @@
 //
-//  AlbumCardView.swift
+//  AlbumCard.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/17/26.
@@ -9,7 +9,7 @@ import SwiftUI
 import Kingfisher
 import os
 
-struct AlbumCardView: View {
+struct AlbumCard: View {
     let album: AlbumItem
     
     private let cardWidth: CGFloat = 124
@@ -73,7 +73,7 @@ struct AlbumCardView: View {
 
 // MARK: - 익성님이 공유해준 앨범 커버 만드는 로직
 
-private extension AlbumCardView {
+private extension AlbumCard {
     struct UnionShape: Shape {
         func path(in rect: CGRect) -> Path {
             let vw: CGFloat = 124

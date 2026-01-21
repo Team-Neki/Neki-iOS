@@ -8,7 +8,7 @@
 import SwiftUI
 
 enum NekiTab: CaseIterable {
-    case pose, archive, map, mypage
+    case archive, pose, map, mypage
     
     var title: String {
         switch self {

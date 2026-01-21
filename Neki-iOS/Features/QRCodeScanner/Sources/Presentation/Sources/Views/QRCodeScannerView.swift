@@ -16,7 +16,7 @@ struct QRCodeScannerView: View {
     private let bracketLineWidth: CGFloat = 6
     
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             CameraPreview(isTorchOn: $store.isLightOn) { urlString in
                 store.send(.codeScanned(urlString))
             }.ignoresSafeArea()
@@ -27,17 +27,14 @@ struct QRCodeScannerView: View {
             VStack {
                 header
                 
-                Spacer()
-                
                 title
+                    .padding(.top, 40)
                 
                 ScannerAreaView(frameSize: scanFrameSize, cornerRadius: frameCornerRadius)
                     .padding(.top, 32)
                 
                 footer
                     .padding(.top, 40)
-                
-                Spacer()
             }
         }
     }
@@ -52,7 +49,7 @@ struct QRCodeScannerView: View {
             
             Spacer()
         }
-        .padding(.top, 15)
+        .padding(.vertical, 15)
         .padding(.leading, 20)
     }
     

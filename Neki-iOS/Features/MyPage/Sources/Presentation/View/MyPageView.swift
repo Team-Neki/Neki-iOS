@@ -43,7 +43,7 @@ private extension MyPageView {
         Rectangle()
             .frame(height: isLarge ? 11 : 1)
             .foregroundStyle(isLarge ? .gray25 : .gray50)
-            .padding(isLarge ? .zero : 20)
+            .padding(.horizontal, isLarge ? .zero : 20)
     }
     
     var profileArea: some View {
@@ -75,19 +75,21 @@ private extension MyPageView {
     }
     
     func section(_ item: SectionItem) -> some View {
-        Section {
-            VStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 4) {
+            // Header
+            Text(item.title)
+                .nekiFont(.caption12Medium)
+                .foregroundStyle(.gray400)
+                .padding(.top, 12)
+            
+            // Content
+            VStack(spacing: 12) {
                 ForEach(item.includedItems) { cellItem in
                     sectionCell(cellItem)
                 }
             }
-        } header: {
-            Text(item.title)
-                .nekiFont(.caption12Medium)
-                .foregroundStyle(.gray400)
-                .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding()
+        .padding(.horizontal)
     }
     
     func sectionCell(_ item: SectionCellItem) -> some View {
@@ -106,6 +108,7 @@ private extension MyPageView {
                     .foregroundStyle(.gray500)
             }
         }
+        .padding(.vertical, 12)
         .contentShape(.rect)
         .onTapGesture { store.send(.cellTapped(item)) }
     }

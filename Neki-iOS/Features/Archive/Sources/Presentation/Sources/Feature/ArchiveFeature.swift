@@ -33,6 +33,7 @@ struct ArchiveFeature {
             maxCount: 10,
             mediaType: .temp // 테스트를 위한 temp, .photoBooth로 변경 예정
         )
+        var isLoading: Bool = false
     }
     
     enum Action: BindableAction {
@@ -101,8 +102,13 @@ struct ArchiveFeature {
                 state.showDropDownMenu = false
                 return .none
                 
-            case let .imagePicker(.uploadCompleted(ids)):
+            case .imagePicker(.uploadStarted):
+                state.isLoading = true
                 state.showDropDownMenu = false
+                return .none
+                
+            case let .imagePicker(.uploadCompleted(ids)):
+                state.isLoading = false
                 if ids.isEmpty { return .none }
                 
                 state.selectUploadAlbum = SelectUploadAlbumFeature.State(
@@ -130,6 +136,7 @@ struct ArchiveFeature {
                 }
                 
             case .imagePicker(.uploadFailed):
+                state.isLoading = false
                 print("❌ [ArchiveFeature] 업로드 실패")
                 let toast = NekiToastItem("업로드에 실패했어요", style: .error)
                 return .send(.delegate(.showToast(toast)))

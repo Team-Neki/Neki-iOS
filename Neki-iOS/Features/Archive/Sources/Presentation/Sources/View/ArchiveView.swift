@@ -104,6 +104,10 @@ struct ArchiveView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
         }
+        .fullScreenCover(isPresented: $store.isLoading, content: {
+            loadingView
+                .presentationBackground(.clear)
+        })
         .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
@@ -288,6 +292,24 @@ private extension ArchiveView {
             .padding(.bottom, 76)
         }
         .padding(.horizontal, 20)
+    }
+    
+    var loadingView: some View {
+        ZStack {
+            Color.gray900.opacity(0.5)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
+                    .scaleEffect(2)
+                
+                Text("사진을 업로드하고 있어요")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.white)
+            }
+        }
     }
 }
 

@@ -39,6 +39,7 @@ public struct ImagePickerFeature {
         
         // Upload Action
         case requestUpload
+        case uploadStarted
         case uploadCompleted([Int])
         case uploadFailed
     }
@@ -50,9 +51,6 @@ public struct ImagePickerFeature {
         
         Reduce { state, action in
             switch action {
-                
-            case .binding:
-                return .none
                 
             case let .pickerItemsChanged(items):
                 state.pickerItems = items
@@ -90,6 +88,7 @@ public struct ImagePickerFeature {
                 
                 return .run { send in
                     do {
+                        await send(.uploadStarted)
                         let result = try await imageUploadClient.upload(items, type)
                         await send(.uploadCompleted(result))
                     } catch {
@@ -100,6 +99,12 @@ public struct ImagePickerFeature {
             case .uploadCompleted, .uploadFailed:
                 state.isLoading = false
                 state.selectedImages.removeAll()
+                return .none
+                
+            case .binding:
+                return .none
+                
+            default:
                 return .none
             }
         }

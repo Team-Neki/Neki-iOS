@@ -58,10 +58,6 @@ struct QRCodeScanFeature {
                 // TODO: QR Scanner Client에 요청하여 브랜드 별 전략이 구동될 수 있도록 해야함
                 return .none
                 
-            case let .codeScanned(urlString):
-                // TODO: 확보한 URL로 파싱
-                return .none
-                
             default:
                 return .none
             }

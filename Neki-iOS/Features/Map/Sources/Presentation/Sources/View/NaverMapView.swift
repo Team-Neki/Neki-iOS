@@ -138,8 +138,6 @@ extension NaverMapRepresentable {
                 markers[id]?.mapView = nil
             }
             
-            let idsToAdd = visibleIDs.subtracting(cachedIDs).union(visibleIDs.intersection(idsToHide))
-            
             for id in visibleIDs {
                 guard let booth = photoBooths[id: id] else { continue }
                 let isTargetSelected = (id == selectedBoothID)

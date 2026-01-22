@@ -10,17 +10,16 @@ import SwiftUI
 public extension UIImage {
     func processedImage() -> ImageUploadEntity? {
         
-        var currentImage = self
         var finalData: Data?
         var ext: String = "jpg"
         var contentType: String = "image/jpeg"
         
-        if let pngData = currentImage.pngData() {
+        if let pngData = self.pngData() {
             finalData = pngData
             ext = "png"
             contentType = "image/png"
         } else {
-            finalData = currentImage.jpegData(compressionQuality: 1.0)  // 아직 별도 압축 없음
+            finalData = self.jpegData(compressionQuality: 1.0)  // 아직 별도 압축 없음
             ext = "jpg"
             contentType = "image/jpeg"
         }
@@ -28,7 +27,6 @@ public extension UIImage {
         guard let data = finalData else { return nil }
         
         return ImageUploadEntity(
-            image: currentImage,
             data: data,
             fileExtension: ext,
             contentType: contentType

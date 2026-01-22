@@ -70,12 +70,34 @@ private extension SelectUploadAlbumView {
     
     var albumListView: some View {
         VStack(spacing: 0) {
-            NekiToolBar(
-                leftItem: .back(action: {store.send(.tapBackToPrompt)}),
-                centerItem: .text("모든 앨범"),
-                rightItem: .text("\(store.uploadedImageIds.count)장 업로드",
-                                 action: {store.send(.tapConfirmUpload)})
-            )
+            ZStack(alignment: .center) {
+                HStack(alignment: .center, spacing: 0) {
+                    Button {
+                        store.send(.tapBackToPrompt)
+                    } label: {
+                        Image(.iconChevronLeft)
+                    }
+
+                    Spacer()
+                    
+                    Button {
+                        store.send(.tapConfirmUpload)
+                    } label: {
+                        Text("\(store.uploadedImageIds.count)장 업로드")
+                            .nekiFont(.body16SemiBold)
+                            .foregroundStyle(store.selectedAlbumId == nil ? .gray200 : .primary500)
+                    }
+                    .disabled(store.selectedAlbumId == nil)
+                }
+                .frame(height: 54)
+                .padding(.horizontal, 20)
+                
+                Text("모든 앨범")
+                    .nekiFont(.title18SemiBold)
+                    .foregroundStyle(.gray900)
+            }
+            .background(.white)
+            .frame(height: 54)
             
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -83,12 +105,13 @@ private extension SelectUploadAlbumView {
                         AlbumRowTile(
                             album: album,
                             isSelectMode: true,
+                            isDeleteMode: false,
                             isSelected: store.selectedAlbumId == album.id
                         )
                         .padding(.horizontal, 20)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            store.send(.tapAlbum(album.id))
+                            store.send(.tapAlbum(album))
                         }
                     }
                 }

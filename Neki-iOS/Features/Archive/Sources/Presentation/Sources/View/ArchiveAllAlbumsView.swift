@@ -25,7 +25,8 @@ struct ArchiveAllAlbumsView: View {
                         ForEach(store.albums) { album in
                             AlbumRowTile(
                                 album: album,
-                                isSelectMode: store.isSelectMode,
+                                isSelectMode: false,
+                                isDeleteMode: store.isSelectMode,
                                 isSelected: store.selectedAlbumIDs.contains(album.id)
                             )
                             .onTapGesture {

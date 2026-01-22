@@ -58,6 +58,7 @@ struct ArchiveFeature {
         // Navigation Action
         case imageTapped(ArchiveImageItem)
         case albumTapped(AlbumItem)
+        case afterUploadNavigateToAlbumDetail(AlbumItem)
         
         // Delegate Action
         case delegate(DelegateAction)
@@ -112,9 +113,20 @@ struct ArchiveFeature {
                 
             case let .selectUploadAlbum(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case .uploadDidSuccess:
-                    state.selectUploadAlbum = nil
-                    return .none
+                case let .uploadDidSuccess(albumId):
+                    state.selectUploadAlbum = nil // 팝업 닫기
+                    let toast = NekiToastItem("이미지를 추가했어요", style: .success)
+                    
+                    // 앨범 선택했다면 해당 앨범으로 이동 요청
+                    if let albumId = albumId,
+                       let album = state.albums.first(where: { $0.id == albumId }) {
+                        return .run { send in
+                            await send(.delegate(.showToast(toast)))
+                            await send(.afterUploadNavigateToAlbumDetail(album))
+                        }
+                    }
+                    
+                    return .send(.delegate(.showToast(toast)))
                 }
                 
             case .imagePicker(.uploadFailed):

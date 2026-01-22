@@ -69,6 +69,20 @@ struct ArchiveCoordinator {
                 }
                 return .none
                 
+            case let .root(.afterUploadNavigateToAlbumDetail(album)):
+                let isFirstAlbum = state.root.albums.first?.id == album.id
+                
+                if isFirstAlbum {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                } else {
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                    ))
+                }
+                return .none
+                
                 
                 // path action
             case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):

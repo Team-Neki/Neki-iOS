@@ -23,6 +23,7 @@ struct SelectUploadAlbumFeature {
         var selectedAlbumId: UUID? = nil
         
         var viewMode: ViewMode = .prompt
+        var isLoading: Bool = false
     }
     
     enum Action: BindableAction {
@@ -34,13 +35,14 @@ struct SelectUploadAlbumFeature {
         
         // Album List Actions
         case tapBackToPrompt // 리스트에서 뒤로가기
-        case tapAlbum(UUID) // 앨범 선택
+        
+        case tapAlbum(AlbumItem) // 앨범 선택
         case tapConfirmUpload // 최종 업로드 버튼
         
         // Delegate
         case delegate(DelegateAction)
         enum DelegateAction {
-            case uploadDidSuccess
+            case uploadDidSuccess(albumId: UUID?)
         }
     }
     
@@ -52,7 +54,7 @@ struct SelectUploadAlbumFeature {
                 
             // 앨범 없이 최종 업로드
             case .tapUploadWithoutAlbum:
-                return .send(.delegate(.uploadDidSuccess))
+                return .send(.delegate(.uploadDidSuccess(albumId: nil)))
                 
             // 앨범 선택 후 업로드
             case .tapSelectAlbumAndUpload:
@@ -64,18 +66,21 @@ struct SelectUploadAlbumFeature {
                 state.viewMode = .prompt
                 return .none
                 
-            case let .tapAlbum(id):
-                if state.selectedAlbumId == id {
+            case let .tapAlbum(album):
+                if state.selectedAlbumId == album.id {
                     state.selectedAlbumId = nil
                 } else {
-                    state.selectedAlbumId = id
+                    state.selectedAlbumId = album.id
                 }
                 return .none
                 
             // 앨범 리스트 화면에서 최종 업로드
             case .tapConfirmUpload:
                 guard let albumId = state.selectedAlbumId else { return .none }
-                return .send(.delegate(.uploadDidSuccess))
+                
+                // TODO: - 업로드 로직
+                
+                return .send(.delegate(.uploadDidSuccess(albumId: albumId)))
                 
             case .binding:
                 return .none

@@ -18,7 +18,7 @@ struct HaruFilmStrategy: QRCodeParsingStrategy {
         let id = path.trimmingCharacters(in: ["/", "@"])
         
         guard id.isEmpty == false else { throw .parsingFailed }
-        guard let imageURL = URL(string: "http://\(host)/download/album/\(id)/output/output.jpg") else { throw .urlConstructionFailed }
+        guard let imageURL = URL(string: "http://\(host)/download/album/\(id)/output/output.jpg") else { throw .urlConstructionFailed } // TODO: 미보안 도메인 예외에 추가해야함
         do {
             let (data, _) = try await URLSession.shared.data(from: imageURL)
             return ParsedQRResult(brand: .harufilm, originalImage: data)

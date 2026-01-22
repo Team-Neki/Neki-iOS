@@ -39,6 +39,30 @@ struct QRCodeScannerView: View {
                 
                 Spacer()
             }
+            
+            if store.isLoading {
+                Color.gray900.opacity(0.6)
+                
+                ProgressView()
+                    .controlSize(.large)
+                    .tint(.white)
+            }
+            
+            if let url = store.webViewURL {
+                webViewLayer(url: url)
+            }
+        }
+        .nekiAlert(
+            isPresented: $store.isManualDownloadNeededAlertPresented,
+            style: .plain,
+            titleMessage: "갤러리에 사진을 먼저 다운받아주세요.",
+            subTitleMessage: "해당 브랜드는 웹사이트에서 사진을 저장해야 네키에 자동으로 저장돼요.",
+            confirmText: "사진 다운로드하러 가기",
+            isProcessing: false
+        ) {
+            store.send(.openWebViewButtonTapped(store.webViewURL))
+        } onCancel: {
+            // 취소 동작 없음
         }
     }
     
@@ -74,6 +98,14 @@ struct QRCodeScannerView: View {
                 .padding(.vertical, 15)
                 .background(.ultraThinMaterial)
                 .clipShape(.circle)
+        }
+    }
+    
+    private func webViewLayer(url: URL) -> some View {
+        DownloadableWebView(url: url) { data in
+            store.send(.webViewImageDownloadResult(.success(data)))
+        } onError: { error in
+            store.send(.webViewImageDownloadResult(.failure(error)))
         }
     }
 }

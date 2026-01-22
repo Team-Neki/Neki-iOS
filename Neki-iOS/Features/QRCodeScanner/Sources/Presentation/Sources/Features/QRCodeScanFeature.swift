@@ -11,17 +11,14 @@ import AVFoundation
 
 @Reducer
 struct QRCodeScanFeature {
-    /// QR Code 스캐너 관련 얼럿 네임스페이스
-    enum ScannerAlert {
-        case manualDownloadRequired
-    }
-    
     @ObservableState
     struct State {
         var isLightOn: Bool = false
-        var scannedURL: URL?
+        var isLoading: Bool = false
         
-        var alert: ScannerAlert?
+        var webViewURL: URL?
+        
+        var isManualDownloadNeededAlertPresented: Bool = false
     }
     
     enum Action: BindableAction {
@@ -30,14 +27,20 @@ struct QRCodeScanFeature {
         case lightButtonTapped
         case codeScanned(String)
         
+        // WebView & Alert Actions
+        case openWebViewButtonTapped(URL?)
+        case webViewImageDownloadResult(Result<Data, Error>)
+        
         // Internal Actions
-        case codeDidScan(URL?)
+        case processResult(Result<ParsedQRResult, QRParseError>)
+        case imageProcessingResult(Result<ImageDownsamplingProcessor.ProcessedImage, Never>)
         
         // Binding Actions
         case binding(BindingAction<State>)
     }
     
     @Dependency(\.dismiss) private var dismiss
+    @Dependency(\.qrScannerClient) private var qrScannerClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -52,9 +55,10 @@ struct QRCodeScanFeature {
                 return .none
                 
             case .codeScanned(let urlString):
-                return .run { send in await send(.codeDidScan(URL(string: urlString))) }
+                // TODO: QR Scanner Client에 요청하여 브랜드 별 전략이 구동될 수 있도록 해야함
+                return .none
                 
-            case .codeDidScan(let url):
+            case let .codeScanned(urlString):
                 // TODO: 확보한 URL로 파싱
                 return .none
                 

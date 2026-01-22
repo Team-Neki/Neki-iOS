@@ -39,12 +39,12 @@ public struct DefaultImageUploadRepository: ImageUploadRepository {
                     
                     // MARK: - Presigned URL 요청
                     
-                    let presighnedEndpoint = PresignedEndpoint(requests: dto)
+                    let presignedEndpoint = ImageUploadEndpoint.getPresignedURL(request: dto)
                     let response: PresignedURLResponseDTO
                     
                     do {
                         Logger.network.debug("[\(index+1)] Presigned URL 요청 중...")
-                        response = try await networkProvider.request(endpoint: presighnedEndpoint)
+                        response = try await networkProvider.request(endpoint: presignedEndpoint)
                         Logger.network.debug("[\(index+1)] Presigned URL 요청 완료")
                     } catch {
                         Logger.network.error("[\(index+1)] ❌ Presigned URL 요청 실패: \(error.localizedDescription)")
@@ -68,9 +68,9 @@ public struct DefaultImageUploadRepository: ImageUploadRepository {
                     
                     Logger.network.debug("[\(index+1)] S3 업로드 시작")
                     
-                    let uploadImageEndpoint = UploadImageEndpoint(
-                        presignedUrl: uploadUrl,
-                        imageData: item.data,
+                    let uploadImageEndpoint = ImageUploadEndpoint.uploadToS3(
+                        presignedURL: uploadUrl,
+                        data: item.data,
                         contentType: item.contentType
                     )
                     

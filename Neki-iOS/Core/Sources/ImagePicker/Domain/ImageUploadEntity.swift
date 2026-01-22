@@ -29,11 +29,13 @@ public struct ImageUploadEntity: Identifiable {
 public enum ImageFileFormat {
     case jpeg
     case png
+    case webp
     
     var fileExtension: String {
         switch self {
         case .jpeg: return "jpg"
         case .png: return "png"
+        case .webp: return "webp"
         }
     }
     
@@ -41,6 +43,7 @@ public enum ImageFileFormat {
         switch self {
         case .jpeg: return "image/jpeg"
         case .png: return "image/png"
+        case .webp: return "image/webp"
         }
     }
 }

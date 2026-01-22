@@ -17,6 +17,8 @@ struct ArchiveFeature {
         @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
         
+        @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
+        
         var newAlbumTitle: String = ""
         
         var albumTitleErrorMessage: String? = nil
@@ -24,6 +26,8 @@ struct ArchiveFeature {
         var isConfirmButtonEnabled: Bool {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
+        
+        var showDropDownMenu: Bool = false
         
         var imagePicker = ImagePickerFeature.State(
             maxCount: 10,
@@ -35,12 +39,15 @@ struct ArchiveFeature {
         case binding(BindingAction<State>)
         
         // User Action
+        case toggleDropDownMenu
+        case closeDropDownMenu
         case onTapAllPhotos
         case onTapAllAlbums
         case onTapQRScan
         
         // 갤러리에서 이미지 선택 시 액션
         case imagePicker(ImagePickerFeature.Action)
+        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
         
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
@@ -80,20 +87,35 @@ struct ArchiveFeature {
                 }
                 return .none
                 
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
+                
             case .onTapQRScan:
                 print("QR 인식")
+                state.showDropDownMenu = false
                 return .none
                 
             case let .imagePicker(.uploadCompleted(ids)):
+                state.showDropDownMenu = false
                 if ids.isEmpty { return .none }
                 
-                print("✅ [ArchiveFeature] S3 업로드 완료! 획득한 ID 목록: \(ids)")
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(
+                    uploadedImageIds: ids,
+                    albums: state.albums
+                )
+                return .none
                 
-                // TODO: 여기서 id를 서버로 보내는 로직 추가
-                
-                // (테스트용) 토스트 띄우기
-                let toast = NekiToastItem("이미지 \(ids.count)장이 업로드 되었어요 (ID 확인 완료)", style: .success)
-                return .send(.delegate(.showToast(toast)))
+            case let .selectUploadAlbum(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case .uploadDidSuccess:
+                    state.selectUploadAlbum = nil
+                    return .none
+                }
                 
             case .imagePicker(.uploadFailed):
                 print("❌ [ArchiveFeature] 업로드 실패")
@@ -101,6 +123,7 @@ struct ArchiveFeature {
                 return .send(.delegate(.showToast(toast)))
                 
             case .onTapCancelAddAlbum:
+                state.showDropDownMenu = false
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 return .none
@@ -144,6 +167,9 @@ struct ArchiveFeature {
             default:
                 return .none
             }
+        }
+        .ifLet(\.$selectUploadAlbum, action: \.selectUploadAlbum) {
+            SelectUploadAlbumFeature()
         }
     }
 }

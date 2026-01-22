@@ -15,7 +15,7 @@ struct ArchiveAllAlbumsFeature {
     struct State {
         @Shared var albums: IdentifiedArrayOf<AlbumItem>
         
-        var isDeleteMode: Bool = false
+        var isSelectMode: Bool = false
         var selectedAlbumIDs: Set<UUID> = []
         var deleteOption: ArchiveAlbumDeleteOption = .withPhotos
                 
@@ -58,19 +58,19 @@ struct ArchiveAllAlbumsFeature {
         Reduce { state, action in
             switch action {
             case .onTapBackButton:
-                if state.isDeleteMode {
+                if state.isSelectMode {
                     return .send(.onTapExitDeleteMode)
                 } else {
                     return .run { _ in await dismiss() }
                 }
                 
             case .onTapEnterDeleteMode:
-                state.isDeleteMode = true
+                state.isSelectMode = true
                 state.selectedAlbumIDs.removeAll()
                 return .none
                             
             case .onTapExitDeleteMode:
-                state.isDeleteMode = false
+                state.isSelectMode = false
                 state.selectedAlbumIDs.removeAll()
                 return .none
                 
@@ -95,7 +95,7 @@ struct ArchiveAllAlbumsFeature {
                     albums.removeAll { state.selectedAlbumIDs.contains($0.id) }
                 }
                 
-                state.isDeleteMode = false
+                state.isSelectMode = false
                 state.selectedAlbumIDs.removeAll()
                 
                 let toastItem = NekiToastItem("앨범을 삭제했어요", style: .success)

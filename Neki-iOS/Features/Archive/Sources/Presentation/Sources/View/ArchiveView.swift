@@ -11,7 +11,6 @@ import Kingfisher
 
 struct ArchiveView: View {
     
-    @State var showDropDownMenu: Bool = false
     @State var showTooltip: Bool = false          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
     @State var addAlbumSheetPresented: Bool = false
     @State var showScrollToTopButton: Bool = false
@@ -80,7 +79,7 @@ struct ArchiveView: View {
                     }
             }
             
-            if showDropDownMenu {
+            if store.showDropDownMenu {
                 dropDownMenu
                     .padding(.top, 42)
                     .padding(.trailing, 60)
@@ -105,6 +104,13 @@ struct ArchiveView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
         }
+        .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
+            SelectUploadAlbumView(store: store)
+                .presentationBackground(.clear)
+        }
+        .transaction { transaction in
+            transaction.disablesAnimations = true
+        }
         .task {
             await store.send(.onAppear).finish()
         }
@@ -123,9 +129,7 @@ private extension ArchiveView {
             
             HStack(alignment: .center, spacing: 12) {
                 Button {
-                    withAnimation() {
-                        showDropDownMenu.toggle()
-                    }
+                    store.send(.toggleDropDownMenu)
                 } label: {
                     Image(.iconPlusRed)
                 }
@@ -151,7 +155,6 @@ private extension ArchiveView {
     var dropDownMenu: some View {
         VStack(alignment: .leading, spacing: 0) {
             dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
-                withAnimation { showDropDownMenu = false }
                 store.send(.onTapQRScan)
             }
             
@@ -176,7 +179,6 @@ private extension ArchiveView {
                 .padding(.vertical, 4)
             
             dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
-                withAnimation { showDropDownMenu = false }
                 addAlbumSheetPresented = true
                 store.send(.onTapCancelAddAlbum)
             }

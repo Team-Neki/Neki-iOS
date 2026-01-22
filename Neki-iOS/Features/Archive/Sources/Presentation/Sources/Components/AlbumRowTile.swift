@@ -10,7 +10,7 @@ import Kingfisher
 
 struct AlbumRowTile: View {
     let album: AlbumItem
-    let isDeleteMode: Bool
+    let isSelectMode: Bool
     let isSelected: Bool
     
     var body: some View {
@@ -35,7 +35,7 @@ struct AlbumRowTile: View {
             
             Spacer()
             
-            if isDeleteMode {
+            if isSelectMode {
                 selectionIndicator
             }
         }
@@ -51,8 +51,7 @@ private extension AlbumRowTile {
                 
                 Image(systemName: "heart.fill")
                     .foregroundColor(.white)
-                    .font(.system(size: 24))
-                    .shadow(color: .black.opacity(0.2), radius: 2)
+                    .frame(width: 20, height: 20)
             }
         }
     }

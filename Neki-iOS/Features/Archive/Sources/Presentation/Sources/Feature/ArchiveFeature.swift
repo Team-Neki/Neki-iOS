@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+//import Core
 
 @Reducer
 struct ArchiveFeature {
@@ -16,6 +17,8 @@ struct ArchiveFeature {
         @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
         
+        @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
+        
         var newAlbumTitle: String = ""
         
         var albumTitleErrorMessage: String? = nil
@@ -23,17 +26,30 @@ struct ArchiveFeature {
         var isConfirmButtonEnabled: Bool {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
-
+        
+        var showDropDownMenu: Bool = false
+        
+        var imagePicker = ImagePickerFeature.State(
+            maxCount: 10,
+            mediaType: .temp // 테스트를 위한 temp, .photoBooth로 변경 예정
+        )
+        var isLoading: Bool = false
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         
         // User Action
+        case toggleDropDownMenu
+        case closeDropDownMenu
         case onTapAllPhotos
         case onTapAllAlbums
         case onTapQRScan
-        case onTapAddFromGallery
+        
+        // 갤러리에서 이미지 선택 시 액션
+        case imagePicker(ImagePickerFeature.Action)
+        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
+        
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
         
@@ -43,6 +59,7 @@ struct ArchiveFeature {
         // Navigation Action
         case imageTapped(ArchiveImageItem)
         case albumTapped(AlbumItem)
+        case afterUploadNavigateToAlbumDetail(AlbumItem)
         
         // Delegate Action
         case delegate(DelegateAction)
@@ -53,6 +70,10 @@ struct ArchiveFeature {
     
     var body: some ReducerOf<Self> {
         BindingReducer()
+        
+        Scope(state: \.imagePicker, action: \.imagePicker) {
+            ImagePickerFeature()
+        }
         
         Reduce { state, action in
             /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
@@ -68,15 +89,60 @@ struct ArchiveFeature {
                 }
                 return .none
                 
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
+                
             case .onTapQRScan:
                 print("QR 인식")
+                state.showDropDownMenu = false
                 return .none
                 
-            case .onTapAddFromGallery:
-                print("갤러리에서 추가")
+            case .imagePicker(.uploadStarted):
+                state.isLoading = true
+                state.showDropDownMenu = false
                 return .none
+                
+            case let .imagePicker(.uploadCompleted(ids)):
+                state.isLoading = false
+                if ids.isEmpty { return .none }
+                
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(
+                    uploadedImageIds: ids,
+                    albums: state.albums
+                )
+                return .none
+                
+            case let .selectUploadAlbum(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case let .uploadDidSuccess(albumId):
+                    state.selectUploadAlbum = nil // 팝업 닫기
+                    let toast = NekiToastItem("이미지를 추가했어요", style: .success)
+                    
+                    // 앨범 선택했다면 해당 앨범으로 이동 요청
+                    if let albumId = albumId,
+                       let album = state.albums.first(where: { $0.id == albumId }) {
+                        return .run { send in
+                            await send(.delegate(.showToast(toast)))
+                            await send(.afterUploadNavigateToAlbumDetail(album))
+                        }
+                    }
+                    
+                    return .send(.delegate(.showToast(toast)))
+                }
+                
+            case .imagePicker(.uploadFailed):
+                state.isLoading = false
+                print("❌ [ArchiveFeature] 업로드 실패")
+                let toast = NekiToastItem("업로드에 실패했어요", style: .error)
+                return .send(.delegate(.showToast(toast)))
                 
             case .onTapCancelAddAlbum:
+                state.showDropDownMenu = false
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 return .none
@@ -90,11 +156,11 @@ struct ArchiveFeature {
                     coverImageURL: nil,         // TODO: - 디자인에서 주는 브랜딩 이미지로 변경
                     isFavorite: false
                 )
-
+                
                 state.$albums.withLock {
                     _ = $0.insert(newAlbum, at: 1)
                 }
-                 
+                
                 // 입력값 초기화
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
@@ -120,6 +186,9 @@ struct ArchiveFeature {
             default:
                 return .none
             }
+        }
+        .ifLet(\.$selectUploadAlbum, action: \.selectUploadAlbum) {
+            SelectUploadAlbumFeature()
         }
     }
 }

@@ -11,7 +11,6 @@ import Kingfisher
 
 struct ArchiveView: View {
     
-    @State var showDropDownMenu: Bool = false
     @State var showTooltip: Bool = false          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
     @State var addAlbumSheetPresented: Bool = false
     @State var showScrollToTopButton: Bool = false
@@ -80,7 +79,7 @@ struct ArchiveView: View {
                     }
             }
             
-            if showDropDownMenu {
+            if store.showDropDownMenu {
                 dropDownMenu
                     .padding(.top, 42)
                     .padding(.trailing, 60)
@@ -105,6 +104,17 @@ struct ArchiveView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
         }
+        .fullScreenCover(isPresented: $store.isLoading, content: {
+            loadingView
+                .presentationBackground(.clear)
+        })
+        .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
+            SelectUploadAlbumView(store: store)
+                .presentationBackground(.clear)
+        }
+        .transaction { transaction in
+            transaction.disablesAnimations = true
+        }
         .task {
             await store.send(.onAppear).finish()
         }
@@ -123,9 +133,7 @@ private extension ArchiveView {
             
             HStack(alignment: .center, spacing: 12) {
                 Button {
-                    withAnimation() {
-                        showDropDownMenu.toggle()
-                    }
+                    store.send(.toggleDropDownMenu)
                 } label: {
                     Image(.iconPlusRed)
                 }
@@ -151,13 +159,23 @@ private extension ArchiveView {
     var dropDownMenu: some View {
         VStack(alignment: .leading, spacing: 0) {
             dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
-                withAnimation { showDropDownMenu = false }
                 store.send(.onTapQRScan)
             }
             
-            dropDownMenuButton(title: "갤러리에서 추가", icon: .iconRoundAddPhotoAlternate) {
-                withAnimation { showDropDownMenu = false }
-                store.send(.onTapAddFromGallery)
+            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                HStack(alignment: .center, spacing: 6) {
+                    Image(uiImage: .iconRoundAddPhotoAlternate)
+                    
+                    Text("갤러리에서 추가")
+                        .nekiFont(.body16Medium)
+                        .foregroundStyle(.gray900)
+                    
+                    Spacer()
+                }
+                .padding(.leading, 12)
+                .padding(.vertical, 5)
+                .frame(height: 34)
+                .contentShape(Rectangle())
             }
             
             Divider()
@@ -165,7 +183,6 @@ private extension ArchiveView {
                 .padding(.vertical, 4)
             
             dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
-                withAnimation { showDropDownMenu = false }
                 addAlbumSheetPresented = true
                 store.send(.onTapCancelAddAlbum)
             }
@@ -275,6 +292,24 @@ private extension ArchiveView {
             .padding(.bottom, 76)
         }
         .padding(.horizontal, 20)
+    }
+    
+    var loadingView: some View {
+        ZStack {
+            Color.gray900.opacity(0.5)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                ProgressView()
+                    .progressViewStyle(.circular)
+                    .tint(.white)
+                    .scaleEffect(2)
+                
+                Text("사진을 업로드하고 있어요")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.white)
+            }
+        }
     }
 }
 

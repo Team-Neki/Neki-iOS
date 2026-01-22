@@ -25,6 +25,7 @@ public enum HTTPContentType {
     case json
     case multipart(boundary: String)
     case raw
+    case custom(String)
 }
 
 public protocol Endpoint {
@@ -99,6 +100,15 @@ extension Endpoint {
             request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
             guard let body = body as? Data else { throw MultipartError.invalidBody }
             request.httpBody = body
+            
+        case .custom(let contentType):
+            request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+            
+            if let bodyData = body as? Data {
+                request.httpBody = bodyData
+            } else if let body = body {
+                request.httpBody = try encoder.encode(body)
+            }
         }
         
         return request

@@ -25,11 +25,12 @@ struct ArchiveAllAlbumsView: View {
                         ForEach(store.albums) { album in
                             AlbumRowTile(
                                 album: album,
-                                isDeleteMode: store.isDeleteMode,
+                                isSelectMode: false,
+                                isDeleteMode: store.isSelectMode,
                                 isSelected: store.selectedAlbumIDs.contains(album.id)
                             )
                             .onTapGesture {
-                                if store.isDeleteMode {
+                                if store.isSelectMode {
                                     store.send(.onTapToggleSelection(album))
                                 } else {
                                     store.send(.onTapAlbum(album))
@@ -44,7 +45,7 @@ struct ArchiveAllAlbumsView: View {
                 
             }
             
-            if showDropDownButton && !store.isDeleteMode {
+            if showDropDownButton && !store.isSelectMode {
                 // TODO: - 삭제하기 드롭다운버튼이 나타나 있을 경우 다른 이벤트 가능한지 여부 물어보기
                 Color.clear
                     .contentShape(Rectangle())
@@ -109,7 +110,7 @@ private extension ArchiveAllAlbumsView {
                 Spacer()
                 
                 HStack(alignment: .center, spacing: 12) {
-                    if store.isDeleteMode {
+                    if store.isSelectMode {
                         Button {
                             deleteAlbumSheetPresented = true
                         } label: {

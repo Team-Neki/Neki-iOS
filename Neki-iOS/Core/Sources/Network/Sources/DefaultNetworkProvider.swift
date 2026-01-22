@@ -29,18 +29,40 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     
     public func setTokenRefresher(_ refresher: TokenRefresher) { tokenRefresher = refresher }
     
+    // TODO: - 프로바이더 부분 수정 필요
+    
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
-    ///
-    /// voidResponse를 수행합니다.
+    /// 임시 구현
+    public func requestVoid(endpoint: Endpoint) async throws -> Void {
+            let request = try await buildRequest(for: endpoint)
+            
+             requestLog(request)
+            
+            do {
+                let (_, response) = try await session.data(for: request, delegate: nil)
+                 responseLog(data: Data(), response: response)
+                
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw NetworkError.responseError
+                }
+                
+                guard (200..<300).contains(httpResponse.statusCode) else {
+                    throw NetworkError.networkFail
+                }
+                
+                return
+            } catch {
+                throw NetworkError.unknownError(error)
+            }
+        }
+    
+    /// 네트워크 요청을 수행하고 성공 여부만 판단하며 BaseResponseDTO<EmptyData>를 반환합니다
     @discardableResult
     public func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData> {
         try await performRequest(endpoint: endpoint, retryCount: 1)
     }
     
     /// 네트워크 요청을 수행하고 제네릭 타입으로 응답 데이터를 디코딩합니다.
-    ///
-    /// decodableResponse를 수행합니다.
-    /// HTTP 200~299 상태 코드는 `JSONDecoder`를 통해 `T` 타입으로 디코딩하여 반환합니다.
     public func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
         try await performRequest(endpoint: endpoint, retryCount: 1)
     }
@@ -93,9 +115,19 @@ private extension DefaultNetworkProvider {
     func appendBearerToken(to request: URLRequest) throws -> URLRequest {
         var newRequest = request
         
+        // 이미지 업로드 테스트를 위한 임시 토큰
+        var temporaryToken: String {
+            guard let token = Bundle.main.infoDictionary?["TEMPORARY_ACCESS_TOKEN"] as? String else {
+                return NetworkError.invalidURLError.localizedDescription
+            }
+            
+            return token
+        }
+        
         do {
-            let tokens = try tokenStorage.fetch()
-            newRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
+            newRequest.setValue("Bearer \(temporaryToken)", forHTTPHeaderField: "Authorization")
+//            let tokens = try tokenStorage.fetch()
+//            newRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
             return newRequest
         } catch TokenStorageError.notFound {
             throw NetworkError.unauthorizedError

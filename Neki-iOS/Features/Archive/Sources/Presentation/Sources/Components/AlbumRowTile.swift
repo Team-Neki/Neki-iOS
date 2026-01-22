@@ -10,6 +10,7 @@ import Kingfisher
 
 struct AlbumRowTile: View {
     let album: AlbumItem
+    let isSelectMode: Bool
     let isDeleteMode: Bool
     let isSelected: Bool
     
@@ -35,7 +36,7 @@ struct AlbumRowTile: View {
             
             Spacer()
             
-            if isDeleteMode {
+            if isSelectMode || isDeleteMode {
                 selectionIndicator
             }
         }
@@ -51,15 +52,20 @@ private extension AlbumRowTile {
                 
                 Image(systemName: "heart.fill")
                     .foregroundColor(.white)
-                    .font(.system(size: 24))
-                    .shadow(color: .black.opacity(0.2), radius: 2)
+                    .frame(width: 20, height: 20)
             }
         }
     }
     
     @ViewBuilder
     var selectionIndicator: some View {
-        if !album.isFavorite {
+        let shouldShowCheckbox: Bool = {
+            if isSelectMode { return true }
+            if isDeleteMode && !album.isFavorite { return true }
+            return false
+        }()
+        
+        if shouldShowCheckbox {
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .resizable()
                 .frame(width: 24, height: 24)

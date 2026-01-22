@@ -155,9 +155,20 @@ private extension ArchiveView {
                 store.send(.onTapQRScan)
             }
             
-            dropDownMenuButton(title: "갤러리에서 추가", icon: .iconRoundAddPhotoAlternate) {
-                withAnimation { showDropDownMenu = false }
-                store.send(.onTapAddFromGallery)
+            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                HStack(alignment: .center, spacing: 6) {
+                    Image(uiImage: .iconRoundAddPhotoAlternate)
+                    
+                    Text("갤러리에서 추가")
+                        .nekiFont(.body16Medium)
+                        .foregroundStyle(.gray900)
+                    
+                    Spacer()
+                }
+                .padding(.leading, 12)
+                .padding(.vertical, 5)
+                .frame(height: 34)
+                .contentShape(Rectangle())
             }
             
             Divider()

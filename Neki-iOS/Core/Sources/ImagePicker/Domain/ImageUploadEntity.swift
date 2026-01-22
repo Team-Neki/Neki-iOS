@@ -7,22 +7,41 @@
 
 import Foundation
 
-public struct ImageUploadEntity: Identifiable, @unchecked Sendable {
+public struct ImageUploadEntity: Identifiable {
     public let id: UUID
-    public let data: Data            // 업로드용 Raw Data
-    public let fileExtension: String // "jpg", "png"
-    public let contentType: String      // "image/jpeg", "image/png"
+    public let data: Data
+    public let format: ImageFileFormat
+    
+    public var contentType: String { format.contentType }
+    public var fileExtension: String { format.fileExtension }
     
     public init(
         id: UUID = UUID(),
         data: Data,
-        fileExtension: String,
-        contentType: String
+        format: ImageFileFormat
     ) {
         self.id = id
         self.data = data
-        self.fileExtension = fileExtension
-        self.contentType = contentType
+        self.format = format
+    }
+}
+
+public enum ImageFileFormat {
+    case jpeg
+    case png
+    
+    var fileExtension: String {
+        switch self {
+        case .jpeg: return "jpg"
+        case .png: return "png"
+        }
+    }
+    
+    var contentType: String {
+        switch self {
+        case .jpeg: return "image/jpeg"
+        case .png: return "image/png"
+        }
     }
 }
 

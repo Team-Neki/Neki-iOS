@@ -5,7 +5,6 @@
 //  Created by SwainYun on 1/22/26.
 //
 
-import UIKit
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -13,8 +12,6 @@ public struct ImageDownsamplingProcessor {
     public struct ProcessedImage {
         /// WebP Data
         public let data: Data
-        /// 디코딩된 이미지
-        public let uiImage: UIImage
     }
     
     /// 목표 해상도: 4096px (4K)
@@ -46,7 +43,6 @@ public struct ImageDownsamplingProcessor {
         CGImageDestinationAddImage(destination, cgImage, webPOptions as CFDictionary)
         
         guard CGImageDestinationFinalize(destination) else { return nil }
-        let displayImage = UIImage(cgImage: cgImage)
-        return ProcessedImage(data: mutableData as Data, uiImage: displayImage)
+        return ProcessedImage(data: mutableData as Data)
     }
 }

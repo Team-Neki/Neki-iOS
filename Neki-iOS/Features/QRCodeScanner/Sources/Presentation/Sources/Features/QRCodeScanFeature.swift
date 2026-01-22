@@ -19,6 +19,7 @@ struct QRCodeScanFeature {
         var webViewURL: URL?
         
         var isManualDownloadNeededAlertPresented: Bool = false
+        var isWebViewPresented: Bool = false
     }
     
     enum Action: BindableAction {
@@ -28,7 +29,7 @@ struct QRCodeScanFeature {
         case codeScanned(String)
         
         // WebView & Alert Actions
-        case openWebViewButtonTapped(URL?)
+        case openWebViewButtonTapped
         case webViewImageDownloadResult(Result<Data, Error>)
         
         // Internal Actions
@@ -56,6 +57,10 @@ struct QRCodeScanFeature {
                 
             case .codeScanned(let urlString):
                 // TODO: QR Scanner Client에 요청하여 브랜드 별 전략이 구동될 수 있도록 해야함
+                return .none
+                
+            case .openWebViewButtonTapped:
+                state.isWebViewPresented = true
                 return .none
                 
             default:

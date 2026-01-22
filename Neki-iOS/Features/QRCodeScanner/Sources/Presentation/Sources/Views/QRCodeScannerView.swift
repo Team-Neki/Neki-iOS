@@ -48,7 +48,7 @@ struct QRCodeScannerView: View {
                     .tint(.white)
             }
             
-            if let url = store.webViewURL {
+            if store.isWebViewPresented, let url = store.webViewURL {
                 webViewLayer(url: url)
             }
         }
@@ -60,7 +60,7 @@ struct QRCodeScannerView: View {
             confirmText: "사진 다운로드하러 가기",
             isProcessing: false
         ) {
-            store.send(.openWebViewButtonTapped(store.webViewURL))
+            store.send(.openWebViewButtonTapped)
         } onCancel: {
             // 취소 동작 없음
         }

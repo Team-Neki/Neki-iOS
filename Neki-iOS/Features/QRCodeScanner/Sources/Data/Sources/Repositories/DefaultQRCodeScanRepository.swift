@@ -12,7 +12,8 @@ struct DefaultQRCodeScanRepository: QRCodeReaderRepository {
         HaruFilmStrategy(),
         PhotograyStrategy(),
         PhotoSignatureStrategy(),
-        Life4CutStrategy()
+        Life4CutStrategy(),
+        PhotoismStrategy()
     ]
     
     private let networkProvider: NetworkProvider

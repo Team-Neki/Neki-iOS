@@ -13,7 +13,7 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
     func canHandle(host: String) -> Bool { PhotoBoothBrand.photogray.hostKeywords.contains(host) }
     
     func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
-        var request = URLRequest(url: url)
+        let request = URLRequest(url: url)
         
         let response: URLResponse
         do {

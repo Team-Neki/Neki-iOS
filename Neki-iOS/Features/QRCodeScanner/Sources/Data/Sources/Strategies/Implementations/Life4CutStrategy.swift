@@ -13,7 +13,7 @@ struct Life4CutStrategy: QRCodeParsingStrategy {
     func canHandle(host: String) -> Bool { PhotoBoothBrand.life4cut.hostKeywords.contains(host) }
     
     func parse(_ url: URL, networkProvider: any NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
-        var request = URLRequest(url: url)
+        let request = URLRequest(url: url)
         
         let response: URLResponse
         do {

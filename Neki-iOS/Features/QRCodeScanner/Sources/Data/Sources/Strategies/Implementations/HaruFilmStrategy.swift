@@ -13,7 +13,7 @@ struct HaruFilmStrategy: QRCodeParsingStrategy {
     func canHandle(host: String) -> Bool { PhotoBoothBrand.harufilm.hostKeywords.contains(host) }
     
     func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
-        guard let host = url.host else { throw .invalidURL }
+        guard let host = url.host() else { throw .invalidURL }
         let path = url.path()
         let id = path.trimmingCharacters(in: ["/", "@"])
         

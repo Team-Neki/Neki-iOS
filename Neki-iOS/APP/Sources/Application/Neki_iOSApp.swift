@@ -14,7 +14,7 @@ struct Neki_iOSApp: App {
     /// 추후 스플래쉬와 로그인 구현 시 변경
     let store = Store(initialState: AppCoordinator.State.mainTab(MainTabCoordinator.State())) {
         AppCoordinator()
-            ._printChanges()
+//            ._printChanges()
     }
     
     var body: some Scene {

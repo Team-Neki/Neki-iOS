@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct DefaultQRCodeScanRepository: QRCodeReaderRepository {
+struct DefaultQRCodeScanRepository: QRCodeScanRepository {
     private let strategies: [QRCodeParsingStrategy] = [
         HaruFilmStrategy(),
         PhotograyStrategy(),

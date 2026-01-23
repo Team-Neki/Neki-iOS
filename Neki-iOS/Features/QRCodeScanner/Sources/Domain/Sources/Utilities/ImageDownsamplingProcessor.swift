@@ -24,12 +24,14 @@ public struct ImageDownsamplingProcessor {
         let width = properties?[kCGImagePropertyPixelWidth] as? CGFloat ?? .zero
         let height = properties?[kCGImagePropertyPixelHeight] as? CGFloat ?? .zero
         let maxSide = max(width, height)
-        let shouldResize = maxSide > maxDimensionInPixels
+        
+        let targetPixelSize: CGFloat = maxSide > .zero ? (maxSide > maxDimensionInPixels) ? maxDimensionInPixels : maxSide : maxDimensionInPixels
+        
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceShouldCacheImmediately: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: shouldResize ? maxDimensionInPixels : maxSide
+            kCGImageSourceThumbnailMaxPixelSize: targetPixelSize
         ]
         
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, .zero, options as CFDictionary) else { return nil }

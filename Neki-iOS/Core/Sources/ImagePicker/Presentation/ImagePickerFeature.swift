@@ -34,8 +34,8 @@ public struct ImagePickerFeature {
         // User Action
         case pickerItemsChanged([PhotosPickerItem])
         
-        // Process Image Action
-        case processImages([UIImage])
+        // Internal Action (Data Load Complete)
+        case uploadReady([ImageUploadEntity])
         
         // Upload Action
         case requestUpload
@@ -54,25 +54,41 @@ public struct ImagePickerFeature {
                 
             case let .pickerItemsChanged(items):
                 state.pickerItems = items
+                state.isLoading = true
                 
                 return .run { send in
-                    var images: [UIImage] = []
                     
-                    for item in items {
-                        if let data = try? await item.loadTransferable(type: Data.self),
-                           let image = UIImage(data: data) {
-                            images.append(image)
+                    let entities = await withTaskGroup(of: ImageUploadEntity?.self) { group in
+                        for item in items {
+                            group.addTask {
+                                guard let data = try? await item.loadTransferable(type: Data.self) else {
+                                    return nil
+                                }
+                                
+                                let format = data.detectedImageFormat
+                                let entity = ImageUploadEntity(data: data, format: format)
+                                
+                                return entity
+                            }
                         }
+                        
+                        var results: [ImageUploadEntity] = []
+                        
+                        for await result in group {
+                            if let result { results.append(result) }
+                        }
+                        
+                        return results
                     }
-                    
-                    await send(.processImages(images))
+                    await send(.uploadReady(entities))
                 }
                 
-            case let .processImages(images):
-                let newItems = images.compactMap { $0.processedImage() }
-                
+            case let .uploadReady(newEntities):
                 let remaining = state.maxCount - state.selectedImages.count
-                state.selectedImages.append(contentsOf: newItems.prefix(remaining))
+                if remaining > 0 {
+                    state.selectedImages.append(contentsOf: newEntities.prefix(remaining))
+                }
+                
                 state.pickerItems.removeAll()
                 
                 return .send(.requestUpload)

@@ -59,7 +59,7 @@ public struct ImagePickerFeature {
                 return .run { send in
                     
                     let entities = await withTaskGroup(of: ImageUploadEntity?.self) { group in
-                        for (index, item) in items.enumerated() {
+                        for item in items {
                             group.addTask {
                                 guard let data = try? await item.loadTransferable(type: Data.self) else {
                                     return nil

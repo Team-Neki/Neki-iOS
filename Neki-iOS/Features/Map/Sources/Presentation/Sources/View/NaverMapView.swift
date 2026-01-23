@@ -206,7 +206,6 @@ private extension NaverMapRepresentable.Coordinator {
         marker.userInfo["isSelected"] = isSelected
         
         if isSelected {
-            // MARK: - 선택 상태의 이미지 리소스 추가해야합니다. 아래는 예제코드 입니다.
             marker.iconImage = MarkerImageResources.image(for: brand, state: .selected)
             marker.width = 72
             marker.height = 83

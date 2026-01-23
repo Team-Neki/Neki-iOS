@@ -16,22 +16,21 @@ struct NaverMapRepresentable: UIViewRepresentable {
     
     /// 마커 이미지 리소스
     fileprivate enum MarkerImageResources {
-        static let harufilm = NMFOverlayImage(image: .imgHarufilmPin)
-        static let life4cut = NMFOverlayImage(image: .imgLife4CutPin)
-        static let photogray = NMFOverlayImage(image: .imgPhotograyPin)
-        static let photoism = NMFOverlayImage(image: .imgPhotoismPin)
-        static let photosignature = NMFOverlayImage(image: .imgPhotosignaturePin)
-        static let planBStudio = NMFOverlayImage(image: .imgPlanBStudioPin)
+        enum State {
+            case normal, selected
+        }
         
-        static func brand(_ brand: PhotoBoothBrand) -> NMFOverlayImage {
-            switch brand {
-            case .life4cut: return Self.life4cut
-            case .photoism: return Self.photoism
-            case .photogray: return Self.photogray
-            case .photosignature: return Self.photosignature
-            case .harufilm: return Self.harufilm
-            case .planBStudio: return Self.planBStudio
-            }
+        private static let images: [PhotoBoothBrand: [State: NMFOverlayImage]] = [
+            .life4cut: [.normal: NMFOverlayImage(image: .imgLife4CutPin), .selected: NMFOverlayImage(image: .imgLife4CutPinSelected)],
+            .photoism: [.normal: NMFOverlayImage(image: .imgPhotoismPin), .selected: NMFOverlayImage(image: .imgPhotoismPinSelected)],
+            .photogray: [.normal: NMFOverlayImage(image: .imgPhotograyPin), .selected: NMFOverlayImage(image: .imgPhotograyPinSelected)],
+            .photosignature: [.normal: NMFOverlayImage(image: .imgPhotosignaturePin), .selected: NMFOverlayImage(image: .imgPhotosignaturePinSelected)],
+            .harufilm: [.normal: NMFOverlayImage(image: .imgHarufilmPin), .selected: NMFOverlayImage(image: .imgHarufilmPinSelected)],
+            .planBStudio: [.normal: NMFOverlayImage(image: .imgPlanBStudioPin), .selected: NMFOverlayImage(image: .imgPlanBStudioPinSelected)]
+        ]
+        
+        static func image(for brand: PhotoBoothBrand, state: State) -> NMFOverlayImage {
+            return images[brand]?[state] ?? NMFOverlayImage(image: .imgLife4CutPin)
         }
     }
     
@@ -120,7 +119,7 @@ extension NaverMapRepresentable {
         var lastCameraPosition: GeographicCoordinate?
         
         private var markers: [UUID: NMFMarker] = [:]
-        private var updateTask: Task<Void, Never>?
+        private var lastSelectedBoothID: UUID?
         
         let parent: NaverMapRepresentable
         
@@ -131,47 +130,45 @@ extension NaverMapRepresentable {
             photoBooths: IdentifiedArrayOf<PhotoBooth>,
             selectedBoothID: UUID?
         ) {
-            updateTask?.cancel()
+            let visibleIDs = Set(photoBooths.ids)
+            let cachedIDs = Set(markers.keys)
             
-            let currentMarkerIDs = Set(markers.keys)
+            let idsToHide = cachedIDs.subtracting(visibleIDs)
+            for id in idsToHide {
+                markers[id]?.mapView = nil
+            }
             
-            updateTask = Task.detached(priority: .userInitiated) { [weak self] in
-                guard let self = self, Task.isCancelled == false else { return }
+            for id in visibleIDs {
+                guard let booth = photoBooths[id: id] else { continue }
+                let isTargetSelected = (id == selectedBoothID)
                 
-                let newIDs = Set(photoBooths.ids)
-                let idsToRemove = currentMarkerIDs.subtracting(newIDs)
-                let idsToAdd = newIDs.subtracting(currentMarkerIDs)
-                let idsToCheck = newIDs.intersection(currentMarkerIDs)
-                
-                await MainActor.run {
-                    guard Task.isCancelled == false else { return }
-                    
-                    // 마커 삭제
-                    for id in idsToRemove {
-                        self.markers[id]?.mapView = nil
-                        self.markers.removeValue(forKey: id)
-                    }
-                    
-                    // 마커 추가
-                    for id in idsToAdd {
-                        guard let booth = photoBooths[id: id] else { continue }
-                        let isSelected = (id == selectedBoothID)
-                        let marker = self.createMarker(for: booth, isSelected: isSelected)
-                        
-                        marker.mapView = mapView
-                        self.markers[id] = marker
-                    }
-                    
-                    // 마커 갱신
-                    for id in idsToCheck {
-                        guard let marker = self.markers[id], let booth = photoBooths[id: id] else { continue }
-                        let isSelected = (id == selectedBoothID)
-                        let wasSelected = marker.userInfo["isSelected"] as? Bool ?? false
-                        
-                        guard wasSelected != isSelected else { continue }
-                        self.configureMarkerStyle(marker, brand: booth.brand, isSelected: isSelected)
-                    }
+                if let existingMarker = markers[id] {
+                    guard existingMarker.mapView == nil else { continue }
+                    configureMarkerStyle(existingMarker, brand: booth.brand, isSelected: isTargetSelected)
+                    existingMarker.mapView = mapView
+                } else {
+                    let newMarker = createMarker(for: booth, isSelected: isTargetSelected)
+                    newMarker.mapView = mapView
+                    markers[id] = newMarker
                 }
+            }
+            
+            if lastSelectedBoothID != selectedBoothID {
+                if let oldID = lastSelectedBoothID,
+                   let oldMarker = markers[oldID],
+                   oldMarker.mapView != nil {
+                    let brand = photoBooths[id: oldID]?.brand ?? .life4cut
+                    configureMarkerStyle(oldMarker, brand: brand, isSelected: false)
+                }
+                
+                if let newID = selectedBoothID,
+                   let newMarker = markers[newID],
+                   newMarker.mapView != nil {
+                    let brand = photoBooths[id: newID]?.brand ?? .life4cut
+                    configureMarkerStyle(newMarker, brand: brand, isSelected: true)
+                }
+                
+                lastSelectedBoothID = selectedBoothID
             }
         }
     }
@@ -209,16 +206,15 @@ private extension NaverMapRepresentable.Coordinator {
         marker.userInfo["isSelected"] = isSelected
         
         if isSelected {
-            // MARK: - 선택 상태의 이미지 리소스 추가해야합니다. 아래는 예제코드 입니다.
-            marker.iconImage = MarkerImageResources.brand(brand) // 임시: 동일 이미지 사용
-            marker.width = 64   // 확대
-            marker.height = 73  // 확대
+            marker.iconImage = MarkerImageResources.image(for: brand, state: .selected)
+            marker.width = 72
+            marker.height = 83
             marker.zIndex = 100 // 맨 위로
         } else {
             // 일반 상태
-            marker.iconImage = MarkerImageResources.brand(brand)
+            marker.iconImage = MarkerImageResources.image(for: brand, state: .normal)
             marker.width = 54
-            marker.height = 61.5
+            marker.height = 62
             marker.zIndex = 0
         }
     }
@@ -264,8 +260,6 @@ public struct NaverMapView: View {
             if let selectedBooth = store.selectedBooth {
                 detailCardLayer(selectedBooth)
             }
-            
-            permissionLayer
         }
         .onAppear { store.send(.onAppear) }
         .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
@@ -295,26 +289,6 @@ private extension NaverMapView {
     var mapLayer: some View {
         NaverMapRepresentable(store: store, isLocationAuthorized: store.isLocationAuthorized)
             .ignoresSafeArea(.container, edges: .top)
-    }
-    
-    @ViewBuilder
-    var permissionLayer: some View {
-        if store.isLocationAuthorized == false && store.isSDKAuthSuccessful {
-            permissionDeniedLayer
-        }
-    }
-    
-    // TODO: 디자인 시안 나오면 작업
-    var permissionDeniedLayer: some View {
-        VStack {
-            Text("위치 권한 확보 필요!!")
-            
-            Button {
-                store.send(.openAppSettings)
-            } label: {
-                Text("설정 앱으로 이동")
-            }
-        }
     }
     
     func detailCardLayer(_ photoBooth: PhotoBooth) -> some View {

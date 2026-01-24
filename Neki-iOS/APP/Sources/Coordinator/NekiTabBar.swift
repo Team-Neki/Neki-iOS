@@ -8,7 +8,7 @@
 import SwiftUI
 
 enum NekiTab: CaseIterable {
-    case archive, pose, map, mypage
+    case archive, pose, map, myPage
     
     var title: String {
         switch self {
@@ -18,7 +18,7 @@ enum NekiTab: CaseIterable {
             return "포즈"
         case .map:
             return "네컷지도"
-        case .mypage:
+        case .myPage:
             return "마이"
         }
     }
@@ -28,7 +28,7 @@ enum NekiTab: CaseIterable {
         case .archive: return isSelected ? .iconTabArchiveFill : .iconTabArchive
         case .pose:    return isSelected ? .iconTabPoseFill    : .iconTabPose
         case .map:     return isSelected ? .iconTabMapFill     : .iconTabMap
-        case .mypage:  return isSelected ? .iconTabMypageFill  : .iconTabMypage
+        case .myPage:  return isSelected ? .iconTabMypageFill  : .iconTabMypage
         }
     }
 }

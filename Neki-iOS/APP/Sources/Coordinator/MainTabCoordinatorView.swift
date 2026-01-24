@@ -24,10 +24,10 @@ struct MainTabCoordinatorView: View {
                     PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
                     
                 case .map:
-                    EmptyView()     // TODO: - MapCoordinator뷰로 바꾸기
+                    MapCoordinatorView(store: store.scope(state: \.map, action: \.map))
 
-                case .mypage:
-                    EmptyView()     // TODO: - MyPageCoordinator뷰로 바꾸기
+                case .myPage:
+                    MyPageCoordinatorView(store: store.scope(state: \.myPage, action: \.myPage))
                 }
             }
             

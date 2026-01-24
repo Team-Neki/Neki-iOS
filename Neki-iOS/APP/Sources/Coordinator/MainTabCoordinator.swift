@@ -20,6 +20,8 @@ struct MainTabCoordinator {
         // 하위 코디네이터들의 State를 보유
         var pose = PoseCoordinator.State()
         var archive = ArchiveCoordinator.State()
+        var map = MapCoordinator.State()
+        var myPage = MyPageCoordinator.State()
         
         var isTabbarHidden: Bool = false
         
@@ -32,6 +34,8 @@ struct MainTabCoordinator {
         
         case pose(PoseCoordinator.Action)
         case archive(ArchiveCoordinator.Action)
+        case map(MapCoordinator.Action)
+        case myPage(MyPageCoordinator.Action)
         
         // 상위 코디네이터(AppCoordinator)로 보낼 신호
         case delegate(Delegate)
@@ -43,12 +47,20 @@ struct MainTabCoordinator {
     var body: some ReducerOf<Self> {
         BindingReducer()
         
+        Scope(state: \.archive, action: \.archive) {
+            ArchiveCoordinator()
+        }
+        
         Scope(state: \.pose, action: \.pose) {
             PoseCoordinator()
         }
         
-        Scope(state: \.archive, action: \.archive) {
-            ArchiveCoordinator()
+        Scope(state: \.map, action: \.map) {
+            MapCoordinator()
+        }
+        
+        Scope(state: \.myPage, action: \.myPage) {
+            MyPageCoordinator()
         }
         
         Reduce { state, action in
@@ -81,9 +93,13 @@ struct MainTabCoordinator {
             case .pose:
                 state.isTabbarHidden = !state.pose.path.isEmpty
                 
-            default:
-                state.isTabbarHidden = false
+            case .map:
+                state.isTabbarHidden = !state.map.path.isEmpty
+                
+            case .myPage:
+                state.isTabbarHidden = !state.myPage.path.isEmpty
             }
+            
             return .none
         }
         

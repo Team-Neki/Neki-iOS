@@ -46,7 +46,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
         
         // UI 초기 설정
         view.showZoomControls = false
-        view.showLocationButton = isLocationAuthorized
+        view.showLocationButton = false
         view.showCompass = false
         view.showScaleBar = false
         view.showIndoorLevelPicker = false

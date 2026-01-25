@@ -18,7 +18,7 @@ struct AuthTokenRefresher: TokenRefresher {
             return AuthTokens(accessToken: data.accessToken, refreshToken: data.refreshToken)
         } catch {
             guard let error = error as? NetworkError else {
-                Logger.data.error("Reisue token failed with unknown error: \(error.localizedDescription)")
+                Logger.data.error("Reissue token failed with unknown error: \(error.localizedDescription)")
                 throw .unknownError(error)
             }
             Logger.data.error("Reissue token failed with error: \(error.localizedDescription)")

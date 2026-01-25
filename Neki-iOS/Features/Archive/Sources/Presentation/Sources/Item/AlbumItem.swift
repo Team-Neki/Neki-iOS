@@ -8,7 +8,7 @@
 import Foundation
 
 struct AlbumItem: Equatable, Identifiable {
-    let id = UUID()
+    let id: Int
     let title: String
     let count: Int
     let coverImageURL: URL?
@@ -18,9 +18,9 @@ struct AlbumItem: Equatable, Identifiable {
 extension AlbumItem {
     static func dummyData() -> [AlbumItem] {
         return [
-            AlbumItem(title: "즐겨찾는 사진", count: 12, coverImageURL: URL(string: "https://picsum.photos/200/300?random=1"), isFavorite: true),
-            AlbumItem(title: "앨범 제목123123", count: 15, coverImageURL: URL(string: "https://picsum.photos/200/300?random=2"), isFavorite: false),
-            AlbumItem(title: "앨범 제목", count: 8, coverImageURL: URL(string: "https://picsum.photos/200/300?random=3"), isFavorite: false)
+            AlbumItem(id: 1, title: "즐겨찾는 사진", count: 12, coverImageURL: URL(string: "https://picsum.photos/200/300?random=1"), isFavorite: true),
+            AlbumItem(id: 2, title: "앨범 제목123123", count: 15, coverImageURL: URL(string: "https://picsum.photos/200/300?random=2"), isFavorite: false),
+            AlbumItem(id: 3, title: "앨범 제목", count: 8, coverImageURL: URL(string: "https://picsum.photos/200/300?random=3"), isFavorite: false)
         ]
     }
 }

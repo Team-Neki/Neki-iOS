@@ -15,7 +15,7 @@ struct ArchiveAllPhotosFeature {
     @ObservableState
     struct State {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
-        var selectedIDs: Set<UUID> = []
+        var selectedIDs: Set<Int> = []
         
         var selectedSortedTime: String = "최신순"
         var isSelectedFavorite: Bool = false

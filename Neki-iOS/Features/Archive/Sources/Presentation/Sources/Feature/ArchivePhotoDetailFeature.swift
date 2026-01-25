@@ -13,7 +13,7 @@ struct ArchivePhotoDetailFeature {
     @ObservableState
     struct State {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
-        let itemID: UUID
+        let itemID: Int
         
         var item: ArchiveImageItem {
             get { photos[id: itemID] ?? ArchiveImageItem(id: itemID, imageURL: nil, date: Date()) }

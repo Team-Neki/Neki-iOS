@@ -16,7 +16,7 @@ struct ArchiveAllAlbumsFeature {
         @Shared var albums: IdentifiedArrayOf<AlbumItem>
         
         var isSelectMode: Bool = false
-        var selectedAlbumIDs: Set<UUID> = []
+        var selectedAlbumIDs: Set<Int> = []
         var deleteOption: ArchiveAlbumDeleteOption = .withPhotos
                 
         var newAlbumTitle: String = ""
@@ -112,6 +112,7 @@ struct ArchiveAllAlbumsFeature {
                 print("새 앨범 추가됨: \(state.newAlbumTitle)")
                 
                 let newAlbum = AlbumItem(
+                    id: Int.random(in: -9999...(-1)),
                     title: state.newAlbumTitle,
                     count: 0,
                     coverImageURL: nil,         // TODO: - 디자인에서 주는 브랜딩 이미지로 변경

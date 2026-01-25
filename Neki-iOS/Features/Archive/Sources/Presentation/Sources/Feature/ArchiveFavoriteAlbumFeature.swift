@@ -15,7 +15,7 @@ struct ArchiveFavoriteAlbumFeature {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
         let album: AlbumItem
         
-        var selectedIDs: Set<UUID> = []
+        var selectedIDs: Set<Int> = []
         
         var isSelectionMode: Bool = false
         

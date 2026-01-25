@@ -16,7 +16,7 @@ struct ArchiveAlbumDetailFeature {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
         let album: AlbumItem
         
-        var selectedIDs: Set<UUID> = []
+        var selectedIDs: Set<Int> = []
         var deleteOption: ArchivePhotoDeleteOption = .fromAlbumOnly
         
         var selectedSortedTime: String = "최신순"

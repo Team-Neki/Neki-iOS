@@ -20,7 +20,7 @@ struct SelectUploadAlbumFeature {
     struct State: Equatable {
         let uploadedImageIds: [Int]
         var albums: IdentifiedArrayOf<AlbumItem>
-        var selectedAlbumId: UUID? = nil
+        var selectedAlbumId: Int? = nil
         
         var viewMode: ViewMode = .prompt
         var isLoading: Bool = false
@@ -42,7 +42,7 @@ struct SelectUploadAlbumFeature {
         // Delegate
         case delegate(DelegateAction)
         enum DelegateAction {
-            case uploadDidSuccess(albumId: UUID?)
+            case uploadDidSuccess(albumId: Int?)
         }
     }
     

@@ -27,7 +27,7 @@ public struct OnboardingCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding))):
-                state.root.isOnboardingNeeded = false
+                state.root.$isOnboardingNeeded.withLock { $0 = false }
                 state.path.pop(from: id)
                 return .none
                 

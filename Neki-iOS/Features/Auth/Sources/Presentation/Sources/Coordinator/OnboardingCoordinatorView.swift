@@ -22,3 +22,7 @@ public struct OnboardingCoordinatorView: View {
         }
     }
 }
+
+#Preview {
+    OnboardingCoordinatorView(store: .init(initialState: OnboardingCoordinator.State(), reducer: { OnboardingCoordinator() }))
+}

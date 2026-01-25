@@ -10,7 +10,7 @@ import Foundation
 public enum TermsType: CaseIterable, Identifiable {
     case serviceUsage, privacyPolicy, locationService
     
-    public var id: Int { self.hashValue }
+    public var id: Self { self }
     
     public var displayName: String {
         switch self {

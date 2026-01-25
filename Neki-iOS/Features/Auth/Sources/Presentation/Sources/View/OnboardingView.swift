@@ -33,8 +33,8 @@ public struct OnboardingView: View {
             }
             .onOpenURL { store.send(.handleKakaoOpenURL($0)) }
             
-            SignInWithAppleButton(.continue) { request in
-                request.nonce = UUID().uuidString
+            SignInWithAppleButton(.continue) { _ in
+                
             } onCompletion: { result in
                 store.send(.appleLogin(result))
             }

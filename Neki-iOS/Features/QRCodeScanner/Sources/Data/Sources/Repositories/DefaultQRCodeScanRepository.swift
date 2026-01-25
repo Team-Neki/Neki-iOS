@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Dependencies
 
 struct DefaultQRCodeScanRepository: QRCodeScanRepository {
     private let strategies: [QRCodeParsingStrategy] = [
@@ -16,11 +17,7 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         PhotoismStrategy()
     ]
     
-    private let networkProvider: NetworkProvider
-    
-    init(networkProvider: NetworkProvider) {
-        self.networkProvider = networkProvider
-    }
+    @Dependency(\.networkProvider) private var networkProvider
     
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         guard let host = url.host() else { throw .invalidURL }

@@ -13,7 +13,7 @@ import Foundation
 extension PhotoBoothBrand {
     var hostKeywords: [String] {
         switch self {
-        case .life4cut: ["life4cut.net"]
+        case .life4cut: ["life4cut.net", "api.life4cut.net", "life-4cut.net"]
         case .photoism: ["seobuk.kr"]
         case .photogray: ["aprd.io", "pgshort.aprd.io"]
         case .photosignature: ["photoqr3.kr"]

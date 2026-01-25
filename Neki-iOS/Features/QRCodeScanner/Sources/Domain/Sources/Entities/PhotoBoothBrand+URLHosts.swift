@@ -18,7 +18,7 @@ extension PhotoBoothBrand {
         case .photogray: ["aprd.io", "pgshort.aprd.io"]
         case .photosignature: ["photoqr3.kr"]
         case .planBStudio: []
-        case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr", "harufilm"]
+        case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"]
         }
     }
 }

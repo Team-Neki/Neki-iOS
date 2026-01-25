@@ -21,7 +21,8 @@ extension AuthEndpoint: Endpoint {
     var authorizationType: AuthorizationType {
         switch self {
         case .reissueToken: return .reissue
-        case .login, .fetchUserInfo: return .bearer
+        case .login: return .none
+        case .fetchUserInfo: return .bearer
         }
     }
     

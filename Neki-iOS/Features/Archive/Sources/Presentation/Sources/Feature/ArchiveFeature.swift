@@ -236,7 +236,7 @@ struct ArchiveFeature {
                 state.currentPage += 1
                 return .none
                 
-            case let .photoListResponse(.failure(error)):
+            case .photoListResponse(.failure):
                 state.isFetchingPhotos = false
                 let toast = NekiToastItem("사진을 불러오지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toast)))

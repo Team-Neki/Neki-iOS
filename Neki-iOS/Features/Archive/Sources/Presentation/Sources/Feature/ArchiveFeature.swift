@@ -97,7 +97,11 @@ struct ArchiveFeature {
                     state.$albums.withLock { $0 = loadedAlbums }
                 }
                 
-                return .send(.fetchPhotos(isRefresh: true))
+                if state.photos.isEmpty {
+                    return .send(.fetchPhotos(isRefresh: true))
+                }
+                
+                return .none
                 
                 
                 // MARK: - User Action

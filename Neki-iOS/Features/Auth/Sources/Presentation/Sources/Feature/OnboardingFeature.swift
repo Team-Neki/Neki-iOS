@@ -14,7 +14,7 @@ import os
 public struct OnboardingFeature {
     @ObservableState
     public struct State {
-        
+        @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = true
     }
     
     public enum Action {

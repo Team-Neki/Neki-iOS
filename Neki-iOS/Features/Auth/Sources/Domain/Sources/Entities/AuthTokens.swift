@@ -8,7 +8,7 @@
 import Foundation
 
 /// 인증 과정에 사용되는 토큰
-public struct AuthTokens: Codable {
+public struct AuthTokens: Codable, Sendable {
     public typealias Token = String
     
     let accessToken: Token

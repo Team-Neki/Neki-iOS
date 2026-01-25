@@ -8,7 +8,7 @@
 import Foundation
 
 /// 사용자 정보
-public struct User {
+public struct User: Sendable {
     let nickname: String
     let providerType: ProviderType
 }

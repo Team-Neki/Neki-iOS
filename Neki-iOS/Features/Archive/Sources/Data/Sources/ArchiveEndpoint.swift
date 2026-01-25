@@ -10,7 +10,7 @@ import Foundation
 public enum ArchiveEndpoint {
     case getPhotoList(request: PhotoListDTO.Request)
     case registerPhoto(ids: [Int])
-    case deletePhoto(ids: [Int])
+    case deletePhoto(request: DeletePhotoRequestDTO)
 }
 
 extension ArchiveEndpoint: Endpoint {
@@ -91,8 +91,8 @@ extension ArchiveEndpoint: Endpoint {
             return nil
         case .registerPhoto:
             return nil
-        case .deletePhoto:
-            return nil
+        case .deletePhoto(let request):
+            return request
         }
     }
 }

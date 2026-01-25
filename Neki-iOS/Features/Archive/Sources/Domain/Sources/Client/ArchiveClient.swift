@@ -12,6 +12,7 @@ import DependenciesMacros
 @DependencyClient
 struct ArchiveClient {
     public var fetchPhotoList: (_ folderId: Int?, _ page: Int?, _ size: Int?, _ sortOrder: String?) async throws -> (photos: [PhotoEntity], hasNext: Bool)
+    public var deletePhotoList: (_ photoIds: [Int]) async throws -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -24,7 +25,11 @@ extension ArchiveClient: DependencyKey {
             return result
         }
         
-        return ArchiveClient(fetchPhotoList: fetchPhotoList)
+        func deletePhotoList(_ photoIds: [Int]) async throws {
+            _ = try await archiveRepository.deletePhotoList(photoIDs: photoIds)
+        }
+        
+        return ArchiveClient(fetchPhotoList: fetchPhotoList, deletePhotoList: deletePhotoList)
     }
 }
 

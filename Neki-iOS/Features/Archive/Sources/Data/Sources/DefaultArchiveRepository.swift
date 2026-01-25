@@ -22,6 +22,12 @@ struct DefaultArchiveRepository: ArchiveRepository {
         
         return (entities, data.hasNext)
     }
+    
+    func deletePhotoList(photoIDs: [Int]) async throws {
+        let request = DeletePhotoRequestDTO(photoIds: photoIDs)
+        let endpoint = ArchiveEndpoint.deletePhoto(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

@@ -48,7 +48,10 @@ struct ArchiveAllPhotosFeature {
         case onTapSelectButton
         case onTapCancelSelectButton
         case onTapDownloadButton
+        
+        // Delete Action
         case onTapDeleteButton
+        case deletePhotosLocally(ids: [Int])
         
         // Filter Action
         case onTapFilterNewest
@@ -110,15 +113,25 @@ struct ArchiveAllPhotosFeature {
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(toast)))
                 
+                
+                // MARK: - Delete Action
+
             case .onTapDeleteButton:
-                // TODO: - 삭제 로직 구현 및 알림 표시
-                state.$photos.withLock {
-                    $0.removeAll { state.selectedIDs.contains($0.id) }
+                return .run { [selectedIDs = state.selectedIDs] send in
+                    try await archiveClient.deletePhotoList(photoIds: Array(selectedIDs))
+
+                    await send(.deletePhotosLocally(ids: Array(selectedIDs)))
                 }
-                let toast = NekiToastItem("사진을 삭제했어요", style: .success)
+
+            case let .deletePhotosLocally(ids):
+                state.$photos.withLock {
+                    $0.removeAll { ids.contains($0.id) }
+                }
+                
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(toast)))
+                
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
                 
                 // MARK: - Filter Action

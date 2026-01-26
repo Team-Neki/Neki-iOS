@@ -181,6 +181,11 @@ struct ArchiveFeature {
                         return .run { send in
                             await send(.delegate(.showToast(toast)))
                             await send(.fetchPhotos(isRefresh: true))
+                            
+                            /// fullScreenCover가 내려가고 전환해야 사진이 잘 불러와짐
+                            /// fullScreenCover가 내려가는 0.35초보다 빨리 전환 시 사진이 fetch가 안 돼서 빈 화면만 보임
+                            try? await Task.sleep(for: .milliseconds(400))
+                            
                             await send(.afterUploadNavigateToAlbumDetail(album))
                         }
                     }

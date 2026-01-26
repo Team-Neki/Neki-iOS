@@ -265,6 +265,9 @@ public struct NaverMapView: View {
         .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
             DirectionAppsSheet(photoBooth: photoBooth)
         }
+        .overlay(alignment: .top) {
+            searchHereControl
+        }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
                 .scrollDisabled(store.detent != .large)
@@ -361,6 +364,28 @@ private extension NaverMapView {
         }
         .padding(.horizontal, 20)
         .shadow(color: .gray400, radius: 8, y: 4)
+    }
+    
+    var searchHereControl: some View {
+        Button {
+            store.send(.didTapSearchHereButton)
+        } label: {
+            HStack(spacing: 6.55) {
+                Image(.iconRotate)
+                
+                Text("현 위치에서 탐색")
+                    .nekiFont(.body14SemiBold)
+                    .foregroundStyle(.gray800)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(.white)
+                    .strokeBorder(.gray100)
+            )
+        }
+        .safeAreaPadding(.top)
     }
 }
 

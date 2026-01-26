@@ -56,6 +56,7 @@ public struct MapFeature {
         case didTapCloseDetail
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
+        case didTapSearchHereButton
         
         // Internal Actions
         case updateLocationAuthorization(CLAuthorizationStatus)
@@ -149,7 +150,6 @@ public struct MapFeature {
             case .didTapCurrentLocationButton:
                 switch state.locationAuthorizationStatus {
                 case .authorizedAlways, .authorizedWhenInUse:
-                    // TODO: 현위치 돌아가기 버튼 누르면 Stage 수준 몇으로 돌아가는지 확인 필요
                     return .run { send in
                         await send(.setUserTrackingMode(true))
                         
@@ -168,7 +168,8 @@ public struct MapFeature {
                     
                 case .denied, .restricted:
                     state.isUserTrackingMode = false
-                    return .send(.openAppSettings)
+                    // TODO: 프리퍼미션 얼럿 노출
+                    return .none
                     
                 @unknown default:
                     state.isUserTrackingMode = false
@@ -178,6 +179,13 @@ public struct MapFeature {
             case .didTapDirectionAppsButton:
                 state.directionSheetPhotoBooth = state.selectedBooth
                 return .none
+                
+            case .didTapSearchHereButton:
+                guard let bounds = state.currentBounds else { return .none }
+                return .run { send in
+                    await send(.fetchPhotoBoothInBounds(Result { try await photoBoothClient.fetchPhotoBooths(bounds: bounds) }))
+                }
+                .cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
                 
             case .updateLocationAuthorization(let status):
                 state.locationAuthorizationStatus = status

@@ -28,6 +28,20 @@ struct DefaultArchiveRepository: ArchiveRepository {
         let endpoint = ArchiveEndpoint.deletePhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
     }
+    
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)]) async throws {
+        let uploadData: [RegisterPhotoDTO.RegisterPhotoData] = uploads.map {
+                    RegisterPhotoDTO.RegisterPhotoData(
+                        mediaID: $0.mediaID,
+                        memo: $0.memo
+                    )
+                }
+        
+        let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData)
+        let endpoint = ArchiveEndpoint.registerPhoto(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

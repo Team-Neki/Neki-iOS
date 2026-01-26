@@ -19,7 +19,6 @@ struct SelectUploadAlbumView: View {
                     .ignoresSafeArea()
             } else {
                 Color.white
-                    .ignoresSafeArea()
             }
             
             switch store.viewMode {

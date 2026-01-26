@@ -180,12 +180,21 @@ struct ArchiveFeature {
                        let album = state.albums.first(where: { $0.id == albumId }) {
                         return .run { send in
                             await send(.delegate(.showToast(toast)))
-                            await send(.afterUploadNavigateToAlbumDetail(album))
                             await send(.fetchPhotos(isRefresh: true))
+                            await send(.afterUploadNavigateToAlbumDetail(album))
                         }
                     }
                     
+                    return .run { send in
+                        await send(.delegate(.showToast(toast)))
+                        await send(.fetchPhotos(isRefresh: true))
+                    }
+                    
+                case .uploadDidFail:
+                    state.selectUploadAlbum = nil // 팝업 닫기
+                    let toast = NekiToastItem("업로드에 실패했어요", style: .error)
                     return .send(.delegate(.showToast(toast)))
+                    
                 }
                 
             case .imagePicker(.uploadFailed):

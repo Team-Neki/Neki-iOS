@@ -16,96 +16,72 @@ public struct DefaultImageUploadRepository: ImageUploadRepository {
     public init() {}
     
     public func upload(items: [ImageUploadEntity], mediaType: ImageMediaType) async throws -> [Int] {
-        return try await withThrowingTaskGroup(of: (Int, Int).self) { group in
-            
-            var uploadedResults: [(Int, Int)] = []
-            Logger.network.debug("🚀 이미지 업로드 시작 (총 \(items.count)장, 타입: \(mediaType.rawValue))")
-            
-            for (index, item) in items.enumerated() {
-                group.addTask {
-                    
-                    // MARK: - PresignedURL 발급을 위한 UUID 및 파일명 생성
-                    
-                    let uuid = UUID().uuidString
-                    let fileName = "\(uuid)"
-                    Logger.data.debug("[\(index+1)] 파일명 생성: \(fileName) (Type: \(item.contentType))")
-                    
-                    let dto = PresignedURLRequestDTO(
-                        filename: fileName,
-                        contentType: item.contentType,
-                        mediaType: mediaType.rawValue
-                    )
-                    
-                    
-                    // MARK: - Presigned URL 요청
-                    
-                    let presignedEndpoint = ImageUploadEndpoint.getPresignedURL(request: dto)
-                    let response: PresignedURLResponseDTO
-                    
-                    do {
-                        Logger.network.debug("[\(index+1)] Presigned URL 요청 중...")
-                        response = try await networkProvider.request(endpoint: presignedEndpoint)
-                        Logger.network.debug("[\(index+1)] Presigned URL 요청 완료")
-                    } catch {
-                        Logger.network.error("[\(index+1)] ❌ Presigned URL 요청 실패: \(error.localizedDescription)")
-                        throw error
-                    }
-                    
-                    // 이미지 업로드 할 Presigned URL
-                    guard let uploadUrl = response.data?.uploadURL else {
-                        Logger.network.error("[\(index+1)] ❌ 응답에 uploadUrl이 없습니다.")
-                        throw UploadError.presignedUrlFailed
-                    }
-                                        
-                    // 성공 시 서버에 업로드 할 이미지 ID
-                    guard let mediaID = response.data?.mediaID else {
-                        Logger.network.error("[\(index+1)] ❌ 응답에 mediaID가 없습니다.")
-                        throw UploadError.presignedUrlFailed
-                    }
-                    
-                    
-                    // MARK: - S3 업로드
-                    
-                    Logger.network.debug("[\(index+1)] S3 업로드 시작")
-                    
-                    let uploadImageEndpoint = ImageUploadEndpoint.uploadToS3(
-                        presignedURL: uploadUrl,
-                        data: item.data,
-                        contentType: item.contentType
-                    )
-                    
-                    do {
-                        let _ = try await networkProvider.requestVoid(endpoint: uploadImageEndpoint)
-                        Logger.network.debug("[\(index+1)] ✅ S3 업로드 성공")
-                    } catch {
-                        Logger.network.error("[\(index+1)] ❌ S3 업로드 실패: \(error.localizedDescription)")
-                        throw error
-                    }
-                    
-                    return (index, mediaID)
-                }
-            }
-            
-            do {
-                for try await result in group {
-                    uploadedResults.append(result)
-                }
-            } catch {
-                // TaskGroup 내부에서 에러 발생 시 (하나라도 실패하면 여기로 옴)
-                Logger.network.error("❌ 이미지 업로드 중단됨 (하나 이상의 작업 실패): \(error.localizedDescription)")
-                throw error // 에러 전파 (전체 실패 처리)
-            }
-            
-            let sortedResult = uploadedResults
-                .sorted { $0.0 < $1.0 }
-                .map { $0.1 }
-            
-            Logger.network.debug("✨ 모든 이미지 업로드 완료! (이미지 ID: \(sortedResult))")
-            
-            return sortedResult
+        Logger.network.debug("🚀 이미지 업로드 시작 (총 \(items.count)장, 타입: \(mediaType.rawValue))")
+        
+        // MARK: - Presigned URL 일괄요청
+        
+        let requestItems = items.map { item in
+            PresignedURLRequestData(
+                filename: UUID().uuidString,
+                contentType: item.contentType,
+                mediaType: mediaType.rawValue
+            )
         }
+        let requestDTO = PresignedURLRequestDTO(items: requestItems)
+        let presignedEndpoint = ImageUploadEndpoint.getPresignedURL(request: requestDTO)
+        
+        let response: PresignedURLResponseDTO
+        do {
+            Logger.network.debug("📡 Presigned URL 요청 중...")
+            response = try await networkProvider.request(endpoint: presignedEndpoint)
+        } catch {
+            Logger.network.error("❌ Presigned URL 요청 실패: \(error.localizedDescription)")
+            throw error
+        }
+        
+        guard let responseItems = response.data?.items, responseItems.count == items.count else {
+            Logger.network.error("❌ 응답 데이터가 누락되었거나 요청한 개수와 일치하지 않습니다.")
+            throw UploadError.presignedUrlFailed
+        }
+        
+        // 결과로 반환할 mediaID들
+        let finalMediaIDs = responseItems.map { $0.mediaID }
+        
+        
+        // MARK: - S3 병렬 업로드
+        
+        let uploadTasks = Array(zip(items, responseItems))
+        
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for (index, taskInfo) in uploadTasks.enumerated() {
+                let entity = taskInfo.0
+                let responseItem = taskInfo.1
+                
+                group.addTask {
+                    let uploadEndpoint = ImageUploadEndpoint.uploadToS3(
+                        presignedURL: responseItem.uploadTicket,
+                        data: entity.data,
+                        contentType: responseItem.contentType
+                    )
+                    
+                    do {
+                        _ = try await networkProvider.requestVoid(endpoint: uploadEndpoint)
+                        Logger.network.debug("[\(index+1)] ✅ S3 업로드 성공 (Media ID: \(responseItem.mediaID))")
+                    } catch {
+                        Logger.network.error("[\(index+1)] ❌ S3 업로드 실패")
+                        throw error // 하나라도 실패하면 전체 에러 발생
+                    }
+                }
+            }
+            
+            try await group.waitForAll()
+        }
+        
+        Logger.network.debug("✨ 모든 이미지 업로드 완료! (결과 ID: \(finalMediaIDs))")
+        
+        return finalMediaIDs
     }
-
+    
 }
 
 private enum ImageUploadRepositoryKey: DependencyKey {

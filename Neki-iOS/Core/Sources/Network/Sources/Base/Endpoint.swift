@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import os
 
 /// 인증 타입
 public enum AuthorizationType {
@@ -42,6 +43,14 @@ public protocol Endpoint {
 }
 
 extension Endpoint {
+    public var baseURL: String {
+        guard let baseURLString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
+            Logger.data.fault("Base URL not found in Bundle")
+            fatalError()
+        }
+        return baseURLString
+    }
+    
     public var queryParameters: [String: String]? { nil }
     
     public var multipartItems: [MultipartItem]? { nil }

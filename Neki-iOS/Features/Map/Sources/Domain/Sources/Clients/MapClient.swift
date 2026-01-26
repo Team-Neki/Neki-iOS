@@ -42,7 +42,7 @@ extension MapClient {
         var authStatusContinuation: AsyncStream<CLAuthorizationStatus>.Continuation?
         var sdkAuthStatusContinuation: AsyncStream<Bool>.Continuation?
         var locationContinuation: CheckedContinuation<CLLocation, Error>?
-        var trackingContinuation: AsyncStream<CLLocation>.Continuation?
+        var trackingContinuations: [UUID: AsyncStream<CLLocation>.Continuation] = [:]
         
         override init() {
             super.init()
@@ -67,16 +67,14 @@ extension MapClient {
             locationManager.requestLocation()
         }
         
-        func startMonitoring(_ continuation: AsyncStream<CLLocation>.Continuation) {
-            trackingContinuation?.finish()
-            trackingContinuation = continuation
-            locationManager.startUpdatingLocation()
+        func startMonitoring(id: UUID, _ continuation: AsyncStream<CLLocation>.Continuation) {
+            if trackingContinuations.isEmpty { locationManager.startUpdatingLocation() }
+            trackingContinuations[id] = continuation
         }
         
-        func stopMonitoring() {
-            trackingContinuation?.finish()
-            trackingContinuation = nil
-            locationManager.stopUpdatingLocation()
+        func stopMonitoring(id: UUID) {
+            trackingContinuations[id] = nil
+            if trackingContinuations.isEmpty { locationManager.stopUpdatingLocation() }
         }
     }
 }
@@ -105,7 +103,9 @@ extension MapClient.MapDelegate: CLLocationManagerDelegate {
                 self.locationContinuation = nil
             }
             
-            trackingContinuation?.yield(latestLocation)
+            for continuation in trackingContinuations.values {
+                continuation.yield(latestLocation)
+            }
         }
     }
     
@@ -113,6 +113,9 @@ extension MapClient.MapDelegate: CLLocationManagerDelegate {
         Task { @MainActor in
             locationContinuation?.resume(throwing: error)
             locationContinuation = nil
+            
+            guard trackingContinuations.isEmpty == false else { return }
+            Logger.domain.error("Location Update Failed: \(error.localizedDescription)")
         }
     }
 }
@@ -124,12 +127,16 @@ extension MapClient.MapDelegate: NMFAuthManagerDelegate {
     nonisolated func authorized(_ state: NMFAuthState, error: Error?) {
         Task { @MainActor in
             if let error = error {
-                // TODO: 네이버 지도 설정 에러 로그하기
+                Logger.domain.error("Naver Map Auth Failed: \(error.localizedDescription)")
                 sdkAuthStatusContinuation?.yield(false)
                 return
             }
             
-            guard case .authorized = state else { sdkAuthStatusContinuation?.yield(false); return }
+            guard case .authorized = state else {
+                Logger.domain.warning("Naver Map Auth State: \(String(describing: state))")
+                sdkAuthStatusContinuation?.yield(false)
+                return
+            }
             sdkAuthStatusContinuation?.yield(true)
         }
     }
@@ -185,13 +192,15 @@ extension MapClient: DependencyKey {
             }
         } trackingLocation: {
             AsyncStream { continuation in
+                let observerID = UUID()
+                
                 Task { @MainActor in
-                    sharedDelegate.startMonitoring(continuation)
+                    sharedDelegate.startMonitoring(id: observerID, continuation)
                 }
                 
                 continuation.onTermination = { _ in
                     Task { @MainActor in
-                        sharedDelegate.stopMonitoring()
+                        sharedDelegate.stopMonitoring(id: observerID)
                     }
                 }
             }

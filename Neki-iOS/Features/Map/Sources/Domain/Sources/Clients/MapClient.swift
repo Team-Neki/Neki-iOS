@@ -9,6 +9,17 @@ import Foundation
 import CoreLocation
 import ComposableArchitecture
 import NMapsMap
+import os
+
+public struct MapClientConfiguration: Equatable, Sendable {
+    public var distanceFilter: CLLocationDistance
+    public var desiredAccuracy: CLLocationAccuracy
+    
+    public init(distanceFilter: CLLocationDistance = 10, desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyNearestTenMeters) {
+        self.distanceFilter = distanceFilter
+        self.desiredAccuracy = desiredAccuracy
+    }
+}
 
 @DependencyClient
 public struct MapClient {
@@ -17,6 +28,7 @@ public struct MapClient {
     var checkSDKAuthorizationStatus: @Sendable () async -> AsyncStream<Bool> = { .finished }
     var getCurrentLocation: @Sendable () async throws -> CLLocation
     var trackingLocation: @Sendable () async -> AsyncStream<CLLocation> = { .finished }
+    var configure: @Sendable (MapClientConfiguration) async -> Void
 }
 
 
@@ -38,6 +50,11 @@ extension MapClient {
             locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
             locationManager.distanceFilter = 10
             NMFAuthManager.shared().delegate = self
+        }
+        
+        func updateConfiguration(_ config: MapClientConfiguration) {
+            locationManager.desiredAccuracy = config.desiredAccuracy
+            locationManager.distanceFilter = config.distanceFilter
         }
         
         func requestLocation(_ continuation: CheckedContinuation<CLLocation, Error>) {
@@ -178,6 +195,10 @@ extension MapClient: DependencyKey {
                     }
                 }
             }
+        } configure: { config in
+            await Task { @MainActor in
+                sharedDelegate.updateConfiguration(config)
+            }.value
         }
     }()
 }

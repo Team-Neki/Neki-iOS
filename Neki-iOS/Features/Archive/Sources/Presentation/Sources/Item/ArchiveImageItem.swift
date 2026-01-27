@@ -14,15 +14,15 @@ struct ArchiveImageItem: Equatable, Identifiable {
     let date: Date
     let folderId: Int?
     
-    init(id: Int, imageURL: URL?, isScrapped: Bool = false, date: Date = Date(), folderId: Int? = nil) {
+    init(id: Int, imageURL: URL?, isFavorite: Bool = false, date: Date = Date(), folderId: Int? = nil) {
             self.id = id
             self.imageURL = imageURL
-            self.isFavorite = isScrapped
+            self.isFavorite = isFavorite
             self.date = date
             self.folderId = folderId
         }
         
-        init(id: Int, imageURLString: String, isScrapped: Bool = false, date: Date = Date(), folderId: Int? = nil) {
-            self.init(id: id, imageURL: URL(string: imageURLString), isScrapped: isScrapped, date: date, folderId: folderId)
+        init(id: Int, imageURLString: String, isFavorite: Bool = false, date: Date = Date(), folderId: Int? = nil) {
+            self.init(id: id, imageURL: URL(string: imageURLString), isFavorite: isFavorite, date: date, folderId: folderId)
         }
 }

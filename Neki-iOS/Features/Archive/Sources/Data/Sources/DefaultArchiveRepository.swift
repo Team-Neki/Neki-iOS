@@ -97,6 +97,12 @@ struct DefaultArchiveRepository: ArchiveRepository {
         
         return (entities, data.hasNext)
     }
+    
+    func toggleFavorite(photoID: Int, request: Bool) async throws {
+        let request = ToggleFavoriteDTO(favorite: request)
+        let endpoint = ArchiveEndpoint.toggleFavorite(photoID: photoID, request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

@@ -16,6 +16,7 @@ public enum ArchiveEndpoint {
     case addFolder(request: AddFolderDTO.Request)
     case deleteFolders(request: DeleteFoldersRequestDTO)
     case getFavoritePhotoList(request: PhotoListDTO.Request)
+    case toggleFavorite(photoID: Int, request: ToggleFavoriteDTO)
 }
 
 extension ArchiveEndpoint: Endpoint {
@@ -61,6 +62,8 @@ extension ArchiveEndpoint: Endpoint {
             return "folders"
         case .getFavoritePhotoList:
             return "photos/favorite"
+        case .toggleFavorite(let id, _):
+            return "photos/\(id)/favorite"
         }
     }
     
@@ -82,6 +85,12 @@ extension ArchiveEndpoint: Endpoint {
             if let page = request.page { params["page"] = String(page) }
             if let size = request.size { params["size"] = String(size) }
             if let sortOrder = request.sortOrder { params["sortOrder"] = sortOrder }
+            
+            return params.isEmpty ? nil : params
+            
+        case .toggleFavorite(let id, _):
+            var params: [String: String] = [:]
+            params["photoId"] = String(id)
             
             return params.isEmpty ? nil : params
             
@@ -108,6 +117,8 @@ extension ArchiveEndpoint: Endpoint {
             return .delete
         case .getFavoritePhotoList:
             return .get
+        case .toggleFavorite:
+            return .patch
         }
     }
     
@@ -129,6 +140,8 @@ extension ArchiveEndpoint: Endpoint {
             return request
         case .getFavoritePhotoList:
             return nil
+        case .toggleFavorite(_, let request):
+            return request
         }
     }
 }

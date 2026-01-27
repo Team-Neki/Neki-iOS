@@ -106,7 +106,7 @@ struct ArchiveFavoriteAlbumFeature {
                     ArchiveImageItem(
                         id: entity.photoId,
                         imageURLString: entity.imageUrl,
-                        isScrapped: true,
+                        isFavorite: true,
                         date: isoFormatter.date(from: entity.createdAt) ?? Date(),
                         folderId: currentAlbumId
                     )

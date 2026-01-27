@@ -189,7 +189,7 @@ struct ArchiveAllPhotosFeature {
                     ArchiveImageItem(
                         id: entity.photoId,
                         imageURLString: entity.imageUrl,
-                        isScrapped: entity.favorite,
+                        isFavorite: entity.favorite,
                         date: isoFormatter.date(from: entity.createdAt) ?? Date(),
                         folderId: entity.folderId
                     )

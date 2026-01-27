@@ -12,11 +12,6 @@ import os
 
 @Reducer
 public struct MapFeature {
-    private enum Constants {
-        /// 재검색 버튼 노출 기준 거리: 2Km
-        static let searchTriggerDistanceThreshold: Double = 2000.0
-    }
-    
     enum SheetStage {
         case first, second, third, photoBoothSelected
         
@@ -36,13 +31,13 @@ public struct MapFeature {
         var isSDKAuthSuccessful: Bool = false
         var detent: NekiSheetDetent = SheetStage.first.detent
         var isSearchHereButtonVisible: Bool = false
+        var isFirstLoad: Bool = true
         
         // Map State
         var cameraPosition: GeographicCoordinate?
         var currentBounds: GeographicBoundingBox?
-        var lastFetchedLocation: GeographicCoordinate?
         
-        // User Location & Tracking
+        // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
         var isUserTrackingMode: Bool = false
@@ -52,6 +47,7 @@ public struct MapFeature {
         // Data
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        
         var selectedBooth: PhotoBooth?
         var directionSheetPhotoBooth: PhotoBooth?
         
@@ -72,23 +68,30 @@ public struct MapFeature {
         case didTapDirectionAppsButton
         case didTapSearchHereButton
         
-        // Internal Actions
+        // Internal Logic Actions
         case updateLocationAuthorization(CLAuthorizationStatus)
         case updateSDKAuthStatus(Bool)
         case updateUserLocation(Result<CLLocation, Error>)
         case setUserTrackingMode(Bool)
         case didDetectMapInteraction
-        case photoBoothChunkLoaded([PhotoBooth])
-        case photoBoothStreamFinished
-        case photoBoothStreamFailure(Error)
+        
+        // Map Logic Actions
         case cameraMotionStarted
         case cameraMotionEnded(GeographicBoundingBox)
         case updateSearchButtonVisibility(isVisible: Bool)
         
-        // Binding Action
-        case binding(BindingAction<State>)
+        // Data Handling Actions
+        case fetchPhotoBooths(bounds: GeographicBoundingBox)
+        case photoBoothChunkLoaded([PhotoBooth])
+        case photoBoothStreamFinished
+        case photoBoothStreamFailure(Error)
         
-        // Child Actions
+        /// 비동기 계산: 브랜드 필터링 (Pruning 로직 삭제됨)
+        case startBackgroundCalculation
+        case didFinishBackgroundCalculation(visible: IdentifiedArrayOf<PhotoBooth>)
+        
+        // Binding & Child
+        case binding(BindingAction<State>)
         case photoBoothListAction(PhotoBoothListFeature.Action)
     }
     
@@ -97,7 +100,7 @@ public struct MapFeature {
         case locationStream
         case locationAuthorizationStream
         case sdkAuthorizationStream
-        case distanceCalculation
+        case calculation
     }
     
     @Dependency(\.mapClient) private var mapClient
@@ -172,7 +175,7 @@ public struct MapFeature {
                     return .send(.openAppSettings)
                 case .authorizedAlways, .authorizedWhenInUse, .authorized:
                     state.isUserTrackingMode = true
-                    if let location = state.userLocation { updateCameraPosition(&state, to: .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)) }
+                    if let location = state.userLocation { updateCameraPosition(&state, to: location.coordinate) }
                     return .none
                 @unknown default:
                     return .none
@@ -180,13 +183,11 @@ public struct MapFeature {
                 
             case let .updateUserLocation(.success(location)):
                 state.userLocation = location
-                if state.isUserTrackingMode {
-                    updateCameraPosition(&state, to: .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude))
-                    state.isSearchHereButtonVisible = false
-                }
                 
-                guard state.lastFetchedLocation == nil else { return .none }
-                return .send(.didTapSearchHereButton)
+                guard state.isUserTrackingMode else { return .none }
+                updateCameraPosition(&state, to: location.coordinate)
+                state.isSearchHereButtonVisible = false
+                return .none
                 
             case .updateUserLocation(.failure):
                 state.isUserTrackingMode = false
@@ -197,50 +198,76 @@ public struct MapFeature {
                 return .none
                 
                 // MARK: - Map Camera & Search Logic
+            case .didDetectMapInteraction:
+                state.isUserTrackingMode = false
+                return .none
+                
             case .cameraMotionStarted:
                 return .cancel(id: CancelID.photoBoothFetch)
                 
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
-                guard let lastFetchedLocation = state.lastFetchedLocation else { return .none }
-                return .run { send in
-                    let distance = calculateDistance(bounds: bounds, lastFetched: lastFetchedLocation)
-                    let isVisible = distance >= Constants.searchTriggerDistanceThreshold
-                    await send(.updateSearchButtonVisibility(isVisible: isVisible))
-                }.cancellable(id: CancelID.distanceCalculation, cancelInFlight: true)
+                
+                if state.isFirstLoad {
+                    state.isFirstLoad = false
+                    return .send(.fetchPhotoBooths(bounds: bounds))
+                }
+                
+                guard state.isUserTrackingMode == false else { return .none }
+                return .send(.updateSearchButtonVisibility(isVisible: true))
                 
             case let .updateSearchButtonVisibility(isVisible):
                 state.isSearchHereButtonVisible = isVisible
                 return .none
                 
-            case .didDetectMapInteraction:
-                state.isUserTrackingMode = false
-                return .none
-                
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
+                return .send(.fetchPhotoBooths(bounds: bounds))
+                
+                // MARK: - Data Fetching
+            case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
-                state.lastFetchedLocation = bounds.center
+                state.photoBooths.removeAll()
+                state.photoBoothListState.photoBooths.removeAll()
+                
                 return .run { send in
-                    let stream = try await photoBoothClient.fetchPhotoBooths(bounds)
-                    
-                    for await chunk in stream { await send(.photoBoothChunkLoaded(chunk)) }
+                    let stream = try await photoBoothClient.fetchPhotoBooths(bounds: bounds)
+                    for await chunk in stream {
+                        await send(.photoBoothChunkLoaded(chunk))
+                    }
                     await send(.photoBoothStreamFinished)
                 } catch: { error, send in
                     await send(.photoBoothStreamFailure(error))
-                }
-                .cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
+                }.cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
                 
             case let .photoBoothChunkLoaded(chunk):
                 state.photoBooths.append(contentsOf: chunk)
-                handleFilterOptionChanged(&state)
-                return .none
+                return .send(.startBackgroundCalculation)
                 
             case .photoBoothStreamFinished:
                 return .none
                 
             case let .photoBoothStreamFailure(error):
                 Logger.presentation.error("PhotoBooth stream error: \(error)")
+                return .none
+                
+            case .startBackgroundCalculation:
+                let allBooths = state.photoBooths
+                let activeFilters = state.photoBoothListState.filteredBrands
+                return .run { send in
+                    let visibleBooths: IdentifiedArrayOf<PhotoBooth>
+                    if activeFilters.isEmpty {
+                        visibleBooths = allBooths
+                    } else {
+                        visibleBooths = allBooths.filter { activeFilters.contains($0.brand) }
+                    }
+                    
+                    await send(.didFinishBackgroundCalculation(visible: visibleBooths))
+                }.cancellable(id: CancelID.calculation, cancelInFlight: true)
+                
+            case let .didFinishBackgroundCalculation(visible):
+                state.visiblePhotoBooths = visible
+                state.photoBoothListState.photoBooths = visible
                 return .none
                 
             case .didTapGoBackToMapButton:
@@ -266,8 +293,7 @@ public struct MapFeature {
                 return .none
                 
             case .photoBoothListAction(.selectFilterOption):
-                handleFilterOptionChanged(&state)
-                return .none
+                return .send(.startBackgroundCalculation)
                 
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 return .send(.didTapBooth(photoBooth))
@@ -295,25 +321,7 @@ private extension MapFeature {
         state.cameraPosition = photoBooth.coordinate
     }
     
-    func handleFilterOptionChanged(_ state: inout State) {
-        let activeFilters = state.photoBoothListState.filteredBrands
-        if activeFilters.isEmpty {
-            state.visiblePhotoBooths = state.photoBooths
-        } else {
-            state.visiblePhotoBooths = state.photoBooths.filter { activeFilters.contains($0.brand) }
-        }
-        
-        state.photoBoothListState.photoBooths = state.visiblePhotoBooths
-    }
-    
-    func updateCameraPosition(_ state: inout State, to location: GeographicCoordinate) {
-        state.cameraPosition = .init(latitude: location.latitude, longitude: location.longitude)
-    }
-    
-    func calculateDistance(bounds: GeographicBoundingBox, lastFetched: GeographicCoordinate) -> Double {
-        let currentCenter = bounds.center
-        let from = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
-        let to = CLLocation(latitude: lastFetched.latitude, longitude: lastFetched.longitude)
-        return from.distance(from: to)
+    func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {
+        state.cameraPosition = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
     }
 }

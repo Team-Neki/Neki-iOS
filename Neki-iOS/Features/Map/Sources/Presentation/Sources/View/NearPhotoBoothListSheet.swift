@@ -91,7 +91,7 @@ private extension NearPhotoBoothListSheet {
                 unavailableView
             } else {
                 LazyVStack(alignment: .leading) {
-                    ForEach(store.photoBooths) { photoBooth in
+                    ForEach(store.visibleBooths) { photoBooth in
                         nearByPhotoBoothCell(photoBooth)
                     }
                 }
@@ -134,7 +134,7 @@ private extension NearPhotoBoothListSheet {
                         .foregroundStyle(.gray600)
                 }
                 
-                Text("300m") // TODO: 실제 거리 값을 표시해야 합니다
+                Text(photoBooth.nearbyDistance?.distanceString ?? "")
                     .nekiFont(.caption12Medium)
                     .foregroundStyle(.gray400)
             }

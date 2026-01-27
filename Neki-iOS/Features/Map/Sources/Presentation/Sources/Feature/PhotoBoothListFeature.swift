@@ -16,6 +16,7 @@ public struct PhotoBoothListFeature {
         var filteredBrands: Set<PhotoBoothBrand> = []
         
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         
         var isWarningAlertPresented: Bool = false
     }

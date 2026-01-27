@@ -328,7 +328,7 @@ private extension NaverMapView {
                             .foregroundStyle(.gray600)
                     }
                     
-                    Text("\(photoBooth.nearbyDistance ?? .zero)") // TODO: 거리 단위 표시하기, 1000 미만이라면 m, 이상이라면 소수점 한자리 Km
+                    Text(photoBooth.nearbyDistance?.distanceString ?? "")
                         .nekiFont(.body14Medium)
                         .foregroundStyle(.gray400)
                 }

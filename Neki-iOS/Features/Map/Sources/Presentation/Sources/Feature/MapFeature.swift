@@ -81,14 +81,16 @@ public struct MapFeature {
         case updateSearchButtonVisibility(isVisible: Bool)
         
         // Data Handling Actions
+        // Map
         case fetchPhotoBooths(bounds: GeographicBoundingBox)
         case photoBoothChunkLoaded([PhotoBooth])
         case photoBoothStreamFinished
         case photoBoothStreamFailure(Error)
-        
-        /// 비동기 계산: 브랜드 필터링 (Pruning 로직 삭제됨)
+        // Sheet
+        case fetchNearbyPhotoBooths(GeographicCoordinate)
+        case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
         case startBackgroundCalculation
-        case didFinishBackgroundCalculation(visible: IdentifiedArrayOf<PhotoBooth>)
+        case didFinishBackgroundCalculation(map: IdentifiedArrayOf<PhotoBooth>, list: IdentifiedArrayOf<PhotoBooth>)
         
         // Binding & Child
         case binding(BindingAction<State>)
@@ -96,7 +98,8 @@ public struct MapFeature {
     }
     
     private enum CancelID {
-        case photoBoothFetch
+        case mapFetch
+        case listFetch
         case locationStream
         case locationAuthorizationStream
         case sdkAuthorizationStream
@@ -203,18 +206,24 @@ public struct MapFeature {
                 return .none
                 
             case .cameraMotionStarted:
-                return .cancel(id: CancelID.photoBoothFetch)
+                return .merge(
+                    .send(.updateSearchButtonVisibility(isVisible: true)),
+                    .cancel(id: CancelID.mapFetch),
+                    .cancel(id: CancelID.listFetch)
+                )
                 
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
                 
                 if state.isFirstLoad {
                     state.isFirstLoad = false
-                    return .send(.fetchPhotoBooths(bounds: bounds))
+                    return .merge(
+                        .send(.fetchPhotoBooths(bounds: bounds)),
+                        .send(.fetchNearbyPhotoBooths(bounds.center))
+                    )
                 }
                 
-                guard state.isUserTrackingMode == false else { return .none }
-                return .send(.updateSearchButtonVisibility(isVisible: true))
+                return .none
                 
             case let .updateSearchButtonVisibility(isVisible):
                 state.isSearchHereButtonVisible = isVisible
@@ -222,13 +231,15 @@ public struct MapFeature {
                 
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
-                return .send(.fetchPhotoBooths(bounds: bounds))
+                return .merge(
+                    .send(.fetchPhotoBooths(bounds: bounds)),
+                    .send(.fetchNearbyPhotoBooths(bounds.center))
+                )
                 
                 // MARK: - Data Fetching
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
                 state.photoBooths.removeAll()
-                state.photoBoothListState.photoBooths.removeAll()
                 
                 return .run { send in
                     let stream = try await photoBoothClient.fetchPhotoBooths(bounds: bounds)
@@ -238,7 +249,7 @@ public struct MapFeature {
                     await send(.photoBoothStreamFinished)
                 } catch: { error, send in
                     await send(.photoBoothStreamFailure(error))
-                }.cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
+                }.cancellable(id: CancelID.mapFetch, cancelInFlight: true)
                 
             case let .photoBoothChunkLoaded(chunk):
                 state.photoBooths.append(contentsOf: chunk)
@@ -251,23 +262,46 @@ public struct MapFeature {
                 Logger.presentation.error("PhotoBooth stream error: \(error)")
                 return .none
                 
+            case let .fetchNearbyPhotoBooths(coordinate):
+                state.photoBoothListState.photoBooths.removeAll()
+                
+                return .run { send in
+                    let booths = try await photoBoothClient.fetchNearbyPhotoBooths(coordinate: coordinate)
+                    await send(.nearbyPhotoBoothResponse(.success(booths)))
+                } catch: { error, send in
+                    await send(.nearbyPhotoBoothResponse(.failure(error)))
+                }.cancellable(id: CancelID.listFetch, cancelInFlight: true)
+                
+            case let .nearbyPhotoBoothResponse(.success(booths)):
+                state.photoBoothListState.photoBooths = IdentifiedArray(uniqueElements: booths)
+                return .send(.startBackgroundCalculation)
+                
+            case let .nearbyPhotoBoothResponse(.failure(error)):
+                Logger.presentation.error("Nearby PhotoBooths fetch error: \(error)")
+                return .none
+                
             case .startBackgroundCalculation:
-                let allBooths = state.photoBooths
+                let mapBooths = state.photoBooths
+                let listBooths = state.photoBoothListState.photoBooths
                 let activeFilters = state.photoBoothListState.filteredBrands
                 return .run { send in
-                    let visibleBooths: IdentifiedArrayOf<PhotoBooth>
+                    let visibleMapBooths: IdentifiedArrayOf<PhotoBooth>
+                    let visibleListBooths: IdentifiedArrayOf<PhotoBooth>
                     if activeFilters.isEmpty {
-                        visibleBooths = allBooths
+                        visibleMapBooths = mapBooths
+                        visibleListBooths = listBooths
                     } else {
-                        visibleBooths = allBooths.filter { activeFilters.contains($0.brand) }
+                        visibleMapBooths = mapBooths.filter { activeFilters.contains($0.brand) }
+                        visibleListBooths = listBooths.filter { activeFilters.contains($0.brand) }
                     }
                     
-                    await send(.didFinishBackgroundCalculation(visible: visibleBooths))
-                }.cancellable(id: CancelID.calculation, cancelInFlight: true)
+                    await send(.didFinishBackgroundCalculation(map: visibleMapBooths, list: visibleListBooths))
+                }
+                .cancellable(id: CancelID.calculation, cancelInFlight: true)
                 
-            case let .didFinishBackgroundCalculation(visible):
-                state.visiblePhotoBooths = visible
-                state.photoBoothListState.photoBooths = visible
+            case let .didFinishBackgroundCalculation(map, list):
+                state.visiblePhotoBooths = map
+                state.photoBoothListState.visibleBooths = list
                 return .none
                 
             case .didTapGoBackToMapButton:

@@ -13,4 +13,5 @@ protocol ArchiveRepository {
     func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)]) async throws
     func getFavoriteAlbumInfo() async throws -> FavoriteAlbumEntity
     func getAlbumList() async throws -> [AlbumEntity]
+    func addFolder(name: String) async throws -> Int
 }

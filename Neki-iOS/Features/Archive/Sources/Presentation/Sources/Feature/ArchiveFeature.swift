@@ -52,10 +52,13 @@ struct ArchiveFeature {
         case onTapAllPhotos
         case onTapAllAlbums
         case onTapQRScan
+        
+        // Add Folder Action
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
+        case addFolderResponse(Result<Int, Error>)
         
-        // Fetch Album Action
+        // Fetch Album(Folder) Action
         case fetchAlbums
         case favoriteAlbumResponse(Result<AlbumItem, Error>)      // 즐겨찾기
         case normalAlbumsResponse(Result<[AlbumItem], Error>)
@@ -118,6 +121,9 @@ struct ArchiveFeature {
                 state.showDropDownMenu = false
                 return .none
                 
+                
+                // MARK: - Add Folder Action
+                
             case .onTapCancelAddAlbum:
                 state.showDropDownMenu = false
                 state.newAlbumTitle = ""
@@ -127,27 +133,26 @@ struct ArchiveFeature {
             case .onTapConfirmAddAlbum:
                 guard state.isConfirmButtonEnabled else { return .none }
                 
-                let newAlbum = AlbumItem(
-                    id: Int.random(in: -9999...(-1)),
-                    title: state.newAlbumTitle,
-                    count: 0,
-                    coverImageURL: nil,         // TODO: - 디자인에서 주는 브랜딩 이미지로 변경
-                    isFavorite: false
-                )
-                
-                state.$albums.withLock {
-                    _ = $0.insert(newAlbum, at: 1)
-                }
-                
-                // 입력값 초기화
+                let title = state.newAlbumTitle.trimmingCharacters(in: .whitespaces)
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 
-                let toastItem = NekiToastItem(
-                    "새로운 앨범을 추가했어요",
-                    style: .success
-                )
+                return .run { send in
+                    await send(.addFolderResponse(Result {
+                        try await archiveClient.addFolder(name: title)
+                    }))
+                }
                 
+            case .addFolderResponse(.success):
+                let toastItem = NekiToastItem("새로운 앨범을 추가했어요", style: .success)
+                
+                return .run { send in
+                    await send(.delegate(.showToast(toastItem)))
+                    await send(.fetchAlbums)
+                }
+                
+            case .addFolderResponse(.failure):
+                let toastItem = NekiToastItem("앨범을 만들지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
                 
                 

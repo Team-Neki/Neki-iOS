@@ -70,6 +70,15 @@ struct DefaultArchiveRepository: ArchiveRepository {
         
         return entities
     }
+    
+    func addFolder(name: String) async throws -> Int {
+        let request = AddFolderDTO.Request(name: name)
+        let result: BaseResponseDTO<AddFolderDTO.Response> = try await networkProvider.request(endpoint: ArchiveEndpoint.addFolder(request: request))
+        
+        guard let data = result.data else { throw NetworkError.responseDecodingError }
+        
+        return data.folderId
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

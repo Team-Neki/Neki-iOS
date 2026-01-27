@@ -13,6 +13,7 @@ public enum ArchiveEndpoint {
     case deletePhoto(request: DeletePhotoRequestDTO)
     case getFavoriteAlbumInfo
     case getAlbumList
+    case addFolder(request: AddFolderDTO.Request)
 }
 
 extension ArchiveEndpoint: Endpoint {
@@ -52,6 +53,8 @@ extension ArchiveEndpoint: Endpoint {
             return "photos/favorite/summary"
         case .getAlbumList:
             return "folders"
+        case .addFolder:
+            return "folders"
         }
     }
     
@@ -84,6 +87,8 @@ extension ArchiveEndpoint: Endpoint {
             return .get
         case .getAlbumList:
             return .get
+        case .addFolder:
+            return .post
         }
     }
     
@@ -99,6 +104,8 @@ extension ArchiveEndpoint: Endpoint {
             return nil
         case .getAlbumList:
             return nil
+        case .addFolder(let request):
+            return request
         }
     }
 }

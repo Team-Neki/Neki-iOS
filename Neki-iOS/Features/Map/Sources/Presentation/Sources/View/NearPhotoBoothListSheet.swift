@@ -125,11 +125,11 @@ private extension NearPhotoBoothListSheet {
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text(photoBooth.name)
+                    Text(photoBooth.brand.displayName)
                         .nekiFont(.title18SemiBold)
                         .foregroundStyle(.gray900)
                     
-                    Text("사당역점") // TODO: 실제 지점 정보를 표시해야 합니다.
+                    Text(photoBooth.name)
                         .nekiFont(.caption12Medium)
                         .foregroundStyle(.gray600)
                 }

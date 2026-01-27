@@ -8,9 +8,15 @@
 import UIKit
 import ComposableArchitecture
 import CoreLocation
+import os
 
 @Reducer
 public struct MapFeature {
+    private enum Constants {
+        /// 재검색 버튼 노출 기준 거리: 2Km
+        static let searchTriggerDistanceThreshold: Double = 2000.0
+    }
+    
     enum SheetStage {
         case first, second, third, photoBoothSelected
         
@@ -26,22 +32,30 @@ public struct MapFeature {
     
     @ObservableState
     public struct State {
+        // UI Control
         var isSDKAuthSuccessful: Bool = false
+        var detent: NekiSheetDetent = SheetStage.first.detent
+        var isSearchHereButtonVisible: Bool = false
+        
+        // Map State
+        var cameraPosition: GeographicCoordinate?
+        var currentBounds: GeographicBoundingBox?
+        var lastFetchedLocation: GeographicCoordinate?
+        
+        // User Location & Tracking
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
         var isUserTrackingMode: Bool = false
-        var cameraPosition: GeographicCoordinate?
-        var currentBounds: GeographicBoundingBox?
-        
-        var detent: NekiSheetDetent = SheetStage.first.detent
-        var selectedBooth: PhotoBooth?
-        var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
-        var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
-        var directionSheetPhotoBooth: PhotoBooth?
-        
         var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
         
+        // Data
+        var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var selectedBooth: PhotoBooth?
+        var directionSheetPhotoBooth: PhotoBooth?
+        
+        // Child State
         var photoBoothListState = PhotoBoothListFeature.State()
     }
     
@@ -64,9 +78,12 @@ public struct MapFeature {
         case updateUserLocation(Result<CLLocation, Error>)
         case setUserTrackingMode(Bool)
         case didDetectMapInteraction
-        case fetchPhotoBoothInBounds(Result<[PhotoBooth], Error>)
+        case photoBoothChunkLoaded([PhotoBooth])
+        case photoBoothStreamFinished
+        case photoBoothStreamFailure(Error)
         case cameraMotionStarted
         case cameraMotionEnded(GeographicBoundingBox)
+        case updateSearchButtonVisibility(isVisible: Bool)
         
         // Binding Action
         case binding(BindingAction<State>)
@@ -77,9 +94,10 @@ public struct MapFeature {
     
     private enum CancelID {
         case photoBoothFetch
+        case locationStream
         case locationAuthorizationStream
         case sdkAuthorizationStream
-        case locationStream
+        case distanceCalculation
     }
     
     @Dependency(\.mapClient) private var mapClient
@@ -93,39 +111,50 @@ public struct MapFeature {
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+                
+                // MARK: - Life Cycle & Streams
             case .onAppear:
                 return .merge(
                     .run { send in
                         for await status in await mapClient.locationAuthorizationStatus() {
                             await send(.updateLocationAuthorization(status))
                         }
-                    }
-                        .cancellable(id: CancelID.locationAuthorizationStream, cancelInFlight: true),
+                    }.cancellable(id: CancelID.locationAuthorizationStream, cancelInFlight: true),
                     .run { send in
                         for await isAuthorized in await mapClient.checkSDKAuthorizationStatus() {
                             await send(.updateSDKAuthStatus(isAuthorized))
                         }
-                    }
-                        .cancellable(id: CancelID.sdkAuthorizationStream, cancelInFlight: true),
-                    .run { send in
-                        for await location in await mapClient.trackingLocation() {
-                            await send(.updateUserLocation(.success(location)))
-                        }
-                    }
-                        .cancellable(id: CancelID.locationStream, cancelInFlight: true)
+                    }.cancellable(id: CancelID.sdkAuthorizationStream, cancelInFlight: true)
                 )
                 
             case .onDisappear:
-                return .merge(
-                    .cancel(id: CancelID.locationAuthorizationStream),
-                    .cancel(id: CancelID.sdkAuthorizationStream),
-                    .cancel(id: CancelID.locationStream),
-                    .cancel(id: CancelID.photoBoothFetch)
-                )
+                return .cancel(id: CancelID.locationStream)
                 
+                // MARK: - Permission Flow
             case .requestPermission:
                 state.locationAuthorizationNeeded = true
                 return .run { _ in await mapClient.requestLocationAuthorization() }
+                
+            case .updateLocationAuthorization(let status):
+                state.locationAuthorizationStatus = status
+                switch status {
+                case .authorizedAlways, .authorizedWhenInUse:
+                    return .merge(
+                        .run { send in
+                            for await location in await mapClient.trackingLocation() {
+                                await send(.updateUserLocation(.success(location)))
+                            }
+                        }.cancellable(id: CancelID.locationStream, cancelInFlight: true),
+                        .send(.didTapCurrentLocationButton)
+                    )
+                    
+                case .notDetermined:
+                    return state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
+                    
+                default:
+                    state.isUserTrackingMode = false
+                    return .none
+                }
                 
             case .openAppSettings:
                 // TODO: 설정 앱 동작 전에 안내문구 따위를 보여주도록 해야하는데 디자인 가이드가 없습니다.
@@ -133,6 +162,86 @@ public struct MapFeature {
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)
                 }
+                
+                // MARK: - User Location Interaction
+            case .didTapCurrentLocationButton:
+                switch state.locationAuthorizationStatus {
+                case .notDetermined:
+                    return .send(.requestPermission)
+                case .restricted, .denied:
+                    return .send(.openAppSettings)
+                case .authorizedAlways, .authorizedWhenInUse, .authorized:
+                    state.isUserTrackingMode = true
+                    if let location = state.userLocation { updateCameraPosition(&state, to: .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)) }
+                    return .none
+                @unknown default:
+                    return .none
+                }
+                
+            case let .updateUserLocation(.success(location)):
+                state.userLocation = location
+                if state.isUserTrackingMode {
+                    updateCameraPosition(&state, to: .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude))
+                    state.isSearchHereButtonVisible = false
+                }
+                
+                guard state.lastFetchedLocation == nil else { return .none }
+                return .send(.didTapSearchHereButton)
+                
+            case .updateUserLocation(.failure):
+                state.isUserTrackingMode = false
+                return .none
+                
+            case let .setUserTrackingMode(isUserTrackingMode):
+                state.isUserTrackingMode = isUserTrackingMode
+                return .none
+                
+                // MARK: - Map Camera & Search Logic
+            case .cameraMotionStarted:
+                return .cancel(id: CancelID.photoBoothFetch)
+                
+            case let .cameraMotionEnded(bounds):
+                state.currentBounds = bounds
+                guard let lastFetchedLocation = state.lastFetchedLocation else { return .none }
+                return .run { send in
+                    let distance = calculateDistance(bounds: bounds, lastFetched: lastFetchedLocation)
+                    let isVisible = distance >= Constants.searchTriggerDistanceThreshold
+                    await send(.updateSearchButtonVisibility(isVisible: isVisible))
+                }.cancellable(id: CancelID.distanceCalculation, cancelInFlight: true)
+                
+            case let .updateSearchButtonVisibility(isVisible):
+                state.isSearchHereButtonVisible = isVisible
+                return .none
+                
+            case .didDetectMapInteraction:
+                state.isUserTrackingMode = false
+                return .none
+                
+            case .didTapSearchHereButton:
+                guard let bounds = state.currentBounds else { return .none }
+                state.isSearchHereButtonVisible = false
+                state.lastFetchedLocation = bounds.center
+                return .run { send in
+                    let stream = try await photoBoothClient.fetchPhotoBooths(bounds)
+                    
+                    for await chunk in stream { await send(.photoBoothChunkLoaded(chunk)) }
+                    await send(.photoBoothStreamFinished)
+                } catch: { error, send in
+                    await send(.photoBoothStreamFailure(error))
+                }
+                .cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
+                
+            case let .photoBoothChunkLoaded(chunk):
+                state.photoBooths.append(contentsOf: chunk)
+                handleFilterOptionChanged(&state)
+                return .none
+                
+            case .photoBoothStreamFinished:
+                return .none
+                
+            case let .photoBoothStreamFailure(error):
+                Logger.presentation.error("PhotoBooth stream error: \(error)")
+                return .none
                 
             case .didTapGoBackToMapButton:
                 resetToMapMode(&state, for: .first)
@@ -147,115 +256,16 @@ public struct MapFeature {
                 resetToMapMode(&state, for: .second)
                 return .none
                 
-            case .didTapCurrentLocationButton:
-                switch state.locationAuthorizationStatus {
-                case .authorizedAlways, .authorizedWhenInUse:
-                    return .run { send in
-                        await send(.setUserTrackingMode(true))
-                        
-                        do {
-                            let location = try await mapClient.getCurrentLocation()
-                            await send(.updateUserLocation(.success(location)))
-                        } catch {
-                            await send(.setUserTrackingMode(false))
-                            await send(.updateUserLocation(.failure(error)))
-                        }
-                    }
-                    
-                case .notDetermined:
-                    state.isUserTrackingMode = false
-                    return .send(.requestPermission)
-                    
-                case .denied, .restricted:
-                    state.isUserTrackingMode = false
-                    // TODO: 프리퍼미션 얼럿 노출
-                    return .none
-                    
-                @unknown default:
-                    state.isUserTrackingMode = false
-                    return .none
-                }
                 
             case .didTapDirectionAppsButton:
                 state.directionSheetPhotoBooth = state.selectedBooth
                 return .none
                 
-            case .didTapSearchHereButton:
-                guard let bounds = state.currentBounds else { return .none }
-                return .run { send in
-                    await send(.fetchPhotoBoothInBounds(Result { try await photoBoothClient.fetchPhotoBooths(bounds: bounds) }))
-                }
-                .cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
-                
-            case .updateLocationAuthorization(let status):
-                state.locationAuthorizationStatus = status
-                switch status {
-                case .authorizedAlways, .authorizedWhenInUse:
-                    guard state.userLocation == nil else { return .none }
-                    return .send(.didTapCurrentLocationButton)
-                    
-                case .notDetermined:
-                    guard state.locationAuthorizationNeeded == true else { return .none }
-                    return .send(.requestPermission)
-                    
-                default:
-                    return .none
-                }
-                
             case .updateSDKAuthStatus(let isAuthorized):
                 state.isSDKAuthSuccessful = isAuthorized
                 return .none
                 
-            case let .updateUserLocation(result):
-                switch result {
-                case let .success(location):
-                    state.userLocation = location
-                    
-                    guard state.isUserTrackingMode else { return .none }
-                    updateCameraPosition(&state, to: .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude))
-                    return .none
-                    
-                case let .failure(error):
-                    // TODO: 에러 핸들링 로직이나 로그 찍기
-                    print(error.localizedDescription)
-                    return .none
-                }
-                
-            case let .setUserTrackingMode(isUserTrackingMode):
-                state.isUserTrackingMode = isUserTrackingMode
-                return .none
-                
-            case .didDetectMapInteraction:
-                state.isUserTrackingMode = false
-                return .none
-                
-            case let .fetchPhotoBoothInBounds(.success(photoBooths)):
-                let photoBooths = IdentifiedArray(uniqueElements: photoBooths)
-                state.photoBooths = photoBooths
-                handleFilterOptionChanged(&state)
-                return .none
-                
-            case let .fetchPhotoBoothInBounds(.failure(error)):
-                // TODO: 에러 핸들링 로직이나 로그를 찍는다던지 그런 작업은 이곳에 작성
-                print(error.localizedDescription)
-                return .none
-                
-            case .cameraMotionStarted:
-                return .cancel(id: CancelID.photoBoothFetch)
-                
-            case let .cameraMotionEnded(bounds):
-                state.currentBounds = bounds
-                return .run { send in
-                    await send(.fetchPhotoBoothInBounds(
-                        Result {
-                            try await photoBoothClient.fetchPhotoBooths(bounds: bounds)
-                        }
-                    ))
-                }
-                .debounce(id: CancelID.photoBoothFetch, for: 0.3, scheduler: DispatchQueue.main)
-                .cancellable(id: CancelID.photoBoothFetch, cancelInFlight: true)
-                
-            case let .photoBoothListAction(.selectFilterOption(brand)):
+            case .photoBoothListAction(.selectFilterOption):
                 handleFilterOptionChanged(&state)
                 return .none
                 
@@ -298,5 +308,12 @@ private extension MapFeature {
     
     func updateCameraPosition(_ state: inout State, to location: GeographicCoordinate) {
         state.cameraPosition = .init(latitude: location.latitude, longitude: location.longitude)
+    }
+    
+    func calculateDistance(bounds: GeographicBoundingBox, lastFetched: GeographicCoordinate) -> Double {
+        let currentCenter = bounds.center
+        let from = CLLocation(latitude: currentCenter.latitude, longitude: currentCenter.longitude)
+        let to = CLLocation(latitude: lastFetched.latitude, longitude: lastFetched.longitude)
+        return from.distance(from: to)
     }
 }

@@ -142,7 +142,7 @@ struct ArchiveAllAlbumsFeature {
                     }))
                 }
                 
-            case let .addFolderResponse(.success(newId)):
+            case .addFolderResponse(.success):
                 let toastItem = NekiToastItem("새로운 앨범을 추가했어요", style: .success)
                 
                 return .merge(

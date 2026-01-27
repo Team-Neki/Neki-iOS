@@ -71,12 +71,7 @@ struct ArchiveAlbumDetailFeature {
                 return .run { _ in await dismiss() }
                 
             case .onAppear:
-                // 이미 로드된 사진이 없을 때만 초기 로드 (캐시 활용)
-                let existingPhotos = state.photos.filter { $0.folderId == state.album.id }
-                if existingPhotos.isEmpty {
-                    return .send(.fetchPhotos(isRefresh: true))
-                }
-                return .none
+                return .send(.fetchPhotos(isRefresh: true))
                 
             case let .fetchPhotos(isRefresh):
                 if isRefresh {
@@ -107,13 +102,15 @@ struct ArchiveAlbumDetailFeature {
                 let isoFormatter = ISO8601DateFormatter()
                 isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 
+                let currentAlbumId = state.album.id
+                
                 let newItems = result.photos.map { entity in
                     ArchiveImageItem(
                         id: entity.photoId,
                         imageURLString: entity.imageUrl,
                         isScrapped: entity.favorite,
                         date: isoFormatter.date(from: entity.createdAt) ?? Date(),
-                        folderId: entity.folderId
+                        folderId: currentAlbumId
                     )
                 }
                 

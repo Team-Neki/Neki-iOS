@@ -31,7 +31,7 @@ struct ArchiveFeature {
         
         var imagePicker = ImagePickerFeature.State(
             maxCount: 10,
-            mediaType: .temp // 테스트를 위한 temp, .photoBooth로 변경 예정
+            mediaType: .photoBooth // 테스트를 위한 temp, .photoBooth로 변경 예정
         )
         var isLoading: Bool = false // 업로드 시 로딩
         

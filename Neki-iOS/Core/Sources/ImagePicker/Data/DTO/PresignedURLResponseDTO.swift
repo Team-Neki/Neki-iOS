@@ -11,7 +11,7 @@ public typealias PresignedURLResponseDTO = BaseResponseDTO<PresignedURLResponseD
 
 public struct PresignedURLResponseData: Decodable {
     public let method: String
-    public let expiresIn: Double
+    public let expiresIn: String
     public let items: [PresignedURLResponseItem]
 }
 

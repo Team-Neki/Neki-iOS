@@ -11,27 +11,21 @@ public enum ArchiveEndpoint {
     case getPhotoList(request: PhotoListDTO.Request)
     case registerPhoto(request: RegisterPhotoDTO.Request)
     case deletePhoto(request: DeletePhotoRequestDTO)
+    case getFavoriteAlbumInfo
+    case getAlbumList
 }
 
 extension ArchiveEndpoint: Endpoint {
     public var authorizationType: AuthorizationType {
         switch self {
-        case .getPhotoList:
-            return .bearer
-        case .registerPhoto:
-            return .bearer
-        case .deletePhoto:
+        default:
             return .bearer
         }
     }
     
     public var contentType: HTTPContentType {
         switch self {
-        case .getPhotoList:
-            return .json
-        case .registerPhoto:
-            return .json
-        case .deletePhoto:
+        default:
             return .json
         }
     }
@@ -54,6 +48,10 @@ extension ArchiveEndpoint: Endpoint {
             return "photos"
         case .deletePhoto:
             return "photos"
+        case .getFavoriteAlbumInfo:
+            return "photos/favorite/summary"
+        case .getAlbumList:
+            return "folders"
         }
     }
     
@@ -82,6 +80,10 @@ extension ArchiveEndpoint: Endpoint {
             return .post
         case .deletePhoto:
             return .delete
+        case .getFavoriteAlbumInfo:
+            return .get
+        case .getAlbumList:
+            return .get
         }
     }
     
@@ -93,6 +95,10 @@ extension ArchiveEndpoint: Endpoint {
             return request
         case .deletePhoto(let request):
             return request
+        case .getFavoriteAlbumInfo:
+            return nil
+        case .getAlbumList:
+            return nil
         }
     }
 }

@@ -42,6 +42,34 @@ struct DefaultArchiveRepository: ArchiveRepository {
         let _ = try await networkProvider.request(endpoint: endpoint)
         
     }
+    
+    func getFavoriteAlbumInfo() async throws -> FavoriteAlbumEntity {
+        let result: BaseResponseDTO<FavoriteAlbumInfoDTO> = try await networkProvider.request(endpoint: ArchiveEndpoint.getFavoriteAlbumInfo)
+        
+        guard let data = result.data else {
+            throw NetworkError.responseDecodingError
+        }
+        
+        let entity: FavoriteAlbumEntity = FavoriteAlbumEntity(latestImageURL: data.latestImageURL ?? "", totalCount: data.totalCount)
+        
+        
+        
+        return entity
+    }
+    
+    func getAlbumList() async throws -> [AlbumEntity] {
+        let result: BaseResponseDTO<AlbumInfoDTO> = try await networkProvider.request(endpoint: ArchiveEndpoint.getAlbumList)
+        
+        guard let data = result.data else {
+            throw NetworkError.responseDecodingError
+        }
+        
+        let entities: [AlbumEntity] = data.items.map {
+            AlbumEntity(id: $0.folderID, name: $0.name)
+        }
+        
+        return entities
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

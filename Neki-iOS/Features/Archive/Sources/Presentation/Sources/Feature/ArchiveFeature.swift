@@ -7,7 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
-//import Core
+import os
 
 @Reducer
 struct ArchiveFeature {
@@ -55,6 +55,11 @@ struct ArchiveFeature {
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
         
+        // Fetch Album Action
+        case fetchAlbums
+        case favoriteAlbumResponse(Result<AlbumItem, Error>)      // 즐겨찾기
+        case normalAlbumsResponse(Result<[AlbumItem], Error>)
+        
         // Image Upload Action
         case imagePicker(ImagePickerFeature.Action)
         case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
@@ -85,23 +90,17 @@ struct ArchiveFeature {
             ImagePickerFeature()
         }
         
-        Reduce { state, action in
+        Reduce { (state: inout State, action: Action) in
             /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
                 
                 // MARK: - View Life Cycle Action
                 
             case .onAppear:
-                if state.albums.isEmpty {
-                    let loadedAlbums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
-                    state.$albums.withLock { $0 = loadedAlbums }
-                }
-                
-                if state.photos.isEmpty {
-                    return .send(.fetchPhotos(isRefresh: true))
-                }
-                
-                return .none
+                return .merge(
+                    state.albums.isEmpty ? .send(.fetchAlbums) : .none,
+                    state.photos.isEmpty ? .send(.fetchPhotos(isRefresh: true)) : .none
+                )
                 
                 
                 // MARK: - User Action
@@ -205,6 +204,85 @@ struct ArchiveFeature {
             case .imagePicker(.uploadFailed):
                 state.isLoading = false
                 let toast = NekiToastItem("업로드에 실패했어요", style: .error)
+                return .send(.delegate(.showToast(toast)))
+                
+                
+                // MARK: - Fetch Album Action
+                
+            case .fetchAlbums:
+                return .merge(
+                    .run { send in
+                        do {
+                            let entity = try await archiveClient.getFavoriteAlbumInfo()
+                            
+                            let favoriteAlbum = AlbumItem(
+                                id: 0,
+                                title: "즐겨찾기",
+                                count: entity.totalCount,
+                                // TODO: - 없을 시 브랜딩 이미지로 변경
+                                coverImageURL: URL(string: entity.latestImageURL.isEmpty ? "" : entity.latestImageURL),
+                                isFavorite: true
+                            )
+                            
+                            await send(.favoriteAlbumResponse(.success(favoriteAlbum)))
+                            
+                        } catch {
+                            await send(.favoriteAlbumResponse(.failure(error)))
+                        }
+                    },
+                    .run { send in
+                        do {
+                            let entities = try await archiveClient.getAlbumList()
+                            
+                            let folders: [AlbumItem] = entities.map {
+                                AlbumItem(
+                                    id: $0.id,
+                                    title: $0.name,
+                                    count: 0,
+                                    coverImageURL: URL(string: ""), // TODO: - 없을 시 브랜딩 이미지로 변경
+                                    isFavorite: false
+                                )
+                            }
+                            
+                            await send(.normalAlbumsResponse(.success(folders)))
+                            
+                        } catch {
+                            await send(.normalAlbumsResponse(.failure(error)))
+                        }
+                    }
+                )
+                
+            case let .favoriteAlbumResponse(.success(result)):
+                state.$albums.withLock { existing in
+                    existing.removeAll(where: { $0.isFavorite })
+                    existing.insert(result, at: 0)
+                }
+                return .none
+                
+            case .favoriteAlbumResponse(.failure):
+                let toast = NekiToastItem("즐겨찾기 앨범을 불러오지 못했어요", style: .error)
+                return .send(.delegate(.showToast(toast)))
+                
+            case let .normalAlbumsResponse(.success(result)):
+                state.$albums.withLock { existing in
+                    var favoriteAlbum: AlbumItem?
+                    if let first = existing.first, first.isFavorite {
+                        favoriteAlbum = first
+                    }
+                    
+                    var newAlbums: [AlbumItem] = []
+                    if let fav = favoriteAlbum {
+                        newAlbums.append(fav)
+                    }
+                    newAlbums.append(contentsOf: result)
+                    
+                    existing = IdentifiedArray(uniqueElements: newAlbums)
+                }
+                return .none
+                
+                
+            case .normalAlbumsResponse(.failure):
+                let toast = NekiToastItem("앨범을 불러오지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toast)))
                 
                 

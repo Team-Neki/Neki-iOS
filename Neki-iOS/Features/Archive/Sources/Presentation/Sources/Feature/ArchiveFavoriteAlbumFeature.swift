@@ -44,7 +44,10 @@ struct ArchiveFavoriteAlbumFeature {
         
         // 기능 액션
         case onTapDownloadButton
+        
         case onTapDeleteButton
+        case deletePhotos
+        case deletePhotosResponse(Result<Void, Error>)
         
         // 네비게이션
         case imageTapped(ArchiveImageItem)
@@ -97,13 +100,15 @@ struct ArchiveFavoriteAlbumFeature {
                 let isoFormatter = ISO8601DateFormatter()
                 isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
                 
+                let currentAlbumId = state.album.id
+                
                 let newItems = result.photos.map { entity in
                     ArchiveImageItem(
                         id: entity.photoId,
                         imageURLString: entity.imageUrl,
                         isScrapped: true,
                         date: isoFormatter.date(from: entity.createdAt) ?? Date(),
-                        folderId: entity.folderId
+                        folderId: currentAlbumId
                     )
                 }
                 
@@ -116,7 +121,7 @@ struct ArchiveFavoriteAlbumFeature {
                 state.currentPage += 1
                 return .none
                 
-            case let .favoritePhotoListResponse(.failure(error)):
+            case .favoritePhotoListResponse(.failure):
                 state.isFetchingPhotos = false
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
@@ -148,12 +153,28 @@ struct ArchiveFavoriteAlbumFeature {
                 return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
                 
             case .onTapDeleteButton:
-                state.$photos.withLock {
-                    $0.removeAll { state.selectedIDs.contains($0.id) }
+                guard !state.selectedIDs.isEmpty else { return .none }
+                return .send(.deletePhotos)
+                
+            case .deletePhotos:
+                return .run { [ids = state.selectedIDs] send in
+                    await send(.deletePhotosResponse(Result {
+                        try await archiveClient.deletePhotoList(photoIds: Array(ids))
+                    }))
                 }
+                
+            case .deletePhotosResponse(.success):
+                state.$photos.withLock { photos in
+                    photos.removeAll { state.selectedIDs.contains($0.id) }
+                }
+                
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
+                
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
+                
+            case .deletePhotosResponse(.failure):
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
                 
             default:
                 return .none

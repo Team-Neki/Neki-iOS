@@ -1,0 +1,50 @@
+//
+//  MapEndpoint.swift
+//  Neki-iOS
+//
+//  Created by SwainYun on 1/26/26.
+//
+
+import Foundation
+
+enum MapEndpoint {
+    case polygon(dto: FetchPhotoBoothsDTO.Request)
+    case point(dto: FetchNearbyPhotoBoothsDTO.Request)
+    case fetchBrands
+}
+
+
+// MARK: - MapEndpoint + Endpoint
+
+extension MapEndpoint: Endpoint {
+    var authorizationType: AuthorizationType { .bearer }
+    
+    var contentType: HTTPContentType {
+        switch self {
+        case .polygon, .point, .fetchBrands: return .json
+        }
+    }
+    
+    var path: String {
+        switch self {
+        case .polygon: return "/photo-booths/polygon"
+        case .point: return "/photo-booths/point"
+        case .fetchBrands: return "/photo-booths/brand"
+        }
+    }
+    
+    var method: HTTPMethodType {
+        switch self {
+        case .polygon, .point: return .post
+        case .fetchBrands: return .get
+        }
+    }
+    
+    var body: (any Encodable)? {
+        switch self {
+        case let .polygon(dto): return dto
+        case let .point(dto): return dto
+        case .fetchBrands: return nil
+        }
+    }
+}

@@ -13,7 +13,14 @@ enum FetchNearbyPhotoBoothsDTO {
         let longitude: Double
         let latitude: Double
         let radiusInMeters: Int
-        let brandIDs: [Int] = []
+        let brandIDs: [Int]
+        
+        init(longitude: Double, latitude: Double, radiusInMeters: Int, brandIDs: [Int] = []) {
+            self.longitude = longitude
+            self.latitude = latitude
+            self.radiusInMeters = radiusInMeters
+            self.brandIDs = brandIDs
+        }
         
         enum CodingKeys: String, CodingKey {
             case longitude, latitude, radiusInMeters

@@ -165,4 +165,17 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         continuation.onTermination = { _ in task.cancel() }
         return stream
     }
+    
+    func readNearbyPhotoBooths(coordinate: GeographicCoordinate) async throws -> [PhotoBooth] {
+        let brands = try await ensureBrandsLoaded()
+        let defaultRadius: Int = 1000
+        let requestDTO = FetchNearbyPhotoBoothsDTO.Request(longitude: coordinate.longitude, latitude: coordinate.latitude, radiusInMeters: defaultRadius)
+        let endpoint = MapEndpoint.point(dto: requestDTO)
+        let responseDTO: BaseResponseDTO<FetchNearbyPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
+            guard let brand = brands[dto.brandName] else { return nil }
+            return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
+        } ?? []
+        return photoBooths
+    }
 }

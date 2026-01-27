@@ -12,6 +12,8 @@ import ComposableArchitecture
 public struct PhotoBoothClient {
     /// 지도 영역(bounds) 내의 포토부스 데이터를 가져옵니다.
     public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncStream<[PhotoBooth]>
+    /// 중심 좌표 주변 거리순으로 포토부스 데이터를 가져옵니다.
+    public var fetchNearbyPhotoBooths: @Sendable (_ coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
 }
 
 
@@ -23,6 +25,8 @@ extension PhotoBoothClient: DependencyKey {
         
         return PhotoBoothClient { bounds in
             await photoBoothRepository.readPhotoBooths(in: bounds)
+        } fetchNearbyPhotoBooths: { coordinate in
+            try await photoBoothRepository.readNearbyPhotoBooths(coordinate: coordinate)
         }
     }()
 }

@@ -85,6 +85,18 @@ struct DefaultArchiveRepository: ArchiveRepository {
         let endpoint = ArchiveEndpoint.deleteFolders(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
     }
+    
+    func fetchFavoritePhotoList(page: Int?, size: Int?, sortOrder: String?) async throws -> (photos: [PhotoEntity], hasNext: Bool) {
+        let request = PhotoListDTO.Request(folderId: nil, page: page, size: size, sortOrder: sortOrder)
+        let endpoint = ArchiveEndpoint.getFavoritePhotoList(request: request)
+        let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
+        
+        guard let data = response.data else { throw NetworkError.responseDecodingError }
+        
+        let entities = data.toEntity()
+        
+        return (entities, data.hasNext)
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

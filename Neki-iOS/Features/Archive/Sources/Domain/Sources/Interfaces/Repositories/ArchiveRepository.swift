@@ -15,4 +15,5 @@ protocol ArchiveRepository {
     func getAlbumList() async throws -> [AlbumEntity]
     func addFolder(name: String) async throws -> Int
     func deleteFolders(folderIDs: [Int]) async throws
+    func fetchFavoritePhotoList(page: Int?, size: Int?, sortOrder: String?) async throws -> (photos: [PhotoEntity], hasNext: Bool)
 }

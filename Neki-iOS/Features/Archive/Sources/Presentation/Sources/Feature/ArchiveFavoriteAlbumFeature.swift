@@ -16,23 +16,27 @@ struct ArchiveFavoriteAlbumFeature {
         let album: AlbumItem
         
         var selectedIDs: Set<Int> = []
-        
         var isSelectionMode: Bool = false
+        
+        var currentPage: Int = 0
+        var hasNext: Bool = true
+        var isFetchingPhotos: Bool = false
         
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
         
         var filteredItems: IdentifiedArrayOf<ArchiveImageItem> {
             let items = photos.filter { $0.isFavorite == true }
-
-            let sorted = items.sorted { item1, item2 in
-                return item1.date > item2.date
-            }
-            return IdentifiedArray(uniqueElements: sorted)
+            return IdentifiedArray(uniqueElements: items)
         }
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        
+        case onAppear
+        case fetchFavoritePhotos(isRefresh: Bool)
+        case favoritePhotoListResponse(Result<(photos: [PhotoEntity], hasNext: Bool), Error>)
+        case loadMorePhotos
         
         case onTapBackButton
         case onTapSelectButton
@@ -52,6 +56,7 @@ struct ArchiveFavoriteAlbumFeature {
     }
     
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.archiveClient) var archiveClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -60,6 +65,63 @@ struct ArchiveFavoriteAlbumFeature {
             switch action {
             case .onTapBackButton:
                 return .run { _ in await dismiss() }
+                
+            case .onAppear:
+                return .send(.fetchFavoritePhotos(isRefresh: true))
+                
+            case let .fetchFavoritePhotos(isRefresh):
+                if isRefresh {
+                    state.currentPage = 0
+                    state.hasNext = true
+                }
+                
+                guard state.hasNext, !state.isFetchingPhotos else { return .none }
+                state.isFetchingPhotos = true
+                
+                return .run { [page = state.currentPage] send in
+                    await send(.favoritePhotoListResponse(
+                        Result {
+                            try await archiveClient.fetchFavoritePhotoList(
+                                page: page,
+                                size: 20,
+                                sortOrder: "DESC"
+                            )
+                        }
+                    ))
+                }
+                
+            case let .favoritePhotoListResponse(.success(result)):
+                state.isFetchingPhotos = false
+                state.hasNext = result.hasNext
+                
+                let isoFormatter = ISO8601DateFormatter()
+                isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                
+                let newItems = result.photos.map { entity in
+                    ArchiveImageItem(
+                        id: entity.photoId,
+                        imageURLString: entity.imageUrl,
+                        isScrapped: true,
+                        date: isoFormatter.date(from: entity.createdAt) ?? Date(),
+                        folderId: entity.folderId
+                    )
+                }
+                
+                state.$photos.withLock { sharedPhotos in
+                    for item in newItems {
+                        sharedPhotos.updateOrAppend(item)
+                    }
+                }
+                
+                state.currentPage += 1
+                return .none
+                
+            case let .favoritePhotoListResponse(.failure(error)):
+                state.isFetchingPhotos = false
+                return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
+                
+            case .loadMorePhotos:
+                return .send(.fetchFavoritePhotos(isRefresh: false))
                 
             case .onTapSelectButton:
                 state.isSelectionMode = true

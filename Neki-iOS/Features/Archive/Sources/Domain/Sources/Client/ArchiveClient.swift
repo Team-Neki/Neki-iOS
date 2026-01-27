@@ -17,6 +17,7 @@ struct ArchiveClient {
     public var getFavoriteAlbumInfo: () async throws -> FavoriteAlbumEntity
     public var getAlbumList: () async throws -> [AlbumEntity]
     public var addFolder: (_ name: String) async throws -> Int
+    public var deleteFolders: (_ folderIDs: [Int]) async throws -> Void
 
 }
 
@@ -50,13 +51,19 @@ extension ArchiveClient: DependencyKey {
             return try await archiveRepository.addFolder(name: name)
         }
         
+        func deleteFolders(folderIDs: [Int]) async throws -> Void {
+            return try await archiveRepository.deleteFolders(folderIDs: folderIDs)
+        }
+
+        
         return ArchiveClient(
             fetchPhotoList: fetchPhotoList,
             deletePhotoList: deletePhotoList,
             registerPhotos: registerPhotos,
             getFavoriteAlbumInfo: getFavoriteAlbumInfo,
             getAlbumList: getAlbumList,
-            addFolder: addFolder
+            addFolder: addFolder,
+            deleteFolders: deleteFolders
         )
     }
 }

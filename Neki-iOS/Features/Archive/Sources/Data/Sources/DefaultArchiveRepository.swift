@@ -79,6 +79,12 @@ struct DefaultArchiveRepository: ArchiveRepository {
         
         return data.folderId
     }
+    
+    func deleteFolders(folderIDs: [Int]) async throws {
+        let request = DeleteFoldersRequestDTO(folderIds: folderIDs)
+        let endpoint = ArchiveEndpoint.deleteFolders(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct ImageUploadEntity: Identifiable {
+public struct ImageUploadEntity: Identifiable, Sendable {
     public let id: UUID
     public let data: Data
     public let format: ImageFileFormat
@@ -26,7 +26,7 @@ public struct ImageUploadEntity: Identifiable {
     }
 }
 
-public enum ImageFileFormat {
+public enum ImageFileFormat: Sendable {
     case jpeg
     case png
     case webp

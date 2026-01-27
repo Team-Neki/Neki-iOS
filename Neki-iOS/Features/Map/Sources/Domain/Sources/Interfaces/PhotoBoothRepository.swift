@@ -6,10 +6,24 @@
 //
 
 import Foundation
+import Dependencies
 
 protocol PhotoBoothRepository {
     /// 특정 지도 영역 내의 포토부스 목록을 가져옵니다.
     /// - Parameter bounds: 조회 시점의 지리적 영역
-    /// - Returns: 해당 영역 내의 포토부스 배열
-    func readPhotoBooths(in bounds: GeographicBoundingBox) async throws -> [PhotoBooth]
+    /// - Returns: 해당 영역 내의 포토부스 배열 스트림
+    func readPhotoBooths(in bounds: GeographicBoundingBox) async -> AsyncStream<[PhotoBooth]>
+}
+
+private enum PhotoBoothRepositoryKey: DependencyKey {
+    static let liveValue: PhotoBoothRepository = {
+        DefaultPhotoBoothRepository()
+    }()
+}
+
+extension DependencyValues {
+    var photoBoothRepository: PhotoBoothRepository {
+        get { self[PhotoBoothRepositoryKey.self] }
+        set {self[PhotoBoothRepositoryKey.self] = newValue }
+    }
 }

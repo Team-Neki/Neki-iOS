@@ -13,8 +13,8 @@ fileprivate enum Constants {
     // Map Settings
     static let defaultInitialPosition = NMGLatLng(lat: 37.498095, lng: 127.027610)
     static let animationDuration: TimeInterval = 0.3
-    static let minZoomLevel: Double = 5.0
-    static let maxZoomLevel: Double = 18.0
+    static let minZoomLevel: Double = 12.0
+    static let maxZoomLevel: Double = 20.0
     
     // Marker Size
     static let normalSize = CGSize(width: 54, height: 62)
@@ -101,6 +101,7 @@ private extension NaverMapRepresentable {
         view.showIndoorLevelPicker = false
         view.mapView.minZoomLevel = Constants.minZoomLevel
         view.mapView.maxZoomLevel = Constants.maxZoomLevel
+        view.mapView.extent = NMGLatLngBounds(southWestLat: 31.43, southWestLng: 122.37, northEastLat: 44.35, northEastLng: 132)
         view.mapView.mapType = .basic
     }
     
@@ -274,7 +275,9 @@ public struct NaverMapView: View {
             DirectionAppsSheet(photoBooth: photoBooth)
         }
         .overlay(alignment: .top) {
-            searchHereControl
+            if store.isSearchHereButtonVisible {
+                searchHereControl
+            }
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))

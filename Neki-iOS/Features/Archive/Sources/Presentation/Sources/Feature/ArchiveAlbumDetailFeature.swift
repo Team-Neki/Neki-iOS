@@ -44,7 +44,10 @@ struct ArchiveAlbumDetailFeature {
         
         // 기능 액션
         case onTapDownloadButton
+        
         case onTapDeleteButton
+        case deletePhotos
+        case deletePhotosResponse(Result<Void, Error>)
         
         case fetchPhotos(isRefresh: Bool)
         case photoListResponse(Result<(photos: [PhotoEntity], hasNext: Bool), Error>)
@@ -155,23 +158,28 @@ struct ArchiveAlbumDetailFeature {
                 return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
                 
             case .onTapDeleteButton:
-                switch state.deleteOption {
-                case .everywhere:
-                    // 모든 위치에서 제거 (원본 데이터 삭제)
-                    state.$photos.withLock { photos in
-                        photos.removeAll { state.selectedIDs.contains($0.id) }
-                    }
-                    
-                case .fromAlbumOnly:
-                    // 앨범에서만 제거
-                    print("앨범 매핑 해제")
+                guard !state.selectedIDs.isEmpty else { return .none }
+                return .send(.deletePhotos)
+                
+            case .deletePhotos:
+                return .run { [ids = state.selectedIDs] send in
+                    await send(.deletePhotosResponse(Result {
+                        try await archiveClient.deletePhotoList(photoIds: Array(ids))
+                    }))
+                }
+                
+            case .deletePhotosResponse(.success):
+                state.$photos.withLock { photos in
+                    photos.removeAll { state.selectedIDs.contains($0.id) }
                 }
                 
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                state.deleteOption = .fromAlbumOnly
                 
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
+                
+            case .deletePhotosResponse(.failure):
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
                 
             default:
                 return .none

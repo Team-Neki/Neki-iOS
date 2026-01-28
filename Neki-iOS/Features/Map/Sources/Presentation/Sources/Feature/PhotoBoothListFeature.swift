@@ -16,15 +16,15 @@ public struct PhotoBoothListFeature {
         var filteredBrands: Set<PhotoBoothBrand> = []
         
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         
-        var isWarningAlertPresented: Bool = false
+        @Shared(.appStorage("NearbyTooltipVisibility")) var isTooltipPresented: Bool = true
     }
     
     public enum Action: BindableAction {
         // View Actions
         case selectFilterOption(PhotoBoothBrand)
-        case showWarningAlert
-        case dismissWarningAlert
+        case toggleTooltip
         
         // Delegate Actions
         case didTapBooth(PhotoBooth)
@@ -42,12 +42,8 @@ public struct PhotoBoothListFeature {
                 toggleFilterOptionSelection(&state, brand: brand)
                 return .none
                 
-            case .showWarningAlert:
-                state.isWarningAlertPresented = true
-                return .none
-                
-            case .dismissWarningAlert:
-                state.isWarningAlertPresented = false
+            case .toggleTooltip:
+                state.$isTooltipPresented.withLock { $0.toggle() }
                 return .none
                 
             default:

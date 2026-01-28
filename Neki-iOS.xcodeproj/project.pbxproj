@@ -44,7 +44,6 @@
 		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Features/Map/Sources/Data/Sources/.gitkeep,
 				Info.plist,
 			);
 			target = 6C4998DC2EF7EF62006BE1DB /* Neki-iOS */;

@@ -9,11 +9,21 @@ import SwiftUI
 import ComposableArchitecture
 import NMapsMap
 
-struct NaverMapRepresentable: UIViewRepresentable {
-    private enum Constants {
-        static let defaultInitialPosition: NMGLatLng = .init(lat: 37.498095, lng: 127.027610)
-    }
+fileprivate enum Constants {
+    // Map Settings
+    static let defaultInitialPosition = NMGLatLng(lat: 37.498095, lng: 127.027610)
+    static let animationDuration: TimeInterval = 0.3
+    static let minZoomLevel: Double = 12.0
+    static let maxZoomLevel: Double = 20.0
     
+    // Marker Size
+    static let normalSize = CGSize(width: 54, height: 62)
+    static let selectedSize = CGSize(width: 72, height: 83)
+    static let zIndexNormal: Int = 0
+    static let zIndexSelected: Int = 100
+}
+
+struct NaverMapRepresentable: UIViewRepresentable {
     /// 마커 이미지 리소스
     fileprivate enum MarkerImageResources {
         enum State {
@@ -45,14 +55,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
         let view = NMFNaverMapView()
         
         // UI 초기 설정
-        view.showZoomControls = false
-        view.showLocationButton = false
-        view.showCompass = false
-        view.showScaleBar = false
-        view.showIndoorLevelPicker = false
-        view.mapView.minZoomLevel = 5.0
-        view.mapView.maxZoomLevel = 18.0
-        view.mapView.mapType = .basic
+        configureMapView(view)
         
         // 초기 카메라 이동
         let startPosition = store.cameraPosition.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) } ?? Constants.defaultInitialPosition
@@ -70,25 +73,10 @@ struct NaverMapRepresentable: UIViewRepresentable {
     
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
         // 현위치 모드 업데이트
-        if isLocationAuthorized {
-            let mode: NMFMyPositionMode = store.isUserTrackingMode ? .direction : .normal
-            
-            if uiView.mapView.positionMode != mode {
-                uiView.mapView.positionMode = mode
-            }
-        } else {
-            uiView.mapView.positionMode = .disabled
-        }
+        updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
         
         // State 변경 시 카메라 이동
-        if let cameraPosition = store.cameraPosition, cameraPosition != context.coordinator.lastCameraPosition {
-            let nmapCameraPosition = NMGLatLng(lat: cameraPosition.latitude, lng: cameraPosition.longitude)
-            let cameraUpdate = NMFCameraUpdate(scrollTo: nmapCameraPosition)
-            cameraUpdate.animation = .linear
-            cameraUpdate.animationDuration = 0.3
-            uiView.mapView.moveCamera(cameraUpdate)
-            context.coordinator.lastCameraPosition = cameraPosition
-        }
+        updateCameraPosition(uiView.mapView, context: context)
         
         // 마커 업데이트
         context.coordinator.updateMarkers(
@@ -97,12 +85,57 @@ struct NaverMapRepresentable: UIViewRepresentable {
             selectedBoothID: store.selectedBooth?.id
         )
         
+        updateContentInset(uiView.mapView)
+    }
+}
+
+
+// MARK: - NaverMapRepresentable + Helper Methods
+
+private extension NaverMapRepresentable {
+    func configureMapView(_ view: NMFNaverMapView) {
+        view.showZoomControls = false
+        view.showLocationButton = false
+        view.showCompass = false
+        view.showScaleBar = false
+        view.showIndoorLevelPicker = false
+        view.mapView.minZoomLevel = Constants.minZoomLevel
+        view.mapView.maxZoomLevel = Constants.maxZoomLevel
+        view.mapView.extent = NMGLatLngBounds(southWestLat: 31.43, southWestLng: 122.37, northEastLat: 44.35, northEastLng: 132)
+        view.mapView.mapType = .basic
+    }
+    
+    func updateLocationOverlay(_ mapView: NMFMapView, isAuthorized: Bool) {
+        if isLocationAuthorized {
+            let mode: NMFMyPositionMode = store.isUserTrackingMode ? .direction : .normal
+            
+            if mapView.positionMode != mode {
+                mapView.positionMode = mode
+            }
+        } else {
+            mapView.positionMode = .disabled
+        }
+    }
+    
+    func updateCameraPosition(_ mapView: NMFMapView, context: Context) {
+        guard let cameraPosition = store.cameraPosition,
+              cameraPosition != context.coordinator.lastCameraPosition
+        else { return }
+        let nmapCameraPosition = NMGLatLng(lat: cameraPosition.latitude, lng: cameraPosition.longitude)
+        let cameraUpdate = NMFCameraUpdate(scrollTo: nmapCameraPosition)
+        cameraUpdate.animation = .linear
+        cameraUpdate.animationDuration = Constants.animationDuration
+        mapView.moveCamera(cameraUpdate)
+        context.coordinator.lastCameraPosition = cameraPosition
+    }
+    
+    func updateContentInset(_ mapView: NMFMapView) {
         let sheetHeight = store.detent.resolve(in: UIScreen.main.bounds.height, inset: .screenTabBarHeight)
         let targetInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
-        if uiView.mapView.contentInset != targetInset {
-            UIView.animate(withDuration: 0.3, delay: .zero) {
-                uiView.mapView.contentInset = targetInset
-                uiView.layoutIfNeeded()
+        if mapView.contentInset != targetInset {
+            UIView.animate(withDuration: Constants.animationDuration, delay: .zero) {
+                mapView.contentInset = targetInset
+                mapView.layoutIfNeeded()
             }
         }
     }
@@ -118,8 +151,8 @@ extension NaverMapRepresentable {
         
         var lastCameraPosition: GeographicCoordinate?
         
-        private var markers: [UUID: NMFMarker] = [:]
-        private var lastSelectedBoothID: UUID?
+        private var markers: [Int: NMFMarker] = [:]
+        private var lastSelectedBoothID: Int?
         
         let parent: NaverMapRepresentable
         
@@ -128,47 +161,28 @@ extension NaverMapRepresentable {
         func updateMarkers(
             mapView: NMFMapView,
             photoBooths: IdentifiedArrayOf<PhotoBooth>,
-            selectedBoothID: UUID?
+            selectedBoothID: Int?
         ) {
-            let visibleIDs = Set(photoBooths.ids)
-            let cachedIDs = Set(markers.keys)
+            let newIDs = Set(photoBooths.ids)
+            let currentIDs = Set(markers.keys)
             
-            let idsToHide = cachedIDs.subtracting(visibleIDs)
-            for id in idsToHide {
+            let idsToRemove = currentIDs.subtracting(newIDs)
+            for id in idsToRemove {
                 markers[id]?.mapView = nil
+                markers[id] = nil
             }
             
-            for id in visibleIDs {
-                guard let booth = photoBooths[id: id] else { continue }
-                let isTargetSelected = (id == selectedBoothID)
+            for booth in photoBooths {
+                let isSelected = (booth.id == selectedBoothID)
                 
-                if let existingMarker = markers[id] {
-                    guard existingMarker.mapView == nil else { continue }
-                    configureMarkerStyle(existingMarker, brand: booth.brand, isSelected: isTargetSelected)
-                    existingMarker.mapView = mapView
+                if let existingMarker = markers[booth.id] {
+                    updateMarkerStyleIfNeeded(existingMarker, brand: booth.brand, isSelected: isSelected)
                 } else {
-                    let newMarker = createMarker(for: booth, isSelected: isTargetSelected)
+                    let newMarker = createMarker(for: booth)
+                    updateMarkerStyleIfNeeded(newMarker, brand: booth.brand, isSelected: isSelected)
                     newMarker.mapView = mapView
-                    markers[id] = newMarker
+                    markers[booth.id] = newMarker
                 }
-            }
-            
-            if lastSelectedBoothID != selectedBoothID {
-                if let oldID = lastSelectedBoothID,
-                   let oldMarker = markers[oldID],
-                   oldMarker.mapView != nil {
-                    let brand = photoBooths[id: oldID]?.brand ?? .life4cut
-                    configureMarkerStyle(oldMarker, brand: brand, isSelected: false)
-                }
-                
-                if let newID = selectedBoothID,
-                   let newMarker = markers[newID],
-                   newMarker.mapView != nil {
-                    let brand = photoBooths[id: newID]?.brand ?? .life4cut
-                    configureMarkerStyle(newMarker, brand: brand, isSelected: true)
-                }
-                
-                lastSelectedBoothID = selectedBoothID
             }
         }
     }
@@ -178,45 +192,40 @@ extension NaverMapRepresentable {
 // MARK: - NaverMapRepresentable.Coordinator + Factory Helpers
 
 private extension NaverMapRepresentable.Coordinator {
-    /// 새 마커 생성
-    func createMarker(for photoBooth: PhotoBooth, isSelected: Bool) -> NMFMarker {
+    func createMarker(for booth: PhotoBooth) -> NMFMarker {
         let marker = NMFMarker()
-        marker.position = NMGLatLng(lat: photoBooth.coordinate.latitude, lng: photoBooth.coordinate.longitude)
-        
-        // 기본 캡션 설정
-        marker.captionText = photoBooth.name
+        marker.position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
+        marker.captionText = "\(booth.brand.displayName)\n\(booth.name)"
         marker.captionColor = .init(hex: 0x202227)
         marker.captionHaloColor = .white
         marker.captionTextSize = 12
         
-        // 탭 핸들러 설정
         marker.touchHandler = { [weak self] _ in
-            self?.parent.store.send(.didTapBooth(photoBooth))
+            self?.parent.store.send(.didTapBooth(booth))
             return true
         }
-        
-        // 스타일 설정
-        configureMarkerStyle(marker, brand: photoBooth.brand, isSelected: isSelected)
-        
         return marker
     }
     
-    /// 마커 스타일 설정
-    func configureMarkerStyle(_ marker: NMFMarker, brand: PhotoBoothBrand, isSelected: Bool) {
-        marker.userInfo["isSelected"] = isSelected
+    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, brand: PhotoBoothBrand, isSelected: Bool) {
+        let isFirstRender = marker.userInfo["isSelected"] == nil
+        let currentSelectionState = marker.userInfo["isSelected"] as? Bool ?? false
+        
+        guard isFirstRender || currentSelectionState != isSelected else { return }
+        let targetImage = MarkerImageResources.image(for: brand, state: isSelected ? .selected : .normal)
+        marker.iconImage = targetImage
         
         if isSelected {
-            marker.iconImage = MarkerImageResources.image(for: brand, state: .selected)
-            marker.width = 72
-            marker.height = 83
-            marker.zIndex = 100 // 맨 위로
+            marker.width = Constants.selectedSize.width
+            marker.height = Constants.selectedSize.height
+            marker.zIndex = Constants.zIndexSelected
         } else {
-            // 일반 상태
-            marker.iconImage = MarkerImageResources.image(for: brand, state: .normal)
-            marker.width = 54
-            marker.height = 62
-            marker.zIndex = 0
+            marker.width = Constants.normalSize.width
+            marker.height = Constants.normalSize.height
+            marker.zIndex = Constants.zIndexNormal
         }
+        
+        marker.userInfo["isSelected"] = isSelected
     }
 }
 
@@ -265,6 +274,11 @@ public struct NaverMapView: View {
         .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
             DirectionAppsSheet(photoBooth: photoBooth)
         }
+        .overlay(alignment: .top) {
+            if store.isSearchHereButtonVisible {
+                searchHereControl
+            }
+        }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
                 .scrollDisabled(store.detent != .large)
@@ -274,7 +288,9 @@ public struct NaverMapView: View {
         .nekiSheetBottomInset()
         .overlay(alignment: .bottom) {
             if case .large = store.detent {
-                ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton, animation: .default) }.safeAreaPadding()
+                ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton, animation: .default) }
+                    .padding(.bottom, 52)
+                    .safeAreaPadding()
             }
         }
         .animation(.easeInOut, value: store.detent)
@@ -303,16 +319,16 @@ private extension NaverMapView {
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
-                        Text("인생네컷") // TODO: 실제 지점 정보를 표시해야 합니다.
+                        Text(photoBooth.brand.displayName)
                             .nekiFont(.title20SemiBold)
                             .foregroundStyle(.gray900)
                         
-                        Text("사당역점") // TODO: 실제 지점 정보를 표시해야 합니다.
+                        Text(photoBooth.name)
                             .nekiFont(.body14Medium)
                             .foregroundStyle(.gray600)
                     }
                     
-                    Text("300m") // TODO: 실제 거리 값을 표시해야 합니다
+                    Text(photoBooth.nearbyDistance?.distanceString ?? "")
                         .nekiFont(.body14Medium)
                         .foregroundStyle(.gray400)
                 }
@@ -329,6 +345,8 @@ private extension NaverMapView {
             .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .shadow(color: .gray400, radius: 8, y: 4)
+            .contentShape(.rect)
+            .onTapGesture { store.send(.didTapBoothCard) }
             .padding(.horizontal)
             .padding(.bottom, 72)
         }
@@ -362,6 +380,28 @@ private extension NaverMapView {
         .padding(.horizontal, 20)
         .shadow(color: .gray400, radius: 8, y: 4)
     }
+    
+    var searchHereControl: some View {
+        Button {
+            store.send(.didTapSearchHereButton)
+        } label: {
+            HStack(spacing: 6.55) {
+                Image(.iconRotate)
+                
+                Text("현 위치에서 탐색")
+                    .nekiFont(.body14SemiBold)
+                    .foregroundStyle(.gray800)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(.white)
+                    .strokeBorder(.gray100)
+            )
+        }
+        .safeAreaPadding(.top)
+    }
 }
 
 
@@ -385,10 +425,5 @@ extension NMGLatLng {
 }
 
 #Preview {
-    TabView {
-        NaverMapView(store: Store(initialState: MapFeature.State(), reducer: { MapFeature() }))
-            .tabItem {
-                Label("네컷지도", systemImage: "mappin.and.ellipse")
-            }
-    }
+    AppCoordinatorView(store: .init(initialState: AppCoordinator.State.mainTab(.init()), reducer: { AppCoordinator() }))
 }

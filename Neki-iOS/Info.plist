@@ -4,11 +4,23 @@
 <dict>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakao${KAKAO_LOGIN_NATIVE_APP_KEY}</string>
+			</array>
+		</dict>
+	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
 		<string>kakaomap</string>
 		<string>comgooglemaps</string>
+		<string>kakaokompassauth</string>
 	</array>
 	<key>NMFNcpKeyId</key>
 	<string>${NAVER_MAPS_CLIENT_ID}</string>

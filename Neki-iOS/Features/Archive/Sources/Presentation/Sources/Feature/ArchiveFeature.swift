@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import AVFoundation
 //import Core
 
 @Reducer
@@ -60,6 +61,10 @@ struct ArchiveFeature {
         case imageTapped(ArchiveImageItem)
         case albumTapped(AlbumItem)
         case afterUploadNavigateToAlbumDetail(AlbumItem)
+        case qrScannerPresented
+        
+        // Internal Action
+        case showPermissionAlert
         
         // Delegate Action
         case delegate(DelegateAction)
@@ -68,6 +73,8 @@ struct ArchiveFeature {
         }
     }
     
+    @Dependency(\.qrScannerClient) private var qrScannerClient
+    
     var body: some ReducerOf<Self> {
         BindingReducer()
         
@@ -75,7 +82,7 @@ struct ArchiveFeature {
             ImagePickerFeature()
         }
         
-        Reduce { state, action in
+        Reduce { (state: inout State, action: Action) -> Effect<Action> in
             /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
             case .onAppear:
@@ -87,6 +94,7 @@ struct ArchiveFeature {
                     let loadedPhotos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
                     state.$photos.withLock { $0 = loadedPhotos }
                 }
+                
                 return .none
                 
             case .toggleDropDownMenu:
@@ -98,9 +106,24 @@ struct ArchiveFeature {
                 return .none
                 
             case .onTapQRScan:
-                print("QR 인식")
-                state.showDropDownMenu = false
-                return .none
+                defer { state.showDropDownMenu = false }
+                switch qrScannerClient.checkAuthorizationStatus() {
+                case .authorized:
+                    return .send(.qrScannerPresented)
+                    
+                case .notDetermined:
+                    return .run { send in
+                        let isAuthorized = await qrScannerClient.requestAccess()
+                        guard isAuthorized else { return await send(.showPermissionAlert) }
+                        await send(.qrScannerPresented)
+                    }
+                    
+                case .denied, .restricted:
+                    return .send(.showPermissionAlert)
+                    
+                @unknown default:
+                    return .none
+                }
                 
             case .imagePicker(.uploadStarted):
                 state.isLoading = true

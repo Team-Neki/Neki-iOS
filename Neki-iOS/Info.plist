@@ -30,10 +30,23 @@
 	<array>
 		<string>Pretendard-Bold.otf</string>
 		<string>Pretendard-Medium.otf</string>
-		<string>Pretendard-Regular.otf</string>
-		<string>Pretendard-SemiBold.otf</string>
-	</array>
-	<key>UIDesignRequiresCompatibility</key>
-	<true/>
+        <string>Pretendard-Regular.otf</string>
+        <string>Pretendard-SemiBold.otf</string>
+    </array>
+    <key>UIDesignRequiresCompatibility</key>
+    <true/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>mx2.co.kr</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
 </dict>
 </plist>

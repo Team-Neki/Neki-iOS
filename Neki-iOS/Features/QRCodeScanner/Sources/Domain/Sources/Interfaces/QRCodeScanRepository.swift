@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Dependencies
+import DependenciesMacros
 
 public enum QRParseError: Error {
     case invalidURL
@@ -19,4 +21,17 @@ public enum QRParseError: Error {
 
 public protocol QRCodeScanRepository {
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult
+}
+
+private enum QRCodeScanRepositoryKey: DependencyKey {
+    static let liveValue: QRCodeScanRepository = DefaultQRCodeScanRepository()
+}
+
+// MARK: - QRCodeScanRepository + Accessor
+
+extension DependencyValues {
+    var qrCodeScanRepository: QRCodeScanRepository {
+        get { self[QRCodeScanRepositoryKey.self] }
+        set { self[QRCodeScanRepositoryKey.self] = newValue }
+    }
 }

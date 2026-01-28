@@ -345,6 +345,8 @@ private extension NaverMapView {
             .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .shadow(color: .gray400, radius: 8, y: 4)
+            .contentShape(.rect)
+            .onTapGesture { store.send(.didTapBoothCard) }
             .padding(.horizontal)
             .padding(.bottom, 72)
         }

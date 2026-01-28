@@ -63,7 +63,6 @@ public struct MapFeature {
         case openAppSettings
         case didTapGoBackToMapButton
         case didTapBooth(PhotoBooth)
-        case didTapBoothCard
         case didTapCloseDetail
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
@@ -172,7 +171,6 @@ public struct MapFeature {
                 
                 // MARK: - User Location Interaction
             case .didTapCurrentLocationButton:
-                resetToMapMode(&state, for: .first)
                 switch state.locationAuthorizationStatus {
                 case .notDetermined:
                     return .send(.requestPermission)
@@ -216,7 +214,6 @@ public struct MapFeature {
                 
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
-                state.cameraPosition = bounds.center
                 
                 if state.isFirstLoad {
                     state.isFirstLoad = false
@@ -316,15 +313,10 @@ public struct MapFeature {
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 return .none
                 
-            case .didTapBoothCard:
-                state.isUserTrackingMode = false
-                guard let photoBooth = state.selectedBooth else { return .none }
-                selectPhotoBooth(&state, photoBooth: photoBooth)
-                return .none
-                
             case .didTapCloseDetail:
                 resetToMapMode(&state, for: .second)
                 return .none
+                
                 
             case .didTapDirectionAppsButton:
                 state.directionSheetPhotoBooth = state.selectedBooth
@@ -360,7 +352,7 @@ private extension MapFeature {
     func selectPhotoBooth(_ state: inout State, photoBooth: PhotoBooth) {
         state.selectedBooth = photoBooth
         state.detent = SheetStage.photoBoothSelected.detent
-        state.cameraPosition = photoBooth.coordinate   
+        state.cameraPosition = photoBooth.coordinate
     }
     
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {

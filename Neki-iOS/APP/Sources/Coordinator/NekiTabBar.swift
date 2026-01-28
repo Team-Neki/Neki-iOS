@@ -42,11 +42,13 @@ struct NekiTabBar: View {
                 Button {
                     selectedTab = tab
                 } label: {
-                    VStack(alignment: .center, spacing: 1) {
+                    VStack(alignment: .center, spacing: 4) {
                         Image(uiImage: tab.icon(isSelected: selectedTab == tab))
+                            .resizable()
+                            .frame(width: 26, height: 26)
                         
                         Text(tab.title)
-                            .nekiFont(.caption11Medium)
+                            .nekiFont(.caption12Medium)
                             .foregroundColor(selectedTab == tab ? .gray800 : .gray500)
                     }
                     .frame(maxWidth: .infinity)
@@ -57,4 +59,8 @@ struct NekiTabBar: View {
         .background(.white)
         
     }
+}
+
+#Preview {
+    NekiTabBar(selectedTab: .constant(.map))
 }

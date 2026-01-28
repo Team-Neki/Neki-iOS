@@ -329,7 +329,8 @@ private extension NaverMapView {
             .background(.white)
             .clipShape(RoundedRectangle(cornerRadius: 20))
             .shadow(color: .gray400, radius: 8, y: 4)
-            .padding([.horizontal, .bottom])
+            .padding(.horizontal)
+            .padding(.bottom, 72)
         }
         .transition(.move(edge: .bottom))
     }

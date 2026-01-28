@@ -18,9 +18,6 @@ struct NearPhotoBoothListSheet: View {
             photoBoothBrandFilterOptionsSection
             nearByPhotoBoothListSection
         }
-        .nekiWarningAlert(isPresented: $store.isWarningAlertPresented, titleMessage: "가까운 네컷 사진 브랜드는 1km 기준으로 표시돼요.") { // TODO: 얼럿 등장 위치 상위 화면으로 옮겨야 할 수도 있음
-            store.send(.dismissWarningAlert)
-        }
     }
 }
 
@@ -107,7 +104,8 @@ private extension NearPhotoBoothListSheet {
                 
                 Image(systemName: "exclamationmark.circle")
                     .foregroundStyle(.gray400)
-                    .onTapGesture { store.send(.showWarningAlert) }
+                    .onTapGesture { store.send(.toggleTooltip) }
+                    .nekiTooltip(isPresented: $store.isTooltipPresented, "가까운 네컷 사진 브랜드는\n1Km 기준으로 표시돼요.")
             }
             .nekiFont(.title18Bold)
             .padding(.horizontal, 20)
@@ -145,16 +143,10 @@ private extension NearPhotoBoothListSheet {
         .padding(.vertical, 4)
     }
     
-    var unavailableView: some View { // TODO: 디자인 수정될 여지 있습니다.
+    var unavailableView: some View {
         Text("1km 이내에 가까운 네컷 사진관이 없어요!")
             .nekiFont(.body16Medium)
             .foregroundStyle(.gray500)
-            .frame(height: 375) // TODO: 스크롤뷰 내부 요소는 상단 정렬이라, 여기서 고정 높이를 줘서 디자인 시안과 맞췄습니다.
-    }
-}
-
-#Preview {
-    TabView {
-        NaverMapView(store: Store(initialState: MapFeature.State(), reducer: { MapFeature() }))
+            .frame(height: 375)
     }
 }

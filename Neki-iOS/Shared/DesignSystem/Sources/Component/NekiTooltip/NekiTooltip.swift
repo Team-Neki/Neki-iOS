@@ -12,7 +12,7 @@ public enum NekiTooltipStyle {
     
     var backgroundColor: Color {
         switch self {
-        case .dark: return .gray700
+        case .dark: return .gray800
         case .light: return .gray25
         }
     }
@@ -76,8 +76,8 @@ struct NekiTooltipView: View {
                 arrowArea(pointsUp: false)
             }
         }
-        .fixedSize()
         .shadow(color: .black.opacity(0.15), radius: 8, y: 4)
+        .fixedSize()
     }
     
     private var contentArea: some View {
@@ -85,7 +85,7 @@ struct NekiTooltipView: View {
             Text(text)
                 .nekiFont(.body14Medium)
                 .foregroundStyle(style.foregroundColor)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
             
             if let onDismiss = onDismiss {
                 Button(action: onDismiss) {
@@ -107,5 +107,12 @@ struct NekiTooltipView: View {
             .rotationEffect(pointsUp ? .degrees(0) : .degrees(180))
             .offset(x: arrowOffset)
             .zIndex(1)
+    }
+}
+
+import ComposableArchitecture
+#Preview {
+    TabView {
+        NaverMapView(store: Store(initialState: MapFeature.State(), reducer: { MapFeature() }))
     }
 }

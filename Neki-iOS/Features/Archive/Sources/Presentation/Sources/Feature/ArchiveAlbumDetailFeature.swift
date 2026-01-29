@@ -14,38 +14,30 @@ struct ArchiveAlbumDetailFeature {
     @ObservableState
     struct State {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
+        @Shared var sharedAlbums: IdentifiedArrayOf<AlbumItem>
+        
         let album: AlbumItem
         
-        var selectedIDs: Set<UUID> = []
-        var deleteOption: ArchivePhotoDeleteOption = .fromAlbumOnly
+        var selectedIDs: Set<Int> = []
         
-        var selectedSortedTime: String = "최신순"
-        var isSelectedFavorite: Bool = false
         var isSelectionMode: Bool = false
         
-        var hasSelectedItems: Bool { !selectedIDs.isEmpty }
-        
-        // 현재는 더미라 전체 photos 사용
-        var filteredItems: IdentifiedArrayOf<ArchiveImageItem> {
-            var items = photos // TODO: 여기서 앨범 ID로 1차 필터링 필요
-            
-            if isSelectedFavorite {
-                items = items.filter { $0.isFavorite }
-            }
-            
-            let sorted = items.sorted { item1, item2 in
-                if selectedSortedTime == "최신순" {
-                    return item1.date > item2.date
-                } else {
-                    return item1.date < item2.date
-                }
-            }
-            return IdentifiedArray(uniqueElements: sorted)
+        var filteredAlbumPhotos: IdentifiedArrayOf<ArchiveImageItem> {
+            let items = photos.filter { $0.folderId == album.id }
+            return IdentifiedArray(uniqueElements: items)
         }
+        
+        var currentPage: Int = 0
+        var hasNext: Bool = true
+        var isFetchingPhotos: Bool = false
+        
+        var hasSelectedItems: Bool { !selectedIDs.isEmpty }
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        
+        case onAppear
         
         case onTapBackButton
         case onTapSelectButton
@@ -53,10 +45,16 @@ struct ArchiveAlbumDetailFeature {
         
         // 기능 액션
         case onTapDownloadButton
-        case onTapDeleteButton
-        case onTapFilterNewest
-        case onTapFilterOldest
-        case onTapFavoriteButton
+        
+        case onTapDeleteButton(option: ArchivePhotoDeleteOption)
+        case deletePhotosResponse(ArchivePhotoDeleteOption, Result<Void, Error>)
+        
+        case fetchAlbums
+        case albumListResponse(Result<[AlbumItem], Error>)
+        
+        case fetchPhotos(isRefresh: Bool)
+        case photoListResponse(Result<(photos: [PhotoEntity], hasNext: Bool), Error>)
+        case loadMorePhotos
         
         // 네비게이션
         case imageTapped(ArchiveImageItem)
@@ -68,6 +66,7 @@ struct ArchiveAlbumDetailFeature {
     }
     
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.archiveClient) var archiveClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -76,6 +75,66 @@ struct ArchiveAlbumDetailFeature {
             switch action {
             case .onTapBackButton:
                 return .run { _ in await dismiss() }
+                
+            case .onAppear:
+                return .send(.fetchPhotos(isRefresh: true))
+                
+            case let .fetchPhotos(isRefresh):
+                if isRefresh {
+                    state.currentPage = 0
+                    state.hasNext = true
+                }
+                
+                guard state.hasNext, !state.isFetchingPhotos else { return .none }
+                state.isFetchingPhotos = true
+                
+                return .run { [page = state.currentPage, albumId = state.album.id] send in
+                    await send(.photoListResponse(
+                        Result {
+                            try await archiveClient.fetchPhotoList(
+                                folderId: albumId,
+                                page: page,
+                                size: 20,
+                                sortOrder: nil
+                            )
+                        }
+                    ))
+                }
+                
+            case let .photoListResponse(.success(result)):
+                state.isFetchingPhotos = false
+                state.hasNext = result.hasNext
+                
+                let isoFormatter = ISO8601DateFormatter()
+                isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                
+                let currentAlbumId = state.album.id
+                
+                let newItems = result.photos.map { entity in
+                    ArchiveImageItem(
+                        id: entity.photoID,
+                        imageURLString: entity.imageURL,
+                        isFavorite: entity.isfavorite,
+                        date: isoFormatter.date(from: entity.createdAt) ?? Date(),
+                        folderId: currentAlbumId
+                    )
+                }
+                
+                state.$photos.withLock { sharedPhotos in
+                    for item in newItems {
+                        sharedPhotos.updateOrAppend(item)
+                    }
+                }
+                
+                state.currentPage += 1
+                return .none
+                
+            case .photoListResponse:
+                state.isFetchingPhotos = false
+                return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
+                
+            case .loadMorePhotos:
+                return .send(.fetchPhotos(isRefresh: false))
                 
             case .onTapSelectButton:
                 state.isSelectionMode = true
@@ -101,35 +160,84 @@ struct ArchiveAlbumDetailFeature {
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
                 
-            case .onTapDeleteButton:
-                switch state.deleteOption {
-                case .everywhere:
-                    // 모든 위치에서 제거 (원본 데이터 삭제)
-                    state.$photos.withLock { photos in
+            case let .onTapDeleteButton(option):
+                guard !state.selectedIDs.isEmpty else { return .none }
+                
+                return .run { [ids = state.selectedIDs, albumId = state.album.id] send in
+                    await send(.deletePhotosResponse(
+                        option,
+                        Result {
+                            if option == .fromAlbumOnly {
+                                try await archiveClient.excludePhotosInAlbum(albumID: albumId, photoIDs: Array(ids))
+                            } else {
+                                try await archiveClient.deletePhotoList(photoIds: Array(ids))
+                            }
+                        }
+                    ))
+                }
+                
+            case let .deletePhotosResponse(option, .success):
+                
+                state.$photos.withLock { photos in
+                    if option == .fromAlbumOnly {
+                        for id in state.selectedIDs {
+                            photos[id: id]?.folderId = nil
+                        }
+                    } else {
                         photos.removeAll { state.selectedIDs.contains($0.id) }
                     }
-                    
-                case .fromAlbumOnly:
-                    // 앨범에서만 제거
-                    print("앨범 매핑 해제")
                 }
                 
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                state.deleteOption = .fromAlbumOnly
                 
-                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
+                let toastItem = NekiToastItem("사진을 삭제했어요", style: .success)
                 
-            case .onTapFilterNewest:
-                state.selectedSortedTime = "최신순"
+                return .merge(
+                    .send(.delegate(.showToast(toastItem))),
+                    .send(.fetchPhotos(isRefresh: true)),
+                    .send(.fetchAlbums)
+                )
+                
+            case .deletePhotosResponse(_, .failure):
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
+                
+            case .fetchAlbums:
+                return .run { send in
+                    await send(.albumListResponse(Result {
+                        let entities = try await archiveClient.getAlbumList()
+                        return entities.map {
+                            AlbumItem(
+                                id: $0.id,
+                                title: $0.name,
+                                count: $0.photoCount,
+                                coverImageURL: URL(string: $0.coverImageURLString),
+                                isFavorite: false
+                            )
+                        }
+                    }))
+                }
+                
+            case let .albumListResponse(.success(newAlbums)):
+                state.$sharedAlbums.withLock { existing in
+                    var favoriteAlbum: AlbumItem?
+                    if let first = existing.first, first.isFavorite {
+                        favoriteAlbum = first
+                    }
+                    
+                    var mergedAlbums: [AlbumItem] = []
+                    
+                    if let fav = favoriteAlbum {
+                        mergedAlbums.append(fav)
+                    }
+                    
+                    mergedAlbums.append(contentsOf: newAlbums)
+                    
+                    existing = IdentifiedArray(uniqueElements: mergedAlbums)
+                }
                 return .none
                 
-            case .onTapFilterOldest:
-                state.selectedSortedTime = "오래된순"
-                return .none
-                
-            case .onTapFavoriteButton:
-                state.isSelectedFavorite.toggle()
+            case .albumListResponse(.failure):
                 return .none
                 
             default:

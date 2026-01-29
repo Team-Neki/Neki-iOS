@@ -20,7 +20,7 @@ struct SelectUploadAlbumFeature {
     struct State: Equatable {
         let uploadedImageIds: [Int]
         var albums: IdentifiedArrayOf<AlbumItem>
-        var selectedAlbumId: UUID? = nil
+        var selectedAlbumId: Int? = nil
         
         var viewMode: ViewMode = .prompt
         var isLoading: Bool = false
@@ -39,12 +39,18 @@ struct SelectUploadAlbumFeature {
         case tapAlbum(AlbumItem) // 앨범 선택
         case tapConfirmUpload // 최종 업로드 버튼
         
+        case registerPhotos(albumId: Int?)
+        case registerPhotosResponse(Result<Int?, Error>)
+        
         // Delegate
         case delegate(DelegateAction)
         enum DelegateAction {
-            case uploadDidSuccess(albumId: UUID?)
+            case uploadDidSuccess(albumId: Int?)
+            case uploadDidFail(Error)
         }
     }
+    
+    @Dependency(\.archiveClient) var archiveClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -52,16 +58,17 @@ struct SelectUploadAlbumFeature {
         Reduce { state, action in
             switch action {
                 
-            // 앨범 없이 최종 업로드
+                // 앨범 없이 최종 업로드
             case .tapUploadWithoutAlbum:
-                return .send(.delegate(.uploadDidSuccess(albumId: nil)))
+                state.isLoading = true
+                return .send(.registerPhotos(albumId: nil))
                 
-            // 앨범 선택 후 업로드
+                // 앨범 선택 후 업로드
             case .tapSelectAlbumAndUpload:
                 state.viewMode = .albumList
                 return .none
                 
-            // [뒤로가기] 리스트 -> 팝업
+                // [뒤로가기] 리스트 -> 팝업
             case .tapBackToPrompt:
                 state.viewMode = .prompt
                 return .none
@@ -74,13 +81,31 @@ struct SelectUploadAlbumFeature {
                 }
                 return .none
                 
-            // 앨범 리스트 화면에서 최종 업로드
+                // 앨범 리스트 화면에서 최종 업로드
             case .tapConfirmUpload:
                 guard let albumId = state.selectedAlbumId else { return .none }
+                state.isLoading = true
+                return .send(.registerPhotos(albumId: albumId))
                 
-                // TODO: - 업로드 로직
+            case let .registerPhotos(albumId):
+                return .run { [mediaIds = state.uploadedImageIds] send in
+                    await send(.registerPhotosResponse(
+                        Result {
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
+                            try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads)
+                            
+                            return albumId
+                        }
+                    ))
+                }
                 
+            case let .registerPhotosResponse(.success(albumId)):
+                state.isLoading = false
                 return .send(.delegate(.uploadDidSuccess(albumId: albumId)))
+                
+            case let .registerPhotosResponse(.failure(error)):
+                state.isLoading = false
+                return .send(.delegate(.uploadDidFail(error)))
                 
             case .binding:
                 return .none

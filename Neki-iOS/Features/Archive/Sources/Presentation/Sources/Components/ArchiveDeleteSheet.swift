@@ -21,14 +21,32 @@ struct ArchiveDeleteSheet<T: Equatable>: View {
     
     // MARK: - Properties
     
-    @Binding var selectedOption: T
+    @State private var selectedOption: T
     
     let title: String
     let firstOption: (value: T, text: String)
     let secondOption: (value: T, text: String)
         
     let onCancel: () -> Void
-    let onConfirm: () -> Void
+    let onConfirm: (T) -> Void
+    
+    // MARK: - init
+
+    init(
+        initialOption: T,
+        title: String,
+        firstOption: (value: T, text: String),
+        secondOption: (value: T, text: String),
+        onCancel: @escaping () -> Void,
+        onConfirm: @escaping (T) -> Void
+    ) {
+        self._selectedOption = State(initialValue: initialOption)
+        self.title = title
+        self.firstOption = firstOption
+        self.secondOption = secondOption
+        self.onCancel = onCancel
+        self.onConfirm = onConfirm
+    }
     
     // MARK: - Body
     
@@ -70,7 +88,9 @@ struct ArchiveDeleteSheet<T: Equatable>: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     
-                    Button(action: onConfirm) {
+                    Button {
+                        onConfirm(selectedOption)
+                    } label: {
                         Text("삭제하기")
                             .nekiFont(.body16SemiBold)
                             .foregroundStyle(.white)

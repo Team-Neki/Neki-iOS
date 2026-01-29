@@ -17,18 +17,25 @@ struct SelectUploadAlbumView: View {
             if store.viewMode == .prompt {
                 Color.gray900.opacity(0.5)
                     .ignoresSafeArea()
+                    .transition(.opacity)
             } else {
                 Color.white
                     .ignoresSafeArea()
             }
             
-            switch store.viewMode {
-            case .prompt:
-                promptPopupView
-                
-            case .albumList:
-                albumListView
+            Group {
+                switch store.viewMode {
+                case .prompt:
+                    promptPopupView
+                        .transition(.opacity)
+                    
+                case .albumList:
+                    NavigationStack {
+                        albumListView
+                            .toolbar(.hidden, for: .navigationBar)
+                    }
                     .transition(.move(edge: .trailing))
+                }
             }
         }
         .animation(.easeInOut, value: store.viewMode)
@@ -77,7 +84,7 @@ private extension SelectUploadAlbumView {
                     } label: {
                         Image(.iconChevronLeft)
                     }
-
+                    
                     Spacer()
                     
                     Button {
@@ -96,7 +103,6 @@ private extension SelectUploadAlbumView {
                     .nekiFont(.title18SemiBold)
                     .foregroundStyle(.gray900)
             }
-            .background(.white)
             .frame(height: 54)
             
             ScrollView {
@@ -115,9 +121,10 @@ private extension SelectUploadAlbumView {
                         }
                     }
                 }
-                .padding(.top, 8)
             }
+            .padding(.top, 8)
+            
         }
-        .background(Color.white)
+        
     }
 }

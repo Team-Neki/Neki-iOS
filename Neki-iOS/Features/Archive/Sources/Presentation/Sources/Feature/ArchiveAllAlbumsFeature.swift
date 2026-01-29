@@ -14,11 +14,11 @@ struct ArchiveAllAlbumsFeature {
     @ObservableState
     struct State {
         @Shared var albums: IdentifiedArrayOf<AlbumItem>
+        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
         
         var isSelectMode: Bool = false
-        var selectedAlbumIDs: Set<UUID> = []
-        var deleteOption: ArchiveAlbumDeleteOption = .withPhotos
-                
+        var selectedAlbumIDs: Set<Int> = []
+        
         var newAlbumTitle: String = ""
         var albumTitleErrorMessage: String? = nil
         
@@ -37,11 +37,22 @@ struct ArchiveAllAlbumsFeature {
         case onTapEnterDeleteMode
         case onTapExitDeleteMode
         case onTapToggleSelection(AlbumItem)
-        case onTapExecuteDelete
         
-        // 앨범 생성 시트 액션
+        // 앨범 삭제 액션
+        case onTapExecuteDelete(option: ArchiveAlbumDeleteOption)
+        case deleteFoldersResponse(Result<Void, Error>)
+        
+        case fetchPhotos
+        case photoListResponse(Result<[ArchiveImageItem], Error>)
+        
+        // 앨범 생성 액션
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
+        case addFolderResponse(Result<Int, Error>)
+        
+        // 앨범 목록 갱신 Action
+        case fetchAlbums
+        case albumListResponse(Result<[AlbumItem], Error>)
         
         // Delegate (부모 코디네이터로 전달)
         case delegate(Delegate)
@@ -51,11 +62,14 @@ struct ArchiveAllAlbumsFeature {
     }
     
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.archiveClient) var archiveClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
         
-        Reduce { state, action in
+        Reduce {
+            state,
+            action in
             switch action {
             case .onTapBackButton:
                 if state.isSelectMode {
@@ -68,7 +82,7 @@ struct ArchiveAllAlbumsFeature {
                 state.isSelectMode = true
                 state.selectedAlbumIDs.removeAll()
                 return .none
-                            
+                
             case .onTapExitDeleteMode:
                 state.isSelectMode = false
                 state.selectedAlbumIDs.removeAll()
@@ -84,22 +98,65 @@ struct ArchiveAllAlbumsFeature {
                 }
                 return .none
                 
-            case .onTapExecuteDelete:
+            case let .onTapExecuteDelete(option):
                 guard !state.selectedAlbumIDs.isEmpty else {
                     return .send(.onTapExitDeleteMode)
                 }
                 
-                // TODO: - 삭제 옵션에 따라 앨범만 삭제하고 이미지들은 유지 혹은 앨범과 이미지 모두 삭제 로직
-                                
+                let shouldDeletePhotos = (option == .withPhotos)
+                
+                return .run { [ids = state.selectedAlbumIDs] send in
+                    await send(.deleteFoldersResponse(Result {
+                        try await archiveClient.deleteFolders(folderIDs: Array(ids), deletePhotos: shouldDeletePhotos)
+                    }))
+                }
+                
+            case .deleteFoldersResponse(.success):
                 state.$albums.withLock { albums in
                     albums.removeAll { state.selectedAlbumIDs.contains($0.id) }
                 }
-                
                 state.isSelectMode = false
                 state.selectedAlbumIDs.removeAll()
                 
                 let toastItem = NekiToastItem("앨범을 삭제했어요", style: .success)
+                
+                return .merge(
+                    .send(.delegate(.showToast(toastItem))),
+                    .send(.fetchAlbums),
+                    .send(.fetchPhotos)
+                )
+                
+            case .deleteFoldersResponse(.failure):
+                let toastItem = NekiToastItem("앨범을 삭제하지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
+                
+            case .fetchPhotos:
+                return .run { send in
+                    await send(.photoListResponse(Result {
+                        let result = try await archiveClient.fetchPhotoList(folderId: nil, page: 0, size: 20, sortOrder: nil)
+                        
+                        let isoFormatter = ISO8601DateFormatter()
+                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        
+                        return result.photos.map { entity in
+                            ArchiveImageItem(
+                                id: entity.photoID,
+                                imageURLString: entity.imageURL,
+                                isFavorite: entity.isfavorite,
+                                date: isoFormatter.date(from: entity.createdAt) ?? Date()
+                            )
+                        }
+                    }))
+                }
+                
+            case let .photoListResponse(.success(newPhotos)):
+                state.$photos.withLock { sharedPhotos in
+                    sharedPhotos = IdentifiedArray(uniqueElements: newPhotos)
+                }
+                return .none
+                
+            case .photoListResponse(.failure):
+                return .none
                 
             case .onTapCancelAddAlbum:
                 state.newAlbumTitle = ""
@@ -109,29 +166,69 @@ struct ArchiveAllAlbumsFeature {
             case .onTapConfirmAddAlbum:
                 guard state.isConfirmButtonEnabled else { return .none }
                 
-                print("새 앨범 추가됨: \(state.newAlbumTitle)")
-                
-                let newAlbum = AlbumItem(
-                    title: state.newAlbumTitle,
-                    count: 0,
-                    coverImageURL: nil,         // TODO: - 디자인에서 주는 브랜딩 이미지로 변경
-                    isFavorite: false
-                )
-
-                state.$albums.withLock {
-                    _ = $0.insert(newAlbum, at: 1)
-                }
-                 
-                // 입력값 초기화
+                let title = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 
-                let toastItem = NekiToastItem(
-                    "새로운 앨범을 추가했어요",
-                    style: .success
+                return .run { send in
+                    await send(.addFolderResponse(Result {
+                        try await archiveClient.addFolder(name: title)
+                    }))
+                }
+                
+            case .addFolderResponse(.success):
+                let toastItem = NekiToastItem("새로운 앨범을 추가했어요", style: .success)
+                
+                return .merge(
+                    .send(.delegate(.showToast(toastItem))),
+                    .send(.fetchAlbums)
                 )
                 
+            case .addFolderResponse(.failure):
+                let toastItem = NekiToastItem("앨범을 만들지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
+                
+            case .fetchAlbums:
+                return .run { send in
+                    await send(
+                        .albumListResponse(
+                            Result {
+                                let entities = try await archiveClient.getAlbumList()
+                                return entities.map {
+                                    AlbumItem(
+                                        id: $0.id,
+                                        title: $0.name,
+                                        count: $0.photoCount,
+                                        coverImageURL: URL(string: $0.coverImageURLString),
+                                        isFavorite: false
+                                    )
+                                }
+                            })
+                    )
+                }
+                
+            case let .albumListResponse(.success(newAlbums)):
+                state.$albums.withLock { existing in
+                    var favoriteAlbum: AlbumItem?
+                    if let first = existing.first,
+                       first.isFavorite {
+                        favoriteAlbum = first
+                    }
+                    
+                    var mergedAlbums: [AlbumItem] = []
+                    if let fav = favoriteAlbum {
+                        mergedAlbums.append(fav)
+                    }
+                    mergedAlbums.append(contentsOf: newAlbums)
+                    existing = IdentifiedArray(uniqueElements: mergedAlbums)
+                }
+                return .none
+                
+            case .albumListResponse(.failure):
+                return .none
+                
+                
+                // MARK: - Binding Action
                 
             case .binding(\.newAlbumTitle):
                 let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)

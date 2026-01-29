@@ -14,6 +14,8 @@ struct ProfileEditFeature {
     struct State {
         var nickname: String
         var selectedProfileImage: UIImage?
+        var doneButtonDisabled: Bool = false
+        let nicknameLengthLimit: Int = 10
         
         init(user: User) {
             self.nickname = user.nickname
@@ -24,6 +26,7 @@ struct ProfileEditFeature {
         // View Actions
         case changeToDefaultProfileImage
         case openPhotosPicker
+        case doneButtonTapped
         
         // Binding Actions
         case binding(BindingAction<State>)
@@ -40,6 +43,17 @@ struct ProfileEditFeature {
                 
             case .openPhotosPicker:
                 // TODO: PhotosUI PhotoPicker 열기
+                return .none
+                
+            case .binding(\.nickname):
+                guard state.nickname.isEmpty == false, state.nickname.count < state.nicknameLengthLimit else {
+                    state.doneButtonDisabled = true
+                    return .none
+                }
+                state.doneButtonDisabled = false
+                return .none
+                
+            case .doneButtonTapped:
                 return .none
                 
             default:

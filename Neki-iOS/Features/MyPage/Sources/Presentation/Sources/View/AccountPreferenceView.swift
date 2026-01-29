@@ -26,8 +26,8 @@ struct AccountPreferenceView: View {
             Spacer()
         }
         .nekiToolbar(
-            left: .back(action: { dismiss() }),
-            center: .text("계정 설정")
+            left: { NekiToolBar.back(action: { dismiss() }) },
+            center: { NekiToolBar.textCenter("계정 설정") }
         )
         .nekiAlert(
             isPresented: $isLogoutAlertPresented,

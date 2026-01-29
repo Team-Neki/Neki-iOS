@@ -43,11 +43,11 @@ struct ArchiveAllPhotosView: View {
             
         }
         .nekiToolbar(
-            left: .back(action: { store.send(.onTapBackButton) }),
-            center: .text("모든 사진"),
-            right: store.isSelectionMode ?
-                .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
-                    .text("선택", action: { store.send(.onTapSelectButton) })
+            left: { NekiToolBar.back(action: { store.send(.onTapBackButton) }) },
+            center: { NekiToolBar.textCenter("모든 사진") },
+            right: {
+                store.isSelectionMode ? NekiToolBar.textRight("취소", action: { store.send(.onTapCancelSelectButton) }) : NekiToolBar.textRight("선택", action: { store.send(.onTapSelectButton) })
+            }
         )
         .nekiAlert(
             isPresented: $showDeleteAlert,

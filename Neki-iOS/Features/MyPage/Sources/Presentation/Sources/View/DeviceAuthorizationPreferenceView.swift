@@ -43,10 +43,12 @@ struct DeviceAuthorizationPreferenceView: View {
             
             Spacer()
         }
-        .nekiToolbar(
-            left: .back(action: { store.send(.dismissButtonTapped) }),
-            center: .text("기기 권한")
-        )
+        .nekiToolbar {
+            NekiToolBar.back { store.send(.dismissButtonTapped) }
+        } center: {
+            NekiToolBar.textCenter("기기 권한")
+        }
+
     }
 }
 

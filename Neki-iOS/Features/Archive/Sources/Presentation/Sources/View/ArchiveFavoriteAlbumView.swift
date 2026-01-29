@@ -35,11 +35,13 @@ struct ArchiveFavoriteAlbumView: View {
             }
         }
         .nekiToolbar(
-            left: .back(action: { store.send(.onTapBackButton) }),
-            center: .text(store.album.title),
-            right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
-                .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
-                .text("선택", action: { store.send(.onTapSelectButton) })
+            left: { NekiToolBar.back(action: { store.send(.onTapBackButton) }) },
+            center: { NekiToolBar.textCenter(store.album.title) },
+            right: {
+                if store.filteredItems.isEmpty == false {
+                    store.isSelectionMode ? NekiToolBar.textRight("취소", action: { store.send(.onTapCancelSelectButton) }) : NekiToolBar.textRight("선택", action: { store.send(.onTapSelectButton) })
+                }
+            }
         )
         .nekiAlert(
             isPresented: $showDeleteAlert,

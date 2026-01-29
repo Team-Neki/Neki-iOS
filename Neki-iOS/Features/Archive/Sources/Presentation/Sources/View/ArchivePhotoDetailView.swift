@@ -34,8 +34,10 @@ struct ArchivePhotoDetailView: View {
                 onFavorite: { store.send(.onTapFavorite) }
             )
         }
-        .nekiToolbar(left: .back(action: { store.send(.onTapBackButton) }),
-                     center: .text(store.formattedDate))
+        .nekiToolbar(
+            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
+            center: { NekiToolBar.textCenter(store.formattedDate) }
+        )
         .nekiAlert(
             isPresented: $showDeleteAlert,
             style: .cancelable,

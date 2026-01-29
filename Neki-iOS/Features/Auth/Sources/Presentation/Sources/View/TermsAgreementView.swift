@@ -31,10 +31,11 @@ public struct TermsAgreementView: View {
             .disabled(store.isConfirmButtonEnabled == false)
         }
         .padding()
-        .nekiToolbar(
-            left: .back(action: { dismiss() }),
-            center: .text("이용약관")
-        )
+        .nekiToolbar {
+            NekiToolBar.back { dismiss() }
+        } center: {
+            NekiToolBar.textCenter("이용약관")
+        }
     }
     
     private var terms: some View {

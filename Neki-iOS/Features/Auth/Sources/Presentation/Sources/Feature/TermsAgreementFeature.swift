@@ -30,6 +30,7 @@ public struct TermsAgreementFeature {
         case toggleAgreement(TermsType)
         case toggleAllAgreements
         case confirmButtonTapped
+        case termPageLinkTapped(TermsType)
         
         // Delegate Actions
         case didFinishOnboarding
@@ -37,6 +38,8 @@ public struct TermsAgreementFeature {
         // Binding Action
         case binding(BindingAction<State>)
     }
+    
+    @Dependency(\.openURL) private var openURL
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -55,6 +58,18 @@ public struct TermsAgreementFeature {
             case .confirmButtonTapped:
                 guard state.isConfirmButtonEnabled else { return .none }
                 return .send(.didFinishOnboarding)
+                
+            case let .termPageLinkTapped(type):
+                let urlString: String
+                switch type {
+                case .serviceUsage: urlString = "https://lydian-tip-26b.notion.site/2ee0d9441db0807c8684ce3e2d4b8aca?source=copy_link"
+                case .privacyPolicy: urlString = "https://lydian-tip-26b.notion.site/2ee0d9441db0807cb850f78145db6dd3?pvs=74"
+                case .locationService: urlString = "https://lydian-tip-26b.notion.site/2ee0d9441db080b48223fb0b3263da08?pvs=74"
+                }
+                return .run { _ in
+                    guard let url = URL(string: urlString) else { return }
+                    await openURL(url)
+                }
                 
             default:
                 return .none

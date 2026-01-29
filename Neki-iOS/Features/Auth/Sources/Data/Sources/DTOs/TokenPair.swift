@@ -7,7 +7,9 @@
 
 import Foundation
 
-struct TokenPair: Decodable {
+struct TokenPair: Decodable, TokenContainer {
     let accessToken: String
     let refreshToken: String
+    
+    func toEntity() -> AuthTokens { .init(accessToken: accessToken, refreshToken: refreshToken) }
 }

@@ -8,15 +8,17 @@
 import ImageIO
 import UniformTypeIdentifiers
 
-public struct ImageDownsamplingProcessor {
-    public struct ProcessedImage {
-        /// WebP Data
+public struct ImageDownsamplingProcessor: Sendable {
+    public struct ProcessedImage: Sendable {
+        /// JPEG Data
         public let data: Data
     }
     
     /// 목표 해상도: 4096px (4K)
     /// Presigned URL 최대 용량: 5GB
     private static let maxDimensionInPixels: CGFloat = 4096
+    
+    private init() {}
     
     nonisolated public static func process(data: Data) async -> ProcessedImage? {
         guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
@@ -37,7 +39,7 @@ public struct ImageDownsamplingProcessor {
         guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, .zero, options as CFDictionary) else { return nil }
         let mutableData = NSMutableData()
         
-        guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.webP.identifier as CFString, 1, nil) else { return nil }
+        guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
         let webPOptions: [CFString: Any] = [
             kCGImageDestinationLossyCompressionQuality: 0.8 // 80% 압축
         ]

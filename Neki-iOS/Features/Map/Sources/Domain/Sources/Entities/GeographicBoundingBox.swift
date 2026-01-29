@@ -13,6 +13,8 @@ public struct GeographicBoundingBox: Equatable, Sendable {
     let maxLatitude: Double
     let maxLongitude: Double
     
+    var center: GeographicCoordinate { .init(latitude: (minLatitude + maxLatitude) / 2, longitude: (minLongitude + maxLongitude) / 2) }
+    
     init(minLatitude: Double, minLongitude: Double, maxLatitude: Double, maxLongitude: Double) {
         precondition(GeographicLimit.isValidLatitude(minLatitude), "최소 위도\(minLatitude)는 유효하지 않습니다.")
         precondition(GeographicLimit.isValidLatitude(maxLatitude), "최대 위도\(maxLatitude)는 유효하지 않습니다.")

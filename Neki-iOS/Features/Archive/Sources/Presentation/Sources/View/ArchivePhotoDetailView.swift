@@ -41,8 +41,8 @@ struct ArchivePhotoDetailView: View {
         .nekiAlert(
             isPresented: $showDeleteAlert,
             style: .cancelable,
-            titleMessage: "사진을 삭제하시겠어요?",
-            subTitleMessage: "이 작업은 실행취소할 수 없어요",
+            title: "사진을 삭제하시겠어요?",
+            subtitle: "이 작업은 실행취소할 수 없어요",
             confirmText: "삭제하기",
             cancelText: "취소",
             onConfirm: {

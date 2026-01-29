@@ -21,6 +21,7 @@ struct QRCodeScanFeature {
         var scannedImage: UIImage? // TODO: 임시코드
         
         var isManualDownloadNeededAlertPresented: Bool = false
+        var isUnsupportedBrandAlertPresented: Bool = false
         var isWebViewPresented: Bool = false
     }
     
@@ -29,6 +30,7 @@ struct QRCodeScanFeature {
         case closeButtonTapped
         case lightButtonTapped
         case codeScanned(String)
+        case openSuggestBrandPage
         
         // WebView & Alert Actions
         case openWebViewButtonTapped
@@ -38,12 +40,16 @@ struct QRCodeScanFeature {
         case processResult(Result<ParsedQRResult, Error>)
         case imageProcessingResult(ImageDownsamplingProcessor.ProcessedImage?)
         
+        // Delegate Actions
+        case addPhotoFromGalleryButtonTapped
+        
         // Binding Actions
         case binding(BindingAction<State>)
     }
     
     @Dependency(\.dismiss) private var dismiss
     @Dependency(\.qrScannerClient) private var qrScannerClient
+    @Dependency(\.openURL) private var openURL
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -80,17 +86,24 @@ struct QRCodeScanFeature {
                 
                 Logger.domain.error("QR 파싱 전략 실패: \(error.localizedDescription)")
                 
-                if let qrError = error as? QRParseError,
-                   case let .fallbackToWebView(url) = qrError {
+                guard let qrError = error as? QRParseError else {
+                    Logger.presentation.error("❌ 알 수 없는 QR스캔 에러 발생: \(error)")
+                    // TODO: 사용자에게 토스트 메시지 표시
+                    return .none
+                }
+                
+                if case let .fallbackToWebView(url) = qrError {
                     Logger.presentation.notice("⚠️ 웹뷰 폴백 UI 활성화: \(url.absoluteString)")
                     state.webViewURL = url
                     state.isManualDownloadNeededAlertPresented = true
                     return .none
                 }
                 
-                Logger.presentation.error("❌ 지원하지 않거나 유효하지 않은 QR")
-                // TODO: 사용자에게 토스트 메시지 표시
-                return .none
+                if case .unsupportedBrand = qrError {
+                    Logger.presentation.notice("⚠️ 비지원 브랜드 인식됨")
+                    state.isUnsupportedBrandAlertPresented = true
+                    return .none
+                }
                 
             case let .imageProcessingResult(processed):
                 state.isLoading = false
@@ -123,6 +136,13 @@ struct QRCodeScanFeature {
             case let .webViewImageDownloadResult(.failure(error)):
                 print("웹뷰 다운로드 실패: \(error)")
                 return .none
+                
+            case .openSuggestBrandPage:
+                Logger.presentation.debug("브랜드 제안 페이지 이동 요청")
+                return .run { _ in
+                    guard let url = URL(string: "https://tally.so/r/0QekXy") else { return }
+                    await openURL(url)
+                }
                 
             default:
                 return .none

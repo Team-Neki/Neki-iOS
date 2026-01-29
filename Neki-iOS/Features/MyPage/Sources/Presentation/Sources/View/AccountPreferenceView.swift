@@ -32,24 +32,26 @@ struct AccountPreferenceView: View {
         .nekiAlert(
             isPresented: $isLogoutAlertPresented,
             style: .cancelable,
-            titleMessage: "로그아웃 하시겠습니까?",
-            subTitleMessage: "다시 로그인해야 서비스를 이용할 수 있어요.",
+            title: "로그아웃 하시겠습니까?",
+            subtitle: "다시 로그인해야 서비스를 이용할 수 있어요.",
             confirmText: "확인",
             cancelText: "취소",
-            isProcessing: false, // TODO: 실제 비동기 작업 상태를 주입해야 합니다.
+            isProcessing: false,
+            hasIcon: false,
             onConfirm: { store.send(.logoutButtonTapped) },
-            onCancel: { isLogoutAlertPresented.toggle() }
+            onCancel: { isLogoutAlertPresented = false }
         )
         .nekiAlert(
             isPresented: $isUnregisterAlertPresented,
             style: .cancelable,
-            titleMessage: "정말 탈퇴하시겠어요?",
-            subTitleMessage: "계정을 탈퇴하면 사진과 정보가 모두 삭제되며, 삭제된 데이터는 복구할 수 없어요.",
+            title: "정말 탈퇴하시겠어요?",
+            subtitle: "계정을 탈퇴하면 사진과 정보가 모두 삭제되며, 삭제된 데이터는 복구할 수 없어요.",
             confirmText: "탈퇴 확정",
             cancelText: "취소",
-            isProcessing: false, // TODO: 여기도 마찬가지로 실제 작업 상태 주입
+            isProcessing: false,
+            hasIcon: false,
             onConfirm: { store.send(.unregisterButtonTapped) },
-            onCancel: { isUnregisterAlertPresented.toggle() }
+            onCancel: { isUnregisterAlertPresented = false }
         )
     }
 }

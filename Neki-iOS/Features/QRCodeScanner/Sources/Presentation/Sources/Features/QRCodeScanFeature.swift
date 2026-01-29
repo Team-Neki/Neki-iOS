@@ -18,7 +18,6 @@ struct QRCodeScanFeature {
         var isLoading: Bool = false
         
         var webViewURL: URL?
-        var scannedImage: UIImage? // TODO: 임시코드
         
         var isManualDownloadNeededAlertPresented: Bool = false
         var isUnsupportedBrandAlertPresented: Bool = false
@@ -38,7 +37,7 @@ struct QRCodeScanFeature {
         
         // Internal Actions
         case processResult(Result<ParsedQRResult, Error>)
-        case imageProcessingResult(ImageDownsamplingProcessor.ProcessedImage?)
+        case imageProcessingResult(Int?)
         
         // Delegate Actions
         case addPhotoFromGalleryButtonTapped
@@ -77,8 +76,10 @@ struct QRCodeScanFeature {
                 Logger.domain.info("✅ QR 파싱 성공: \(parsed.brand.displayName)")
                 
                 return .run { send in
-                    let processed = await qrScannerClient.processImage(parsed.originalImage)
-                    await send(.imageProcessingResult(processed))
+                    guard let processedID = try await qrScannerClient.processImage(parsed.originalImage).first else {
+                        return await send(.imageProcessingResult(nil))
+                    }
+                    await send(.imageProcessingResult(processedID))
                 }
                 
             case let .processResult(.failure(error)):
@@ -105,15 +106,7 @@ struct QRCodeScanFeature {
                     return .none
                 }
                 
-            case let .imageProcessingResult(processed):
-                state.isLoading = false
-                // TODO: 이미지 표시 하지말고 즉시 S3로 전송해야함 (WIP)
-                guard let data = processed?.data, let image = UIImage(data: data) else {
-                    Logger.data.error("❌ 이미지 데이터 변환 실패")
-                    return .none
-                }
-                state.scannedImage = image
-                Logger.data.info("🎉 최종 이미지 확보 완료 (Size: \(data.count) bytes)")
+                // TODO: 토스트 띄우기
                 return .none
                 
             case .openWebViewButtonTapped:
@@ -127,10 +120,10 @@ struct QRCodeScanFeature {
                 Logger.data.debug("웹뷰에서 이미지 데이터 수신 성공")
                 
                 return .run { send in
-                    guard let processed = await qrScannerClient.processImage(data) else {
+                    guard let processedID = try await qrScannerClient.processImage(data).first else {
                         return await send(.imageProcessingResult(nil))
                     }
-                    return await send(.imageProcessingResult(processed))
+                    await send(.imageProcessingResult(processedID))
                 }
                 
             case let .webViewImageDownloadResult(.failure(error)):

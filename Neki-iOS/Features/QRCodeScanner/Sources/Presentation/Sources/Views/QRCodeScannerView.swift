@@ -48,14 +48,6 @@ struct QRCodeScannerView: View {
             if store.isWebViewPresented, let url = store.webViewURL {
                 webViewLayer(url: url)
             }
-            
-            // TODO: 임시 코드
-            if let image = store.scannedImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .padding()
-            }
         }
         .nekiAlert(
             isPresented: $store.isManualDownloadNeededAlertPresented,

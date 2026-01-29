@@ -112,6 +112,9 @@ struct ArchiveView: View {
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
         }
+        .fullScreenCover(item: $store.scope(state: \.qrScanner, action: \.qrScanner)) { store in
+            QRCodeScannerView(store: store)
+        }
         .transaction { transaction in
             transaction.disablesAnimations = true
         }
@@ -337,3 +340,6 @@ private extension TextField {
 }
 
 
+#Preview {
+    ArchiveCoordinatorView(store: .init(initialState: ArchiveCoordinator.State(), reducer: { ArchiveCoordinator() }))
+}

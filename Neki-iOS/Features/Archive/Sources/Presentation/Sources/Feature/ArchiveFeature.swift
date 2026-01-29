@@ -101,7 +101,6 @@ struct ArchiveFeature {
         }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
-        Reduce { (state: inout State, action: Action) in
             /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
                 
@@ -113,18 +112,7 @@ struct ArchiveFeature {
                     state.photos.isEmpty ? .send(.fetchPhotos(isRefresh: true)) : .none
                 )
                 
-                
                 // MARK: - User Action
-                if state.albums.isEmpty {
-                    let loadedAlbums = IdentifiedArray(uniqueElements: AlbumItem.dummyData())
-                    state.$albums.withLock { $0 = loadedAlbums }
-                }
-                if state.photos.isEmpty {
-                    let loadedPhotos = IdentifiedArray(uniqueElements: ArchiveImageItem.dummyData())
-                    state.$photos.withLock { $0 = loadedPhotos }
-                }
-                
-                return .none
                 
             case .toggleDropDownMenu:
                 state.showDropDownMenu.toggle()

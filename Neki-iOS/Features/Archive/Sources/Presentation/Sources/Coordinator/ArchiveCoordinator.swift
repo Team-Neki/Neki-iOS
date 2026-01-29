@@ -55,7 +55,7 @@ struct ArchiveCoordinator {
                 
             case .root(.onTapAllAlbums):
                 state.path.append(.allAlbums(
-                    ArchiveAllAlbumsFeature.State(albums: state.root.$albums)
+                    ArchiveAllAlbumsFeature.State(albums: state.root.$albums, photos: state.root.$photos)
                 ))
                 return .none
                 

@@ -14,7 +14,7 @@ public enum ArchiveEndpoint {
     case getFavoriteAlbumInfo
     case getAlbumList
     case addFolder(request: AddFolderDTO.Request)
-    case deleteFolders(request: DeleteFoldersRequestDTO)
+    case deleteFolders(request: DeleteFoldersRequestDTO, deletePhotos: Bool)
     case getFavoritePhotoList(request: PhotoListDTO.Request)
     case toggleFavorite(photoID: Int, request: ToggleFavoriteDTO)
 }
@@ -75,6 +75,12 @@ extension ArchiveEndpoint: Endpoint {
             
             return params.isEmpty ? nil : params
             
+        case .deleteFolders(_, let deletePhotos):
+            var params: [String: String] = [:]
+            params["deletePhotos"] = "\(deletePhotos.description)"
+            
+            return params
+            
         default:
             return nil
         }
@@ -117,7 +123,7 @@ extension ArchiveEndpoint: Endpoint {
             return nil
         case .addFolder(let request):
             return request
-        case .deleteFolders(let request):
+        case .deleteFolders(let request, _):
             return request
         case .getFavoritePhotoList:
             return nil

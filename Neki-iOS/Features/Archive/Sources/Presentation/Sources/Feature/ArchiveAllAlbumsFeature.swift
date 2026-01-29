@@ -14,6 +14,7 @@ struct ArchiveAllAlbumsFeature {
     @ObservableState
     struct State {
         @Shared var albums: IdentifiedArrayOf<AlbumItem>
+        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
         
         var isSelectMode: Bool = false
         var selectedAlbumIDs: Set<Int> = []
@@ -40,6 +41,9 @@ struct ArchiveAllAlbumsFeature {
         // 앨범 삭제 액션
         case onTapExecuteDelete(option: ArchiveAlbumDeleteOption)
         case deleteFoldersResponse(Result<Void, Error>)
+        
+        case fetchPhotos
+        case photoListResponse(Result<[ArchiveImageItem], Error>)
         
         // 앨범 생성 액션
         case onTapCancelAddAlbum
@@ -99,15 +103,11 @@ struct ArchiveAllAlbumsFeature {
                     return .send(.onTapExitDeleteMode)
                 }
                 
-                if option == .withPhotos {
-                    // 사진도 함께 삭제
-                } else {
-                    // 앨범만 삭제
-                }
+                let shouldDeletePhotos = (option == .withPhotos)
                 
                 return .run { [ids = state.selectedAlbumIDs] send in
                     await send(.deleteFoldersResponse(Result {
-                        try await archiveClient.deleteFolders(folderIDs: Array(ids))
+                        try await archiveClient.deleteFolders(folderIDs: Array(ids), deletePhotos: shouldDeletePhotos)
                     }))
                 }
                 
@@ -122,12 +122,41 @@ struct ArchiveAllAlbumsFeature {
                 
                 return .merge(
                     .send(.delegate(.showToast(toastItem))),
-                    .send(.fetchAlbums)
+                    .send(.fetchAlbums),
+                    .send(.fetchPhotos)
                 )
                 
             case .deleteFoldersResponse(.failure):
                 let toastItem = NekiToastItem("앨범을 삭제하지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
+                
+            case .fetchPhotos:
+                return .run { send in
+                    await send(.photoListResponse(Result {
+                        let result = try await archiveClient.fetchPhotoList(folderId: nil, page: 0, size: 20, sortOrder: nil)
+                        
+                        let isoFormatter = ISO8601DateFormatter()
+                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                        
+                        return result.photos.map { entity in
+                            ArchiveImageItem(
+                                id: entity.photoID,
+                                imageURLString: entity.imageURL,
+                                isFavorite: entity.isfavorite,
+                                date: isoFormatter.date(from: entity.createdAt) ?? Date()
+                            )
+                        }
+                    }))
+                }
+                
+            case let .photoListResponse(.success(newPhotos)):
+                state.$photos.withLock { sharedPhotos in
+                    sharedPhotos = IdentifiedArray(uniqueElements: newPhotos)
+                }
+                return .none
+                
+            case .photoListResponse(.failure):
+                return .none
                 
             case .onTapCancelAddAlbum:
                 state.newAlbumTitle = ""

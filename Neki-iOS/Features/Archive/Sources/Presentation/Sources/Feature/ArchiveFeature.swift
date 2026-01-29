@@ -321,9 +321,9 @@ struct ArchiveFeature {
                 
                 let newItems = result.photos.map { entity in
                     ArchiveImageItem(
-                        id: entity.photoId,
-                        imageURLString: entity.imageUrl,
-                        isFavorite: entity.favorite,
+                        id: entity.photoID,
+                        imageURLString: entity.imageURL,
+                        isFavorite: entity.isfavorite,
                         date: isoFormatter.date(from: entity.createdAt) ?? Date()
                     )
                 }

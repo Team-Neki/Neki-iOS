@@ -17,7 +17,6 @@ struct ArchiveAlbumDetailFeature {
         let album: AlbumItem
         
         var selectedIDs: Set<Int> = []
-        var deleteOption: ArchivePhotoDeleteOption = .fromAlbumOnly
         
         var isSelectionMode: Bool = false
         
@@ -45,7 +44,7 @@ struct ArchiveAlbumDetailFeature {
         // 기능 액션
         case onTapDownloadButton
         
-        case onTapDeleteButton
+        case onTapDeleteButton(option: ArchivePhotoDeleteOption)
         case deletePhotos
         case deletePhotosResponse(Result<Void, Error>)
         
@@ -109,9 +108,9 @@ struct ArchiveAlbumDetailFeature {
                 
                 let newItems = result.photos.map { entity in
                     ArchiveImageItem(
-                        id: entity.photoId,
-                        imageURLString: entity.imageUrl,
-                        isFavorite: entity.favorite,
+                        id: entity.photoID,
+                        imageURLString: entity.imageURL,
+                        isFavorite: entity.isfavorite,
                         date: isoFormatter.date(from: entity.createdAt) ?? Date(),
                         folderId: currentAlbumId
                     )
@@ -157,8 +156,15 @@ struct ArchiveAlbumDetailFeature {
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
                 
-            case .onTapDeleteButton:
+            case let .onTapDeleteButton(option):
                 guard !state.selectedIDs.isEmpty else { return .none }
+                
+                if option == .fromAlbumOnly {
+                    // 앨범에서만 제거 로직
+                } else {
+                    // 전체 삭제 로직
+                }
+                
                 return .send(.deletePhotos)
                 
             case .deletePhotos:

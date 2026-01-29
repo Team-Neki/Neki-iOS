@@ -20,28 +20,15 @@ public enum ArchiveEndpoint {
 }
 
 extension ArchiveEndpoint: Endpoint {
-    public var authorizationType: AuthorizationType {
-        switch self {
-        default:
-            return .bearer
-        }
-    }
+    public var authorizationType: AuthorizationType { return .bearer }
     
-    public var contentType: HTTPContentType {
-        switch self {
-        default:
-            return .json
-        }
-    }
+    public var contentType: HTTPContentType { return .json }
     
     public var baseURL: String {
-        switch self {
-        default:
-            guard let urlString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
-                return NetworkError.invalidURLError.localizedDescription
-            }
-            return urlString
+        guard let urlString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
+            return NetworkError.invalidURLError.localizedDescription
         }
+        return urlString
     }
     
     public var path: String {
@@ -85,12 +72,6 @@ extension ArchiveEndpoint: Endpoint {
             if let page = request.page { params["page"] = String(page) }
             if let size = request.size { params["size"] = String(size) }
             if let sortOrder = request.sortOrder { params["sortOrder"] = sortOrder }
-            
-            return params.isEmpty ? nil : params
-            
-        case .toggleFavorite(let id, _):
-            var params: [String: String] = [:]
-            params["photoId"] = String(id)
             
             return params.isEmpty ? nil : params
             

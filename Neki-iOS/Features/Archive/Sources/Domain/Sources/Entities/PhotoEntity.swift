@@ -8,10 +8,10 @@
 import Foundation
 
 struct PhotoEntity {
-    let photoId: Int
-    let imageUrl: String
-    let folderId: Int?
-    let favorite: Bool
+    let photoID: Int
+    let imageURL: String
+    let folderID: Int?
+    let isfavorite: Bool
     let contentType: String
     let createdAt: String
 }

@@ -17,7 +17,6 @@ struct ArchiveAllAlbumsFeature {
         
         var isSelectMode: Bool = false
         var selectedAlbumIDs: Set<Int> = []
-        var deleteOption: ArchiveAlbumDeleteOption = .withPhotos
         
         var newAlbumTitle: String = ""
         var albumTitleErrorMessage: String? = nil
@@ -39,7 +38,7 @@ struct ArchiveAllAlbumsFeature {
         case onTapToggleSelection(AlbumItem)
         
         // 앨범 삭제 액션
-        case onTapExecuteDelete
+        case onTapExecuteDelete(option: ArchiveAlbumDeleteOption)
         case deleteFoldersResponse(Result<Void, Error>)
         
         // 앨범 생성 액션
@@ -95,9 +94,15 @@ struct ArchiveAllAlbumsFeature {
                 }
                 return .none
                 
-            case .onTapExecuteDelete:
+            case let .onTapExecuteDelete(option):
                 guard !state.selectedAlbumIDs.isEmpty else {
                     return .send(.onTapExitDeleteMode)
+                }
+                
+                if option == .withPhotos {
+                    // 사진도 함께 삭제
+                } else {
+                    // 앨범만 삭제
                 }
                 
                 return .run { [ids = state.selectedAlbumIDs] send in

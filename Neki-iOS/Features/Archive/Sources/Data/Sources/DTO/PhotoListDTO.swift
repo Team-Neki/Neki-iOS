@@ -24,10 +24,10 @@ public enum PhotoListDTO {
         func toEntity() -> [PhotoEntity] {
             return items.map {
                 PhotoEntity(
-                    photoId: $0.photoID,
-                    imageUrl: $0.imageURL,
-                    folderId: $0.folderID,
-                    favorite: $0.favorite,
+                    photoID: $0.photoID,
+                    imageURL: $0.imageURL,
+                    folderID: $0.folderID,
+                    isfavorite: $0.favorite,
                     contentType: $0.contentType,
                     createdAt: $0.createdAt
                 )

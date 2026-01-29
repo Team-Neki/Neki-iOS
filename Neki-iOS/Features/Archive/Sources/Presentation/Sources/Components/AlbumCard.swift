@@ -17,24 +17,24 @@ struct AlbumCard: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            if let url = album.coverImageURL {
-                KFImage(url)
-                    .resizable()
-                    .retry(maxCount: 3, interval: .seconds(5))
-                    .onFailure { error in
-                        Logger.presentation.error("앨범이미지 로드 실패: \(error)")
-                        Logger.presentation.error("실패한 앨범이미지 id: \(album.id)")
-                    }
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: cardWidth, height: cardHeight)
-                    .clipped()
-            } else {
-                Image(.temporaryBranding) // TODO: 준비한 기본 이미지 에셋 이름으로 변경
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: cardWidth, height: cardHeight)
-                    .clipped()
-            }
+            KFImage(album.coverImageURL)
+                .placeholder({
+                    Image(.temporaryBranding)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardWidth, height: cardHeight)
+                        .clipped()
+                })
+                .onFailureImage(.temporaryBranding)
+                .resizable()
+                .retry(maxCount: 3, interval: .seconds(5))
+                .onFailure { error in
+                    Logger.presentation.error("앨범이미지 로드 실패: \(error)")
+                    Logger.presentation.error("실패한 앨범이미지 id: \(album.id)")
+                }
+                .aspectRatio(contentMode: .fill)
+                .frame(width: cardWidth, height: cardHeight)
+                .clipped()
             
             UnionShape()
                 .fill(album.isFavorite ? .primary400.opacity(0.9) : .gray900.opacity(0.9))

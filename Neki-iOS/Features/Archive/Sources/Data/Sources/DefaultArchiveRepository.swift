@@ -65,7 +65,7 @@ struct DefaultArchiveRepository: ArchiveRepository {
         }
         
         let entities: [AlbumEntity] = data.items.map {
-            AlbumEntity(id: $0.folderID, name: $0.name)
+            AlbumEntity(id: $0.folderID, name: $0.name, photoCount: $0.totalCount, coverImageURLString: $0.latestImageURL ?? "")
         }
         
         return entities

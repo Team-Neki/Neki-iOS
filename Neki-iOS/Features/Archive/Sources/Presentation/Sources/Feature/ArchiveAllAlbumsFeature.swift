@@ -169,8 +169,8 @@ struct ArchiveAllAlbumsFeature {
                                     AlbumItem(
                                         id: $0.id,
                                         title: $0.name,
-                                        count: 0,
-                                        coverImageURL: nil,
+                                        count: $0.photoCount,
+                                        coverImageURL: URL(string: $0.coverImageURLString),
                                         isFavorite: false
                                     )
                                 }

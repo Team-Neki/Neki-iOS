@@ -206,6 +206,7 @@ struct ArchiveFeature {
                         return .run { send in
                             await send(.delegate(.showToast(toast)))
                             await send(.fetchPhotos(isRefresh: true))
+                            await send(.fetchAlbums)
                             
                             /// fullScreenCover가 내려가고 전환해야 사진이 잘 불러와짐
                             /// fullScreenCover가 내려가는 0.35초보다 빨리 전환 시 사진이 fetch가 안 돼서 빈 화면만 보임
@@ -217,6 +218,7 @@ struct ArchiveFeature {
                     
                     return .run { send in
                         await send(.delegate(.showToast(toast)))
+                        await send(.fetchAlbums)
                         await send(.fetchPhotos(isRefresh: true))
                     }
                     
@@ -264,8 +266,8 @@ struct ArchiveFeature {
                                 AlbumItem(
                                     id: $0.id,
                                     title: $0.name,
-                                    count: 0,
-                                    coverImageURL: URL(string: ""), // TODO: - 없을 시 브랜딩 이미지로 변경
+                                    count: $0.photoCount,
+                                    coverImageURL: URL(string: $0.coverImageURLString), // TODO: - 없으면 브랜딩 이미지
                                     isFavorite: false
                                 )
                             }

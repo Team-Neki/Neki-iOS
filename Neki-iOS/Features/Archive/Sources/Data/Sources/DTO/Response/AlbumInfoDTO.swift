@@ -14,9 +14,13 @@ public struct AlbumInfoDTO: Codable {
 public struct AlbumInfoData: Codable {
     let folderID: Int
     let name: String
+    let latestImageURL: String?
+    let totalCount: Int
 
     enum CodingKeys: String, CodingKey {
         case folderID = "folderId"
         case name
+        case latestImageURL = "latestImageUrl"
+        case totalCount
     }
 }

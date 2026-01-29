@@ -10,6 +10,6 @@ import Foundation
 struct AlbumEntity {
     let id: Int
     let name: String
-//    let count: Int
-//    let cover: String
+    let photoCount: Int
+    let coverImageURLString: String
 }

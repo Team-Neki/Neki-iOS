@@ -19,8 +19,8 @@ struct ArchiveClient {
     public var addFolder: (_ name: String) async throws -> Int
     public var deleteFolders: (_ folderIDs: [Int], _ deletePhotos: Bool) async throws -> Void
     public var fetchFavoritePhotoList: (_ page: Int?, _ size: Int?, _ sortOrder: String?) async throws -> (photos: [PhotoEntity], hasNext: Bool)
-    
     public var toggleFavorite: (_ photoID: Int, _ request: Bool) async throws -> Void
+    public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -67,6 +67,10 @@ extension ArchiveClient: DependencyKey {
             return try await archiveRepository.toggleFavorite(photoID: photoID, request: request)
         }
         
+        func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws -> Void {
+            try await archiveRepository.excludePhotosInAlbum(albumID: albumID, photoIDs: photoIDs)
+        }
+        
         return ArchiveClient(
             fetchPhotoList: fetchPhotoList,
             deletePhotoList: deletePhotoList,
@@ -76,7 +80,8 @@ extension ArchiveClient: DependencyKey {
             addFolder: addFolder,
             deleteFolders: deleteFolders,
             fetchFavoritePhotoList: fetchFavoritePhotoList,
-            toggleFavorite: toggleFavorite
+            toggleFavorite: toggleFavorite,
+            excludePhotosInAlbum: excludePhotosInAlbum
         )
     }
 }

@@ -12,7 +12,7 @@ struct ArchiveImageItem: Equatable, Identifiable {
     let imageURL: URL?
     var isFavorite: Bool
     let date: Date
-    let folderId: Int?
+    var folderId: Int?
     
     init(id: Int, imageURL: URL?, isFavorite: Bool = false, date: Date = Date(), folderId: Int? = nil) {
             self.id = id

@@ -68,7 +68,7 @@ struct ArchiveCoordinator {
                     ))
                 } else {
                     state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
                     ))
                 }
                 return .none
@@ -82,7 +82,7 @@ struct ArchiveCoordinator {
                     ))
                 } else {
                     state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
                     ))
                 }
                 return .none
@@ -112,7 +112,7 @@ struct ArchiveCoordinator {
                     ))
                 } else {
                     state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, album: album)
+                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
                     ))
                 }
                 return .none

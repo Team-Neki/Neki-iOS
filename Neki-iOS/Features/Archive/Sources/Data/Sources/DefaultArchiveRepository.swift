@@ -103,6 +103,12 @@ struct DefaultArchiveRepository: ArchiveRepository {
         let endpoint = ArchiveEndpoint.toggleFavorite(photoID: photoID, request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
     }
+    
+    func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws {
+        let request = DeletePhotoRequestDTO(photoIds: photoIDs)
+        let endpoint = ArchiveEndpoint.excludePhotosInAlbum(albumID: albumID, request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+    }
 }
 
 private enum ArchiveRepositoryKey: DependencyKey {

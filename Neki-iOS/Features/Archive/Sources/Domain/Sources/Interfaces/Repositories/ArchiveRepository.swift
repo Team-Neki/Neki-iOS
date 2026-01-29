@@ -17,4 +17,5 @@ protocol ArchiveRepository {
     func deleteFolders(folderIDs: [Int], deletePhotos: Bool) async throws
     func fetchFavoritePhotoList(page: Int?, size: Int?, sortOrder: String?) async throws -> (photos: [PhotoEntity], hasNext: Bool)
     func toggleFavorite(photoID: Int, request: Bool) async throws
+    func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws
 }

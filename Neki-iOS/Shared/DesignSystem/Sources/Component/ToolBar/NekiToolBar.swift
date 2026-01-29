@@ -7,163 +7,137 @@
 
 import SwiftUI
 
-public struct NekiToolBar: View {
-    
-    // MARK: - Enums
-    
-    public enum LeftItem {
-        case none
-        case back(action: () -> Void)
-        case close(action: () -> Void)
-        case text(String, action: (() -> Void)?)
-        case icon(UIImage, action: (() -> Void)?)
+public enum NekiToolBar {
+    public static func back(action: @escaping () -> Void) -> some View {
+        Items.Back(action: action)
     }
     
-    public enum CenterItem {
-        case none
-        case text(String)
+    public static func close(action: @escaping () -> Void) -> some View {
+        Items.Close(action: action)
     }
     
-    public enum RightItem {
-        case none
-        case text(String, action: () -> Void)
-        case icon(UIImage, action: () -> Void)
-        case both([RightItem])
+    public static func textLeft(_ title: String, action: (() -> Void)? = nil) -> some View {
+        Items.Title(title: title, action: action)
     }
     
-    // MARK: - Properties
-    
-    let leftItem: LeftItem
-    let centerItem: CenterItem
-    let rightItem: RightItem
-    let backgroundColor: Color
-    
-    // MARK: - init
-    
-    public init(
-        leftItem: LeftItem,
-        centerItem: CenterItem,
-        rightItem: RightItem,
-        backgroundColor: Color = .white
-    ) {
-        self.leftItem = leftItem
-        self.centerItem = centerItem
-        self.rightItem = rightItem
-        self.backgroundColor = backgroundColor
+    public static func textCenter(_ title: String, action: (() -> Void)? = nil) -> some View {
+        Items.Title(title: title, action: action)
     }
     
-    // MARK: - Body
+    /// 우측 텍스트 버튼 (활성화/비활성화 상태 지원)
+    public static func textRight(_ title: String, isEnabled: Bool = true, action: @escaping () -> Void) -> some View {
+        Items.TextButton(title: title, isEnabled: isEnabled, action: action)
+    }
     
-    public var body: some View {
-        ZStack(alignment: .center) {
-            HStack(alignment: .center, spacing: 0) {
-                leftView
-                Spacer()
-                rightView
-            }
-            .frame(height: 54)
-            .padding(.horizontal, 20)
-            
-            centerView
+    public static func icon(_ image: UIImage, action: (() -> Void)? = nil) -> some View {
+        Items.Icon(image: image, action: action)
+    }
+    
+    public static func items<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            content()
         }
-        .background(backgroundColor)
-        .frame(height: 54)
     }
-    
 }
 
 
 // MARK: - Subviews
 
-private extension NekiToolBar {
-    @ViewBuilder
-    var leftView: some View {
-        switch leftItem {
-        case .none:
-            EmptyView()
-        case .back(let action):
-            Button(action: action) {
-                Image(.iconChevronLeft)
+extension NekiToolBar {
+    enum Items {
+        struct Back: View {
+            let action: () -> Void
+            var body: some View {
+                Button(action: action) { Image(.iconChevronLeft) }
             }
-        case .close(let action):
-            Button(action: action) {
-                Image(.iconXmarkBlack)
+        }
+        
+        struct Close: View {
+            let action: () -> Void
+            var body: some View {
+                Button(action: action) { Image(.iconXmarkBlack) }
             }
-        case .text(let title, let action):
-            Button {
+        }
+        
+        struct Title: View {
+            let title: String
+            let action: (() -> Void)?
+            
+            var body: some View {
                 if let action = action {
-                    action()
+                    Button(action: action) { content }
+                } else {
+                    content
                 }
-            } label: {
+            }
+            
+            var content: some View {
                 Text(title)
                     .nekiFont(.title18SemiBold)
                     .foregroundStyle(.gray900)
             }
-        case .icon(let image, let action):
-            Button {
-                if let action = action {
-                    action()
+        }
+        
+        struct TextButton: View {
+            let title: String
+            let isEnabled: Bool
+            let action: () -> Void
+            
+            var body: some View {
+                Button(action: action) {
+                    Text(title)
+                        .nekiFont(.body16SemiBold)
+                        .foregroundStyle(isEnabled ? .primary500 : .gray400)
                 }
-            } label: {
-                Image(uiImage: image)
+                .disabled(!isEnabled)
             }
         }
-    }
-    
-    @ViewBuilder
-    var centerView: some View {
-        switch centerItem {
-        case .none:
-            EmptyView()
-        case .text(let title):
-            Text(title)
-                .nekiFont(.title18SemiBold)
-                .foregroundStyle(.gray900)
-        }
-    }
-    
-    @ViewBuilder
-    var rightView: some View {
-        switch rightItem {
-        case .none:
-            EmptyView()
+        
+        struct Icon: View {
+            let image: UIImage
+            let action: (() -> Void)?
             
-        case .text(let title, let action):
-            Button(action: action) {
-                Text(title)
-                    .nekiFont(.body16SemiBold)
-                    .foregroundStyle(.primary500)
-            }
-            
-        case .icon(let image, let action):
-            Button(action: action) {
-                Image(uiImage: image)
-            }
-            
-        case .both(let items):
-            HStack(alignment: .center, spacing: 12) {
-                ForEach(0..<items.count, id: \.self) { index in
-                    makeRightItem(items[index])
+            var body: some View {
+                Button {
+                    action?()
+                } label: {
+                    Image(uiImage: image)
                 }
             }
         }
     }
+}
+
+public struct NekiToolbarLayout<Left: View, Center: View, Right: View>: View {
+    let left: Left
+    let center: Center
+    let right: Right
+    let backgroundColor: Color
     
-    @ViewBuilder
-    func makeRightItem(_ item: RightItem) -> some View {
-        switch item {
-        case .text(let title, let action):
-            Button(action: action) {
-                Text(title)
-                    .nekiFont(.body16SemiBold)
-                    .foregroundStyle(.primary500)
+    public init(
+        backgroundColor: Color = .white,
+        @ViewBuilder left: () -> Left,
+        @ViewBuilder center: () -> Center,
+        @ViewBuilder right: () -> Right
+    ) {
+        self.backgroundColor = backgroundColor
+        self.left = left()
+        self.center = center()
+        self.right = right()
+    }
+    
+    public var body: some View {
+        ZStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 0) {
+                left
+                Spacer()
+                right
             }
-        case .icon(let image, let action):
-            Button(action: action) {
-                Image(uiImage: image)
-            }
-        default:
-            EmptyView()
+            .padding(.horizontal, 20)
+            
+            center
         }
+        .background(backgroundColor)
+        .frame(height: 54)
     }
 }

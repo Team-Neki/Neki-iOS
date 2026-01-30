@@ -35,8 +35,8 @@ extension PoseClient: DependencyKey {
             try await poseRepository.initializeRandomPoseBuffer(peopleCount: peopleCount)
         } startRandomPoseSuggestion: { direction in
             switch direction {
-            case .left: return try await poseRepository.fetchNextRandomPose()
-            case .right: return try await poseRepository.fetchPreviousRandomPose()
+            case .left: return try await poseRepository.fetchPreviousRandomPose()
+            case .right: return try await poseRepository.fetchNextRandomPose()
             }
         } stopRandomPoseSuggestion: {
             await poseRepository.flushRandomPoseBuffer()

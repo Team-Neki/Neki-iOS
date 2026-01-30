@@ -15,7 +15,7 @@ struct ArchiveAllPhotosView: View {
     @State private var lastDragPoint: CGFloat = 0
     @State var showDropDownMenu: Bool = false
     @State var showDeleteAlert: Bool = false
-
+    
     
     var body: some View {
         ZStack(alignment: .top) {
@@ -65,6 +65,9 @@ struct ArchiveAllPhotosView: View {
             }
         )
         .background(.white)
+        .task {
+            await store.send(.onAppear).finish()
+        }
     }
 }
 
@@ -72,17 +75,29 @@ private extension ArchiveAllPhotosView {
     @ViewBuilder
     var masonryView: some View {
         ScrollView {
-            MasonryGridView(
-                items: Array(store.filteredItems),
-                columns: 2
-            ) { item in
-                ArchiveImageCard(
-                    item: item,
-                    isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id)
-                )
-                .onTapGesture {
-                    store.send(.imageTapped(item))
+            VStack(alignment: .leading, spacing: 0) {
+                MasonryGridView(
+                    items: Array(store.filteredItems),
+                    columns: 2,
+                ) { item in
+                    ArchiveImageCard(
+                        item: item,
+                        isSelectionMode: store.isSelectionMode,
+                        isSelected: store.selectedIDs.contains(item.id)
+                    )
+                    .onTapGesture {
+                        store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        if item == store.filteredItems.last {
+                            store.send(.loadMorePhotos)
+                        }
+                    }
+                }
+                
+                if store.isFetchingPhotos && !store.photos.isEmpty {
+                    ProgressView()
+                        .padding(.vertical, 20)
                 }
             }
             .padding(.horizontal, 20)

@@ -10,12 +10,11 @@ import ComposableArchitecture
 
 struct ArchiveFavoriteAlbumView: View {
     @Bindable var store: StoreOf<ArchiveFavoriteAlbumFeature>
-
+    
     @State var showDeleteAlert: Bool = false
     
     var body: some View {
         ZStack(alignment: .top) {
-//            if store.filteredItems.isEmpty {
             if store.album.count == 0 {
                 ArchiveEmptyView()
                     .padding(.bottom, 54)
@@ -34,12 +33,13 @@ struct ArchiveFavoriteAlbumView: View {
                 }
             }
         }
+        .task { await store.send(.onAppear).finish() }
         .nekiToolbar(
             left: .back(action: { store.send(.onTapBackButton) }),
             center: .text(store.album.title),
             right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
                 .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
-                .text("선택", action: { store.send(.onTapSelectButton) })
+                    .text("선택", action: { store.send(.onTapSelectButton) })
         )
         .nekiAlert(
             isPresented: $showDeleteAlert,
@@ -75,6 +75,11 @@ private extension ArchiveFavoriteAlbumView {
                 )
                 .onTapGesture {
                     store.send(.imageTapped(item))
+                }
+                .onAppear {
+                    if item == store.filteredItems.last {
+                        store.send(.loadMorePhotos)
+                    }
                 }
             }
             .padding(.horizontal, 20)

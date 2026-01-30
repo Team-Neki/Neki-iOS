@@ -94,6 +94,7 @@ struct RandomPoseCarouselFeature {
                 state.isLoading = false
                 // TODO: 플로터 띄...
                 Logger.presentation.error("Random Pose Fetching Failed: \(error)")
+                // TODO: 만약 NoHistory 에러면 그냥 이전 포즈사진이 없다는 거니까 무시하거나 플로터 띄워서 알려주면 될듯
                 return .none
                 
             case let .scrapResponse(id, .failure(error)):

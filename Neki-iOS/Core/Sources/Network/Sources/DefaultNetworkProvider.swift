@@ -24,6 +24,7 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     ) {
         self.session = session
         self.tokenStorage = tokenStorage
+        decoder.dateDecodingStrategy = .iso8601
         self.decoder = decoder
     }
     

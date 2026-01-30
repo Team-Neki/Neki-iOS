@@ -7,6 +7,7 @@
 
 import Foundation
 import ComposableArchitecture
+import os
 
 @Reducer
 struct RandomPoseCarouselFeature {
@@ -14,31 +15,92 @@ struct RandomPoseCarouselFeature {
     struct State {
         @Shared(.appStorage("RandomPoseTutorial")) var isTutorialPresented: Bool = true
         
-        var poseImages: [String] = ["pose1", "pose2", "pose3", "pose4"]
-        var currentIndex: Int = .zero
+        var currentPose: Pose?
+        var isLoading: Bool = false
+        var activePeopleCount: PeopleCountOption
+        var isScrapped: Bool { currentPose?.isScrapped ?? false }
+        
+        init(peopleCount: PeopleCountOption) { activePeopleCount = peopleCount }
     }
     
     enum Action {
+        // Lifecycle Actions
+        case onAppear
+        case onDisappear
+        
         // View Actions
         case closeTutorialOverlay
+        case onTapClose
         case tapLeft, tapRight
+        case onTapScrap
+        case onTapDetail(Pose)
+        
+        // Internal Actions
+        case poseResponse(Result<Pose, Error>)
+        case scrapResponse(PoseID, Result<Void, Error>)
+        
+        // Delegate Actions
+        case poseUpdated(Pose)
     }
+    
+    @Dependency(\.poseClient) private var poseClient
+    @Dependency(\.dismiss) private var dismiss
     
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+            case .onAppear:
+                state.isLoading = true
+                return .run { [count = state.activePeopleCount] send in
+                    await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }))
+                }
+                
+            case .onDisappear:
+                return .run { _ in
+                    await poseClient.stopRandomPoseSuggestion()
+                }
+                
             case .closeTutorialOverlay:
                 state.$isTutorialPresented.withLock { $0 = false }
                 return .none
                 
+            case .onTapClose:
+                return .run { _ in await dismiss() }
+                
             case .tapLeft:
-                let previousIndex = state.currentIndex - 1
-                state.currentIndex = previousIndex < .zero ? state.poseImages.count - 1 : previousIndex
-                return .none
+                return .run { send in
+                    await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }))
+                }
                 
             case .tapRight:
-                let nextIndex = state.currentIndex + 1
-                state.currentIndex = nextIndex >= state.poseImages.count ? .zero : nextIndex
+                return .run { send in
+                    await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
+                }
+                
+            case .onTapScrap:
+                guard var pose = state.currentPose else { return .none }
+                pose.isScrapped.toggle()
+                state.currentPose = pose
+                return .run { [id = pose.id] send in
+                    try await poseClient.scrapPose(poseID: id)
+                }
+                
+            case let .poseResponse(.success(pose)):
+                state.isLoading = false
+                state.currentPose = pose
+                return .none
+                
+            case let .poseResponse(.failure(error)):
+                state.isLoading = false
+                // TODO: 플로터 띄...
+                Logger.presentation.error("Random Pose Fetching Failed: \(error)")
+                return .none
+                
+            case let .scrapResponse(id, .failure(error)):
+                Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
+                return .none
+                
+            default:
                 return .none
             }
         }

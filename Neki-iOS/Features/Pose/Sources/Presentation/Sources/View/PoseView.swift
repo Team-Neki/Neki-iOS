@@ -61,12 +61,16 @@ private extension PoseView {
     var masonryView: some View {
         ScrollView {
             MasonryGridView(
-                items: Array(store.filteredItems),
+                items: Array(store.filteredPoses),
                 columns: 2
             ) { item in
                 FeedImageView(item: item)
                     .onTapGesture {
                         store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        guard item == store.filteredPoses.last else { return }
+                        store.send(.loadMoreItems)
                     }
             }
             .padding(.horizontal, 20)
@@ -98,7 +102,7 @@ private extension PoseView {
             Button {
                 store.send(.onTapFilter)
             } label: {
-                Text(optionDisplayName(for: store.selectedCountFilterOption))
+                Text(store.selectedCountFilterOption?.displayName ?? "인원수")
             }
             .buttonStyle(
                 .nekiChip(
@@ -108,9 +112,8 @@ private extension PoseView {
                 )
             )
             
-            
             Button("스크랩") {
-                store.send(.onTapScrap)
+                store.send(.onTapScrapMode)
             }
             .buttonStyle(
                 .nekiChip(
@@ -216,7 +219,7 @@ private extension PoseView {
                     let selectFactor = 230.0 / contentWidth
                     
                     Button {
-                        // 취소 Action
+                        store.send(.binding(.set(\.sheetItem, nil)))
                     } label: {
                         Text("취소")
                             .lineLimit(1)
@@ -229,7 +232,7 @@ private extension PoseView {
                     }
                     
                     Button {
-                        // 선택 Action
+                        store.send(.onTapStartRandomPoseCarousel)
                     } label: {
                         Text("선택하기")
                     }
@@ -262,16 +265,6 @@ extension PoseView {
         case randomPoseCountSelection
         
         var id: Self { self }
-    }
-}
-
-
-// MARK: - Helpers
-
-private extension PoseView {
-    func optionDisplayName(for option: PeopleCountOption?) -> String {
-        guard let option else { return "인원수" }
-        return option.displayName
     }
 }
 

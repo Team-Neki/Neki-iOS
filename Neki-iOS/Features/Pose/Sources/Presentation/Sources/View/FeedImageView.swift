@@ -13,7 +13,7 @@ struct FeedImageView: View {
     
     //MARK: - Properties
 
-    let item: FeedImageItem
+    let item: Pose
     
     //MARK: - Main Body
     

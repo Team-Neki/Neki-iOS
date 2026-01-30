@@ -27,22 +27,7 @@ struct RandomPoseCarouselView: View {
             }
             .ignoresSafeArea()
             
-            // TODO: 랜덤포즈 사진 위치 이곳
-            Group {
-                if store.poseImages.isEmpty == false {
-                    color()
-                        // .resizable()
-                        .scaledToFit()
-                        .padding()
-                        .clipShape(.rect(cornerRadius: 20))
-                        .id(store.currentIndex)
-                        .transition(.opacity)
-                } else {
-                    // TODO: 랜덤포즈 로딩 안됐으면 버퍼 비어있을텐데, 그때 노출되는 에러페이지 / 절대 나와선 안됨 / 보완할 것!
-                    Text("404 not found")
-                }
-            }
-            .animation(.easeInOut(duration: 0.3), value: store.currentIndex)
+            mainContentView
             
             HStack(spacing: .zero) {
                 Color.clear
@@ -61,17 +46,8 @@ struct RandomPoseCarouselView: View {
             if store.isTutorialPresented { tutorialOverlay }
         }
         .animation(.easeInOut, value: store.isTutorialPresented)
-    }
-    
-    // TODO: 임시 메서드 / 추후 제거 대상
-    func color() -> Color {
-        switch store.poseImages[store.currentIndex] {
-        case "pose1": return .green
-        case "pose2": return .cyan
-        case "pose3": return .red
-        case "pose4": return .gray
-        default: return .yellow
-        }
+        .task { await store.send(.onAppear).finish() }
+        .onDisappear { store.send(.onDisappear) }
     }
 }
 
@@ -82,7 +58,7 @@ private extension RandomPoseCarouselView {
     var controlButtons: some View {
         HStack {
             Button {
-                
+                store.send(.onTapClose)
             } label: {
                 Image(.iconXmarkBlack)
                     .padding(12)
@@ -95,7 +71,8 @@ private extension RandomPoseCarouselView {
             Spacer()
             
             Button {
-                
+                guard let pose = store.currentPose else { return }
+                store.send(.onTapDetail(pose))
             } label: {
                 Image(.iconArrowOutward)
                     .padding(12)
@@ -106,9 +83,9 @@ private extension RandomPoseCarouselView {
             }
             
             Button {
-                
+                store.send(.onTapScrap)
             } label: {
-                Image(.iconBookmarkWhite) // TODO: 북마크 상태에 따라 아이콘 달라짐
+                Image(store.isScrapped ? .iconBookmarkFillWhite : .iconBookmarkWhite)
                     .padding(12)
                     .background {
                         Circle()
@@ -205,8 +182,18 @@ private extension RandomPoseCarouselView {
         .transition(.opacity)
         .zIndex(1)
     }
+    
+    var mainContentView: some View {
+        Group {
+            if let pose = store.currentPose {
+                
+            } else if store.isLoading {
+                
+            }
+        }
+    }
 }
 
 #Preview {
-    RandomPoseCarouselView(store: .init(initialState: RandomPoseCarouselFeature.State(), reducer: { RandomPoseCarouselFeature() }))
+    RandomPoseCarouselView(store: .init(initialState: RandomPoseCarouselFeature.State(peopleCount: .solo), reducer: { RandomPoseCarouselFeature() }))
 }

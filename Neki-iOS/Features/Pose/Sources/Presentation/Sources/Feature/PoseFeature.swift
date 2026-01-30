@@ -7,58 +7,74 @@
 
 import SwiftUI
 import ComposableArchitecture
+import os
 
 @Reducer
 struct PoseFeature {
     
     @ObservableState
     struct State: Equatable {
-        var items: IdentifiedArrayOf<FeedImageItem> = []
+        // Data
+        @ObservationStateIgnored var poses: IdentifiedArrayOf<Pose> = []
+        var filteredPoses: IdentifiedArrayOf<Pose> {
+            guard isSelectedScrap == false else { return poses.filter(\.isScrapped) }
+            guard let countOption = selectedCountFilterOption else { return poses }
+            return poses.filter { $0.peopleCountOption == countOption }
+        }
+        
+        // Pagination & Filter
+        var page: Int = .zero
+        @ObservationIgnored let pageSize: Int = 20
+        var isLoading: Bool = false
+        var isLastPage: Bool = false
+        
+        // Filter Options
         var selectedCountFilterOption: PeopleCountOption?
-        var selectedRandomPoseCountSelectionOption: PeopleCountOption? = .solo
-        var sheetItem: PoseView.SheetType? = .randomPoseCountSelection
         var isSelectedScrap: Bool = false
         
-        var filteredItems: IdentifiedArrayOf<FeedImageItem> {
-            if isSelectedScrap {
-                return items.filter { $0.isScrapped }
-            } else {
-                // TODO: - 인원수 필터 로직 추가
-                return items
-            }
-        }
+        // Sheet Presentation
+        var sheetItem: PoseView.SheetType?
+        var selectedRandomPoseCountSelectionOption: PeopleCountOption = .solo
     }
     
     enum Action: BindableAction {
-        // User Action
+        // User Actions
+        case onAppear
+        case loadMoreItems
         case onTapFilter
-        case onTapScrap
+        case onTapScrapMode
         case selectPeopleCount(PeopleCountOption)
         case selectPeopleCountForRandomPose(PeopleCountOption)
-        
-        // View Life Cycle Action
-        case onAppear
-        
-        // Navigation Action
-        case imageTapped(FeedImageItem)
         case onTapRandomPoseRecommend
+        case onTapStartRandomPoseCarousel
+        case imageTapped(Pose)
+        
+        // Data Actions
+        case fetchListResponse(Result<[Pose], Error>)
+        case toggleScrapResponse(PoseID, Result<Void, Error>)
+        
+        // Delegate Action
+        case updatePose(Pose)
+        case moveToRandomPoseSuggestionMode(PeopleCountOption)
         
         // Binding Action
         case binding(BindingAction<State>)
     }
     
+    @Dependency(\.poseClient) private var poseClient
+    
     var body: some ReducerOf<Self> {
         BindingReducer()
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
-            /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
             case .onAppear:
-                if state.items.isEmpty {
-                    let dummyList = FeedImageItem.dummyData()
-                    state.items = IdentifiedArray(uniqueElements: dummyList)
-                }
-                return .none
+                guard state.poses.isEmpty else { return .none }
+                return fetchPoses(state: &state, refreshNeeded: true)
+                
+            case .loadMoreItems:
+                guard state.isLoading == false, state.isLastPage == false else { return .none }
+                return fetchPoses(state: &state, refreshNeeded: false)
                 
             case .onTapFilter:
                 state.sheetItem = .peopleCountFilter
@@ -67,24 +83,68 @@ struct PoseFeature {
             case let .selectPeopleCount(option):
                 state.selectedCountFilterOption = state.selectedCountFilterOption == option ? nil : option
                 state.isSelectedScrap = false
-                return .none
+                guard state.isSelectedScrap else { return .none }
+                state.isSelectedScrap = false
+                return fetchPoses(state: &state, refreshNeeded: false)
+                
+            case .onTapScrapMode:
+                state.isSelectedScrap.toggle()
+                state.selectedCountFilterOption = nil
+                return fetchPoses(state: &state, refreshNeeded: false)
                 
             case let .selectPeopleCountForRandomPose(option):
                 state.selectedRandomPoseCountSelectionOption = option
-                return .none
-                
-            case .onTapScrap:
-                state.selectedCountFilterOption = nil
-                state.isSelectedScrap.toggle()
                 return .none
                 
             case .onTapRandomPoseRecommend:
                 state.sheetItem = .randomPoseCountSelection
                 return .none
                 
+            case .onTapStartRandomPoseCarousel:
+                state.sheetItem = nil
+                return .send(.moveToRandomPoseSuggestionMode(state.selectedRandomPoseCountSelectionOption))
+                
+            case let .fetchListResponse(.success(poses)):
+                state.isLoading = false
+                if poses.isEmpty {
+                    state.isLastPage = true
+                } else {
+                    state.poses.append(contentsOf: poses)
+                    state.page += 1
+                }
+                return .none
+                
+            case let .fetchListResponse(.failure(error)):
+                state.isLoading = false
+                // TODO: 에러 토스트 띄우는 것 고려
+                Logger.presentation.error("Pose List Fetching Failed: \(error)")
+                return .none
+                
             default:
                 return .none
             }
+        }
+    }
+    
+    private func fetchPoses(state: inout State, refreshNeeded: Bool) -> Effect<Action> {
+        if refreshNeeded {
+            state.poses.removeAll()
+            state.page = .zero
+            state.isLastPage = false
+        }
+        
+        state.isLoading = true
+        let currentPage = state.page
+        let pageSize = state.pageSize
+        let isScrapMode = state.isSelectedScrap
+        return .run { send in
+            await send(.fetchListResponse(Result {
+                if isScrapMode {
+                    return try await poseClient.fetchScrappedPoseList(page: currentPage, pageSize: pageSize)
+                } else {
+                    return try await poseClient.fetchPoseList(page: currentPage, pageSize: pageSize)
+                }
+            }))
         }
     }
 }

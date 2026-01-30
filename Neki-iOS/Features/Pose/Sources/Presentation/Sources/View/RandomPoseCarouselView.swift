@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct RandomPoseCarouselView: View {
     @Bindable var store: StoreOf<RandomPoseCarouselFeature>
@@ -184,13 +185,15 @@ private extension RandomPoseCarouselView {
     }
     
     var mainContentView: some View {
-        Group {
-            if let pose = store.currentPose {
-                
-            } else if store.isLoading {
-                
+        KFImage(store.currentPose?.imageURL)
+            .placeholder {
+                ProgressView()
+                    .controlSize(.large)
             }
-        }
+            .resizable()
+            .scaledToFit()
+            .clipShape(.rect(cornerRadius: 20))
+            .padding()
     }
 }
 

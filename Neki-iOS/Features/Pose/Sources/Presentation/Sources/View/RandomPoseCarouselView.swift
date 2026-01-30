@@ -119,7 +119,7 @@ private extension RandomPoseCarouselView {
         .padding(8)
         .background {
             Capsule() // TODO: 이거 디자인 수치 확인해서 다시 그려야함
-                .fill(.gray800.opacity(0.3))
+                .fill(.white.opacity(0.3))
                 .strokeBorder(
                     LinearGradient(colors: [
                         .white.opacity(1),

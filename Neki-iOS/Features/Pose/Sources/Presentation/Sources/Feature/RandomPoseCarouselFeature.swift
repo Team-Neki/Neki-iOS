@@ -99,8 +99,8 @@ struct RandomPoseCarouselFeature {
                 
             case let .scrapResponse(id, .failure(error)):
                 if error is CancellationError { return .none }
-                if var pose = state.currentPose[id: id] {
-                    pose.isScrapped.toggle(); state.currentPose[id: id] = pose
+                if var pose = state.currentPose, pose.id == id {
+                    pose.isScrapped.toggle(); state.currentPose = pose
                 }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
                 return .none

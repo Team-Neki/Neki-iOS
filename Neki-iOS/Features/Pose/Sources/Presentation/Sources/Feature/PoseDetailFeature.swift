@@ -56,6 +56,10 @@ struct PoseDetailFeature {
                 return .none
                 
             case let .scrapResponse(id, .failure(error)):
+                if error is CancellationError { return .none }
+                if var pose = state.poses[id: id] {
+                    pose.isScrapped.toggle(); state.poses[id: id] = pose
+                }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
                 // TODO: 토스트 띄우기?
                 return .none

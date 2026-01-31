@@ -83,9 +83,7 @@ struct PoseFeature {
             case let .selectPeopleCount(option):
                 state.selectedCountFilterOption = state.selectedCountFilterOption == option ? nil : option
                 state.isSelectedScrap = false
-                guard state.isSelectedScrap else { return .none }
-                state.isSelectedScrap = false
-                return fetchPoses(state: &state, refreshNeeded: false)
+                return .none
                 
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()

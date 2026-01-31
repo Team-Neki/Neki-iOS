@@ -9,7 +9,10 @@ import Foundation
 
 /// 사용자 정보
 public struct User: Sendable {
+    let id: Int
     let nickname: String
+    let email: String?
+    let profileImageURL: URL?
     let providerType: ProviderType
 }
 

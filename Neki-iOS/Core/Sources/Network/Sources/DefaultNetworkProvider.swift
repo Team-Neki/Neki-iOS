@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Dependencies
+import DependenciesMacros
 import os
 
 public final actor DefaultNetworkProvider: NetworkProvider {
@@ -13,17 +15,16 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     private var refreshTask: Task<Void, Error>?
     
     private let session: URLSessionProtocol
-    private let tokenStorage: TokenStorage
     private var tokenRefresher: TokenRefresher?
     private let decoder: JSONDecoder
     
+    @Dependency(\.tokenStorage) private var tokenStorage
+    
     public init(
         session: URLSessionProtocol = URLSession.shared,
-        tokenStorage: TokenStorage,
         decoder: JSONDecoder = JSONDecoder()
     ) {
         self.session = session
-        self.tokenStorage = tokenStorage
         self.decoder = decoder
     }
     

@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Dependencies
+import DependenciesMacros
 
 public protocol TokenStorage {
     typealias Query = [String: Any]
@@ -19,4 +21,15 @@ public enum TokenStorageError: Error {
     case unknown
     case notFound
     case conversionFailed
+}
+
+private enum TokenStorageKey: DependencyKey {
+    static let liveValue: TokenStorage = KeychainTokenStorage(encoder: .init(), decoder: .init())
+}
+
+extension DependencyValues {
+    var tokenStorage: TokenStorage {
+        get { self[TokenStorageKey.self] }
+        set { self[TokenStorageKey.self] = newValue }
+    }
 }

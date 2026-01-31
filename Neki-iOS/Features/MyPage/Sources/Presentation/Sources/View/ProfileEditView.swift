@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,8 +18,20 @@ struct ProfileEditView: View {
     var body: some View {
         VStack {
             ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .frame(width: 142, height: 142)
+                Group {
+                    if let selectedImage = store.selectedProfileImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        KFImage(store.currentProfileImageURL)
+                            .resizable()
+                            .onFailureImage(.iconDefaultProfile)
+                            .scaledToFill()
+                    }
+                }
+                .frame(width: 142, height: 142)
+                .clipShape(.circle)
                 
                 Button {
                     isProfileSelectionAlertPresented = true
@@ -42,7 +55,7 @@ struct ProfileEditView: View {
         .nekiToolbar(
             left: .back(action: { dismiss() }),
             center: .text("프로필 편집"),
-            right: .text("완료", action: {  }) // TODO: 완료버튼 disabled 방안 강구
+            right: .text("완료", action: {  }) // TODO: 완료버튼 disabled 방안 강구, 액션연결
         )
         .nekiSelectAlert(isPresented: $isProfileSelectionAlertPresented, style: .plain, items: ["기본 프로필로 바꾸기", "사진 선택하기"]) {
             // 별도의 onExit 동작 없음

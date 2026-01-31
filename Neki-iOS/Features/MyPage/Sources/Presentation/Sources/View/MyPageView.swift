@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct MyPageView: View {
     typealias SectionItem = MyPageFeature.SectionItem
@@ -47,9 +48,11 @@ private extension MyPageView {
     }
     
     var profileArea: some View {
-        // TODO: 사용자 프로필 연결 필요 (Auth Feature 작업 이후 변경 예정)
         HStack(spacing: 16) {
-            Circle()
+            KFImage(store.user.profileImageURL)
+                .resizable()
+                .onFailureImage(.iconDefaultProfile)
+                .aspectRatio(contentMode: .fill)
                 .frame(width: 78, height: 78)
             
             HStack {
@@ -58,7 +61,7 @@ private extension MyPageView {
                         .nekiFont(.title18SemiBold)
                         .foregroundStyle(.gray900)
                     
-                    Text(store.user.providerType.name)
+                    Text("\(store.user.providerType.name.uppercased()) 로그인")
                         .nekiFont(.caption12Regular)
                         .foregroundStyle(.gray600)
                 }
@@ -112,4 +115,8 @@ private extension MyPageView {
         .contentShape(.rect)
         .onTapGesture { store.send(.cellTapped(item)) }
     }
+}
+
+#Preview {
+    MyPageView(store: .init(initialState: MyPageFeature.State(user: .init(id: 1, nickname: "Swain", email: "dsad", profileImageURL: nil, providerType: .apple)), reducer: { MyPageFeature() }))
 }

@@ -212,6 +212,11 @@ extension DefaultPoseRepository: PoseRepository {
         let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
         guard let pose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
         let handled = cacheOrUpdate(pose)
+        if let existingNext = currentNode.next {
+            appendNode(handled, to: existingNext)
+            currentRandomNode = existingNext
+            return existingNext.pose
+        }
         appendNode(handled, to: currentNode)
         currentRandomNode = currentNode.next
         return handled

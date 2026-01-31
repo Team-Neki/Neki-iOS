@@ -7,18 +7,26 @@
 
 import Foundation
 import ComposableArchitecture
+import os
 
 @Reducer
 public struct LoginCoordinator {
     @ObservableState
     public struct State {
+        @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = true
         var root = LoginFeature.State()
         var path = StackState<Path.State>()
+        var pendingUser: User?
     }
     
     public enum Action {
         case root(LoginFeature.Action)
         case path(StackActionOf<Path>)
+        
+        case delegate(Delegate)
+        public enum Delegate {
+            case moveToMainTab(User)
+        }
     }
     
     public var body: some ReducerOf<Self> {
@@ -27,8 +35,26 @@ public struct LoginCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding))):
-                state.root.$isOnboardingNeeded.withLock { $0 = false }
+                state.$isOnboardingNeeded.withLock { $0 = false }
+                guard let user = state.pendingUser else {
+                    Logger.presentation.error("온보딩 과정 중 중단됨.")
+                    return .none
+                }
+                state.pendingUser = nil
                 state.path.pop(from: id)
+                return .send(.delegate(.moveToMainTab(user)))
+                
+            case let .root(.loginResponse(.success(user))):
+                if state.isOnboardingNeeded {
+                    state.pendingUser = user
+                    state.path.append(.termsAgreement(.init()))
+                    return .none
+                } else {
+                    return .send(.delegate(.moveToMainTab(user)))
+                }
+                
+            case let .root(.loginResponse(.failure(error))):
+                Logger.presentation.error("로그인 과정 중 에러 발생: \(error)")
                 return .none
                 
             default:

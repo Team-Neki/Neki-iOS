@@ -38,7 +38,9 @@ struct AppCoordinator {
                 return .none
                 
             // MARK: - Auth 화면에서의 이동
-            // 없음 아직
+            case let .auth(.delegate(.moveToMainTab(user))):
+                state = .mainTab(.init(user: user))
+                return .none
                 
             // MARK: - MainTab 화면에서의 이동
             case .mainTab(.delegate(.logout)):

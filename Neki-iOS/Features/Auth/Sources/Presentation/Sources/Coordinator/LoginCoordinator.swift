@@ -1,5 +1,5 @@
 //
-//  OnboardingCoordinator.swift
+//  LoginCoordinator.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 1/24/26.
@@ -9,20 +9,20 @@ import Foundation
 import ComposableArchitecture
 
 @Reducer
-public struct OnboardingCoordinator {
+public struct LoginCoordinator {
     @ObservableState
     public struct State {
-        var root = OnboardingFeature.State()
+        var root = LoginFeature.State()
         var path = StackState<Path.State>()
     }
     
     public enum Action {
-        case root(OnboardingFeature.Action)
+        case root(LoginFeature.Action)
         case path(StackActionOf<Path>)
     }
     
     public var body: some ReducerOf<Self> {
-        Scope(state: \.root, action: \.root) { OnboardingFeature() }
+        Scope(state: \.root, action: \.root) { LoginFeature() }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
@@ -42,7 +42,7 @@ public struct OnboardingCoordinator {
 
 // MARK: - OnboardingCoordinator + Path
 
-extension OnboardingCoordinator {
+extension LoginCoordinator {
     @Reducer
     public enum Path {
         case termsAgreement(TermsAgreementFeature)

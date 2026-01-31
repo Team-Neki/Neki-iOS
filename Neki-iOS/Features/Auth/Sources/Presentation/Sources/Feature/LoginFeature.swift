@@ -1,5 +1,5 @@
 //
-//  OnboardingFeature.swift
+//  LoginFeature.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 1/24/26.
@@ -11,7 +11,7 @@ import AuthenticationServices
 import os
 
 @Reducer
-public struct OnboardingFeature {
+public struct LoginFeature {
     @ObservableState
     public struct State {
         @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = true

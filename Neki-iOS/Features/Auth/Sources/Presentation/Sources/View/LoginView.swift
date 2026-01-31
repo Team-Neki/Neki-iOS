@@ -1,5 +1,5 @@
 //
-//  OnboardingView.swift
+//  LoginView.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 1/24/26.
@@ -9,10 +9,10 @@ import SwiftUI
 import ComposableArchitecture
 import AuthenticationServices
 
-public struct OnboardingView: View {
-    @Bindable var store: StoreOf<OnboardingFeature>
+public struct LoginView: View {
+    @Bindable var store: StoreOf<LoginFeature>
     
-    public init(store: StoreOf<OnboardingFeature>) { self.store = store }
+    public init(store: StoreOf<LoginFeature>) { self.store = store }
     
     public var body: some View {
         ZStack(alignment: .bottom) {
@@ -47,5 +47,5 @@ public struct OnboardingView: View {
 }
 
 #Preview {
-    OnboardingView(store: .init(initialState: OnboardingFeature.State(), reducer: { OnboardingFeature() }))
+    LoginView(store: .init(initialState: LoginFeature.State(), reducer: { LoginFeature() }))
 }

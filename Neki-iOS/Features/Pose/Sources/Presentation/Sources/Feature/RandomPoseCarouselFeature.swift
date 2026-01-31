@@ -20,6 +20,8 @@ struct RandomPoseCarouselFeature {
         var activePeopleCount: PeopleCountOption
         var isScrapped: Bool { currentPose?.isScrapped ?? false }
         
+        var isDismissing: Bool = false
+        
         init(peopleCount: PeopleCountOption) { activePeopleCount = peopleCount }
     }
     
@@ -38,9 +40,11 @@ struct RandomPoseCarouselFeature {
         // Internal Actions
         case poseResponse(Result<Pose, Error>)
         case scrapResponse(PoseID, Result<Void, Error>)
+        case flushResources
         
         // Delegate Actions
         case poseUpdated(Pose)
+        case routeToDetail(Pose)
     }
     
     @Dependency(\.poseClient) private var poseClient
@@ -56,9 +60,8 @@ struct RandomPoseCarouselFeature {
                 }
                 
             case .onDisappear:
-                return .run { _ in
-                    await poseClient.stopRandomPoseSuggestion()
-                }
+                if state.isDismissing { return .none }
+                return .send(.flushResources)
                 
             case .closeTutorialOverlay:
                 state.$isTutorialPresented.withLock { $0 = false }
@@ -104,6 +107,17 @@ struct RandomPoseCarouselFeature {
                 }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
                 return .none
+                
+            case let .onTapDetail(pose):
+                state.isDismissing = true
+                return .run { send in
+                    await send(.flushResources)
+                    await send(.routeToDetail(pose))
+                    await dismiss()
+                }
+                
+            case .flushResources:
+                return .run { _ in await poseClient.stopRandomPoseSuggestion() }
                 
             default:
                 return .none

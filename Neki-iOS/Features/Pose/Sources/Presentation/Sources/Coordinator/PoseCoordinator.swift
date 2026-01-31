@@ -65,8 +65,7 @@ struct PoseCoordinator {
                 )))
                 return .none
                 
-            case let .randomPose(.presented(.onTapDetail(pose))):
-                state.randomPose = nil
+            case let .randomPose(.presented(.routeToDetail(pose))):
                 return .send(.routeToDetail(pose))
                 
             default:

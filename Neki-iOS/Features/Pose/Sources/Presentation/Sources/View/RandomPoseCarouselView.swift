@@ -48,7 +48,10 @@ struct RandomPoseCarouselView: View {
         }
         .animation(.easeInOut, value: store.isTutorialPresented)
         .task { await store.send(.onAppear).finish() }
-        .onDisappear { store.send(.onDisappear) }
+        .onDisappear {
+            guard store.isDismissing == false else { return }
+            store.send(.onDisappear)
+        }
     }
 }
 

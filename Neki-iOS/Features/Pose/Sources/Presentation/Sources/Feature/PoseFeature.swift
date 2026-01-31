@@ -15,7 +15,7 @@ struct PoseFeature {
     @ObservableState
     struct State: Equatable {
         // Data
-        @ObservationStateIgnored var poses: IdentifiedArrayOf<Pose> = []
+        var poses: IdentifiedArrayOf<Pose> = []
         var filteredPoses: IdentifiedArrayOf<Pose> {
             guard isSelectedScrap == false else { return poses.filter(\.isScrapped) }
             guard let countOption = selectedCountFilterOption else { return poses }

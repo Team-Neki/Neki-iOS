@@ -11,7 +11,7 @@ import DependenciesMacros
 import os
 
 private final class RandomPoseNode {
-    let pose: Pose
+    var pose: Pose
     var next: RandomPoseNode?
     var previous: RandomPoseNode?
     
@@ -42,6 +42,11 @@ private extension DefaultPoseRepository {
         case .quartet: return "FOUR"
         case .overQuartet: return "FIVE_OR_MORE"
         }
+    }
+    
+    func syncNodeWithCache(_ node: RandomPoseNode) -> Pose {
+        guard let cached = cache[node.pose.id] else { return node.pose }
+        node.pose = cached; return cached
     }
     
     /// 캐시 정책을 적용하여 데이터를 병합합니다.
@@ -198,7 +203,7 @@ extension DefaultPoseRepository: PoseRepository {
         if let nextNode = currentNode.next {
             currentRandomNode = nextNode
             Task { [weak self] in try await self?.prefetchNext(from: nextNode) }
-            return nextNode.pose
+            return syncNodeWithCache(nextNode)
         }
         
         let peopleCountValue = convertToRawValue(activeRandomPosePeopleCount)
@@ -214,6 +219,6 @@ extension DefaultPoseRepository: PoseRepository {
     public func fetchPreviousRandomPose() async throws -> Pose {
         guard let previous = currentRandomNode?.previous else { throw PoseRepositoryError.noHistory }
         currentRandomNode = previous
-        return previous.pose
+        return syncNodeWithCache(previous)
     }
 }

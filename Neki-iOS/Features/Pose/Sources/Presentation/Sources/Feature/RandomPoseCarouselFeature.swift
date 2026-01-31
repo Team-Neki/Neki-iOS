@@ -82,7 +82,7 @@ struct RandomPoseCarouselFeature {
                 pose.isScrapped.toggle()
                 state.currentPose = pose
                 return .run { [id = pose.id] send in
-                    try await poseClient.scrapPose(poseID: id)
+                    await send(.scrapResponse(id, Result { try await poseClient.scrapPose(poseID: id) }))
                 }
                 
             case let .poseResponse(.success(pose)):
@@ -98,6 +98,10 @@ struct RandomPoseCarouselFeature {
                 return .none
                 
             case let .scrapResponse(id, .failure(error)):
+                if error is CancellationError { return .none }
+                if var pose = state.currentPose[id: id] {
+                    pose.isScrapped.toggle(); state.currentPose[id: id] = pose
+                }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
                 return .none
                 

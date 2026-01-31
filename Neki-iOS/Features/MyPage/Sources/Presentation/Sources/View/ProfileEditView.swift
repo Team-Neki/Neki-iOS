@@ -60,7 +60,3 @@ struct ProfileEditView: View {
         .onTapGesture { isFocused = false }
     }
 }
-
-#Preview {
-    ProfileEditView(store: .init(initialState: ProfileEditFeature.State(user: .init(nickname: "변우진", providerType: .apple)), reducer: { ProfileEditFeature() }))
-}

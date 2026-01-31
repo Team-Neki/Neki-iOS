@@ -423,7 +423,3 @@ extension NMGLatLng {
         GeographicCoordinate(latitude: self.lat, longitude: self.lng)
     }
 }
-
-#Preview {
-    AppCoordinatorView(store: .init(initialState: AppCoordinator.State.mainTab(.init()), reducer: { AppCoordinator() }))
-}

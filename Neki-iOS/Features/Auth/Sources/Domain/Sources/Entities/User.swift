@@ -15,9 +15,3 @@ public struct User: Sendable {
     let profileImageURL: URL?
     let providerType: ProviderType
 }
-
-/// 로그인된 사용자의 연결 정보
-public struct UserSession {
-    let user: User
-    let tokens: AuthTokens
-}

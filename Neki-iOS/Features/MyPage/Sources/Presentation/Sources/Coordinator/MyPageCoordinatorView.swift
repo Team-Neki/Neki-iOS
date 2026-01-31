@@ -33,7 +33,3 @@ struct MyPageCoordinatorView: View {
         }
     }
 }
-
-#Preview {
-    MyPageCoordinatorView(store: .init(initialState: MyPageCoordinator.State(), reducer: { MyPageCoordinator() }))
-}

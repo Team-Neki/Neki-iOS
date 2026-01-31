@@ -141,6 +141,7 @@ extension DefaultPoseRepository: PoseRepository {
                 scrapTasks[pose.id] = nil
             } catch {
                 if error is CancellationError { return }
+                scrapTasks[pose.id] = nil
                 if var rolledBack = cache[poseID] {
                     rolledBack.isScrapped = originalState
                     cache[poseID] = rolledBack

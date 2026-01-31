@@ -54,6 +54,7 @@ private extension MyPageView {
                 .onFailureImage(.iconDefaultProfile)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 78, height: 78)
+                .clipShape(.circle)
             
             HStack {
                 VStack(alignment: .leading, spacing: 4) {

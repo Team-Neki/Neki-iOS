@@ -116,7 +116,7 @@ extension DefaultPoseRepository: PoseRepository {
         let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
         guard let pose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
         let handled = cacheOrUpdate(pose)
-        return pose
+        return handled
     }
     
     public func scrapPose(poseID: PoseID) async throws {

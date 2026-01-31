@@ -29,7 +29,10 @@ struct PoseDetailFeature {
         case scrapResponse(PoseID, Result<Void, Error>)
         
         // Delegate Actions
-        case poseUpdated(Pose)
+        case delegate(Delegate)
+        enum Delegate {
+            case poseUpdated(Pose)
+        }
     }
     
     private enum CancelID: Hashable {
@@ -42,11 +45,14 @@ struct PoseDetailFeature {
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+                // MARK: - View Actions
             case .onTapScrap:
                 guard var pose = state.currentPose else { return .none }
                 pose.isScrapped.toggle()
                 state.poses[id: pose.id] = pose
+                
                 return .run { [pose] send in
+                    await send(.delegate(.poseUpdated(pose)))
                     await send(.scrapResponse(pose.id, Result { try await poseClient.scrapPose(poseID: pose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
@@ -55,19 +61,25 @@ struct PoseDetailFeature {
                 state.selectedID = newID
                 return .none
                 
-            case let .scrapResponse(id, .failure(error)):
-                if error is CancellationError { return .none }
-                if var pose = state.poses[id: id] {
-                    pose.isScrapped.toggle(); state.poses[id: id] = pose
-                }
-                Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
-                // TODO: 토스트 띄우기?
-                return .none
-                
             case .didTapBackButton:
                 return .run { _ in await dismiss() }
                 
-            default:
+                // MARK: - Internal Actions
+            case let .scrapResponse(id, .failure(error)):
+                if error is CancellationError { return .none }
+                
+                if var pose = state.poses[id: id] {
+                    pose.isScrapped.toggle()
+                    state.poses[id: id] = pose
+                    return .send(.delegate(.poseUpdated(pose)))
+                }
+                Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
+                return .none
+                
+            case .scrapResponse:
+                return .none
+                
+            case .delegate:
                 return .none
             }
         }

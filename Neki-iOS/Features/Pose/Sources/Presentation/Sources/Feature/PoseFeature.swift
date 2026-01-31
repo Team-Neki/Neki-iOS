@@ -49,13 +49,16 @@ struct PoseFeature {
         case onTapStartRandomPoseCarousel
         case imageTapped(Pose)
         
-        // Data Actions
+        // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(Result<[Pose], Error>)
-        case toggleScrapResponse(PoseID, Result<Void, Error>)
+        case updatePoseInList(Pose)
         
         // Delegate Action
-        case updatePose(Pose)
-        case moveToRandomPoseSuggestionMode(PeopleCountOption)
+        case delegate(Delegate)
+        enum Delegate {
+            case didTapImage(Pose)
+            case didTapStartRandomPose(PeopleCountOption)
+        }
         
         // Binding Action
         case binding(BindingAction<State>)
@@ -68,6 +71,7 @@ struct PoseFeature {
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+                // MARK: - View Actions
             case .onAppear:
                 guard state.poses.isEmpty else { return .none }
                 return fetchPoses(state: &state, refreshNeeded: true)
@@ -100,7 +104,17 @@ struct PoseFeature {
                 
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
-                return .send(.moveToRandomPoseSuggestionMode(state.selectedRandomPoseCountSelectionOption))
+                // Coordinator에게 화면 전환 위임
+                return .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
+                
+            case let .imageTapped(pose):
+                // Coordinator에게 화면 전환 위임
+                return .send(.delegate(.didTapImage(pose)))
+                
+                // MARK: - Internal Actions
+            case let .updatePoseInList(pose):
+                if state.poses.contains(where: { $0.id == pose.id }) { state.poses[id: pose.id] = pose }
+                return .none
                 
             case let .fetchListResponse(.success(poses)):
                 state.isLoading = false
@@ -114,10 +128,10 @@ struct PoseFeature {
                 
             case let .fetchListResponse(.failure(error)):
                 state.isLoading = false
-                // TODO: 에러 토스트 띄우는 것 고려
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
                 
+                // MARK: - Default
             default:
                 return .none
             }

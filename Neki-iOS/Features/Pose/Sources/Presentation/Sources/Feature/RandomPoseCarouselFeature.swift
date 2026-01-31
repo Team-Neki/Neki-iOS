@@ -43,8 +43,11 @@ struct RandomPoseCarouselFeature {
         case flushResources
         
         // Delegate Actions
-        case poseUpdated(Pose)
-        case routeToDetail(Pose)
+        case delegate(Delegate)
+        enum Delegate {
+            case poseUpdated(Pose)
+            case routeToDetail(Pose)
+        }
     }
     
     @Dependency(\.poseClient) private var poseClient
@@ -53,6 +56,7 @@ struct RandomPoseCarouselFeature {
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+                // MARK: - Lifecycle & View Actions
             case .onAppear:
                 state.isLoading = true
                 return .run { [count = state.activePeopleCount] send in
@@ -80,14 +84,18 @@ struct RandomPoseCarouselFeature {
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
                 }
                 
+                // MARK: - Scrap Logic (Optimistic)
             case .onTapScrap:
                 guard var pose = state.currentPose else { return .none }
                 pose.isScrapped.toggle()
                 state.currentPose = pose
-                return .run { [id = pose.id] send in
+                
+                return .run { [id = pose.id, pose] send in
+                    await send(.delegate(.poseUpdated(pose)))
                     await send(.scrapResponse(id, Result { try await poseClient.scrapPose(poseID: id) }))
                 }
                 
+                // MARK: - Internal Actions
             case let .poseResponse(.success(pose)):
                 state.isLoading = false
                 state.currentPose = pose
@@ -95,31 +103,36 @@ struct RandomPoseCarouselFeature {
                 
             case let .poseResponse(.failure(error)):
                 state.isLoading = false
-                // TODO: 플로터 띄...
                 Logger.presentation.error("Random Pose Fetching Failed: \(error)")
-                // TODO: 만약 NoHistory 에러면 그냥 이전 포즈사진이 없다는 거니까 무시하거나 플로터 띄워서 알려주면 될듯
                 return .none
                 
             case let .scrapResponse(id, .failure(error)):
                 if error is CancellationError { return .none }
+                
                 if var pose = state.currentPose, pose.id == id {
-                    pose.isScrapped.toggle(); state.currentPose = pose
+                    pose.isScrapped.toggle()
+                    state.currentPose = pose
+                    return .send(.delegate(.poseUpdated(pose)))
                 }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
                 return .none
                 
+            case .scrapResponse:
+                return .none
+                
+                // MARK: - Navigation
             case let .onTapDetail(pose):
                 state.isDismissing = true
                 return .run { send in
                     await send(.flushResources)
-                    await send(.routeToDetail(pose))
+                    await send(.delegate(.routeToDetail(pose)))
                     await dismiss()
                 }
                 
             case .flushResources:
                 return .run { _ in await poseClient.stopRandomPoseSuggestion() }
                 
-            default:
+            case .delegate:
                 return .none
             }
         }

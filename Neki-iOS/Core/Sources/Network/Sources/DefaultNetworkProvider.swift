@@ -24,6 +24,9 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     ) {
         self.session = session
         self.tokenStorage = tokenStorage
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        decoder.dateDecodingStrategy = .formatted(formatter)
         self.decoder = decoder
     }
     

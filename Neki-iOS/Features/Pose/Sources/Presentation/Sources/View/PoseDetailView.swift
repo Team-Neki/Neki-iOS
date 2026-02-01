@@ -16,7 +16,7 @@ struct PoseDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             TabView(selection: $store.selectedID.sending(\.pageChanged)) {
-                ForEach(store.items) { item in
+                ForEach(store.poses) { item in
                     KFImage(item.imageURL)
                         .resizable()
                         .placeholder {
@@ -24,6 +24,7 @@ struct PoseDetailView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .retry(maxCount: 3, interval: .seconds(5))
+                        .cancelOnDisappear(true)
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .tag(item.id)

@@ -78,6 +78,8 @@ private extension PoseView {
             .padding(.bottom, 76)
         }
         .scrollIndicators(.never)
+        .id(store.isSelectedScrap ? "Scrapped" : "General")
+        .refreshable { await store.send(.onRefresh).finish() }
         .simultaneousGesture(
             DragGesture()
                 .onChanged { value in

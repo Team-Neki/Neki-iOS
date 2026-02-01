@@ -18,8 +18,8 @@ public typealias PoseID = Int
 public typealias PageID = Int
 
 public protocol PoseRepository {
-    func fetchPoseList(page: PageID, pageSize: Int) async throws -> [Pose]
-    func fetchScrappedPoseList(page: PageID, pageSize: Int) async throws -> [Pose]
+    func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool)
+    func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool)
     func fetchPoseDetail(id: PoseID) async throws -> Pose
     func scrapPose(poseID: PoseID) async throws
     func initializeRandomPoseBuffer(peopleCount: PeopleCountOption) async throws -> Pose

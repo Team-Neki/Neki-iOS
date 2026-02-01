@@ -15,18 +15,25 @@ struct PoseFeature {
     @ObservableState
     struct State: Equatable {
         // Data
-        var poses: IdentifiedArrayOf<Pose> = []
+        var generalPoses: IdentifiedArrayOf<Pose> = []
+        var scrappedPoses: IdentifiedArrayOf<Pose> = []
         var filteredPoses: IdentifiedArrayOf<Pose> {
-            guard isSelectedScrap == false else { return poses.filter(\.isScrapped) }
-            guard let countOption = selectedCountFilterOption else { return poses }
-            return poses.filter { $0.peopleCountOption == countOption }
+            let targetPoses = isSelectedScrap ? scrappedPoses : generalPoses
+            guard let countOption = selectedCountFilterOption else { return targetPoses }
+            return targetPoses.filter { $0.peopleCountOption == countOption }
         }
         
         // Pagination & Filter
-        var page: Int = .zero
+        var generalPage: Int = .zero
+        var isLastGeneralPage: Bool = false
+        var scrappedPage: Int = .zero
+        var isLastScrappedPage: Bool = false
+        
         @ObservationIgnored let pageSize: Int = 20
         var isLoading: Bool = false
-        var isLastPage: Bool = false
+        
+        var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
+        var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
         
         // Filter Options
         var selectedCountFilterOption: PeopleCountOption?
@@ -48,9 +55,10 @@ struct PoseFeature {
         case onTapRandomPoseRecommend
         case onTapStartRandomPoseCarousel
         case imageTapped(Pose)
+        case onRefresh
         
         // Internal Actions (Async Results & Data Updates)
-        case fetchListResponse(Result<[Pose], Error>)
+        case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
         case updatePoseInList(Pose)
         
         // Delegate Action
@@ -73,12 +81,19 @@ struct PoseFeature {
             switch action {
                 // MARK: - View Actions
             case .onAppear:
-                guard state.poses.isEmpty else { return .none }
-                return fetchPoses(state: &state, refreshNeeded: true)
+                if state.isSelectedScrap {
+                    if state.scrappedPoses.isEmpty { return fetchPoses(state: &state, refreshNeeded: true) }
+                } else {
+                    if state.generalPoses.isEmpty { return fetchPoses(state: &state, refreshNeeded: true) }
+                }
+                return .none
                 
             case .loadMoreItems:
-                guard state.isLoading == false, state.isLastPage == false else { return .none }
+                guard state.isLoading == false, state.isCurrentLastPage == false else { return .none }
                 return fetchPoses(state: &state, refreshNeeded: false)
+                
+            case .onRefresh:
+                return fetchPoses(state: &state, refreshNeeded: true)
                 
             case .onTapFilter:
                 state.sheetItem = .peopleCountFilter
@@ -92,7 +107,12 @@ struct PoseFeature {
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()
                 state.selectedCountFilterOption = nil
-                return fetchPoses(state: &state, refreshNeeded: false)
+                if state.isSelectedScrap, state.scrappedPoses.isEmpty {
+                    return fetchPoses(state: &state, refreshNeeded: true)
+                } else if state.isLoading == false, state.generalPoses.isEmpty {
+                    return fetchPoses(state: &state, refreshNeeded: true)
+                }
+                return .none
                 
             case let .selectPeopleCountForRandomPose(option):
                 state.selectedRandomPoseCountSelectionOption = option
@@ -104,29 +124,52 @@ struct PoseFeature {
                 
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
-                // Coordinator에게 화면 전환 위임
                 return .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
                 
             case let .imageTapped(pose):
-                // Coordinator에게 화면 전환 위임
                 return .send(.delegate(.didTapImage(pose)))
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
-                if state.poses.contains(where: { $0.id == pose.id }) { state.poses[id: pose.id] = pose }
-                return .none
-                
-            case let .fetchListResponse(.success(poses)):
-                state.isLoading = false
-                if poses.isEmpty {
-                    state.isLastPage = true
+                if state.generalPoses.contains(where: { $0.id == pose.id }) { state.generalPoses[id: pose.id] = pose }
+                if pose.isScrapped {
+                    if state.scrappedPoses.contains(where: { $0.id == pose.id }) == false {
+                        guard state.scrappedPoses.isEmpty == false else { return .none }
+                        state.scrappedPoses.append(pose)
+                    } else {
+                        state.scrappedPoses[id: pose.id] = pose
+                    }
                 } else {
-                    state.poses.append(contentsOf: poses)
-                    state.page += 1
+                    state.scrappedPoses.remove(id: pose.id)
                 }
                 return .none
                 
-            case let .fetchListResponse(.failure(error)):
+            case let .fetchListResponse(isScrapResult, .success((poses, hasNext))):
+                state.isLoading = false
+                if isScrapResult {
+                    state.isLastScrappedPage = hasNext == false
+                    if state.scrappedPage == .zero {
+                        state.scrappedPoses = IdentifiedArray(uniqueElements: poses)
+                    } else {
+                        state.scrappedPoses.append(contentsOf: poses)
+                    }
+                    
+                    guard hasNext else { return .none }
+                    state.scrappedPage += 1
+                } else {
+                    state.isLastGeneralPage = hasNext == false
+                    if state.generalPage == .zero {
+                        state.generalPoses = IdentifiedArray(uniqueElements: poses)
+                    } else {
+                        state.generalPoses.append(contentsOf: poses)
+                    }
+                    
+                    guard hasNext else { return .none }
+                    state.generalPage += 1
+                }
+                return .none
+                
+            case let .fetchListResponse(_, .failure(error)):
                 state.isLoading = false
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
@@ -139,22 +182,27 @@ struct PoseFeature {
     }
     
     private func fetchPoses(state: inout State, refreshNeeded: Bool) -> Effect<Action> {
+        state.isLoading = true
+        let isScrapMode = state.isSelectedScrap
+        
         if refreshNeeded {
-            state.poses.removeAll()
-            state.page = .zero
-            state.isLastPage = false
+            if isScrapMode {
+                state.scrappedPage = .zero
+                state.isLastScrappedPage = false
+            } else {
+                state.generalPage = .zero
+                state.isLastGeneralPage = false
+            }
         }
         
-        state.isLoading = true
-        let currentPage = state.page
+        let page = isScrapMode ? state.scrappedPage : state.generalPage
         let pageSize = state.pageSize
-        let isScrapMode = state.isSelectedScrap
         return .run { send in
-            await send(.fetchListResponse(Result {
+            await send(.fetchListResponse(isScrapResult: isScrapMode, Result {
                 if isScrapMode {
-                    return try await poseClient.fetchScrappedPoseList(page: currentPage, pageSize: pageSize)
+                    return try await poseClient.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refreshNeeded)
                 } else {
-                    return try await poseClient.fetchPoseList(page: currentPage, pageSize: pageSize)
+                    return try await poseClient.fetchPoseList(page: page, pageSize: pageSize, refresh: refreshNeeded)
                 }
             }))
         }

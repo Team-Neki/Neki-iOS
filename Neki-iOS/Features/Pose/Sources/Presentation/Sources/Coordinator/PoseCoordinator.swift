@@ -63,7 +63,7 @@ struct PoseCoordinator {
                 
             case let .routeToDetail(pose):
                 state.path.append(.detail(PoseDetailFeature.State(
-                    poses: state.root.poses,
+                    poses: state.root.filteredPoses,
                     selectedID: pose.id
                 )))
                 return .none

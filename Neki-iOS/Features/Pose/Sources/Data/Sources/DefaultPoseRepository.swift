@@ -18,9 +18,15 @@ private final class RandomPoseNode {
     init(pose: Pose) { self.pose = pose }
 }
 
+private struct Page {
+    let poseIDs: [PoseID]
+    let hasNext: Bool
+}
+
 public final actor DefaultPoseRepository {
     private var cache: [PoseID: Pose] = [:]
-    private var pageIDs: [PageID: [PoseID]] = [:]
+    private var generalPages: [PageID: Page] = [:]
+    private var scrappedPages: [PageID: Page] = [:]
     private var activeRandomPosePeopleCount: PeopleCountOption = .solo
     private var currentRandomNode: RandomPoseNode?
     private var scrapTasks: [PoseID: Task<Void, Error>] = [:]
@@ -91,29 +97,60 @@ private extension DefaultPoseRepository {
         previous.next = newNode
         newNode.previous = previous
     }
+    
+    /// 스크랩 목록에서 캐시를 갱신합니다. (스크랩 등록 또는 취소 시)
+    /// - Parameters:
+    ///     - poseID: 대상 포즈 식별자
+    ///     - isScrapped: `true`면 목록의 끝에 추가, `false`면 목록에서 제거
+    func updateScrappedPagesCache(poseID: PoseID, isScrapped: Bool) {
+        guard isScrapped else {
+            for (pageID, page) in scrappedPages {
+                guard let index = page.poseIDs.firstIndex(of: poseID) else { continue }
+                var currentIDs = page.poseIDs
+                currentIDs.remove(at: index)
+                scrappedPages[pageID] = Page(poseIDs: currentIDs, hasNext: page.hasNext)
+            }
+            return
+        }
+        
+        guard scrappedPages.isEmpty == false, let lastPageID = scrappedPages.keys.max(), let lastPage = scrappedPages[lastPageID] else { return }
+        guard lastPage.poseIDs.contains(poseID) == false else { return }
+        var currentIDs = lastPage.poseIDs
+        currentIDs.append(poseID)
+        scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext)
+    }
 }
 
 
 // MARK: - DefaultPoseRepository + PoseRepository
 
 extension DefaultPoseRepository: PoseRepository {
-    public func fetchPoseList(page: PageID, pageSize: Int) async throws -> [Pose] {
-        if let ids = pageIDs[page] { return ids.compactMap { cache[$0] } }
+    public func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
+        if refresh { generalPages.removeAll() }
+        else if let cachedPage = generalPages[page] { return (cachedPage.poseIDs.compactMap { cache[$0] }, cachedPage.hasNext) }
         
         let endpoint = PoseEndpoint.fetchPoseList(page: page, size: pageSize, peopleCount: nil, sortBy: nil)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let poses = responseDTO.data?.items.compactMap { $0.toEntity() } ?? []
+        let hasNext = responseDTO.data?.hasNext ?? false
+        
         let handled = poses.map { cacheOrUpdate($0, preserved: true) }
-        pageIDs[page] = handled.map(\.id)
-        return handled
+        generalPages[page] = Page(poseIDs: handled.map(\.id), hasNext: hasNext)
+        return (handled, hasNext)
     }
     
-    public func fetchScrappedPoseList(page: PageID, pageSize: Int) async throws -> [Pose] {
+    public func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
+        if refresh { scrappedPages.removeAll() }
+        else if let cachedPage = scrappedPages[page] { return (cachedPage.poseIDs.compactMap { cache[$0] }, cachedPage.hasNext) }
+        
         let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: nil)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let poses = responseDTO.data?.items.compactMap { $0.toEntity() } ?? []
+        let hasNext = responseDTO.data?.hasNext ?? false
+        
         let handled = poses.map { var pose = $0; pose.isScrapped = true; cache[pose.id] = pose; return pose }
-        return handled
+        scrappedPages[page] = Page(poseIDs: handled.map(\.id), hasNext: hasNext)
+        return (handled, hasNext)
     }
     
     public func fetchPoseDetail(id: PoseID) async throws -> Pose {
@@ -133,6 +170,8 @@ extension DefaultPoseRepository: PoseRepository {
         pose.isScrapped = newState
         cache[poseID] = pose
         
+        updateScrappedPagesCache(poseID: poseID, isScrapped: newState)
+        
         let task = Task {
             do {
                 let requestDTO = ScrapPoseDTO.Request(toBe: newState)
@@ -146,6 +185,7 @@ extension DefaultPoseRepository: PoseRepository {
                     rolledBack.isScrapped = originalState
                     cache[poseID] = rolledBack
                 }
+                updateScrappedPagesCache(poseID: poseID, isScrapped: originalState)
                 throw error
             }
         }

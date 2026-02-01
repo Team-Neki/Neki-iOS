@@ -10,8 +10,8 @@ import ComposableArchitecture
 
 @DependencyClient
 public struct PoseClient {
-    public var fetchPoseList: @Sendable (_ page: Int, _ pageSize: Int) async throws -> [Pose]
-    public var fetchScrappedPoseList: @Sendable (_ page: Int, _ pageSize: Int) async throws -> [Pose]
+    public var fetchPoseList: @Sendable (_ page: Int, _ pageSize: Int, _ refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool)
+    public var fetchScrappedPoseList: @Sendable (_ page: Int, _ pageSize: Int, _ refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool)
     public var scrapPose: @Sendable (_ poseID: Int) async throws -> Void
     public var initializeRandomPose: @Sendable (_ peopleCount: PeopleCountOption) async throws -> Pose
     public var startRandomPoseSuggestion: @Sendable (_ direction: RandomPosePagingDirection) async throws -> Pose
@@ -25,10 +25,10 @@ extension PoseClient: DependencyKey {
     public static var liveValue: PoseClient = {
         @Dependency(\.poseRepository) var poseRepository
         
-        return PoseClient { page, pageSize in
-            try await poseRepository.fetchPoseList(page: page, pageSize: pageSize)
-        } fetchScrappedPoseList: { page, pageSize in
-            try await poseRepository.fetchScrappedPoseList(page: page, pageSize: pageSize)
+        return PoseClient { page, pageSize, refresh in
+            try await poseRepository.fetchPoseList(page: page, pageSize: pageSize, refresh: refresh)
+        } fetchScrappedPoseList: { page, pageSize, refresh in
+            try await poseRepository.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refresh)
         } scrapPose: { poseID in
             try await poseRepository.scrapPose(poseID: poseID)
         } initializeRandomPose: { peopleCount in

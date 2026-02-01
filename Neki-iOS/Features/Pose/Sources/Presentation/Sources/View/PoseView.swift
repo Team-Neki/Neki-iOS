@@ -40,8 +40,8 @@ struct PoseView: View {
             
         }
         .nekiToolbar(
-            left: .text("포즈", action: nil),
-            right: .icon(.iconBellFill, action: {})
+            left: { NekiToolBar.textLeft("포즈") },
+            right: { NekiToolBar.icon(.iconBellFill) }
         )
         .sheet(isPresented: $isSheetVisible, content: {
             filterSheetView

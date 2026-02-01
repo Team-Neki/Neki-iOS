@@ -29,8 +29,11 @@ struct MyPageView: View {
             Spacer()
         }
         .nekiToolbar(
-            left: .text("마이페이지", action: nil),
-            right: .icon(.iconBellFill, action: {}) // TODO: 알림기능 연결 필요
+            left: { NekiToolBar.textLeft("마이페이지") },
+            right: {
+                // TODO: 알림 기능 보류
+                // NekiToolBar.icon(.iconBellFill)
+            }
         )
     }
 }

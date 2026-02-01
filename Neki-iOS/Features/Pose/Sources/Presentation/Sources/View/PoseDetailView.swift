@@ -46,7 +46,10 @@ struct PoseDetailView: View {
             .frame(height: 68)
             .background(.white)
         }
-        .nekiToolbar(left: .back(action: { store.send(.didTapBackButton) }), center: .text("포즈 상세"))
+        .nekiToolbar(
+            left: { NekiToolBar.back { store.send(.didTapBackButton) } },
+            center: { NekiToolBar.textCenter("포즈 상세") }
+        )
         .background(.white)
     }
 }

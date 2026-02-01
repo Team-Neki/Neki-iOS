@@ -37,12 +37,17 @@ struct ArchiveAlbumDetailView: View {
             }
         }
         .nekiToolbar(
-            left: .back(action: { store.send(.onTapBackButton) }),
-            center: .text(store.album.title),
-            right: store.photos.isEmpty ? .none : store.isSelectionMode ?
-                .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
-                    .text("선택", action: { store.send(.onTapSelectButton) })
+            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
+            center: { NekiToolBar.textCenter(store.album.title) },
+            right: {
+                if store.photos.count != 0 {
+                    store.isSelectionMode ?
+                    NekiToolBar.textRight("취소") { store.send(.onTapCancelSelectButton) } :
+                    NekiToolBar.textRight("선택") { store.send(.onTapSelectButton) }
+                }
+            }
         )
+        
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
                 initialOption: .fromAlbumOnly,
@@ -64,6 +69,7 @@ struct ArchiveAlbumDetailView: View {
             await store.send(.onAppear).finish()
         }
         .background(.white)
+        
     }
 }
 

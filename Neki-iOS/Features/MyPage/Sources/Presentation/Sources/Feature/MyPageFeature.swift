@@ -13,7 +13,7 @@ struct MyPageFeature {
     @ObservableState
     struct State {
         // TODO: 유저정보 @Shared로 가져오거나 아니면 생성자로 주입, 일단은 임시값
-        var user: User = User(nickname: "강유신", providerType: .kakao)
+        var user: User = User(nickname: "SwainYun", providerType: .kakao)
     }
     
     enum Action {
@@ -21,10 +21,17 @@ struct MyPageFeature {
         case profileTapped
     }
     
+    @Dependency(\.openURL) private var openURL
+    
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
-            default: return .none
+            case let .cellTapped(item):
+                // TODO: 노션 이동시키기
+                return .none
+                
+            default:
+                return .none
             }
         }
     }

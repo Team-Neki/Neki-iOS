@@ -92,7 +92,7 @@ public struct MapFeature {
         case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
         case startBackgroundCalculation
         case processNewChunk([PhotoBooth], isFirstBatch: Bool)
-        case appendProcessedChunk(map: [PhotoBooth], list: [PhotoBooth], isFirstBatch: Bool)
+        case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool)
         case didFinishBackgroundCalculation(map: IdentifiedArrayOf<PhotoBooth>, list: IdentifiedArrayOf<PhotoBooth>)
         
         // Binding & Child
@@ -266,16 +266,14 @@ public struct MapFeature {
                 return .run { send in
                     let filteredChunk: [PhotoBooth]
                     filteredChunk = activeFilters.isEmpty ? chunk : chunk.filter { activeFilters.contains($0.brand) }
-                    await send(.appendProcessedChunk(map: filteredChunk, list: filteredChunk, isFirstBatch: isFirstBatch))
+                    await send(.appendProcessedChunk(map: filteredChunk, isFirstBatch: isFirstBatch))
                 }
                 
-            case let .appendProcessedChunk(map, list, isFirstBatch):
+            case let .appendProcessedChunk(map, isFirstBatch):
                 if isFirstBatch {
                     state.visiblePhotoBooths = IdentifiedArray(uniqueElements: map)
-                    state.photoBoothListState.visibleBooths = IdentifiedArrayOf(uniqueElements: list)
                 } else {
                     state.visiblePhotoBooths.append(contentsOf: map)
-                    state.photoBoothListState.visibleBooths.append(contentsOf: list)
                 }
                 return .none
                 
@@ -311,14 +309,8 @@ public struct MapFeature {
                 return .run { send in
                     let visibleMapBooths: IdentifiedArrayOf<PhotoBooth>
                     let visibleListBooths: IdentifiedArrayOf<PhotoBooth>
-                    if activeFilters.isEmpty {
-                        visibleMapBooths = mapBooths
-                        visibleListBooths = listBooths
-                    } else {
-                        visibleMapBooths = mapBooths.filter { activeFilters.contains($0.brand) }
-                        visibleListBooths = listBooths.filter { activeFilters.contains($0.brand) }
-                    }
-                    
+                    visibleMapBooths = activeFilters.isEmpty ? mapBooths : mapBooths.filter { activeFilters.contains($0.brand) }
+                    visibleListBooths = activeFilters.isEmpty ? listBooths : listBooths.filter { activeFilters.contains($0.brand) }
                     await send(.didFinishBackgroundCalculation(map: visibleMapBooths, list: visibleListBooths))
                 }
                 .cancellable(id: CancelID.calculation, cancelInFlight: true)

@@ -91,6 +91,8 @@ public struct MapFeature {
         case fetchNearbyPhotoBooths(GeographicCoordinate)
         case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
         case startBackgroundCalculation
+        case processNewChunk([PhotoBooth], isFirstBatch: Bool)
+        case appendProcessedChunk(map: [PhotoBooth], list: [PhotoBooth], isFirstBatch: Bool)
         case didFinishBackgroundCalculation(map: IdentifiedArrayOf<PhotoBooth>, list: IdentifiedArrayOf<PhotoBooth>)
         
         // Binding & Child
@@ -256,7 +258,26 @@ public struct MapFeature {
                 
             case let .photoBoothChunkLoaded(chunk):
                 state.photoBooths.append(contentsOf: chunk)
-                return .send(.startBackgroundCalculation)
+                let isFirstBatch = state.photoBooths.count == chunk.count
+                return .send(.processNewChunk(chunk, isFirstBatch: isFirstBatch))
+                
+            case let .processNewChunk(chunk, isFirstBatch):
+                let activeFilters = state.photoBoothListState.filteredBrands
+                return .run { send in
+                    let filteredChunk: [PhotoBooth]
+                    filteredChunk = activeFilters.isEmpty ? chunk : chunk.filter { activeFilters.contains($0.brand) }
+                    await send(.appendProcessedChunk(map: filteredChunk, list: filteredChunk, isFirstBatch: isFirstBatch))
+                }
+                
+            case let .appendProcessedChunk(map, list, isFirstBatch):
+                if isFirstBatch {
+                    state.visiblePhotoBooths = IdentifiedArray(uniqueElements: map)
+                    state.photoBoothListState.visibleBooths = IdentifiedArrayOf(uniqueElements: list)
+                } else {
+                    state.visiblePhotoBooths.append(contentsOf: map)
+                    state.photoBoothListState.visibleBooths.append(contentsOf: list)
+                }
+                return .none
                 
             case .photoBoothStreamFinished:
                 return .none

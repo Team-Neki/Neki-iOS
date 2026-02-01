@@ -40,7 +40,7 @@ struct ArchiveAlbumDetailView: View {
             left: { NekiToolBar.back { store.send(.onTapBackButton) } },
             center: { NekiToolBar.textCenter(store.album.title) },
             right: {
-                if store.album.count != 0 {
+                if store.photos.count != 0 {
                     store.isSelectionMode ?
                     NekiToolBar.textRight("취소") { store.send(.onTapCancelSelectButton) } :
                     NekiToolBar.textRight("선택") { store.send(.onTapSelectButton) }

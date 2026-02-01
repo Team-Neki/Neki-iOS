@@ -32,6 +32,7 @@ struct AlbumCard: View {
                     Logger.presentation.error("앨범이미지 로드 실패: \(error)")
                     Logger.presentation.error("실패한 앨범이미지 id: \(album.id)")
                 }
+                .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: cardWidth, height: cardHeight)
                 .clipped()

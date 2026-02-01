@@ -24,6 +24,7 @@ struct PoseDetailView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         }
                         .retry(maxCount: 3, interval: .seconds(5))
+                        .cancelOnDisappear(true)
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .tag(item.id)

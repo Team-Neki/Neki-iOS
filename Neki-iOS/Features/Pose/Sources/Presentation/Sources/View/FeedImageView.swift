@@ -27,6 +27,7 @@ struct FeedImageView: View {
                     Logger.presentation.error("이미지 로드 실패: \(error)")
                     Logger.presentation.error("실패한 이미지 id: \(item.id)")
                 }
+                .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fit)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))

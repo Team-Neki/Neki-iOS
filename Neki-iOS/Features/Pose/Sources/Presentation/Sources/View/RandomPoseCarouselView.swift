@@ -194,6 +194,7 @@ private extension RandomPoseCarouselView {
                 ProgressView()
                     .controlSize(.large)
             }
+            .cancelOnDisappear(true)
             .resizable()
             .scaledToFit()
             .clipShape(.rect(cornerRadius: 20))

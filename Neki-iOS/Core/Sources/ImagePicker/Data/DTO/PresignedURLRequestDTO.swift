@@ -8,6 +8,10 @@
 import Foundation
 
 public struct PresignedURLRequestDTO: Encodable {
+    public let items: [PresignedURLRequestData]
+}
+
+public struct PresignedURLRequestData: Encodable {
     public let filename: String
     public let contentType: String
     public let mediaType: String

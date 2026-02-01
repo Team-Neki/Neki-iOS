@@ -291,8 +291,22 @@ private extension ArchiveView {
                     .onTapGesture {
                         store.send(.imageTapped(item))
                     }
+                    .onAppear {
+                        if item == store.photos.last {
+                            store.send(.loadMorePhotos)
+                        }
+                    }
             }
             .padding(.bottom, 76)
+            
+            if store.isFetchingPhotos && !store.photos.isEmpty {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+                .padding(.vertical, 20)
+            }
         }
         .padding(.horizontal, 20)
     }

@@ -17,9 +17,9 @@ import os
 
 @DependencyClient
 public struct AuthClient {
-    public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
-    public var loginWithKakao: @Sendable () async throws -> User
-    public var autoLogin: @Sendable () async throws -> User
+    public var loginWithApple: @Sendable (_ idToken: Data) async throws -> Void
+    public var loginWithKakao: @Sendable () async throws -> Void
+    public var autoLogin: @Sendable () async throws -> Void
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
     public var updateProfile: @Sendable (_ nickname: String?, _ profileImage: Data?) async throws -> Void
@@ -32,24 +32,26 @@ extension AuthClient: DependencyKey {
         @Dependency(\.authRepository) var authRepository
         @Dependency(\.imageUploadRepository) var imageUploadRepository
         
-        @Sendable func loginWithApple(idToken: Data) async throws -> User {
+        @Sendable func loginWithApple(idToken: Data) async throws -> Void {
             guard let idTokenString = String(data: idToken, encoding: .utf8) else {
                 throw AuthClientError.invalidClientToken
             }
             
             do {
                 _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
-                return try await authRepository.fetchUser()
+                let user = try await authRepository.fetchUser()
+                UserSessionStatus.updateStatus(.signedIn(user))
             } catch {
                 throw AuthClient.mapError(error)
             }
         }
         
-        @Sendable func loginWithKakao() async throws -> User {
+        @Sendable func loginWithKakao() async throws -> Void {
             do {
                 let idToken = try await kakaoSDKHelper.login()
                 _ = try await authRepository.login(idToken: idToken, provider: .kakao)
-                return try await authRepository.fetchUser()
+                let user = try await authRepository.fetchUser()
+                UserSessionStatus.updateStatus(.signedIn(user))
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
             } catch let error as AuthClientError {
@@ -59,9 +61,10 @@ extension AuthClient: DependencyKey {
             }
         }
         
-        @Sendable func autoLogin() async throws -> User {
+        @Sendable func autoLogin() async throws -> Void {
             do {
-                return try await authRepository.restoreSession()
+                let user = try await authRepository.restoreSession()
+                UserSessionStatus.updateStatus(.signedIn(user))
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -71,6 +74,7 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.logout()
                 kakaoSDKHelper.logout()
+                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -80,6 +84,7 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.withdraw()
                 kakaoSDKHelper.logout()
+                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -130,10 +135,11 @@ private extension AuthClient {
             case .networkError(let networkError):
                 switch networkError {
                 case .networkFail: return .networkConnectionLost
-                case .unauthorizedError: return .sessionExpired
+                case .unauthorizedError: UserSessionStatus.updateStatus(.signedOut); return .sessionExpired
                 default: return .serverError(networkError.localizedDescription)
                 }
             case .unauthorized, .userNotFound:
+                UserSessionStatus.updateStatus(.signedOut)
                 return .sessionExpired
             case .unknown:
                 return .unknown

@@ -97,7 +97,7 @@ public struct DefaultAuthRepository: AuthRepository {
     }
     
     public func restoreSession() async throws(AuthRepositoryError) -> User {
-        guard let tokens = try? tokenStorage.fetch() else { throw .unauthorized }
+        guard let _ = try? tokenStorage.fetch() else { throw .unauthorized }
         do {
             return try await fetchUser()
         } catch {

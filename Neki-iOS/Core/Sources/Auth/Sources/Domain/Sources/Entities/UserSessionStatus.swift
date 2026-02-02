@@ -1,5 +1,5 @@
 //
-//  UsesSessionStatus.swift
+//  UserSessionStatus.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 2/2/26.

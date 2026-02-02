@@ -283,7 +283,7 @@ private extension ArchiveView {
             }
             .padding(.bottom, 12)
             
-            if !store.photos.isEmpty {
+            if store.photos.isEmpty {
                 ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n찍은 네컷을 네키에 저장해보세요!")
                     .padding(.top, 70)
             } else {

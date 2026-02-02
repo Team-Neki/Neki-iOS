@@ -20,10 +20,17 @@ struct MyPageFeature {
         case profileTapped
     }
     
+    @Dependency(\.openURL) private var openURL
+    
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
-            default: return .none
+            case let .cellTapped(item):
+                // TODO: 노션 이동시키기
+                return .none
+                
+            default:
+                return .none
             }
         }
     }

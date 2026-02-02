@@ -15,13 +15,17 @@ struct PoseCoordinator {
     struct State {
         var root = PoseFeature.State()
         var path = StackState<Path.State>()
+        @Presents var randomPose: RandomPoseCarouselFeature.State?
     }
     
     enum Action {
+        // Child
         case root(PoseFeature.Action)
         case path(StackActionOf<Path>)
+        case randomPose(PresentationAction<RandomPoseCarouselFeature.Action>)
         
-        case routeToDetail(FeedImageItem)
+        // Navigation
+        case routeToDetail(Pose)
         
         case delegate(Delegate)
         enum Delegate {
@@ -34,36 +38,42 @@ struct PoseCoordinator {
             PoseFeature()
         }
         
-        Reduce { state, action in
-            /// 화면전환과 관련된 액션 case만 사용하고 나머지는 default를 이용해 무시
+        Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
-                // 포즈 피드에서 이미지 클릭해서 상세 보기
-            case let .root(.imageTapped(item)):
+                
+                // MARK: - Navigation Triggers from Root
+            case let .root(.delegate(.didTapImage(pose))):
+                state.path.append(.detail(PoseDetailFeature.State(poses: state.root.filteredPoses, selectedID: pose.id)))
+                return .none
+                
+            case let .root(.delegate(.didTapStartRandomPose(option))):
+                state.randomPose = RandomPoseCarouselFeature.State(peopleCount: option)
+                return .none
+                
+                // MARK: - Data Synchronization (Coordinator's Main Job)
+            case let .path(.element(_, action: .detail(.delegate(.poseUpdated(pose))))):
+                return .send(.root(.updatePoseInList(pose)))
+                
+            case let .randomPose(.presented(.delegate(.poseUpdated(pose)))):
+                return .send(.root(.updatePoseInList(pose)))
+                
+                // MARK: - Navigation from Random Pose
+            case let .randomPose(.presented(.delegate(.routeToDetail(pose)))):
+                return .send(.routeToDetail(pose))
+                
+            case let .routeToDetail(pose):
                 state.path.append(.detail(PoseDetailFeature.State(
-                    items: state.root.filteredItems,
-                    selectedID: item.id
+                    poses: state.root.filteredPoses,
+                    selectedID: pose.id
                 )))
                 return .none
-                
-            case let .routeToDetail(item):
-                // 기존 스택을 비우고 싶다면: state.path.removeAll()
-                // 포즈 외부에서 이미지 디테일 뷰로 이동 (Feature간 전환)
-                state.path.append(.detail(PoseDetailFeature.State(
-                    items: state.root.items, // 전체 리스트 전달
-                    selectedID: item.id      // 클릭한 아이템의 ID 전달
-                )))
-                return .none
-                
-            case .path(.element(id: _, action: .detail(.didTapBackButton))):
-                state.path.removeLast()
-                return .none
-                
                 
             default:
                 return .none
             }
         }
         .forEach(\.path, action: \.path)
+        .ifLet(\.$randomPose, action: \.randomPose) { RandomPoseCarouselFeature() }
     }
 }
 

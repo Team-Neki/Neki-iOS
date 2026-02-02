@@ -20,6 +20,7 @@ struct ArchiveFeature {
         @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
         
         @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
+        @Presents var qrScanner: QRCodeScanFeature.State?
         
         var newAlbumTitle: String = ""
         
@@ -88,6 +89,9 @@ struct ArchiveFeature {
         enum DelegateAction {
             case showToast(NekiToastItem)
         }
+        
+        // Child Action
+        case qrScanner(PresentationAction<QRCodeScanFeature.Action>)
     }
     
     @Dependency(\.archiveClient) var archiveClient
@@ -178,6 +182,10 @@ struct ArchiveFeature {
                 
                 
                 // MARK: - Image Upload Action
+                
+            case .qrScannerPresented:
+                state.qrScanner = QRCodeScanFeature.State()
+                return .none
                 
             case .imagePicker(.uploadStarted):
                 state.isLoading = true
@@ -381,6 +389,11 @@ struct ArchiveFeature {
                 }
                 return .none
                 
+            case let .qrScanner(.presented(.imageProcessingResult(processedID))):
+                state.qrScanner = nil
+                // TODO: QR 파싱 후 업로드 끝난 ID를 어떻게 해야하는거지?
+                let toast = NekiToastItem("이미지를 추가했어요", style: .success)
+                return .send(.delegate(.showToast(toast)))
                 
             default:
                 return .none
@@ -388,6 +401,9 @@ struct ArchiveFeature {
         }
         .ifLet(\.$selectUploadAlbum, action: \.selectUploadAlbum) {
             SelectUploadAlbumFeature()
+        }
+        .ifLet(\.$qrScanner, action: \.qrScanner) {
+            QRCodeScanFeature()
         }
     }
 }

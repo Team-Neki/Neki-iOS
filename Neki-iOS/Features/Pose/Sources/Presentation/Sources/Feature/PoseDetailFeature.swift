@@ -7,44 +7,81 @@
 
 import SwiftUI
 import ComposableArchitecture
+import os
 
 @Reducer
 struct PoseDetailFeature {
     @ObservableState
     struct State: Equatable {
-        var items: IdentifiedArrayOf<FeedImageItem>
-        var selectedID: UUID
-        var isScrapped: Bool {
-            items[id: selectedID]?.isScrapped ?? false
-        }
+        var poses: IdentifiedArrayOf<Pose>
+        var selectedID: PoseID
+        var currentPose: Pose? { poses[id: selectedID] }
+        var isScrapped: Bool { currentPose?.isScrapped ?? false }
     }
     
     enum Action {
-        // User Action
+        // User Actions
         case onTapScrap
-        case pageChanged(UUID)
-        
-        // Navigation Action
+        case pageChanged(PoseID)
         case didTapBackButton
+        
+        // Internal Actions
+        case scrapResponse(PoseID, Result<Void, Error>)
+        
+        // Delegate Actions
+        case delegate(Delegate)
+        enum Delegate {
+            case poseUpdated(Pose)
+        }
     }
     
+    private enum CancelID: Hashable {
+        case scrap(PoseID)
+    }
+    
+    @Dependency(\.poseClient) private var poseClient
+    @Dependency(\.dismiss) private var dismiss
+    
     var body: some ReducerOf<Self> {
-        Reduce { state, action in
+        Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+                // MARK: - View Actions
             case .onTapScrap:
-                if state.items[id: state.selectedID] != nil {
-                    state.items[id: state.selectedID]?.isScrapped.toggle()
+                guard var pose = state.currentPose else { return .none }
+                pose.isScrapped.toggle()
+                state.poses[id: pose.id] = pose
+                
+                return .run { [pose] send in
+                    await send(.delegate(.poseUpdated(pose)))
+                    await send(.scrapResponse(pose.id, Result { try await poseClient.scrapPose(poseID: pose.id) }))
                 }
-                return .none
+                .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
                 
             case let .pageChanged(newID):
                 state.selectedID = newID
                 return .none
                 
-            default:
+            case .didTapBackButton:
+                return .run { _ in await dismiss() }
+                
+                // MARK: - Internal Actions
+            case let .scrapResponse(id, .failure(error)):
+                if error is CancellationError { return .none }
+                
+                if var pose = state.poses[id: id] {
+                    pose.isScrapped.toggle()
+                    state.poses[id: id] = pose
+                    return .send(.delegate(.poseUpdated(pose)))
+                }
+                Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
+                return .none
+                
+            case .scrapResponse:
+                return .none
+                
+            case .delegate:
                 return .none
             }
         }
     }
-    
 }

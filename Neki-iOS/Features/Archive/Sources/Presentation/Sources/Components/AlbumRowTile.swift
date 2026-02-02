@@ -25,6 +25,7 @@ struct AlbumRowTile: View {
                         .clipped()
                 })
                 .resizable()
+                .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 72, height: 72)
                 .overlay(favoriteHeartOverlay)

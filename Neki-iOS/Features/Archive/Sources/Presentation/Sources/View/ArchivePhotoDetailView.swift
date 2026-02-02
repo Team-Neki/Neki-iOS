@@ -23,6 +23,7 @@ struct ArchivePhotoDetailView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .retry(maxCount: 3, interval: .seconds(5))
+                .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         
@@ -34,13 +35,15 @@ struct ArchivePhotoDetailView: View {
                 onFavorite: { store.send(.onTapFavorite) }
             )
         }
-        .nekiToolbar(left: .back(action: { store.send(.onTapBackButton) }),
-                     center: .text(store.formattedDate))
+        .nekiToolbar(
+            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
+            center: { NekiToolBar.textCenter(store.formattedDate) }
+        )
         .nekiAlert(
             isPresented: $showDeleteAlert,
             style: .cancelable,
-            titleMessage: "사진을 삭제하시겠어요?",
-            subTitleMessage: "이 작업은 실행취소할 수 없어요",
+            title: "사진을 삭제하시겠어요?",
+            subtitle: "이 작업은 실행취소할 수 없어요",
             confirmText: "삭제하기",
             cancelText: "취소",
             onConfirm: {

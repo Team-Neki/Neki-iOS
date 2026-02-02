@@ -31,10 +31,11 @@ public struct TermsAgreementView: View {
             .disabled(store.isConfirmButtonEnabled == false)
         }
         .padding()
-        .nekiToolbar(
-            left: .back(action: { dismiss() }),
-            center: .text("이용약관")
-        )
+        .nekiToolbar {
+            NekiToolBar.back { dismiss() }
+        } center: {
+            NekiToolBar.textCenter("이용약관")
+        }
     }
     
     private var terms: some View {
@@ -97,7 +98,9 @@ public struct TermsAgreementView: View {
                             }
                         }
                         
-                        Link(destination: URL(string: "https://example.com")!) { // TODO: 노션 약관 페이지로 이동시키기
+                        Button {
+                            store.send(.termPageLinkTapped(type))
+                        } label: {
                             Image(.iconChevronRight)
                                 .resizable()
                                 .frame(width: 24, height: 24)

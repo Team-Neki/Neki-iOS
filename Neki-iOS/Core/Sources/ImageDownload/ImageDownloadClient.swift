@@ -19,7 +19,7 @@ public struct ImageDownloadClient {
 extension ImageDownloadClient: DependencyKey {
     public static var liveValue: ImageDownloadClient {
         
-        func downloadImages(urls: [URL]) async -> Int {
+        func downloadImages(urls: [URL]) async throws -> Int {
             let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard status == .authorized || status == .limited else {
                 Logger.domain.error("‼️ 갤러리 접근 권한이 없습니다.")

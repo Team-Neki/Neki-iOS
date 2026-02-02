@@ -35,7 +35,7 @@ struct MyPageCoordinator {
                 return .none
                 
             case .root(.profileTapped):
-                state.path.append(.accountPreference(.init()))
+                state.path.append(.accountPreference(.init(user: state.root.user)))
                 return .none
                 
             case .path(.element(id: _, action: .accountPreference(.editProfileButtonTapped))):

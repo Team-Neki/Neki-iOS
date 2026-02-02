@@ -10,7 +10,7 @@ import ComposableArchitecture
 
 @main
 struct Neki_iOSApp: App {
-    let store = Store(initialState: AppCoordinator.State.splash(.init())) {
+    let store = Store(initialState: AppCoordinator.State()) {
         AppCoordinator()
     }
     

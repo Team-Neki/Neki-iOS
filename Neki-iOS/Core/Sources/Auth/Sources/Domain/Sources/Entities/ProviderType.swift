@@ -8,7 +8,7 @@
 import Foundation
 
 /// OAuth 공급자 종류
-public enum ProviderType: String, Sendable {
+public enum ProviderType: String, Sendable, Codable {
     case local = "local"
     case apple = "apple"
     case kakao = "kakao"

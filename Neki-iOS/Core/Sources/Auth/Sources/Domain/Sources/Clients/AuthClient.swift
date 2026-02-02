@@ -32,6 +32,7 @@ extension AuthClient: DependencyKey {
         @Dependency(\.authRepository) var authRepository
         @Dependency(\.imageUploadRepository) var imageUploadRepository
         
+        @discardableResult
         @Sendable func loginWithApple(idToken: Data) async throws -> User {
             guard let idTokenString = String(data: idToken, encoding: .utf8) else {
                 throw AuthClientError.invalidClientToken
@@ -39,17 +40,22 @@ extension AuthClient: DependencyKey {
             
             do {
                 _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
-                return try await authRepository.fetchUser()
+                let user = try await authRepository.fetchUser()
+                UserSessionStatus.updateStatus(.signedIn(user))
+                return user
             } catch {
                 throw AuthClient.mapError(error)
             }
         }
         
+        @discardableResult
         @Sendable func loginWithKakao() async throws -> User {
             do {
                 let idToken = try await kakaoSDKHelper.login()
                 _ = try await authRepository.login(idToken: idToken, provider: .kakao)
-                return try await authRepository.fetchUser()
+                let user = try await authRepository.fetchUser()
+                UserSessionStatus.updateStatus(.signedIn(user))
+                return user
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
             } catch let error as AuthClientError {
@@ -59,9 +65,12 @@ extension AuthClient: DependencyKey {
             }
         }
         
+        @discardableResult
         @Sendable func autoLogin() async throws -> User {
             do {
-                return try await authRepository.restoreSession()
+                let user = try await authRepository.restoreSession()
+                UserSessionStatus.updateStatus(.signedIn(user))
+                return user
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -71,6 +80,7 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.logout()
                 kakaoSDKHelper.logout()
+                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -80,6 +90,7 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.withdraw()
                 kakaoSDKHelper.logout()
+                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -130,10 +141,11 @@ private extension AuthClient {
             case .networkError(let networkError):
                 switch networkError {
                 case .networkFail: return .networkConnectionLost
-                case .unauthorizedError: return .sessionExpired
+                case .unauthorizedError: UserSessionStatus.updateStatus(.signedOut); return .sessionExpired
                 default: return .serverError(networkError.localizedDescription)
                 }
             case .unauthorized, .userNotFound:
+                UserSessionStatus.updateStatus(.signedOut)
                 return .sessionExpired
             case .unknown:
                 return .unknown

@@ -8,7 +8,7 @@
 import Foundation
 
 /// 사용자 정보
-public struct User: Sendable {
+public struct User: Sendable, Equatable, Codable {
     let id: Int
     let nickname: String
     let email: String?

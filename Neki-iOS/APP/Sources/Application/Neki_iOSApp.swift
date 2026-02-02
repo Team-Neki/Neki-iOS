@@ -10,11 +10,8 @@ import ComposableArchitecture
 
 @main
 struct Neki_iOSApp: App {
-//    let store = Store(initialState: AppCoordinator.State.splash(.init())) {
-//        AppCoordinator()
-//    }
-    let store = Store(initialState: MainTabCoordinator.State.init(user: User(id: 1, nickname: "testuser", email: nil, profileImageURL: nil, providerType: .apple))) {
-        MainTabCoordinator()
+    let store = Store(initialState: AppCoordinator.State()) {
+        AppCoordinator()
     }
     
     var body: some Scene {

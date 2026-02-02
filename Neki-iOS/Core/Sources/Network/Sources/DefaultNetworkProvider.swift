@@ -36,7 +36,7 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     // TODO: - 프로바이더 부분 수정 필요
     
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
-    /// 임시 구현
+    /// 임시 구현 - Presigned URL 요청 시에만 사용합니다
     public func requestVoid(endpoint: Endpoint) async throws -> Void {
             let request = try await buildRequest(for: endpoint)
             

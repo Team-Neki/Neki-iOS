@@ -44,7 +44,7 @@ struct ArchiveImageFooter: View {
             Button(action: onDownload) {
                 Image(isEnabled ? .iconDownloadFill : .iconDownload)
                     .renderingMode(.template)
-                    .foregroundStyle(isEnabled ? .gray900 : .gray300)
+                    .foregroundStyle(isEnabled ? .gray500 : .gray100)
             }
             .frame(width: 44, height: 44)
             .disabled(!isEnabled)
@@ -64,7 +64,7 @@ struct ArchiveImageFooter: View {
             Button(action: onDelete) {
                 Image(isEnabled ? .iconTrashFill : .iconTrash)
                     .renderingMode(.template)
-                    .foregroundStyle(isEnabled ? .gray900 : .gray300)
+                    .foregroundStyle(isEnabled ? .gray600 : .gray100)
             }
             .frame(width: 44, height: 44)
             .disabled(!isEnabled)

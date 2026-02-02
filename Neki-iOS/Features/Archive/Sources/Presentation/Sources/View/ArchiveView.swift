@@ -283,21 +283,26 @@ private extension ArchiveView {
             }
             .padding(.bottom, 12)
             
-            MasonryGridView(
-                items: Array(store.photos),
-                columns: 2
-            ) { item in
-                ArchiveImageCard(item: item)
-                    .onTapGesture {
-                        store.send(.imageTapped(item))
-                    }
-                    .onAppear {
-                        if item == store.photos.last {
-                            store.send(.loadMorePhotos)
+            if store.photos.isEmpty {
+                ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n찍은 네컷을 네키에 저장해보세요!")
+                    .padding(.top, 70)
+            } else {
+                MasonryGridView(
+                    items: Array(store.photos),
+                    columns: 2
+                ) { item in
+                    ArchiveImageCard(item: item)
+                        .onTapGesture {
+                            store.send(.imageTapped(item))
                         }
-                    }
+                        .onAppear {
+                            if item == store.photos.last {
+                                store.send(.loadMorePhotos)
+                            }
+                        }
+                }
+                .padding(.bottom, 76)
             }
-            .padding(.bottom, 76)
             
             if store.isFetchingPhotos && !store.photos.isEmpty {
                 HStack {

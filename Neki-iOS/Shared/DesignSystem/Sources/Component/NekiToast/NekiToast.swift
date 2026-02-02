@@ -12,19 +12,11 @@ public enum NekiToastStyle {
     case error
     case info
     
-    var iconName: String {
+    var iconName: UIImage {
         switch self {
-        case .success: return "checkmark.circle.fill"
-        case .error: return "exclamationmark.circle.fill"
-        case .info: return "info.circle.fill"
-        }
-    }
-    
-    var iconColor: Color {
-        switch self {
-        case .success: return .primary500
-        case .error: return .red
-        case .info: return .primary500
+        case .success: return .iconCheck
+        case .error: return .iconError
+        case .info: return .iconInfo
         }
     }
 }
@@ -63,12 +55,12 @@ struct NekiToastView: View {
     let onDismiss: () -> Void
     
     var body: some View {
-        HStack {
-            Image(systemName: item.style.iconName)
-                .foregroundStyle(item.style.iconColor)
+        HStack(alignment: .center, spacing: 0) {
+            Image(uiImage: item.style.iconName)
+                .padding(.trailing, 8)
             
             Text(item.message)
-                .nekiFont(.body16SemiBold)
+                .nekiFont(.body16Medium)
                 .foregroundStyle(.white)
                 .lineLimit(2)
             
@@ -89,6 +81,7 @@ struct NekiToastView: View {
                 }
             }
         }
+        .frame(width: 303, height: 26)
         .padding(16)
         .background(.gray800)
         .clipShape(RoundedRectangle(cornerRadius: 12))

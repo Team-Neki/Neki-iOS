@@ -35,6 +35,8 @@ struct ArchivePhotoDetailFeature {
             formatter.dateFormat = "yyyy.MM.dd"
             return formatter.string(from: item.date)
         }
+        
+        var isLoading: Bool = false
     }
     
     enum Action: BindableAction {
@@ -42,6 +44,7 @@ struct ArchivePhotoDetailFeature {
         
         case onTapBackButton
         case onTapDownload
+        case downloadImageResponse(successCount: Int)
         
         case onTapFavorite
         case toggleFavoriteResponse(Result<Void, Error>)
@@ -57,6 +60,7 @@ struct ArchivePhotoDetailFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -85,7 +89,25 @@ struct ArchivePhotoDetailFeature {
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownload:
-                return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                guard let url = state.item.imageURL else {
+                    return .none
+                }
+                
+                state.isLoading = true
+                
+                return .run { send in
+                    let count = try await imageDownloadClient.downloadImages(urls: [url])
+                    await send(.downloadImageResponse(successCount: count))
+                }
+                
+            case let .downloadImageResponse(count):
+                state.isLoading = false
+                
+                if count > 0 {
+                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                } else {
+                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
+                }
                 
             case .onTapDelete:
                 return .run { [id = state.itemID] send in
@@ -102,7 +124,7 @@ struct ArchivePhotoDetailFeature {
                     await dismiss()
                 }
                 
-            case .deletePhotoResponse(.failure(let error)):
+            case .deletePhotoResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
                 
             default:

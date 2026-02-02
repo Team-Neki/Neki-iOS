@@ -269,7 +269,3 @@ extension PoseView {
         var id: Self { self }
     }
 }
-
-#Preview {
-    AppCoordinatorView(store: .init(initialState: AppCoordinator.State.mainTab(.init()), reducer: { AppCoordinator() }))
-}

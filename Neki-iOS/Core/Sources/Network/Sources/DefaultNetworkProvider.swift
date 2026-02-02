@@ -38,27 +38,27 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
     /// 임시 구현
     public func requestVoid(endpoint: Endpoint) async throws -> Void {
-            let request = try await buildRequest(for: endpoint)
+        let request = try await buildRequest(for: endpoint)
+        
+        requestLog(request)
+        
+        do {
+            let (_, response) = try await session.data(for: request, delegate: nil)
+            responseLog(data: Data(), response: response)
             
-             requestLog(request)
-            
-            do {
-                let (_, response) = try await session.data(for: request, delegate: nil)
-                 responseLog(data: Data(), response: response)
-                
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    throw NetworkError.responseError
-                }
-                
-                guard (200..<300).contains(httpResponse.statusCode) else {
-                    throw NetworkError.networkFail
-                }
-                
-                return
-            } catch {
-                throw NetworkError.unknownError(error)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NetworkError.responseError
             }
+            
+            guard (200..<300).contains(httpResponse.statusCode) else {
+                throw NetworkError.networkFail
+            }
+            
+            return
+        } catch {
+            throw NetworkError.unknownError(error)
         }
+    }
     
     /// 네트워크 요청을 수행하고 성공 여부만 판단하며 BaseResponseDTO<EmptyData>를 반환합니다
     @discardableResult
@@ -77,6 +77,7 @@ public final actor DefaultNetworkProvider: NetworkProvider {
 
 private extension DefaultNetworkProvider {
     func performRequest<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
+        try await validateToken(for: endpoint)
         let request = try await buildRequest(for: endpoint)
         let (data, response) = try await executeSession(with: request)
         
@@ -130,19 +131,9 @@ private extension DefaultNetworkProvider {
     func appendBearerToken(to request: URLRequest) throws -> URLRequest {
         var newRequest = request
         
-        // 이미지 업로드 테스트를 위한 임시 토큰
-        var temporaryToken: String {
-            guard let token = Bundle.main.infoDictionary?["TEMPORARY_ACCESS_TOKEN"] as? String else {
-                return NetworkError.invalidURLError.localizedDescription
-            }
-            
-            return token
-        }
-        
         do {
-            newRequest.setValue("Bearer \(temporaryToken)", forHTTPHeaderField: "Authorization")
-//            let tokens = try tokenStorage.fetch()
-//            newRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
+            let tokens = try tokenStorage.fetch()
+            newRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
             return newRequest
         } catch TokenStorageError.notFound {
             throw NetworkError.unauthorizedError
@@ -177,14 +168,32 @@ private extension DefaultNetworkProvider {
 // MARK: - Auth Retry Logic
 
 private extension DefaultNetworkProvider {
+    func validateToken(for endpoint: Endpoint) async throws {
+        guard endpoint.authorizationType == .bearer, let token = try? tokenStorage.fetch() else { return }
+        guard token.refreshNeeded else { return }
+        Logger.network.debug("토큰 만료로 인해 재발급 시도")
+        try await performTokenRefresh()
+    }
+    
+    func handleSessionExpired() {
+        UserSessionStatus.updateStatus(.expired)
+        try? tokenStorage.delete()
+        Logger.network.error("❌ Session Expired.")
+    }
+    
     func retryWithTokenRefresh<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
         guard endpoint.authorizationType != .reissue, retryCount > .zero else {
-            try? tokenStorage.delete()
+            handleSessionExpired()
             throw NetworkError.unauthorizedError
         }
         
-        try await performTokenRefresh()
-        return try await performRequest(endpoint: endpoint, retryCount: retryCount - 1)
+        do {
+            try await performTokenRefresh()
+            return try await performRequest(endpoint: endpoint, retryCount: retryCount - 1)
+        } catch {
+            handleSessionExpired()
+            throw error
+        }
     }
     
     func performTokenRefresh() async throws {

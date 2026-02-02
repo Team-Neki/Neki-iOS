@@ -17,7 +17,15 @@ struct AlbumRowTile: View {
     var body: some View {
         HStack(alignment: .center, spacing: 16) {
             KFImage(album.coverImageURL)
+                .placeholder({
+                    Image(.temporaryBranding)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 72, height: 72)
+                        .clipped()
+                })
                 .resizable()
+                .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 72, height: 72)
                 .overlay(favoriteHeartOverlay)

@@ -40,10 +40,3 @@ struct MainTabCoordinatorView: View {
         // TODO: - 탭 이동 시 화면 초기화 되는지 기디 물어보기. 그리고 탭 한 번 더 누르면 초기화면으로 가는지도
     }
 }
-
-#Preview {
-    MainTabCoordinatorView(store: Store(initialState: MainTabCoordinator.State()) {
-        MainTabCoordinator()
-    }
-    )
-}

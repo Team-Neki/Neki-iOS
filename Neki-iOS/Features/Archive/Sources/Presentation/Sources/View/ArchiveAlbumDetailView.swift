@@ -18,22 +18,11 @@ struct ArchiveAlbumDetailView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-//            if store.filteredItems.isEmpty {
-            if store.album.count == 0 {
+            if store.photos.isEmpty {
                 ArchiveEmptyView()
                     .padding(.bottom, 54)
             } else {
                 masonryView
-            }
-            
-//            if !store.filteredItems.isEmpty && !store.isSelectionMode {
-            if (store.album.count != 0) && !store.isSelectionMode {
-                filterBar
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 4)
-                    .padding(.bottom, 12)
-                    .background(.white)
-                    .offset(y: isFilterBarVisible ? 0 : -100)
             }
             
             if store.isSelectionMode {
@@ -48,31 +37,39 @@ struct ArchiveAlbumDetailView: View {
             }
         }
         .nekiToolbar(
-            left: .back(action: { store.send(.onTapBackButton) }),
-            center: .text(store.album.title),
-//            right: store.filteredItems.isEmpty ? .none : store.isSelectionMode ?
-            right: (store.album.count == 0) ? .none : store.isSelectionMode ?
-                .text("취소", action: { store.send(.onTapCancelSelectButton) }) :
-                .text("선택", action: { store.send(.onTapSelectButton) })
+            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
+            center: { NekiToolBar.textCenter(store.album.title) },
+            right: {
+                if store.photos.count != 0 {
+                    store.isSelectionMode ?
+                    NekiToolBar.textRight("취소") { store.send(.onTapCancelSelectButton) } :
+                    NekiToolBar.textRight("선택") { store.send(.onTapSelectButton) }
+                }
+            }
         )
+        
         .sheet(isPresented: $deleteAlbumSheetPresented) {
-            ArchiveDeleteSheet(
-                selectedOption: $store.deleteOption,
+            ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
+                initialOption: .fromAlbumOnly,
                 title: "사진을 삭제하시겠어요?",
                 firstOption: (.fromAlbumOnly, "앨범에서만 제거"),
                 secondOption: (.everywhere, "모든 위치에서 사진 제거"),
                 onCancel: {
                     deleteAlbumSheetPresented = false
                 },
-                onConfirm: {
-                    store.send(.onTapDeleteButton)
+                onConfirm: { selectedOption in
+                    store.send(.onTapDeleteButton(option: selectedOption))
                     deleteAlbumSheetPresented = false
                 }
             )
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
         }
+        .task {
+            await store.send(.onAppear).finish()
+        }
         .background(.white)
+        
     }
 }
 
@@ -81,7 +78,7 @@ private extension ArchiveAlbumDetailView {
     var masonryView: some View {
         ScrollView {
             MasonryGridView(
-                items: Array(store.filteredItems),
+                items: Array(store.filteredAlbumPhotos),
                 columns: 2
             ) { item in
                 ArchiveImageCard(
@@ -92,9 +89,14 @@ private extension ArchiveAlbumDetailView {
                 .onTapGesture {
                     store.send(.imageTapped(item))
                 }
+                .onAppear {
+                    if item == store.filteredAlbumPhotos.last {
+                        store.send(.loadMorePhotos)
+                    }
+                }
             }
             .padding(.horizontal, 20)
-            .padding(.top, store.isSelectionMode ? 8 : 54)
+            .padding(.top, 8)
             .padding(.bottom, 76)
         }
         .scrollIndicators(.never)
@@ -111,63 +113,5 @@ private extension ArchiveAlbumDetailView {
                 }
                 .onEnded { _ in lastDragPoint = 0 }
         )
-    }
-    
-    @ViewBuilder
-    var filterBar: some View {
-        HStack(alignment: .center, spacing: 6) {
-            Button(store.state.selectedSortedTime) {
-                withAnimation { showDropDownMenu.toggle() }
-            }
-            .buttonStyle(.nekiChip(isHighlighted: false, shape: .capsule, style: .dropdown))
-            .overlay(alignment: .top) {
-                if showDropDownMenu {
-                    dropDownMenu
-                        .padding(.top, 45)
-                        .padding(.leading, 10)
-                }
-            }
-            
-            Button("즐겨찾는") {
-                store.send(.onTapFavoriteButton)
-                if showDropDownMenu { showDropDownMenu = false }
-            }
-            .buttonStyle(.nekiChip(isHighlighted: store.state.isSelectedFavorite, shape: .capsule, style: .normal))
-            
-            Spacer()
-        }
-    }
-    
-    @ViewBuilder
-    var dropDownMenu: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            dropDownMenuButton(title: "최신순") {
-                withAnimation { showDropDownMenu = false }
-                store.send(.onTapFilterNewest)
-            }
-            dropDownMenuButton(title: "오래된순") {
-                withAnimation { showDropDownMenu = false }
-                store.send(.onTapFilterOldest)
-            }
-        }
-        .padding(.vertical, 6)
-        .frame(width: 96, height: 72)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(.gray.opacity(0.5), lineWidth: 1)
-                .shadow(color: .gray.opacity(0.5), radius: 2)
-        )
-    }
-    
-    func dropDownMenuButton(title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray900)
-                .frame(height: 20)
-                .padding(.vertical, 5)
-        }
     }
 }

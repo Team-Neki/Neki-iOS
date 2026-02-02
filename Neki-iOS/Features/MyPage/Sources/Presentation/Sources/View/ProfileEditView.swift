@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,8 +18,20 @@ struct ProfileEditView: View {
     var body: some View {
         VStack {
             ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .frame(width: 142, height: 142)
+                Group {
+                    if let selectedImage = store.selectedProfileImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        KFImage(store.currentProfileImageURL)
+                            .resizable()
+                            .onFailureImage(.iconDefaultProfile)
+                            .scaledToFill()
+                    }
+                }
+                .frame(width: 142, height: 142)
+                .clipShape(.circle)
                 
                 Button {
                     isProfileSelectionAlertPresented = true
@@ -33,16 +46,15 @@ struct ProfileEditView: View {
                 text: $store.nickname,
                 isFocused: $isFocused,
                 prompt: "닉네임을 입력해주세요.",
-                limit: 10
-            )
-                .padding(.horizontal)
+                limit: store.nicknameLengthLimit
+            ).padding(.horizontal)
             
             Spacer()
         }
         .nekiToolbar(
-            left: .back(action: { dismiss() }),
-            center: .text("프로필 편집"),
-            right: .text("완료", action: {  }) // TODO: 완료버튼 disabled 방안 강구
+            left: { NekiToolBar.back { dismiss() } },
+            center: { NekiToolBar.textCenter("프로필 편집") },
+            right: { NekiToolBar.textRight("완료", isEnabled: store.doneButtonDisabled == false) { store.send(.doneButtonTapped) } }
         )
         .nekiSelectAlert(isPresented: $isProfileSelectionAlertPresented, style: .plain, items: ["기본 프로필로 바꾸기", "사진 선택하기"]) {
             // 별도의 onExit 동작 없음
@@ -59,8 +71,4 @@ struct ProfileEditView: View {
         .contentShape(.rect)
         .onTapGesture { isFocused = false }
     }
-}
-
-#Preview {
-    ProfileEditView(store: .init(initialState: ProfileEditFeature.State(user: .init(nickname: "변우진", providerType: .apple)), reducer: { ProfileEditFeature() }))
 }

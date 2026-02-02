@@ -15,18 +15,24 @@ struct MainTabCoordinator {
     
     @ObservableState
     struct State {
+        var user: User
         var selectedTab: NekiTab = .archive
         
         // 하위 코디네이터들의 State를 보유
         var pose = PoseCoordinator.State()
         var archive = ArchiveCoordinator.State()
         var map = MapCoordinator.State()
-        var myPage = MyPageCoordinator.State()
+        var myPage: MyPageCoordinator.State
         
         var isTabbarHidden: Bool = false
         
         // 토스트메세지 상태
         var toast: NekiToastItem? = nil
+        
+        init(user: User) {
+            self.user = user
+            myPage = MyPageCoordinator.State(user: user)
+        }
     }
     
     enum Action: BindableAction {

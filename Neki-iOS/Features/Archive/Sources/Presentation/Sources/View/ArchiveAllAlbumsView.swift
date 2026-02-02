@@ -78,16 +78,16 @@ struct ArchiveAllAlbumsView: View {
             .presentationCornerRadius(20)
         }
         .sheet(isPresented: $deleteAlbumSheetPresented) {
-            ArchiveDeleteSheet(
-                selectedOption: $store.deleteOption,
+            ArchiveDeleteSheet<ArchiveAlbumDeleteOption>(
+                initialOption: .withPhotos,
                 title: "앨범을 삭제하시겠어요?",
                 firstOption: (.withPhotos, "사진까지 함께 삭제"),
                 secondOption: (.albumOnly, "사진은 유지하고 앨범만 삭제"),
                 onCancel: {
                     deleteAlbumSheetPresented = false
                 },
-                onConfirm: {
-                    store.send(.onTapExecuteDelete)
+                onConfirm: { selectedOption in
+                    store.send(.onTapExecuteDelete(option: selectedOption))
                     deleteAlbumSheetPresented = false
                 }
             )

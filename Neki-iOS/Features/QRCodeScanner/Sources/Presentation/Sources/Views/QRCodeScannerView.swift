@@ -52,15 +52,22 @@ struct QRCodeScannerView: View {
         .nekiAlert(
             isPresented: $store.isManualDownloadNeededAlertPresented,
             style: .plain,
-            titleMessage: "갤러리에 사진을 먼저 다운받아주세요.",
-            subTitleMessage: "해당 브랜드는 웹사이트에서 사진을 저장해야 네키에 자동으로 저장돼요.",
+            title: "갤러리에 사진을 먼저 다운받아주세요.",
+            subtitle: "해당 브랜드는 웹사이트에서 사진을 저장해야 네키에 자동으로 저장돼요.",
             confirmText: "사진 다운로드하러 가기",
-            isProcessing: false
-        ) {
-            store.send(.openWebViewButtonTapped)
-        } onCancel: {
-            // 취소 동작 없음
-        }
+            isProcessing: false,
+            onConfirm: { store.send(.openWebViewButtonTapped) }
+        )
+        .nekiAlert(
+            isPresented: $store.isUnsupportedBrandAlertPresented,
+            style: .primarySecondary,
+            title: "지원하지 않는 브랜드예요.",
+            subtitle: "갤러리에서 사진을 추가해 바로 저장할 수 있어요.\n원하는 브랜드가 있다면 제안해주세요!",
+            confirmText: "갤러리에서 추가하기",
+            secondaryText: "텍스트 버튼",
+            onConfirm: { store.send(.addPhotoFromGalleryButtonTapped) },
+            onSecondary: { store.send(.openSuggestBrandPage) }
+        )
     }
     
     private var header: some View {

@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import Dependencies
+import DependenciesMacros
 import os
 
 public final actor DefaultNetworkProvider: NetworkProvider {
@@ -13,17 +15,20 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     private var refreshTask: Task<Void, Error>?
     
     private let session: URLSessionProtocol
-    private let tokenStorage: TokenStorage
     private var tokenRefresher: TokenRefresher?
     private let decoder: JSONDecoder
     
+    @Dependency(\.tokenStorage) private var tokenStorage
+    
     public init(
         session: URLSessionProtocol = URLSession.shared,
-        tokenStorage: TokenStorage,
         decoder: JSONDecoder = JSONDecoder()
     ) {
         self.session = session
         self.tokenStorage = tokenStorage
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        decoder.dateDecodingStrategy = .formatted(formatter)
         self.decoder = decoder
     }
     
@@ -77,9 +82,20 @@ private extension DefaultNetworkProvider {
         let (data, response) = try await executeSession(with: request)
         
         switch validateResponse(response) {
-        case .success: return try decode(data: data)
-        case .unauthorized: return try await retryWithTokenRefresh(endpoint: endpoint, retryCount: retryCount)
-        case .failure(let error): throw error
+        case .success:
+            let decodedResponse: BaseResponseDTO<T> = try decode(data: data)
+            if let tokenData = decodedResponse.data as? TokenContainer {
+                Logger.network.debug("Tokens detected in Network response, Saving to token storage.")
+                try? tokenStorage.store(tokenData.toEntity())
+            }
+            
+            return decodedResponse
+            
+        case .unauthorized:
+            return try await retryWithTokenRefresh(endpoint: endpoint, retryCount: retryCount)
+            
+        case .failure(let error):
+            throw error
         }
     }
     
@@ -179,10 +195,9 @@ private extension DefaultNetworkProvider {
             defer { refreshTask = nil }
             
             guard let refresher = tokenRefresher else { throw NetworkError.unauthorizedError }
-            
-            // TODO: 토큰 재발급 후 저장 로직 필요
-//            let newToken = try await refresher.refresh(provider: self)
-//            try tokenStorage.store(newToken)
+            let newToken = try await refresher.refresh(provider: self)
+            Logger.network.debug("Token refreshed, Saving to token storage.")
+            try tokenStorage.store(newToken)
         }
         
         refreshTask = task

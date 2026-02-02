@@ -19,8 +19,10 @@ struct PoseCoordinatorView: View {
             case .detail(let store):
                 PoseDetailView(store: store)
                     .toolbar(.hidden, for: .tabBar)
-
             }
+        }
+        .fullScreenCover(item: $store.scope(state: \.randomPose, action: \.randomPose)) { store in
+            RandomPoseCarouselView(store: store)
         }
     }
 }

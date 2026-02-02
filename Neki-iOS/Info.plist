@@ -9,6 +9,9 @@
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kakao${KAKAO_LOGIN_NATIVE_APP_KEY}</string>
 			<key>CFBundleURLName</key>
 			<string>com.OneTen.Neki-iOS</string>
 			<key>CFBundleURLSchemes</key>
@@ -22,6 +25,7 @@
 		<string>nmap</string>
 		<string>kakaomap</string>
 		<string>comgooglemaps</string>
+		<string>kakaokompassauth</string>
 	</array>
 	<key>NMFNcpKeyId</key>
 	<string>${NAVER_MAPS_CLIENT_ID}</string>
@@ -31,10 +35,23 @@
 	<array>
 		<string>Pretendard-Bold.otf</string>
 		<string>Pretendard-Medium.otf</string>
-		<string>Pretendard-Regular.otf</string>
-		<string>Pretendard-SemiBold.otf</string>
-	</array>
-	<key>UIDesignRequiresCompatibility</key>
-	<true/>
+        <string>Pretendard-Regular.otf</string>
+        <string>Pretendard-SemiBold.otf</string>
+    </array>
+    <key>UIDesignRequiresCompatibility</key>
+    <true/>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>mx2.co.kr</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+                <key>NSIncludesSubdomains</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
 </dict>
 </plist>

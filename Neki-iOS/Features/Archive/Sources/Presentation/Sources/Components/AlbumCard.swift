@@ -18,12 +18,21 @@ struct AlbumCard: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             KFImage(album.coverImageURL)
+                .placeholder({
+                    Image(.temporaryBranding)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: cardWidth, height: cardHeight)
+                        .clipped()
+                })
+                .onFailureImage(.temporaryBranding)
                 .resizable()
                 .retry(maxCount: 3, interval: .seconds(5))
                 .onFailure { error in
                     Logger.presentation.error("앨범이미지 로드 실패: \(error)")
                     Logger.presentation.error("실패한 앨범이미지 id: \(album.id)")
                 }
+                .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: cardWidth, height: cardHeight)
                 .clipped()

@@ -8,6 +8,7 @@
 import Foundation
 import SwiftUI
 import ComposableArchitecture
+import os
 
 // MARK: - 1. Splash Feature
 @Reducer
@@ -16,17 +17,42 @@ struct SplashFeature {
     struct State: Equatable {}
     
     enum Action {
+        // View Actions
+        case onAppear
         case didTapGoAuthButton
+        
+        // Internal Actions
+        case autoLoginResponse(Result<User, Error>)
+        
+        // Delegate Actions
         case delegate(Delegate)
-        enum Delegate { case moveToAuth }
+        enum Delegate {
+            case moveToAuth
+            case moveToMainTab(User)
+        }
     }
+    
+    @Dependency(\.authClient) private var authClient
     
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
+            case .onAppear:
+                return .run { send in
+                    await send(.autoLoginResponse(Result { try await authClient.autoLogin() }))
+                }
+                
             case .didTapGoAuthButton:
                 return .send(.delegate(.moveToAuth))
-            default:
+                
+            case let .autoLoginResponse(.success(user)):
+                return .send(.delegate(.moveToMainTab(user)))
+                
+            case let .autoLoginResponse(.failure(error)):
+                Logger.presentation.debug("자동 로그인 시도 후 실패: \(error)")
+                return .send(.delegate(.moveToAuth))
+                
+            case .delegate:
                 return .none
             }
         }
@@ -46,65 +72,6 @@ struct SplashView: View {
                 Button("Auth 화면으로 이동") {
                     store.send(.didTapGoAuthButton)
                 }
-                .buttonStyle(.borderedProminent)
-            }
-        }
-    }
-}
-
-// MARK: - 2. Auth Coordinator
-@Reducer
-struct AuthCoordinator {
-    @ObservableState
-    struct State: Equatable {}
-    
-    enum Action {
-        case didTapGoSplashButton
-        case didTapLoginButton
-        
-        case delegate(Delegate)
-        enum Delegate {
-            case moveToSplash
-            case moveToMainTab
-        }
-    }
-    
-    var body: some ReducerOf<Self> {
-        Reduce { state, action in
-            switch action {
-            case .didTapGoSplashButton:
-                return .send(.delegate(.moveToSplash))
-                
-            case .didTapLoginButton:
-                return .send(.delegate(.moveToMainTab))
-                
-            default:
-                return .none
-            }
-        }
-    }
-}
-
-struct AuthCoordinatorView: View {
-    let store: StoreOf<AuthCoordinator>
-    
-    var body: some View {
-        ZStack {
-            Color.yellow.opacity(0.2).ignoresSafeArea()
-            VStack(spacing: 20) {
-                Text("Auth View 🔒")
-                    .font(.largeTitle)
-                
-                Button("Splash로 돌아가기") {
-                    store.send(.didTapGoSplashButton)
-                }
-                .tint(.gray)
-                .buttonStyle(.borderedProminent)
-                
-                Button("로그인 완료 (메인으로)") {
-                    store.send(.didTapLoginButton)
-                }
-                .tint(.green)
                 .buttonStyle(.borderedProminent)
             }
         }

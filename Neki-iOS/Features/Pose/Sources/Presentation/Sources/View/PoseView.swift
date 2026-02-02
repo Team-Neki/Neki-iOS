@@ -14,12 +14,10 @@ struct PoseView: View {
     
     @State private var isFilterBarVisible: Bool = true
     @State private var lastDragPoint: CGFloat = 0
-    @State private var isSheetVisible: Bool = false
     
     //MARK: - Properties
     
-    let store: StoreOf<PoseFeature>
-    let filterNumberOption = ["1인", "2인", "3인", "4인", "5인 이상"]
+    @Bindable var store: StoreOf<PoseFeature>
     
     //MARK: - Main Body
     
@@ -40,15 +38,15 @@ struct PoseView: View {
             
         }
         .nekiToolbar(
-            left: .text("포즈", action: nil),
-            right: .icon(.iconBellFill, action: {})
+            left: { NekiToolBar.textLeft("포즈") },
+            right: { NekiToolBar.icon(.iconBellFill) }
         )
-        .sheet(isPresented: $isSheetVisible, content: {
-            filterSheetView
-                .presentationDetents([.height(358)])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(20)
-        })
+        .sheet(item: $store.sheetItem) { item in
+            switch item {
+            case .peopleCountFilter: filterSheetView
+            case .randomPoseCountSelection: randomPoseFilterSheetView
+            }
+        }
         .task {
             await store.send(.onAppear).finish()
         }
@@ -63,12 +61,16 @@ private extension PoseView {
     var masonryView: some View {
         ScrollView {
             MasonryGridView(
-                items: Array(store.filteredItems),
+                items: Array(store.filteredPoses),
                 columns: 2
             ) { item in
                 FeedImageView(item: item)
                     .onTapGesture {
                         store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        guard item == store.filteredPoses.last else { return }
+                        store.send(.loadMoreItems)
                     }
             }
             .padding(.horizontal, 20)
@@ -76,6 +78,8 @@ private extension PoseView {
             .padding(.bottom, 76)
         }
         .scrollIndicators(.never)
+        .id(store.isSelectedScrap ? "Scrapped" : "General")
+        .refreshable { await store.send(.onRefresh).finish() }
         .simultaneousGesture(
             DragGesture()
                 .onChanged { value in
@@ -97,20 +101,21 @@ private extension PoseView {
     @ViewBuilder
     var filterBar: some View {
         HStack(alignment: .center, spacing: 6) {
-            Button(store.state.selectedPeopleCount ?? "인원수") {
+            Button {
                 store.send(.onTapFilter)
-                isSheetVisible = true
+            } label: {
+                Text(store.selectedCountFilterOption?.displayName ?? "인원수")
             }
             .buttonStyle(
                 .nekiChip(
-                    isHighlighted: store.state.selectedPeopleCount != nil,
+                    isHighlighted: store.selectedCountFilterOption != nil,
                     shape: .capsule,
                     style: .dropdown
                 )
             )
             
             Button("스크랩") {
-                store.send(.onTapScrap)
+                store.send(.onTapScrapMode)
             }
             .buttonStyle(
                 .nekiChip(
@@ -129,44 +134,142 @@ private extension PoseView {
         VStack {
             Spacer()
             ChipFloatingButton(.randomPose) {
-                // TODO: - 랜덤포즈로 이동
+                store.send(.onTapRandomPoseRecommend)
             }
         }
     }
     
     @ViewBuilder
     var filterSheetView: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("인원 수")
-                .nekiFont(.title20SemiBold)
-                .foregroundStyle(.gray900)
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 28)
+        VStack(spacing: 4) {
+            Capsule()
+                .frame(width: 45, height: 4)
+                .padding(.horizontal, 165)
+                .padding(.vertical, 10)
+                .foregroundStyle(.gray100)
             
-            VStack(alignment: .leading, spacing: 28) {
-                ForEach(filterNumberOption, id: \.self) { count in
+            VStack(alignment: .leading, spacing: 24) {
+                Text("인원 수")
+                    .nekiFont(.title20SemiBold)
+                    .foregroundStyle(.gray900)
+                
+                ForEach(PeopleCountOption.allCases, id: \.self) { option in
                     Button {
-                        store.send(.selectPeopleCount(count))
-                        isSheetVisible = false
+                        store.send(.selectPeopleCount(option))
                     } label: {
                         HStack(alignment: .center, spacing: 8) {
-                            if store.selectedPeopleCount == count {
+                            let isHighlighted = store.selectedCountFilterOption == option
+                            if isHighlighted {
                                 Image(.iconCheckmark)
                             }
                             
-                            Text(count)
-                                .nekiFont(store.selectedPeopleCount == count ? .body16SemiBold : .body16Medium)
-                                .foregroundStyle(store.selectedPeopleCount == count ? .gray900 : .gray600)
+                            Text(option.displayName)
+                                .nekiFont(isHighlighted ? .body16SemiBold : .body16Medium)
+                                .foregroundStyle(isHighlighted ? .gray900 : .gray600)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                
+                Spacer()
             }
-            .padding(.horizontal, 20)
-            
-            Spacer()
+            .padding()
         }
         .background(.white)
+        .presentationDetents([.height(358)]) // TODO: 5인 케이스 사라지면 높이도 바뀔 예정
+        .presentationCornerRadius(20)
+        .presentationDragIndicator(.hidden)
     }
+    
+    var randomPoseFilterSheetView: some View {
+        VStack(spacing: 4) {
+            Capsule()
+                .frame(width: 45, height: 4)
+                .padding(.horizontal, 165)
+                .padding(.vertical, 10)
+                .foregroundStyle(.gray100)
+            
+            VStack(alignment: .leading, spacing: 24) {
+                Text("랜덤 포즈 추천을 위해\n촬영 중인 인원수를 선택해주세요")
+                    .nekiFont(.title20SemiBold)
+                    .foregroundStyle(.gray900)
+                
+                ForEach(PeopleCountOption.allCases, id: \.self) { option in
+                    Button {
+                        store.send(.selectPeopleCountForRandomPose(option))
+                    } label: {
+                        HStack(alignment: .center, spacing: 8) {
+                            let isHighlighted: Bool = store.selectedRandomPoseCountSelectionOption == option
+                            if isHighlighted {
+                                Image(.iconCheckmark)
+                            }
+                            
+                            Text(option.displayName)
+                                .nekiFont(isHighlighted ? .body16SemiBold : .body16Medium)
+                                .foregroundStyle(isHighlighted ? .gray900 : .gray600)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                
+                HStack(spacing: 12) {
+                    let designTotalWidth: CGFloat = 375.0
+                    let designPadding: CGFloat = 20.0 * 2
+                    let designSpacing: CGFloat = 12.0
+                    let contentWidth = designTotalWidth - designPadding - designSpacing
+                    let cancelFactor = 93.0 / contentWidth
+                    let selectFactor = 230.0 / contentWidth
+                    
+                    Button {
+                        store.send(.binding(.set(\.sheetItem, nil)))
+                    } label: {
+                        Text("취소")
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.5)
+                    }
+                    .buttonStyle(.nekiCTA(.secondary))
+                    .containerRelativeFrame(.horizontal) { length, _ in
+                        let availableSpace = length - designPadding - designSpacing
+                        return availableSpace * cancelFactor
+                    }
+                    
+                    Button {
+                        store.send(.onTapStartRandomPoseCarousel)
+                    } label: {
+                        Text("선택하기")
+                    }
+                    .buttonStyle(.nekiCTA(.primary))
+                    .containerRelativeFrame(.horizontal) { length, _ in
+                        let availableSpace = length - designPadding - designSpacing
+                        return availableSpace * selectFactor
+                    }
+                }
+                
+                Spacer()
+            }
+            .padding()
+        }
+        .background(.white)
+        .presentationDetents([.height(458)])
+        .presentationCornerRadius(20)
+        .presentationDragIndicator(.hidden)
+    }
+}
+
+
+// MARK: - Nested Types
+
+extension PoseView {
+    enum SheetType: Identifiable {
+        /// 포즈 인원수 필터 시트
+        case peopleCountFilter
+        /// 랜덤포즈 인원수 선택 시트
+        case randomPoseCountSelection
+        
+        var id: Self { self }
+    }
+}
+
+#Preview {
+    AppCoordinatorView(store: .init(initialState: AppCoordinator.State.mainTab(.init()), reducer: { AppCoordinator() }))
 }

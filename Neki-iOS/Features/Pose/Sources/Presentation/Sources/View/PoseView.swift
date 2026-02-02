@@ -153,7 +153,7 @@ private extension PoseView {
                     .nekiFont(.title20SemiBold)
                     .foregroundStyle(.gray900)
                 
-                ForEach(PeopleCountOption.allCases, id: \.self) { option in
+                ForEach(PeopleCountOption.allCases.filter({ $0 != .overQuartet }), id: \.self) { option in
                     Button {
                         store.send(.selectPeopleCount(option))
                     } label: {
@@ -176,7 +176,7 @@ private extension PoseView {
             .padding()
         }
         .background(.white)
-        .presentationDetents([.height(358)]) // TODO: 5인 케이스 사라지면 높이도 바뀔 예정
+        .presentationDetents([.height(308)])
         .presentationCornerRadius(20)
         .presentationDragIndicator(.hidden)
     }
@@ -194,7 +194,7 @@ private extension PoseView {
                     .nekiFont(.title20SemiBold)
                     .foregroundStyle(.gray900)
                 
-                ForEach(PeopleCountOption.allCases, id: \.self) { option in
+                ForEach(PeopleCountOption.allCases.filter({ $0 != .overQuartet }), id: \.self) { option in
                     Button {
                         store.send(.selectPeopleCountForRandomPose(option))
                     } label: {
@@ -250,7 +250,7 @@ private extension PoseView {
             .padding()
         }
         .background(.white)
-        .presentationDetents([.height(458)])
+        .presentationDetents([.height(406)])
         .presentationCornerRadius(20)
         .presentationDragIndicator(.hidden)
     }

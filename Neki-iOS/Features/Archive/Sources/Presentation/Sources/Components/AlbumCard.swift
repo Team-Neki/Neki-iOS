@@ -28,10 +28,6 @@ struct AlbumCard: View {
                 .onFailureImage(.temporaryBranding)
                 .resizable()
                 .retry(maxCount: 3, interval: .seconds(5))
-                .onFailure { error in
-                    Logger.presentation.error("앨범이미지 로드 실패: \(error)")
-                    Logger.presentation.error("실패한 앨범이미지 id: \(album.id)")
-                }
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: cardWidth, height: cardHeight)

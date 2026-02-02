@@ -31,6 +31,8 @@ struct ArchiveAlbumDetailFeature {
         var hasNext: Bool = true
         var isFetchingPhotos: Bool = false
         
+        var isLoading: Bool = false
+        
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
     }
     
@@ -45,6 +47,7 @@ struct ArchiveAlbumDetailFeature {
         
         // 기능 액션
         case onTapDownloadButton
+        case downloadImagesResponse(successCount: Int)
         
         case onTapDeleteButton(option: ArchivePhotoDeleteOption)
         case deletePhotosResponse(ArchivePhotoDeleteOption, Result<Void, Error>)
@@ -67,6 +70,7 @@ struct ArchiveAlbumDetailFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -105,9 +109,6 @@ struct ArchiveAlbumDetailFeature {
                 state.isFetchingPhotos = false
                 state.hasNext = result.hasNext
                 
-                let isoFormatter = ISO8601DateFormatter()
-                isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                
                 let currentAlbumId = state.album.id
                 
                 let newItems = result.photos.map { entity in
@@ -115,7 +116,7 @@ struct ArchiveAlbumDetailFeature {
                         id: entity.photoID,
                         imageURLString: entity.imageURL,
                         isFavorite: entity.isfavorite,
-                        date: isoFormatter.date(from: entity.createdAt) ?? Date(),
+                        date: entity.createdAt.toISO8601Date(),
                         folderId: currentAlbumId
                     )
                 }
@@ -156,9 +157,33 @@ struct ArchiveAlbumDetailFeature {
                 return .none
                 
             case .onTapDownloadButton:
+                guard !state.selectedIDs.isEmpty else { return .none }
+                state.isLoading = true
+
+                let selectedURLs: [URL] = state.selectedIDs.compactMap { id in
+                        return state.photos[id: id]?.imageURL
+                    }
+                
+                guard !selectedURLs.isEmpty else {
+                    state.isLoading = false
+                    return .none
+                }
+                
+                return .run { send in
+                    let count = try await imageDownloadClient.downloadImages(urls: selectedURLs)
+                    await send(.downloadImagesResponse(successCount: count))
+                }
+                
+            case let .downloadImagesResponse(count):
+                state.isLoading = false
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                
+                if count > 0 {
+                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                } else {
+                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
+                }
                 
             case let .onTapDeleteButton(option):
                 guard !state.selectedIDs.isEmpty else { return .none }

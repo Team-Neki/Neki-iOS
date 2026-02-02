@@ -11,6 +11,10 @@ import os
 enum AuthEndpoint {
     case reissueToken
     case login(dto: SocialLoginDTO.Request, provider: ProviderType)
+    
+    case withdraw
+    case editNickname(dto: EditNicknameDTO.Request)
+    case editProfileImage(dto: EditProfileImageDTO.Request)
     case fetchUserInfo
 }
 
@@ -22,7 +26,7 @@ extension AuthEndpoint: Endpoint {
         switch self {
         case .reissueToken: return .reissue
         case .login: return .none
-        case .fetchUserInfo: return .bearer
+        case .withdraw, .editNickname, .editProfileImage, .fetchUserInfo: return .bearer
         }
     }
     
@@ -40,6 +44,9 @@ extension AuthEndpoint: Endpoint {
         switch self {
         case .reissueToken: return "/auth/refresh"
         case let .login(_, provider): return "/auth/\(provider.name)/login"
+        case .withdraw: return "/users/me"
+        case .editNickname: return "/users/me"
+        case .editProfileImage: return "/users/me/profile-image"
         case .fetchUserInfo: return "/users/info"
         }
     }
@@ -47,14 +54,18 @@ extension AuthEndpoint: Endpoint {
     var method: HTTPMethodType {
         switch self {
         case .reissueToken, .login: return .post
+        case .withdraw: return .delete
+        case .editNickname, .editProfileImage: return .patch
         case .fetchUserInfo: return .get
         }
     }
     
     var body: (any Encodable)? {
         switch self {
-        case .reissueToken, .fetchUserInfo: return nil
+        case .reissueToken, .fetchUserInfo, .withdraw: return nil
         case let .login(dto, _): return dto
+        case let .editNickname(dto): return dto
+        case let .editProfileImage(dto): return dto
         }
     }
 }

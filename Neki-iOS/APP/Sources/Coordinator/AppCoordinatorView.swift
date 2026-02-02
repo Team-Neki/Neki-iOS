@@ -19,7 +19,7 @@ struct AppCoordinatorView: View {
               }
         case .auth:
             if let store = store.scope(state: \.auth, action: \.auth) {
-                AuthCoordinatorView(store: store)
+                LoginCoordinatorView(store: store)
               }
             
         case .mainTab:

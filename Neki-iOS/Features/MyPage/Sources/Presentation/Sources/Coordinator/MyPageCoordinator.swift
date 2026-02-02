@@ -12,8 +12,12 @@ import ComposableArchitecture
 struct MyPageCoordinator {
     @ObservableState
     struct State {
-        var root = MyPageFeature.State()
+        var root: MyPageFeature.State
         var path = StackState<Path.State>()
+        
+        init(user: User) {
+            root = MyPageFeature.State(user: user)
+        }
     }
     
     enum Action {
@@ -35,7 +39,7 @@ struct MyPageCoordinator {
                 return .none
                 
             case .path(.element(id: _, action: .accountPreference(.editProfileButtonTapped))):
-                state.path.append(.profileEdit(.init(user: .init(nickname: "SwainYun", providerType: .apple)))) // TODO: AuthClient에서 로그인 정보 구독 후 전달하도록 수정하기, 일단 임시값
+                state.path.append(.profileEdit(.init(user: state.root.user)))
                 return .none
                 
             default:

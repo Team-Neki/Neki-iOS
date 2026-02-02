@@ -15,18 +15,7 @@ public protocol NetworkProvider {
 }
 
 private enum NetworkProviderKey: DependencyKey {
-    static let liveValue: NetworkProvider = {
-        let tokenStorage = KeychainTokenStorage(
-            encoder: JSONEncoder(),
-            decoder: JSONDecoder()
-        )
-        
-        let provider = DefaultNetworkProvider(
-            tokenStorage: tokenStorage
-        )
-        
-        return provider
-    }()
+    static let liveValue: NetworkProvider = DefaultNetworkProvider()
 }
 
 public extension DependencyValues {

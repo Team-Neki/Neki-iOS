@@ -9,12 +9,17 @@ import Foundation
 
 enum UserInfoDTO {
     struct Response: Decodable {
+        let id: Int
         let nickname: String
+        let email: String?
+        let profileImageURLString: String?
         let providerType: String
         
         enum CodingKeys: String, CodingKey {
-            case providerType
+            case id = "userId"
             case nickname = "name"
+            case profileImageURLString = "profileImageUrl"
+            case email, providerType
         }
     }
 }

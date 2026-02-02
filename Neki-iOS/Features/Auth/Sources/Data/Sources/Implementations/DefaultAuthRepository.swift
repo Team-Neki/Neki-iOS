@@ -11,14 +11,17 @@ import os
 
 public struct DefaultAuthRepository: AuthRepository {
     @Dependency(\.networkProvider) private var networkProvider
+    @Dependency(\.tokenStorage) private var tokenStorage
+    
+    public init() {}
     
     public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens {
         let dto = SocialLoginDTO.Request(idToken: idToken)
         let endpoint = AuthEndpoint.login(dto: dto, provider: provider)
         
         do {
-            let response: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let tokens = response.data?.toEntity() else { throw AuthRepositoryError.decodingError }
+            let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let tokens = responseDTO.data?.toEntity() else { throw AuthRepositoryError.networkError(.responseDecodingError) }
             return tokens
         } catch let error as NetworkError {
             throw .networkError(error)
@@ -31,12 +34,13 @@ public struct DefaultAuthRepository: AuthRepository {
         let endpoint = AuthEndpoint.fetchUserInfo
         
         do {
-            let response: BaseResponseDTO<UserInfoDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let nickname = response.data?.nickname,
-                  let providerIdentifier = response.data?.providerType,
-                  let providerType = ProviderType(rawValue: providerIdentifier)
-            else { throw AuthRepositoryError.decodingError }
-            return User(nickname: nickname, providerType: providerType)
+            let responseDTO: BaseResponseDTO<UserInfoDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let data = responseDTO.data,
+                  let providerType = ProviderType(rawValue: data.providerType)
+            else { throw AuthRepositoryError.networkError(.responseDecodingError) }
+            
+            let profileImageURL = URL(string: data.profileImageURLString ?? "")
+            return User(id: data.id, nickname: data.nickname, email: data.email, profileImageURL: profileImageURL, providerType: providerType)
         } catch let error as NetworkError {
             throw .networkError(error)
         } catch {
@@ -45,15 +49,61 @@ public struct DefaultAuthRepository: AuthRepository {
     }
     
     public func withdraw() async throws(AuthRepositoryError) {
-        // TODO: API is WIP
+        let endpoint = AuthEndpoint.withdraw
+        do {
+            let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+            try tokenStorage.delete()
+        } catch let error as NetworkError {
+            throw .networkError(error)
+        } catch let error as TokenStorageError {
+            throw .userNotFound
+        } catch {
+            throw .unknown
+        }
     }
     
     public func logout() async throws(AuthRepositoryError) {
-        // TODO: API is WIP
+        do {
+            try tokenStorage.delete()
+        } catch {
+            throw .userNotFound
+        }
     }
     
-    public func updateProfile(nickname: String?, profileImage: Data?) async throws(AuthRepositoryError) {
-        // TODO: API is WIP
+    public func updateProfile(nickname: String?, profileImageID: Int?) async throws(AuthRepositoryError) {
+        if let nickname {
+            let requestDTO = EditNicknameDTO.Request(nickname: nickname)
+            let endpoint = AuthEndpoint.editNickname(dto: requestDTO)
+            do {
+                let _: BaseResponseDTO<EditNicknameDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            } catch let error as NetworkError {
+                throw .networkError(error)
+            } catch {
+                throw .unknown
+            }
+        }
+        
+        if let profileImageID {
+            let requestDTO = EditProfileImageDTO.Request(imageID: profileImageID)
+            let endpoint = AuthEndpoint.editProfileImage(dto: requestDTO)
+            do {
+                let _: BaseResponseDTO<EditProfileImageDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            } catch let error as NetworkError {
+                throw .networkError(error)
+            } catch {
+                throw .unknown
+            }
+        }
+    }
+    
+    public func restoreSession() async throws(AuthRepositoryError) -> User {
+        guard let tokens = try? tokenStorage.fetch() else { throw .unauthorized }
+        do {
+            return try await fetchUser()
+        } catch {
+            try? tokenStorage.delete()
+            throw .unauthorized
+        }
     }
 }
 

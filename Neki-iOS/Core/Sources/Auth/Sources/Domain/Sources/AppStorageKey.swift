@@ -8,5 +8,5 @@
 import Foundation
 
 public struct AppStorageKey {
-    static let userSessionStatus: String = "SserSessionStatus"
+    public static let userSessionStatus: String = "UserSessionStatus"
 }

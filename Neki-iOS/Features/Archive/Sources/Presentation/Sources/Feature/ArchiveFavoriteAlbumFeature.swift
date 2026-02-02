@@ -97,9 +97,6 @@ struct ArchiveFavoriteAlbumFeature {
                 state.isFetchingPhotos = false
                 state.hasNext = result.hasNext
                 
-                let isoFormatter = ISO8601DateFormatter()
-                isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                
                 let currentAlbumId = state.album.id
                 
                 let newItems = result.photos.map { entity in
@@ -107,7 +104,7 @@ struct ArchiveFavoriteAlbumFeature {
                         id: entity.photoID,
                         imageURLString: entity.imageURL,
                         isFavorite: true,
-                        date: isoFormatter.date(from: entity.createdAt) ?? Date(),
+                        date: entity.createdAt.toISO8601Date(),
                         folderId: currentAlbumId
                     )
                 }

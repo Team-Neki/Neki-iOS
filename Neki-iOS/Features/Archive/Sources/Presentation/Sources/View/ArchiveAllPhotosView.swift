@@ -142,8 +142,8 @@ private extension ArchiveAllPhotosView {
             .overlay(alignment: .top) {
                 if showDropDownMenu {
                     dropDownMenu
-                        .padding(.top, 45)
-                        .padding(.leading, 10)
+                        .padding(.top, 43)
+                        .padding(.leading, 15)
                 }
             }
             
@@ -180,11 +180,7 @@ private extension ArchiveAllPhotosView {
         .frame(width: 96, height: 72)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 8))
-        .overlay(content: {
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(.gray.opacity(0.5), lineWidth: 1)
-                .shadow(color: .gray.opacity(0.5), radius: 2)
-        })
+        .shadow(color: .gray.opacity(0.3), radius: 2, x: -1, y: -1)
     }
     
     func dropDownMenuButton(
@@ -196,8 +192,18 @@ private extension ArchiveAllPhotosView {
                 .nekiFont(.body14Medium)
                 .foregroundStyle(.gray900)
                 .frame(height: 20)
-                .padding(.vertical, 5)
         }
+        .buttonStyle(MenuButtonStyle())
     }
     
+    struct MenuButtonStyle: ButtonStyle {
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .padding(.leading, 16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                .padding(.vertical, 5)
+                .background(configuration.isPressed ? .gray50 : .white)
+        }
+    }
 }

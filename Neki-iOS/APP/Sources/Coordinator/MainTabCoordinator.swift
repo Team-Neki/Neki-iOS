@@ -42,12 +42,6 @@ struct MainTabCoordinator {
         case archive(ArchiveCoordinator.Action)
         case map(MapCoordinator.Action)
         case myPage(MyPageCoordinator.Action)
-        
-        // 상위 코디네이터(AppCoordinator)로 보낼 신호
-        case delegate(Delegate)
-        enum Delegate {
-            case logout
-        }
     }
     
     var body: some ReducerOf<Self> {
@@ -69,7 +63,7 @@ struct MainTabCoordinator {
             MyPageCoordinator()
         }
         
-        Reduce { state, action in
+        Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .binding:
                 return .none
@@ -78,9 +72,6 @@ struct MainTabCoordinator {
             case let .archive(.delegate(.showToast(item))):
                 state.toast = item
                 return .none
-                
-            case .pose(.delegate(.logout)):
-                return .send(.delegate(.logout))
                 
             default:
                 return .none

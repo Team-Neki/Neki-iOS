@@ -17,9 +17,9 @@ import os
 
 @DependencyClient
 public struct AuthClient {
-    public var loginWithApple: @Sendable (_ idToken: Data) async throws -> Void
-    public var loginWithKakao: @Sendable () async throws -> Void
-    public var autoLogin: @Sendable () async throws -> Void
+    public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
+    public var loginWithKakao: @Sendable () async throws -> User
+    public var autoLogin: @Sendable () async throws -> User
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
     public var updateProfile: @Sendable (_ nickname: String?, _ profileImage: Data?) async throws -> Void
@@ -32,7 +32,8 @@ extension AuthClient: DependencyKey {
         @Dependency(\.authRepository) var authRepository
         @Dependency(\.imageUploadRepository) var imageUploadRepository
         
-        @Sendable func loginWithApple(idToken: Data) async throws -> Void {
+        @discardableResult
+        @Sendable func loginWithApple(idToken: Data) async throws -> User {
             guard let idTokenString = String(data: idToken, encoding: .utf8) else {
                 throw AuthClientError.invalidClientToken
             }
@@ -41,17 +42,20 @@ extension AuthClient: DependencyKey {
                 _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
                 let user = try await authRepository.fetchUser()
                 UserSessionStatus.updateStatus(.signedIn(user))
+                return user
             } catch {
                 throw AuthClient.mapError(error)
             }
         }
         
-        @Sendable func loginWithKakao() async throws -> Void {
+        @discardableResult
+        @Sendable func loginWithKakao() async throws -> User {
             do {
                 let idToken = try await kakaoSDKHelper.login()
                 _ = try await authRepository.login(idToken: idToken, provider: .kakao)
                 let user = try await authRepository.fetchUser()
                 UserSessionStatus.updateStatus(.signedIn(user))
+                return user
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
             } catch let error as AuthClientError {
@@ -61,10 +65,12 @@ extension AuthClient: DependencyKey {
             }
         }
         
-        @Sendable func autoLogin() async throws -> Void {
+        @discardableResult
+        @Sendable func autoLogin() async throws -> User {
             do {
                 let user = try await authRepository.restoreSession()
                 UserSessionStatus.updateStatus(.signedIn(user))
+                return user
             } catch {
                 throw AuthClient.mapError(error)
             }

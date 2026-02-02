@@ -11,9 +11,8 @@ import ComposableArchitecture
 @Reducer
 struct AccountPreferenceFeature {
     @ObservableState
-    struct State: Equatable {
-        // TODO: User Profile
-        
+    struct State {
+        var user: User
     }
     
     enum Action {

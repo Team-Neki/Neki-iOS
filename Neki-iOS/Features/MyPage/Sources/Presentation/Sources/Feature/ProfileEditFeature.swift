@@ -13,12 +13,14 @@ struct ProfileEditFeature {
     @ObservableState
     struct State {
         var nickname: String
+        var currentProfileImageURL: URL?
         var selectedProfileImage: UIImage?
         var doneButtonDisabled: Bool = false
         let nicknameLengthLimit: Int = 10
         
         init(user: User) {
-            self.nickname = user.nickname
+            nickname = user.nickname
+            currentProfileImageURL = user.profileImageURL
         }
     }
     
@@ -39,6 +41,7 @@ struct ProfileEditFeature {
             switch action {
             case .changeToDefaultProfileImage:
                 state.selectedProfileImage = nil
+                state.currentProfileImageURL = nil
                 return .none
                 
             case .openPhotosPicker:

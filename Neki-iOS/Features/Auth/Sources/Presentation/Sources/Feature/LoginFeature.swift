@@ -1,5 +1,5 @@
 //
-//  OnboardingFeature.swift
+//  LoginFeature.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 1/24/26.
@@ -11,16 +11,20 @@ import AuthenticationServices
 import os
 
 @Reducer
-public struct OnboardingFeature {
+public struct LoginFeature {
     @ObservableState
     public struct State {
-        @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = true
+        
     }
     
     public enum Action {
+        // View Actions
         case kakaoLogin
         case appleLogin(Result<ASAuthorization, any Error>)
         case handleKakaoOpenURL(URL)
+        
+        // Internal Actions
+        case loginResponse(Result<User, Error>)
     }
     
     @Dependency(\.authClient) private var authClient
@@ -29,7 +33,9 @@ public struct OnboardingFeature {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .kakaoLogin:
-                return .none
+                return .run { send in
+                    await send(.loginResponse(Result { try await authClient.loginWithKakao() }))
+                }
                 
             case let .appleLogin(.success(authorization)):
                 guard let auth = authorization.credential as? ASAuthorizationAppleIDCredential,
@@ -39,7 +45,9 @@ public struct OnboardingFeature {
                     return .none
                 }
                 
-                return .none
+                return .run { send in
+                    await send(.loginResponse(Result { try await authClient.loginWithApple(idToken: idToken) }))
+                }
                 
             case let .handleKakaoOpenURL(url):
                 authClient.handleKakaoOpenURL(url: url)

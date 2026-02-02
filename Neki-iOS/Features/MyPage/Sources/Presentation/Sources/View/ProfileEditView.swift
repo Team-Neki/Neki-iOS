@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
@@ -17,8 +18,20 @@ struct ProfileEditView: View {
     var body: some View {
         VStack {
             ZStack(alignment: .bottomTrailing) {
-                Circle()
-                    .frame(width: 142, height: 142)
+                Group {
+                    if let selectedImage = store.selectedProfileImage {
+                        Image(uiImage: selectedImage)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        KFImage(store.currentProfileImageURL)
+                            .resizable()
+                            .onFailureImage(.iconDefaultProfile)
+                            .scaledToFill()
+                    }
+                }
+                .frame(width: 142, height: 142)
+                .clipShape(.circle)
                 
                 Button {
                     isProfileSelectionAlertPresented = true
@@ -58,8 +71,4 @@ struct ProfileEditView: View {
         .contentShape(.rect)
         .onTapGesture { isFocused = false }
     }
-}
-
-#Preview {
-    ProfileEditView(store: .init(initialState: ProfileEditFeature.State(user: .init(nickname: "변우진", providerType: .apple)), reducer: { ProfileEditFeature() }))
 }

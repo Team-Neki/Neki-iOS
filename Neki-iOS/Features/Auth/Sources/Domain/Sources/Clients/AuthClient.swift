@@ -19,6 +19,7 @@ import os
 public struct AuthClient {
     public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
     public var loginWithKakao: @Sendable () async throws -> User
+    public var autoLogin: @Sendable () async throws -> User
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
     public var updateProfile: @Sendable (_ nickname: String?, _ profileImage: Data?) async throws -> Void
@@ -29,6 +30,7 @@ extension AuthClient: DependencyKey {
     public static var liveValue: AuthClient = {
         let kakaoSDKHelper = KakaoSDKHelper()
         @Dependency(\.authRepository) var authRepository
+        @Dependency(\.imageUploadRepository) var imageUploadRepository
         
         @Sendable func loginWithApple(idToken: Data) async throws -> User {
             guard let idTokenString = String(data: idToken, encoding: .utf8) else {
@@ -57,6 +59,14 @@ extension AuthClient: DependencyKey {
             }
         }
         
+        @Sendable func autoLogin() async throws -> User {
+            do {
+                return try await authRepository.restoreSession()
+            } catch {
+                throw AuthClient.mapError(error)
+            }
+        }
+        
         @Sendable func signOut() async throws -> Void {
             do {
                 try await authRepository.logout()
@@ -76,8 +86,19 @@ extension AuthClient: DependencyKey {
         }
         
         @Sendable func updateProfile(_ nickname: String?, profileImage: Data?) async throws -> Void {
+            var uploadedImageID: Int?
+            if let profileImage {
+                do {
+                    let imageEntity = ImageUploadEntity(data: profileImage, format: .jpeg)
+                    guard let id = try await imageUploadRepository.upload(items: [imageEntity], mediaType: .userProfile).first else { throw AuthClientError.serverError("프로필 이미지 업로드 실패") }
+                    uploadedImageID = id
+                } catch {
+                    throw AuthClient.mapError(error)
+                }
+            }
+            
             do {
-                try await authRepository.updateProfile(nickname: nickname, profileImage: profileImage)
+                try await authRepository.updateProfile(nickname: nickname, profileImageID: uploadedImageID)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -90,6 +111,7 @@ extension AuthClient: DependencyKey {
         return AuthClient(
             loginWithApple: loginWithApple,
             loginWithKakao: loginWithKakao,
+            autoLogin: autoLogin,
             signOut: signOut,
             withdraw: withdraw,
             updateProfile: updateProfile,
@@ -103,20 +125,31 @@ extension AuthClient: DependencyKey {
 
 private extension AuthClient {
     static func mapError(_ error: Error) -> AuthClientError {
-        guard let repositoryError = error as? AuthRepositoryError else { return .unknown }
-        
-        switch repositoryError {
-        case .networkError(let networkError):
-            switch networkError {
-            case .networkFail: return .networkConnectionLost
-            case .unauthorizedError: return .sessionExpired
-            default: return .serverError(networkError.localizedDescription)
+        if let repositoryError = error as? AuthRepositoryError {
+            switch repositoryError {
+            case .networkError(let networkError):
+                switch networkError {
+                case .networkFail: return .networkConnectionLost
+                case .unauthorizedError: return .sessionExpired
+                default: return .serverError(networkError.localizedDescription)
+                }
+            case .unauthorized, .userNotFound:
+                return .sessionExpired
+            case .unknown:
+                return .unknown
             }
-        case .decodingError:
-            return .serverError("데이터 처리 중 오류가 발생했습니다.")
-        case .unauthorized, .userNotFound:
-            return .sessionExpired
         }
+        
+        if let uploadError = error as? UploadError {
+            switch uploadError {
+            case .presignedUrlFailed:
+                return .serverError("이미지 업로드 정보를 받아올 수 없음.")
+            case .uploadFailed:
+                return .networkConnectionLost
+            }
+        }
+        
+        return .unknown
     }
 }
 

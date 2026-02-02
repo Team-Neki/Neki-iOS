@@ -9,7 +9,7 @@ import Foundation
 
 public enum AuthRepositoryError: Error {
     case networkError(NetworkError)
-    case decodingError
+    case unknown
     case unauthorized
     case userNotFound
 }
@@ -23,6 +23,8 @@ public protocol AuthRepository {
     func withdraw() async throws(AuthRepositoryError) -> Void
     /// 로그아웃
     func logout() async throws(AuthRepositoryError) -> Void
-    
-    func updateProfile(nickname: String?, profileImage: Data?) async throws(AuthRepositoryError) -> Void
+    /// 프로필 편집
+    func updateProfile(nickname: String?, profileImageID: Int?) async throws(AuthRepositoryError) -> Void
+    /// 자동 로그인 (유저 세션 복구)
+    func restoreSession() async throws(AuthRepositoryError) -> User
 }

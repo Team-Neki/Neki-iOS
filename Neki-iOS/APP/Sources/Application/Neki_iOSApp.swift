@@ -16,8 +16,8 @@ struct Neki_iOSApp: App {
     
     var body: some Scene {
         WindowGroup {
-//            AppCoordinatorView(store: store)
-            MainTabCoordinatorView(store: store)
+            AppCoordinatorView(store: store)
+//            MainTabCoordinatorView(store: store)
         }
     }
 }

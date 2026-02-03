@@ -22,14 +22,20 @@ struct AccountPreferenceFeature {
         case unregisterButtonTapped
     }
     
+    @Dependency(\.authClient) private var authClient
+    
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .logoutButtonTapped:
-                return .none
+                return .run { send in
+                    try await authClient.signOut()
+                }
                 
             case .unregisterButtonTapped:
-                return .none
+                return .run { send in
+                    try await authClient.withdraw()
+                }
                 
             default:
                 return .none

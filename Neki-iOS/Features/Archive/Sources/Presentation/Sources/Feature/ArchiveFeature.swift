@@ -112,7 +112,10 @@ struct ArchiveFeature {
                 
             case .onAppear:
                 return .merge(
-                    state.albums.isEmpty ? .send(.fetchAlbums) : .none,
+                    /// TODO: - 사진상세에서 즐겨찾기 호출 시 앨범 갱신 로직을 델리게이트 해야하지만, 현재 시간이 없으므로
+                    /// 임시로 onappear 마다 갱신하도록 수정
+//                    state.albums.isEmpty ? .send(.fetchAlbums) : .none,
+                    .send(.fetchAlbums),
                     state.photos.isEmpty ? .send(.fetchPhotos(isRefresh: true)) : .none
                 )
                 

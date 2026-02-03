@@ -15,8 +15,10 @@ public struct DefaultAuthRepository: AuthRepository {
     
     public init() {}
     
-    public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens {
-        let dto = SocialLoginDTO.Request(idToken: idToken)
+    public func login(idToken: String, provider: ProviderType, platform: String) async throws(AuthRepositoryError) -> AuthTokens {
+        let platformParam: String? = (provider == .apple) ? nil : "ios"
+            
+        let dto = SocialLoginDTO.Request(idToken: idToken, platform: platformParam)
         let endpoint = AuthEndpoint.login(dto: dto, provider: provider)
         
         do {
@@ -36,7 +38,7 @@ public struct DefaultAuthRepository: AuthRepository {
         do {
             let responseDTO: BaseResponseDTO<UserInfoDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data,
-                  let providerType = ProviderType(rawValue: data.providerType)
+                  let providerType = ProviderType(rawValue: data.providerType.lowercased())
             else { throw AuthRepositoryError.networkError(.responseDecodingError) }
             
             let profileImageURL = URL(string: data.profileImageURLString ?? "")

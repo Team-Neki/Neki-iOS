@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>이미지를 갤러리에 저장하기 위해 접근 권한이 필요합니다.</string>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
 	<key>CFBundleURLTypes</key>
@@ -17,6 +15,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>KAKAO_LOGIN_NATIVE_APP_KEY</key>
+	<string>$(KAKAO_LOGIN_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
@@ -26,17 +26,6 @@
 	</array>
 	<key>NMFNcpKeyId</key>
 	<string>${NAVER_MAPS_CLIENT_ID}</string>
-	<key>TEMPORARY_ACCESS_TOKEN</key>
-	<string>$(TEMPORARY_ACCESS_TOKEN)</string>
-	<key>UIAppFonts</key>
-	<array>
-		<string>Pretendard-Bold.otf</string>
-		<string>Pretendard-Medium.otf</string>
-		<string>Pretendard-Regular.otf</string>
-		<string>Pretendard-SemiBold.otf</string>
-	</array>
-	<key>UIDesignRequiresCompatibility</key>
-	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>
@@ -50,5 +39,16 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>TEMPORARY_ACCESS_TOKEN</key>
+	<string>$(TEMPORARY_ACCESS_TOKEN)</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Pretendard-Bold.otf</string>
+		<string>Pretendard-Medium.otf</string>
+		<string>Pretendard-Regular.otf</string>
+		<string>Pretendard-SemiBold.otf</string>
+	</array>
+	<key>UIDesignRequiresCompatibility</key>
+	<true/>
 </dict>
 </plist>

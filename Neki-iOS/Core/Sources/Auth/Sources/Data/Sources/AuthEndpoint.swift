@@ -42,12 +42,12 @@ extension AuthEndpoint: Endpoint {
     
     var path: String {
         switch self {
-        case .reissueToken: return "/auth/refresh"
-        case let .login(_, provider): return "/auth/\(provider.name)/login"
-        case .withdraw: return "/users/me"
-        case .editNickname: return "/users/me"
-        case .editProfileImage: return "/users/me/profile-image"
-        case .fetchUserInfo: return "/users/info"
+        case .reissueToken: return "auth/refresh"
+        case let .login(_, provider): return "auth/\(provider.name)/login"
+        case .withdraw: return "users/me"
+        case .editNickname: return "users/me"
+        case .editProfileImage: return "users/me/profile-image"
+        case .fetchUserInfo: return "users/info"
         }
     }
     

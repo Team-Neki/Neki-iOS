@@ -44,7 +44,7 @@ struct AlbumRowTile: View {
             
             Spacer()
             
-            if isSelectMode || isDeleteMode {
+            if isSelectMode && !album.isFavorite || isDeleteMode && !album.isFavorite {
                 selectionIndicator
             }
         }
@@ -68,7 +68,7 @@ private extension AlbumRowTile {
     @ViewBuilder
     var selectionIndicator: some View {
         let shouldShowCheckbox: Bool = {
-            if isSelectMode { return true }
+            if isSelectMode && !album.isFavorite { return true }
             if isDeleteMode && !album.isFavorite { return true }
             return false
         }()

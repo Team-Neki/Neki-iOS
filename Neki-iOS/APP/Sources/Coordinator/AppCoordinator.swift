@@ -19,6 +19,13 @@ struct AppCoordinator {
         var route: Route.State
         
         init() {
+            
+            //            #if DEBUG
+            //            UserDefaults.standard.removeObject(forKey: AppStorageKey.userSessionStatus)
+            //            print("[DEBUG] Keychain cleared for login testing")
+            //            #endif
+            
+            
             var initialStatus: UserSessionStatus
             guard let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
                   let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data)
@@ -34,6 +41,8 @@ struct AppCoordinator {
     enum Action: BindableAction {
         // View Actions
         case onAppLaunched
+        
+        case userSessionStatusChanged(UserSessionStatus)
         
         // Binding Actions
         case binding(BindingAction<State>)
@@ -52,13 +61,14 @@ struct AppCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppLaunched:
+                //                return .none
                 return .run { [status = state.userSessionStatus] _ in
                     guard case let .signedIn(user) = status else { return }
                     try? await authClient.autoLogin()
                 }
                 
-            case .binding(\.userSessionStatus):
-                switch state.userSessionStatus {
+            case let .userSessionStatusChanged(newStatus):
+                switch newStatus {
                 case let .signedIn(user):
                     if case .mainTab = state.route { return .none }
                     state.route = .mainTab(.init(user: user))
@@ -66,7 +76,8 @@ struct AppCoordinator {
                     
                 case .signedOut, .expired:
                     state.route = .auth(.init())
-                    guard case .expired = state.userSessionStatus else { return .none }
+                    
+                    guard case .expired = newStatus else { return .none }
                     state.toastItem = .init("다시 로그인 해주세요.")
                     return .none
                 }

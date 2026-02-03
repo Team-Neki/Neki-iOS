@@ -16,7 +16,7 @@ public enum AuthRepositoryError: Error {
 
 public protocol AuthRepository {
     /// 로그인/회원가입, idToken으로 서비스 토큰을 확보
-    func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens
+    func login(idToken: String, provider: ProviderType, platform: String) async throws(AuthRepositoryError) -> AuthTokens
     /// 사용자 정보 조회
     func fetchUser() async throws(AuthRepositoryError) -> User
     /// 회원탈퇴

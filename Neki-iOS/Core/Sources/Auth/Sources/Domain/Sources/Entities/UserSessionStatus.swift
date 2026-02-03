@@ -18,4 +18,8 @@ extension UserSessionStatus {
         guard let data = try? encoder.encode(status) else { return }
         UserDefaults.standard.set(data, forKey: AppStorageKey.userSessionStatus)
     }
+    
+    public static func removeState() {
+        UserDefaults.standard.removeObject(forKey: AppStorageKey.userSessionStatus)
+    }
 }

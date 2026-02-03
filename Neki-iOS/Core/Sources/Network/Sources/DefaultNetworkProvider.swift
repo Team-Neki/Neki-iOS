@@ -258,11 +258,11 @@ private extension DefaultNetworkProvider {
     func requestLog(_ request: URLRequest) {
         Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
         if let headers = request.allHTTPHeaderFields {
-            Logger.network.debug("🧾 Headers: \(headers.description)")
+            Logger.network.debug("🧾 Request Headers: \(headers.description)")
         }
         if let body = request.httpBody,
            let bodyString = String(data: body, encoding: .utf8) {
-            Logger.network.debug("📦 Body: \(bodyString)")
+            Logger.network.debug("📦 Request Body: \(bodyString)")
         }
     }
     

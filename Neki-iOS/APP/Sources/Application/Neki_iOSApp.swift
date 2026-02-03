@@ -7,6 +7,8 @@
 
 import SwiftUI
 import ComposableArchitecture
+import KakaoSDKCommon
+import KakaoSDKAuth
 
 @main
 struct Neki_iOSApp: App {
@@ -14,10 +16,19 @@ struct Neki_iOSApp: App {
         AppCoordinator()
     }
     
+    init() {
+        let kakaoAppKey = Bundle.main.infoDictionary?["KAKAO_LOGIN_NATIVE_APP_KEY"] as? String ?? ""
+        KakaoSDK.initSDK(appKey: kakaoAppKey)
+    }
+    
     var body: some Scene {
         WindowGroup {
             AppCoordinatorView(store: store)
-//            MainTabCoordinatorView(store: store)
+                .onOpenURL { url in
+                    if (AuthApi.isKakaoTalkLoginUrl(url)) {
+                        _ = AuthController.handleOpenUrl(url: url)
+                    }
+                }
         }
     }
 }

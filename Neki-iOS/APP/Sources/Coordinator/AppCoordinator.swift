@@ -79,6 +79,16 @@ struct AppCoordinator {
                     return .none
                 }
                 
+            case let .route(.auth(.delegate(.moveToMainTab(user)))):
+                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
+                state.route = .mainTab(.init(user: user))
+                return .none
+                
+            case .route(.mainTab(.delegate(.signedOut))):
+                state.$userSessionStatus.withLock { $0 = .signedOut }
+                state.route = .auth(.init())
+                return .none
+                
             default:
                 return .none
             }

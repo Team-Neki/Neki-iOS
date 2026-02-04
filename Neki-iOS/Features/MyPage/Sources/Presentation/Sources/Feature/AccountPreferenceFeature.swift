@@ -7,6 +7,7 @@
 
 import Foundation
 import ComposableArchitecture
+import os
 
 @Reducer
 struct AccountPreferenceFeature {
@@ -20,6 +21,10 @@ struct AccountPreferenceFeature {
         case editProfileButtonTapped
         case logoutButtonTapped
         case unregisterButtonTapped
+        
+        // Delegate Actions
+        case didSignOut
+        case didWithdraw
     }
     
     @Dependency(\.authClient) private var authClient
@@ -30,11 +35,17 @@ struct AccountPreferenceFeature {
             case .logoutButtonTapped:
                 return .run { send in
                     try await authClient.signOut()
+                    await send(.didSignOut)
+                } catch: { error, _ in
+                    Logger.presentation.error("로그아웃 과정 중 에러 발생: \(error)")
                 }
                 
             case .unregisterButtonTapped:
                 return .run { send in
                     try await authClient.withdraw()
+                    await send(.didWithdraw)
+                } catch: { error, _ in
+                    Logger.presentation.error("회원탈퇴 과정 중 에러 발생: \(error)")
                 }
                 
             default:

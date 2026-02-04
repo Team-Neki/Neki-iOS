@@ -41,7 +41,6 @@ extension AuthClient: DependencyKey {
             do {
                 _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
                 let user = try await authRepository.fetchUser()
-                UserSessionStatus.updateStatus(.signedIn(user))
                 return user
             } catch {
                 throw AuthClient.mapError(error)
@@ -54,7 +53,6 @@ extension AuthClient: DependencyKey {
                 let idToken = try await kakaoSDKHelper.login()
                 _ = try await authRepository.login(idToken: idToken, provider: .kakao)
                 let user = try await authRepository.fetchUser()
-                UserSessionStatus.updateStatus(.signedIn(user))
                 return user
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
@@ -69,7 +67,6 @@ extension AuthClient: DependencyKey {
         @Sendable func autoLogin() async throws -> User {
             do {
                 let user = try await authRepository.restoreSession()
-                UserSessionStatus.updateStatus(.signedIn(user))
                 return user
             } catch {
                 throw AuthClient.mapError(error)
@@ -80,7 +77,6 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.logout()
                 kakaoSDKHelper.logout()
-                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -90,7 +86,6 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.withdraw()
                 kakaoSDKHelper.logout()
-                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -145,7 +140,6 @@ private extension AuthClient {
                 default: return .serverError(networkError.localizedDescription)
                 }
             case .unauthorized, .userNotFound:
-                UserSessionStatus.updateStatus(.signedOut)
                 return .sessionExpired
             case .unknown:
                 return .unknown

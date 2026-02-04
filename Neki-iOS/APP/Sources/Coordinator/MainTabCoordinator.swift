@@ -42,6 +42,11 @@ struct MainTabCoordinator {
         case archive(ArchiveCoordinator.Action)
         case map(MapCoordinator.Action)
         case myPage(MyPageCoordinator.Action)
+        
+        case delegate(Delegate)
+        enum Delegate {
+            case signedOut
+        }
     }
     
     var body: some ReducerOf<Self> {
@@ -72,6 +77,9 @@ struct MainTabCoordinator {
             case let .archive(.delegate(.showToast(item))):
                 state.toast = item
                 return .none
+                
+            case .myPage(.delegate(.didLogout)), .myPage(.delegate(.didWithdraw)):
+                return .send(.delegate(.signedOut))
                 
             default:
                 return .none

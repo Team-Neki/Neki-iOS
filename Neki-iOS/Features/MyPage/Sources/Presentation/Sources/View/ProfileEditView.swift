@@ -61,7 +61,8 @@ struct ProfileEditView: View {
             left: { NekiToolBar.back { dismiss() } },
             center: { NekiToolBar.textCenter("프로필 편집") },
             right: { NekiToolBar.textRight("완료", isEnabled: store.doneButtonDisabled == false) { store.send(.doneButtonTapped) } }
-        ).nekiSelectAlert(isPresented: $isProfileSelectionAlertPresented) {
+        )
+        .nekiSelectAlert(isPresented: $isProfileSelectionAlertPresented) {
             // 별도의 onExit 동작 없음
         } content: {
             VStack(spacing: 4) {
@@ -83,10 +84,10 @@ struct ProfileEditView: View {
                     isProfileSelectionAlertPresented = false
                 }
             }
+            .padding(.vertical, 12)
+            .nekiFont(.body16SemiBold)
+            .foregroundStyle(.gray800)
         }
-        .padding(.vertical, 12)
-        .nekiFont(.body16SemiBold)
-        .foregroundStyle(.gray800)
         .contentShape(.rect)
         .onTapGesture { isFocused = false }
     }

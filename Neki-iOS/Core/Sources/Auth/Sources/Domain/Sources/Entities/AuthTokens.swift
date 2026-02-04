@@ -14,8 +14,7 @@ public struct AuthTokens: Codable, Sendable {
     public let accessToken: Token // 1시간
     public let refreshToken: Token // 30일
     public let expiredAt: Date
-//    public var refreshNeeded: Bool { Date.now.addingTimeInterval(60 * 5) >= expiredAt } // 만료 5분 전
-    public var refreshNeeded: Bool { Date.now == expiredAt }
+    public var refreshNeeded: Bool { Date.now.addingTimeInterval(60 * 5) >= expiredAt } // 만료 5분 전
     
     public init(accessToken: Token, refreshToken: Token) {
         self.accessToken = accessToken

@@ -15,7 +15,7 @@ public struct DefaultAuthRepository: AuthRepository {
     
     public init() {}
     
-    public func login(idToken: String, provider: ProviderType, platform: String) async throws(AuthRepositoryError) -> AuthTokens {
+    public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens {
         let platformParam: String? = (provider == .apple) ? nil : "ios"
             
         let dto = SocialLoginDTO.Request(idToken: idToken, platform: platformParam)
@@ -57,7 +57,7 @@ public struct DefaultAuthRepository: AuthRepository {
             try tokenStorage.delete()
         } catch let error as NetworkError {
             throw .networkError(error)
-        } catch let error as TokenStorageError {
+        } catch is TokenStorageError {
             throw .userNotFound
         } catch {
             throw .unknown

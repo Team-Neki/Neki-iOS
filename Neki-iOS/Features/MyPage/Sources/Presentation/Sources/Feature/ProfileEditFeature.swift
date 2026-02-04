@@ -27,7 +27,6 @@ struct ProfileEditFeature {
     enum Action: BindableAction {
         // View Actions
         case changeToDefaultProfileImage
-        case openPhotosPicker
         case doneButtonTapped
         
         // Binding Actions
@@ -42,10 +41,6 @@ struct ProfileEditFeature {
             case .changeToDefaultProfileImage:
                 state.selectedProfileImage = nil
                 state.currentProfileImageURL = nil
-                return .none
-                
-            case .openPhotosPicker:
-                // TODO: PhotosUI PhotoPicker 열기
                 return .none
                 
             case .binding(\.nickname):

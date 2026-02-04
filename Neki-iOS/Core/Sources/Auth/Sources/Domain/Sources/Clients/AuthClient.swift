@@ -39,7 +39,7 @@ extension AuthClient: DependencyKey {
             }
             
             do {
-                _ = try await authRepository.login(idToken: idTokenString, provider: .apple, platform: "ios")
+                _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
                 let user = try await authRepository.fetchUser()
                 UserSessionStatus.updateStatus(.signedIn(user))
                 return user
@@ -52,7 +52,7 @@ extension AuthClient: DependencyKey {
         @Sendable func loginWithKakao() async throws -> User {
             do {
                 let idToken = try await kakaoSDKHelper.login()
-                _ = try await authRepository.login(idToken: idToken, provider: .kakao, platform: "ios")
+                _ = try await authRepository.login(idToken: idToken, provider: .kakao)
                 let user = try await authRepository.fetchUser()
                 UserSessionStatus.updateStatus(.signedIn(user))
                 return user

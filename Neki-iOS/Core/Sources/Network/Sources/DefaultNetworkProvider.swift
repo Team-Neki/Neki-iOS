@@ -22,6 +22,7 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     
     public init(
         session: URLSessionProtocol = URLSession.shared,
+        refresher: TokenRefresher? = nil,
         decoder: JSONDecoder = JSONDecoder()
     ) {
         self.session = session
@@ -29,9 +30,8 @@ public final actor DefaultNetworkProvider: NetworkProvider {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         decoder.dateDecodingStrategy = .formatted(formatter)
         self.decoder = decoder
+        self.tokenRefresher = refresher
     }
-    
-    public func setTokenRefresher(_ refresher: TokenRefresher) { tokenRefresher = refresher }
     
     // TODO: - 프로바이더 부분 수정 필요
     

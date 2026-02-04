@@ -48,6 +48,8 @@ struct ProfileEditFeature {
         case binding(BindingAction<State>)
     }
     
+    private enum CancelID { case imageLoad }
+    
     @Dependency(\.dismiss) private var dismiss
     @Dependency(\.authClient) private var authClient
     
@@ -62,7 +64,7 @@ struct ProfileEditFeature {
                 state.selectedImageData = nil
                 state.currentProfileImageURL = nil
                 state.isDefaultImageSelected = true
-                return .none
+                return .cancel(id: CancelID.imageLoad)
                 
             case let .pickerItemChanged(item):
                 guard let item else { return .none }
@@ -75,6 +77,7 @@ struct ProfileEditFeature {
                         await send(.imageLoaded(nil))
                     }
                 }
+                .cancellable(id: CancelID.imageLoad, cancelInFlight: true)
             
             case let .imageLoaded(data):
                 guard let data, let image = UIImage(data: data) else { return .none }

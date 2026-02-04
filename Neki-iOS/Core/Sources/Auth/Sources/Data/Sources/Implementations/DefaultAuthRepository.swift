@@ -72,7 +72,7 @@ public struct DefaultAuthRepository: AuthRepository {
         }
     }
     
-    public func updateProfile(nickname: String?, profileImageID: Int?) async throws(AuthRepositoryError) {
+    public func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void {
         if let nickname {
             let requestDTO = EditNicknameDTO.Request(nickname: nickname)
             let endpoint = AuthEndpoint.editNickname(dto: requestDTO)
@@ -85,16 +85,10 @@ public struct DefaultAuthRepository: AuthRepository {
             }
         }
         
-        if let profileImageID {
-            let requestDTO = EditProfileImageDTO.Request(imageID: profileImageID)
-            let endpoint = AuthEndpoint.editProfileImage(dto: requestDTO)
-            do {
-                let _: BaseResponseDTO<EditProfileImageDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            } catch let error as NetworkError {
-                throw .networkError(error)
-            } catch {
-                throw .unknown
-            }
+        switch editAction {
+        case let .update(imageID): try await requestUpdateProfileImage(id: imageID)
+        case .delete: try await requestUpdateProfileImage(id: nil)
+        case .keep: break
         }
     }
     
@@ -105,6 +99,24 @@ public struct DefaultAuthRepository: AuthRepository {
         } catch {
             try? tokenStorage.delete()
             throw .unauthorized
+        }
+    }
+}
+
+
+// MARK: - DefaultAuthRepository + Helpers
+
+private extension DefaultAuthRepository {
+    func requestUpdateProfileImage(id: ProfileImageEditAction.ImageID?) async throws(AuthRepositoryError) {
+        let requestDTO = EditProfileImageDTO.Request(imageID: id)
+        let endpoint = AuthEndpoint.editProfileImage(dto: requestDTO)
+        
+        do {
+            let _: BaseResponseDTO<EditProfileImageDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        } catch let error as NetworkError {
+            throw .networkError(error)
+        } catch {
+            throw .unknown
         }
     }
 }

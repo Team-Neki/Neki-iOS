@@ -59,6 +59,7 @@ struct DeviceAuthorizationPreferenceView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.alertDismissed) }
         )
+        .onAppear { store.send(.onAppear) }
     }
 }
 

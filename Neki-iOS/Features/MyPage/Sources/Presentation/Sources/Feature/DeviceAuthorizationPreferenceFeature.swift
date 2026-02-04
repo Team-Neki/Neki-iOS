@@ -92,7 +92,7 @@ struct DeviceAuthorizationPreferenceFeature {
                         }
                     },
                     .run { send in
-                        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
                         await send(.updatePhotosStatus(status))
                     }
                 )

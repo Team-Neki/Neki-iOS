@@ -65,9 +65,14 @@ struct AppCoordinator {
                 }
                 
             case let .userSessionStatusChanged(newStatus):
+                if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
                 switch newStatus {
                 case let .signedIn(user):
-                    if case .mainTab = state.route { return .none }
+                    if case var .mainTab(mainTabState) = state.route {
+                        mainTabState.user = user
+                        state.route = .mainTab(.init(user: user))
+                        return .none
+                    }
                     state.route = .mainTab(.init(user: user))
                     return .none
                     

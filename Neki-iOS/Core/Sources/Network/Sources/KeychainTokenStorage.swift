@@ -43,8 +43,7 @@ private extension KeychainTokenStorage {
     func checkStatus(_ status: OSStatus, which function: String) throws(TokenStorageError) {
         guard status != noErr else { return }
         let errorMessage = SecCopyErrorMessageString(status, nil) as? String ?? "\(TokenStorageError.unknown)"
-        // TODO: Logging 필요
-        print(errorMessage)
+        Logger.data.debug("토큰 저장소 쿼리 실행 중 에러 발생 - \(function): \(errorMessage)")
         throw status == errSecItemNotFound ? .notFound : .unknown
     }
     

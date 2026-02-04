@@ -7,13 +7,17 @@
 
 import SwiftUI
 
-struct NekiSelectAlertModifier: ViewModifier {
+struct NekiSelectAlertModifier<AlertContent: View>: ViewModifier {
     @Binding var isPresented: Bool
+    let alertContent: AlertContent
     
-    let style: NekiSelectModal.AlertStyle
-    let items: [String]?
-    let onExit: () -> Void
-    let onSelect: (Int) -> Void
+    init(
+        isPresented: Binding<Bool>,
+        @ViewBuilder content: () -> AlertContent
+    ) {
+        self._isPresented = isPresented
+        self.alertContent = content()
+    }
     
     func body(content: Content) -> some View {
         ZStack {
@@ -24,20 +28,14 @@ struct NekiSelectAlertModifier: ViewModifier {
                 Color.gray900.opacity(0.5)
                     .ignoresSafeArea()
                     .zIndex(1)
-                
-                NekiSelectModal(
-                    style: style,
-                    items: items,
-                    onExit: {
-                        onExit()
-                    },
-                    onSelect: { index in
-                        onSelect(index)
+                    .onTapGesture {
+                        isPresented = false
                     }
-                )
-                .padding(.horizontal, 28)
-                .zIndex(2)
-                .transition(.scale.combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.7)))
+                
+                alertContent
+                    .padding(.horizontal, 28)
+                    .zIndex(2)
+                    .transition(.scale.combined(with: .opacity).animation(.spring(response: 0.3, dampingFraction: 0.7)))
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isPresented)
@@ -45,6 +43,24 @@ struct NekiSelectAlertModifier: ViewModifier {
 }
 
 public extension View {
+    func nekiSelectAlert<Content: View>(
+        isPresented: Binding<Bool>,
+        title: String? = nil,
+        onExit: @escaping () -> Void,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        self.modifier(NekiSelectAlertModifier(
+            isPresented: isPresented,
+            content: {
+                NekiSelectContainer(
+                    title: title,
+                    onExit: onExit,
+                    content: content
+                )
+            }
+        ))
+    }
+    
     func nekiSelectAlert(
         isPresented: Binding<Bool>,
         style: NekiSelectModal.AlertStyle,
@@ -52,12 +68,18 @@ public extension View {
         onExit: @escaping () -> Void,
         onSelect: @escaping (Int) -> Void
     ) -> some View {
-        self.modifier(NekiSelectAlertModifier(
+        let title = (style == .map) ? "길찾기" : nil
+        
+        return self.nekiSelectAlert(
             isPresented: isPresented,
-            style: style,
-            items: items,
-            onExit: onExit,
-            onSelect: onSelect
-        ))
+            title: title,
+            onExit: onExit
+        ) {
+            NekiSelectModal(
+                style: style,
+                items: items,
+                onSelect: onSelect
+            )
+        }
     }
 }

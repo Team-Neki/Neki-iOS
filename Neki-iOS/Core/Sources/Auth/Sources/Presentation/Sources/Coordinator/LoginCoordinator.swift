@@ -13,7 +13,7 @@ import os
 public struct LoginCoordinator {
     @ObservableState
     public struct State {
-        @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = true
+        @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = false
         var root = LoginFeature.State()
         var path = StackState<Path.State>()
         var pendingUser: User?

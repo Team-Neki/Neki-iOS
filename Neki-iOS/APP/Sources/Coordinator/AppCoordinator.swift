@@ -35,6 +35,8 @@ struct AppCoordinator {
         // View Actions
         case onAppLaunched
         
+        case userSessionStatusChanged(UserSessionStatus)
+        
         // Binding Actions
         case binding(BindingAction<State>)
         
@@ -52,13 +54,18 @@ struct AppCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppLaunched:
-                return .run { [status = state.userSessionStatus] _ in
-                    guard case let .signedIn(user) = status else { return }
-                    try? await authClient.autoLogin()
+                return .run { [status = state.userSessionStatus] send in
+                    guard case .signedIn = status else { return }
+                    do {
+                        let user = try await authClient.autoLogin()
+                        await send(.userSessionStatusChanged(.signedIn(user)))
+                    } catch {
+                        await send(.userSessionStatusChanged(.signedOut))
+                    }
                 }
                 
-            case .binding(\.userSessionStatus):
-                switch state.userSessionStatus {
+            case let .userSessionStatusChanged(newStatus):
+                switch newStatus {
                 case let .signedIn(user):
                     if case .mainTab = state.route { return .none }
                     state.route = .mainTab(.init(user: user))
@@ -66,10 +73,21 @@ struct AppCoordinator {
                     
                 case .signedOut, .expired:
                     state.route = .auth(.init())
-                    guard case .expired = state.userSessionStatus else { return .none }
+                    
+                    guard case .expired = newStatus else { return .none }
                     state.toastItem = .init("다시 로그인 해주세요.")
                     return .none
                 }
+                
+            case let .route(.auth(.delegate(.moveToMainTab(user)))):
+                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
+                state.route = .mainTab(.init(user: user))
+                return .none
+                
+            case .route(.mainTab(.delegate(.signedOut))):
+                state.$userSessionStatus.withLock { $0 = .signedOut }
+                state.route = .auth(.init())
+                return .none
                 
             default:
                 return .none

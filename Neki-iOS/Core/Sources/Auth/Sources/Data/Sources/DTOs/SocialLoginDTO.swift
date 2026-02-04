@@ -10,6 +10,7 @@ import Foundation
 enum SocialLoginDTO {
     struct Request: Encodable {
         let idToken: String
+        let platform: String?
     }
     
     typealias Response = TokenPair

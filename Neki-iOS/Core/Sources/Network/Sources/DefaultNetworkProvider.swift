@@ -22,6 +22,7 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     
     public init(
         session: URLSessionProtocol = URLSession.shared,
+        refresher: TokenRefresher? = nil,
         decoder: JSONDecoder = JSONDecoder()
     ) {
         self.session = session
@@ -29,9 +30,8 @@ public final actor DefaultNetworkProvider: NetworkProvider {
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         decoder.dateDecodingStrategy = .formatted(formatter)
         self.decoder = decoder
+        self.tokenRefresher = refresher
     }
-    
-    public func setTokenRefresher(_ refresher: TokenRefresher) { tokenRefresher = refresher }
     
     // TODO: - 프로바이더 부분 수정 필요
     
@@ -258,11 +258,11 @@ private extension DefaultNetworkProvider {
     func requestLog(_ request: URLRequest) {
         Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
         if let headers = request.allHTTPHeaderFields {
-            Logger.network.debug("🧾 Headers: \(headers.description)")
+            Logger.network.debug("🧾 Request Headers: \(headers.description)")
         }
         if let body = request.httpBody,
            let bodyString = String(data: body, encoding: .utf8) {
-            Logger.network.debug("📦 Body: \(bodyString)")
+            Logger.network.debug("📦 Request Body: \(bodyString)")
         }
     }
     

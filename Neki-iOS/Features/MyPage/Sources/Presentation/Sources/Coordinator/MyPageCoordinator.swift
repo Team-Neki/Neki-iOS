@@ -23,6 +23,12 @@ struct MyPageCoordinator {
     enum Action {
         case root(MyPageFeature.Action)
         case path(StackActionOf<Path>)
+        
+        case delegate(Delegate)
+        enum Delegate {
+            case didLogout
+            case didWithdraw
+        }
     }
     
     var body: some ReducerOf<Self> {
@@ -41,6 +47,12 @@ struct MyPageCoordinator {
             case .path(.element(id: _, action: .accountPreference(.editProfileButtonTapped))):
                 state.path.append(.profileEdit(.init(user: state.root.user)))
                 return .none
+                
+            case .path(.element(id: _, action: .accountPreference(.didSignOut))):
+                return .send(.delegate(.didLogout))
+                
+            case .path(.element(id: _, action: .accountPreference(.didWithdraw))):
+                return .send(.delegate(.didWithdraw))
                 
             default:
                 return .none

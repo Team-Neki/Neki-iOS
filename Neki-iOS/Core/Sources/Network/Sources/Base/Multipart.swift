@@ -36,7 +36,6 @@ public struct MultipartFormField: MultipartItem {
         case let int as Int: stringValue = String(int)
         case let bool as Bool: stringValue = bool ? "true" : "false"
         case let double as Double: stringValue = String(double)
-            // TODO: Date 등 다양한 타입 지원이 필요하면 이곳에 케이스 추가
         default: throw MultipartError.unsupportedValueType
         }
         

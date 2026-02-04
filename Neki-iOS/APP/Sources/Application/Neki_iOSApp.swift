@@ -7,6 +7,8 @@
 
 import SwiftUI
 import ComposableArchitecture
+import KakaoSDKCommon
+import KakaoSDKAuth
 
 @main
 struct Neki_iOSApp: App {
@@ -17,7 +19,6 @@ struct Neki_iOSApp: App {
     var body: some Scene {
         WindowGroup {
             AppCoordinatorView(store: store)
-//            MainTabCoordinatorView(store: store)
         }
     }
 }

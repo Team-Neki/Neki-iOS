@@ -15,6 +15,12 @@ import KakaoSDKCert
 import KakaoSDKCommon
 import os
 
+public enum ProfileImageUpdateAction: Sendable, Equatable {
+    case new(Data)
+    case delete
+    case keep
+}
+
 @DependencyClient
 public struct AuthClient {
     public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
@@ -22,7 +28,7 @@ public struct AuthClient {
     public var autoLogin: @Sendable () async throws -> User
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
-    public var updateProfile: @Sendable (_ nickname: String?, _ profileImage: Data?) async throws -> Void
+    public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> Void
     public var handleKakaoOpenURL: @Sendable (_ url: URL) -> Void
 }
 
@@ -41,7 +47,6 @@ extension AuthClient: DependencyKey {
             do {
                 _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
                 let user = try await authRepository.fetchUser()
-                UserSessionStatus.updateStatus(.signedIn(user))
                 return user
             } catch {
                 throw AuthClient.mapError(error)
@@ -54,7 +59,6 @@ extension AuthClient: DependencyKey {
                 let idToken = try await kakaoSDKHelper.login()
                 _ = try await authRepository.login(idToken: idToken, provider: .kakao)
                 let user = try await authRepository.fetchUser()
-                UserSessionStatus.updateStatus(.signedIn(user))
                 return user
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
@@ -69,7 +73,6 @@ extension AuthClient: DependencyKey {
         @Sendable func autoLogin() async throws -> User {
             do {
                 let user = try await authRepository.restoreSession()
-                UserSessionStatus.updateStatus(.signedIn(user))
                 return user
             } catch {
                 throw AuthClient.mapError(error)
@@ -80,7 +83,6 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.logout()
                 kakaoSDKHelper.logout()
-                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -90,26 +92,32 @@ extension AuthClient: DependencyKey {
             do {
                 try await authRepository.withdraw()
                 kakaoSDKHelper.logout()
-                UserSessionStatus.updateStatus(.signedOut)
             } catch {
                 throw AuthClient.mapError(error)
             }
         }
         
-        @Sendable func updateProfile(_ nickname: String?, profileImage: Data?) async throws -> Void {
-            var uploadedImageID: Int?
-            if let profileImage {
+        @Sendable func updateProfile(_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> Void {
+            let editAction: ProfileImageEditAction
+            switch updateAction {
+            case .new(let data):
                 do {
-                    let imageEntity = ImageUploadEntity(data: profileImage, format: .jpeg)
+                    let imageEntity = ImageUploadEntity(data: data, format: .jpeg)
                     guard let id = try await imageUploadRepository.upload(items: [imageEntity], mediaType: .userProfile).first else { throw AuthClientError.serverError("프로필 이미지 업로드 실패") }
-                    uploadedImageID = id
+                    editAction = .update(id)
                 } catch {
                     throw AuthClient.mapError(error)
                 }
+                
+            case .delete:
+                editAction = .delete
+                
+            case .keep:
+                editAction = .keep
             }
             
             do {
-                try await authRepository.updateProfile(nickname: nickname, profileImageID: uploadedImageID)
+                try await authRepository.updateProfile(nickname: nickname, editAction: editAction)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -145,7 +153,6 @@ private extension AuthClient {
                 default: return .serverError(networkError.localizedDescription)
                 }
             case .unauthorized, .userNotFound:
-                UserSessionStatus.updateStatus(.signedOut)
                 return .sessionExpired
             case .unknown:
                 return .unknown
@@ -173,6 +180,11 @@ private extension AuthClient {
         typealias IdentityToken = String
         
         private let kakaoAPI = UserApi.shared
+        
+        init() {
+            let kakaoAppKey = Bundle.main.infoDictionary?["KAKAO_LOGIN_NATIVE_APP_KEY"] as? String ?? ""
+            KakaoSDK.initSDK(appKey: kakaoAppKey)
+        }
         
         private func handleResponse(_ oAuthToken: OAuthToken?, error: Error?, _ continuation: CheckedContinuation<Result<IdentityToken, Error>, Never>) {
             if let error = error {

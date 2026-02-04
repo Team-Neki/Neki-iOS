@@ -26,6 +26,9 @@ struct AppCoordinatorView: View {
             }
         }
         .task { await store.send(.onAppLaunched).finish() }
+        .onChange(of: store.userSessionStatus) { _, newValue in
+            store.send(.userSessionStatusChanged(newValue))
+        }
         .nekiToast(item: $store.toastItem)
     }
 }

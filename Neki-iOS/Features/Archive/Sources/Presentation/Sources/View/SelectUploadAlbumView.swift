@@ -117,7 +117,11 @@ private extension SelectUploadAlbumView {
                         .padding(.horizontal, 20)
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            store.send(.tapAlbum(album))
+                            if album.isFavorite {
+                                store.selectedAlbumId = nil
+                            } else {
+                                store.send(.tapAlbum(album))
+                            }
                         }
                     }
                 }

@@ -16,7 +16,9 @@ public struct DefaultAuthRepository: AuthRepository {
     public init() {}
     
     public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens {
-        let dto = SocialLoginDTO.Request(idToken: idToken)
+        let platformParam: String? = (provider == .apple) ? nil : "ios"
+            
+        let dto = SocialLoginDTO.Request(idToken: idToken, platform: platformParam)
         let endpoint = AuthEndpoint.login(dto: dto, provider: provider)
         
         do {
@@ -36,7 +38,7 @@ public struct DefaultAuthRepository: AuthRepository {
         do {
             let responseDTO: BaseResponseDTO<UserInfoDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data,
-                  let providerType = ProviderType(rawValue: data.providerType)
+                  let providerType = ProviderType(rawValue: data.providerType.lowercased())
             else { throw AuthRepositoryError.networkError(.responseDecodingError) }
             
             let profileImageURL = URL(string: data.profileImageURLString ?? "")
@@ -55,7 +57,7 @@ public struct DefaultAuthRepository: AuthRepository {
             try tokenStorage.delete()
         } catch let error as NetworkError {
             throw .networkError(error)
-        } catch let error as TokenStorageError {
+        } catch is TokenStorageError {
             throw .userNotFound
         } catch {
             throw .unknown
@@ -70,7 +72,7 @@ public struct DefaultAuthRepository: AuthRepository {
         }
     }
     
-    public func updateProfile(nickname: String?, profileImageID: Int?) async throws(AuthRepositoryError) {
+    public func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void {
         if let nickname {
             let requestDTO = EditNicknameDTO.Request(nickname: nickname)
             let endpoint = AuthEndpoint.editNickname(dto: requestDTO)
@@ -83,16 +85,10 @@ public struct DefaultAuthRepository: AuthRepository {
             }
         }
         
-        if let profileImageID {
-            let requestDTO = EditProfileImageDTO.Request(imageID: profileImageID)
-            let endpoint = AuthEndpoint.editProfileImage(dto: requestDTO)
-            do {
-                let _: BaseResponseDTO<EditProfileImageDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            } catch let error as NetworkError {
-                throw .networkError(error)
-            } catch {
-                throw .unknown
-            }
+        switch editAction {
+        case let .update(imageID): try await requestUpdateProfileImage(id: imageID)
+        case .delete: try await requestUpdateProfileImage(id: nil)
+        case .keep: break
         }
     }
     
@@ -103,6 +99,24 @@ public struct DefaultAuthRepository: AuthRepository {
         } catch {
             try? tokenStorage.delete()
             throw .unauthorized
+        }
+    }
+}
+
+
+// MARK: - DefaultAuthRepository + Helpers
+
+private extension DefaultAuthRepository {
+    func requestUpdateProfileImage(id: ProfileImageEditAction.ImageID?) async throws(AuthRepositoryError) {
+        let requestDTO = EditProfileImageDTO.Request(imageID: id)
+        let endpoint = AuthEndpoint.editProfileImage(dto: requestDTO)
+        
+        do {
+            let _: BaseResponseDTO<EditProfileImageDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        } catch let error as NetworkError {
+            throw .networkError(error)
+        } catch {
+            throw .unknown
         }
     }
 }

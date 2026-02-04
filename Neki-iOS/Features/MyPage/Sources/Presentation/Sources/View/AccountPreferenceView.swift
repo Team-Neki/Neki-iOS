@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct AccountPreferenceView: View {
     @Environment(\.dismiss) private var dismiss
@@ -68,12 +69,14 @@ private extension AccountPreferenceView {
     
     var profileArea: some View {
         VStack(spacing: 16) {
-            Circle() // TODO: 실제 프로필 이미지 주입되어야 함
+            KFImage(store.user.profileImageURL)
+                .resizable()
+                .onFailureImage(.iconDefaultProfile)
+                .scaledToFill()
                 .frame(width: 142, height: 142)
             
             HStack(spacing: 9) {
-                // TODO: 실제 유저 정보가 주입되어야 함
-                Text("닉네임")
+                Text(store.user.nickname)
                     .nekiFont(.title20Medium)
                     .foregroundStyle(.gray900)
                 

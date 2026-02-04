@@ -7,6 +7,51 @@
 
 import SwiftUI
 
+struct NekiSelectContainer<Content: View>: View {
+    let title: String?
+    let onExit: () -> Void
+    let content: Content
+    
+    init(
+        title: String? = nil,
+        onExit: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.onExit = onExit
+        self.content = content()
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            if let title = title {
+                HStack(alignment: .center, spacing: 0) {
+                    Text(title)
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray800)
+                    
+                    Spacer()
+                    
+                    Button {
+                        onExit()
+                    } label: {
+                        Image(.iconXmarkBlack)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+            }
+            
+            content
+                .padding(.top, title == nil ? 12 : 16)
+                .padding(.bottom, title == nil ? 12 : 24)
+        }
+        .frame(maxWidth: .infinity)
+        .background(Color.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
 public struct NekiSelectModal: View {
     
     public enum AlertStyle {
@@ -43,23 +88,16 @@ public struct NekiSelectModal: View {
         let text: String
     }
     
-    // MARK: - Properties
-    
     let style: AlertStyle
     private let items: [InternalItem]
-    let onExit: () -> Void
     let onSelect: (Int) -> Void
-    
-    // MARK: - Init
     
     public init(
         style: AlertStyle,
         items: [String]? = nil,
-        onExit: @escaping () -> Void,
         onSelect: @escaping (Int) -> Void
     ) {
         self.style = style
-        self.onExit = onExit
         self.onSelect = onSelect
         
         if style == .map {
@@ -73,52 +111,14 @@ public struct NekiSelectModal: View {
         }
     }
     
-    // MARK: - Main Body
-    
     public var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if style == .map {
-                mapHeader
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-            }
-            
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(items) { item in
-                    Button {
-                        onSelect(item.index)
-                    } label: {
-                        rowView(for: item)
-                    }
+            ForEach(items) { item in
+                Button {
+                    onSelect(item.index)
+                } label: {
+                    rowView(for: item)
                 }
-            }
-            .padding(.bottom, style == .map ? 24 : 12)
-            .padding(.top, style == .map ? 16 : 12)
-        }
-        .frame(maxWidth: .infinity)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-    
-}
-
-
-// MARK: - Sub Views
-
-extension NekiSelectModal {
-    @ViewBuilder
-    private var mapHeader: some View {
-        HStack(alignment: .center, spacing: 0) {
-            Text("길찾기")
-                .nekiFont(.title20SemiBold)
-                .foregroundStyle(.gray800)
-            
-            Spacer()
-            
-            Button {
-                onExit()
-            } label: {
-                Image(.iconXmarkBlack)
             }
         }
     }

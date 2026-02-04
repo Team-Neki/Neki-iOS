@@ -23,7 +23,7 @@ public struct LoginFeature {
         case appleLogin(Result<ASAuthorization, any Error>)
         case handleKakaoOpenURL(URL)
         
-        // Internal Actions
+        // Delegate Actions
         case loginResponse(Result<User, Error>)
     }
     

@@ -94,6 +94,10 @@ struct AppCoordinator {
                 state.route = .auth(.init())
                 return .none
                 
+            case let .route(.mainTab(.delegate(.profileUpdated(user)))):
+                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
+                return .none
+                
             default:
                 return .none
             }

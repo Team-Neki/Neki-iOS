@@ -46,10 +46,13 @@ struct ProfileEditFeature {
         case doneButtonTapped
         
         // Internal & Network Actions
-        case updateProfileResponse(Result<Void, Error>)
+        case updateProfileResponse(Result<User, Error>)
         
         // Binding Actions
         case binding(BindingAction<State>)
+        
+        // Delegate Actions
+        case profileUpdated(User)
     }
     
     private enum CancelID { case imageLoad }
@@ -119,16 +122,19 @@ struct ProfileEditFeature {
                 
                 return .run { [user = state.user, nickname = state.nickname, imageAction] send in
                     do {
-                        try await authClient.updateProfile(nickname: user.nickname == nickname ? nil : nickname, updateAction: imageAction)
-                        await send(.updateProfileResponse(.success(())))
+                        let user = try await authClient.updateProfile(nickname: user.nickname == nickname ? nil : nickname, updateAction: imageAction)
+                        await send(.updateProfileResponse(.success(user)))
                     } catch {
                         await send(.updateProfileResponse(.failure(error)))
                     }
                 }
                 
-            case .updateProfileResponse(.success):
+            case let .updateProfileResponse(.success(user)):
                 state.isLoading = false
-                return .run { _ in await dismiss() }
+                return .run { send in
+                    await send(.profileUpdated(user))
+                    await dismiss()
+                }
                 
             case let .updateProfileResponse(.failure(error)):
                 state.isLoading = false

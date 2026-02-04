@@ -28,6 +28,7 @@ struct MyPageCoordinator {
         enum Delegate {
             case didLogout
             case didWithdraw
+            case profileUpdated(User)
         }
     }
     
@@ -53,6 +54,9 @@ struct MyPageCoordinator {
                 
             case .path(.element(id: _, action: .accountPreference(.didWithdraw))):
                 return .send(.delegate(.didWithdraw))
+                
+            case let .path(.element(id: _, action: .profileEdit(.profileUpdated(user)))):
+                return .send(.delegate(.profileUpdated(user)))
                 
             default:
                 return .none

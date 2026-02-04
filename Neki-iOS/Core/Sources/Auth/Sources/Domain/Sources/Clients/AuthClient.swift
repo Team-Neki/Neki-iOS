@@ -29,7 +29,7 @@ public struct AuthClient {
     public var autoLogin: @Sendable () async throws -> User
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
-    public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> Void
+    public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User
     public var handleKakaoOpenURL: @Sendable (_ url: URL) -> Void
 }
 
@@ -98,7 +98,7 @@ extension AuthClient: DependencyKey {
             }
         }
         
-        @Sendable func updateProfile(_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> Void {
+        @Sendable func updateProfile(_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User {
             let editAction: ProfileImageEditAction
             switch updateAction {
             case .new(let data):
@@ -136,6 +136,7 @@ extension AuthClient: DependencyKey {
             
             do {
                 try await authRepository.updateProfile(nickname: nickname, editAction: editAction)
+                return try await authRepository.fetchUser()
             } catch {
                 throw AuthClient.mapError(error)
             }

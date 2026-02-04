@@ -46,6 +46,7 @@ struct MainTabCoordinator {
         case delegate(Delegate)
         enum Delegate {
             case signedOut
+            case profileUpdated(User)
         }
     }
     
@@ -80,6 +81,9 @@ struct MainTabCoordinator {
                 
             case .myPage(.delegate(.didLogout)), .myPage(.delegate(.didWithdraw)):
                 return .send(.delegate(.signedOut))
+                
+            case let .myPage(.delegate(.profileUpdated(user))):
+                return .send(.delegate(.profileUpdated(user)))
                 
             default:
                 return .none

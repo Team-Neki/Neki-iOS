@@ -156,19 +156,3 @@ public extension View {
         ))
     }
 }
-
-#Preview {
-    VStack {
-        
-    }
-    .nekiAlert(
-        isPresented: .constant(true),
-        style: .cancelable,
-        title: "로그아웃 하시겠습니까?",
-        subtitle: "다시 로그인해야 서비스를 이용할 수 있어요.",
-        confirmText: "확인",
-        cancelText: "취소",
-        isProcessing: false,
-        hasIcon: false
-    )
-}

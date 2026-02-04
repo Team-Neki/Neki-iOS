@@ -55,12 +55,12 @@ struct AppCoordinator {
             switch action {
             case .onAppLaunched:
                 return .run { [status = state.userSessionStatus] send in
-                    guard case let .signedIn(user) = status else { return }
+                    guard case .signedIn = status else { return }
                     do {
                         let user = try await authClient.autoLogin()
-                        send(.userSessionStatusChanged(.signedIn(user)))
+                        await send(.userSessionStatusChanged(.signedIn(user)))
                     } catch {
-                        send(.userSessionStatusChanged(.signedOut))
+                        await send(.userSessionStatusChanged(.signedOut))
                     }
                 }
                 

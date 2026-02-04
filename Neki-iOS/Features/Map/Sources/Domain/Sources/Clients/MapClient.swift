@@ -39,7 +39,7 @@ extension MapClient {
     final class MapDelegate: NSObject {
         let locationManager = CLLocationManager()
         
-        var authStatusContinuation: AsyncStream<CLAuthorizationStatus>.Continuation?
+        var authStatusContinuations: [UUID: AsyncStream<CLAuthorizationStatus>.Continuation] = [:]
         var sdkAuthStatusContinuation: AsyncStream<Bool>.Continuation?
         var locationContinuation: CheckedContinuation<CLLocation, Error>?
         var trackingContinuations: [UUID: AsyncStream<CLLocation>.Continuation] = [:]
@@ -67,6 +67,15 @@ extension MapClient {
             locationManager.requestLocation()
         }
         
+        func registerAuthStatus(id: UUID, continuation: AsyncStream<CLAuthorizationStatus>.Continuation) {
+            authStatusContinuations[id] = continuation
+            continuation.yield(locationManager.authorizationStatus)
+        }
+        
+        func unregisterAuthStatus(id: UUID) {
+            authStatusContinuations[id] = nil
+        }
+        
         func startMonitoring(id: UUID, _ continuation: AsyncStream<CLLocation>.Continuation) {
             if trackingContinuations.isEmpty { locationManager.startUpdatingLocation() }
             trackingContinuations[id] = continuation
@@ -84,7 +93,9 @@ extension MapClient {
 
 extension MapClient.MapDelegate: CLLocationManagerDelegate {
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        authStatusContinuation?.yield(manager.authorizationStatus)
+        for continuation in authStatusContinuations.values {
+            continuation.yield(manager.authorizationStatus)
+        }
         
         switch manager.authorizationStatus {
         case .authorizedAlways, .authorizedWhenInUse:
@@ -152,14 +163,15 @@ extension MapClient: DependencyKey {
     public static var liveValue: MapClient = {
         MapClient {
             AsyncStream { continuation in
+                let id = UUID()
                 Task { @MainActor in
-                    sharedDelegate.authStatusContinuation = continuation
+                    sharedDelegate.registerAuthStatus(id: id, continuation: continuation)
                     continuation.yield(sharedDelegate.locationManager.authorizationStatus)
                 }
                 
                 continuation.onTermination = { _ in
                     Task { @MainActor in
-                        sharedDelegate.authStatusContinuation = nil
+                        sharedDelegate.unregisterAuthStatus(id: id)
                     }
                 }
             }

@@ -19,13 +19,6 @@ struct AppCoordinator {
         var route: Route.State
         
         init() {
-            
-            //            #if DEBUG
-            //            UserDefaults.standard.removeObject(forKey: AppStorageKey.userSessionStatus)
-            //            print("[DEBUG] Keychain cleared for login testing")
-            //            #endif
-            
-            
             var initialStatus: UserSessionStatus
             guard let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
                   let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data)
@@ -61,10 +54,14 @@ struct AppCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppLaunched:
-                //                return .none
-                return .run { [status = state.userSessionStatus] _ in
+                return .run { [status = state.userSessionStatus] send in
                     guard case let .signedIn(user) = status else { return }
-                    try? await authClient.autoLogin()
+                    do {
+                        let user = try await authClient.autoLogin()
+                        send(.userSessionStatusChanged(.signedIn(user)))
+                    } catch {
+                        send(.userSessionStatusChanged(.signedOut))
+                    }
                 }
                 
             case let .userSessionStatusChanged(newStatus):

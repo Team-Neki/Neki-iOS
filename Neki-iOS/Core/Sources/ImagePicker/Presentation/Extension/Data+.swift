@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 extension Data {
     /// 데이터의 매직넘버(MagicNumber)를 확인하여 이미지 포맷을 판별합니다.
@@ -32,5 +34,12 @@ extension Data {
         
         // 나머지는 JPEG로
         return .jpeg
+    }
+    
+    var detectedContentType: UTType? {
+        guard let source = CGImageSourceCreateWithData(self as CFData, nil),
+              let typeIdentifier = CGImageSourceGetType(source)
+        else { return nil }
+        return UTType(typeIdentifier as String)
     }
 }

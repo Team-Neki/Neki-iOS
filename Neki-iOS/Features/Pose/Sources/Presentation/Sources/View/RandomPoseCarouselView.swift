@@ -10,7 +10,10 @@ import ComposableArchitecture
 import Kingfisher
 
 struct RandomPoseCarouselView: View {
+    enum SlideDirection { case previous, next, none }
+    
     @Bindable var store: StoreOf<RandomPoseCarouselFeature>
+    @State private var slideDirection: SlideDirection = .none
     
     var body: some View {
         ZStack {
@@ -28,21 +31,27 @@ struct RandomPoseCarouselView: View {
             }
             .ignoresSafeArea()
             
-            mainContentView
+            ZStack {
+                if let pose = store.currentPose {
+                    mainContentView(for: pose)
+                        .id(pose.id)
+                        .transition(activeTransition)
+                }
+            }
+            .animation(.easeInOut(duration: 0.35), value: store.currentPose)
             
             HStack(spacing: .zero) {
                 Color.clear
                     .contentShape(.rect)
-                    .onTapGesture { store.send(.tapLeft) }
+                    .onTapGesture { slideDirection = .previous; store.send(.tapLeft) }
                 
                 Color.clear
                     .contentShape(.rect)
-                    .onTapGesture { store.send(.tapRight) }
+                    .onTapGesture { slideDirection = .next; store.send(.tapRight) }
             }
             
             controlButtons
                 .frame(maxHeight: .infinity, alignment: .bottom)
-            // TODO: 하단부 안전영역 패딩 줘야할 수도 있음 / 디자인팀에 문의해보기
             
             if store.isTutorialPresented { tutorialOverlay }
         }
@@ -52,6 +61,17 @@ struct RandomPoseCarouselView: View {
         .onDisappear {
             guard store.isDismissing == false else { return }
             store.send(.onDisappear)
+        }
+    }
+    
+    private var activeTransition: AnyTransition {
+        switch slideDirection {
+        case .previous:
+            return .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
+        case .next:
+            return .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading))
+        case .none:
+            return .opacity
         }
     }
 }
@@ -100,7 +120,7 @@ private extension RandomPoseCarouselView {
         }
         .padding(8)
         .background {
-            Capsule() // TODO: 이거 디자인 수치 확인해서 다시 그려야함
+            Capsule()
                 .fill(.white.opacity(0.3))
                 .strokeBorder(
                     LinearGradient(colors: [
@@ -188,19 +208,17 @@ private extension RandomPoseCarouselView {
         .zIndex(1)
     }
     
-    var mainContentView: some View {
-        KFImage(store.currentPose?.imageURL)
+    func mainContentView(for pose: Pose) -> some View {
+        KFImage(pose.imageURL)
             .placeholder {
                 ProgressView()
                     .controlSize(.large)
             }
-            .cancelOnDisappear(true)
             .resizable()
             .scaledToFit()
             .clipShape(.rect(cornerRadius: 20))
             .padding()
-            .id(store.currentPose?.id)
-            .transition(.opacity)
+            .compositingGroup()
     }
 }
 

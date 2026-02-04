@@ -174,6 +174,11 @@ private extension AuthClient {
         
         private let kakaoAPI = UserApi.shared
         
+        init() {
+            let kakaoAppKey = Bundle.main.infoDictionary?["KAKAO_LOGIN_NATIVE_APP_KEY"] as? String ?? ""
+            KakaoSDK.initSDK(appKey: kakaoAppKey)
+        }
+        
         private func handleResponse(_ oAuthToken: OAuthToken?, error: Error?, _ continuation: CheckedContinuation<Result<IdentityToken, Error>, Never>) {
             if let error = error {
                 Logger.domain.error("Kakao Login Failed: \(error.localizedDescription)")

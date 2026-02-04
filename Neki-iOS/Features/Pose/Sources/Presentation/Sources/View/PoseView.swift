@@ -14,6 +14,7 @@ struct PoseView: View {
     
     @State private var isFilterBarVisible: Bool = true
     @State private var lastDragPoint: CGFloat = 0
+    @State private var sheetHeight: CGFloat = 1
     
     //MARK: - Properties
     
@@ -42,10 +43,19 @@ struct PoseView: View {
             right: { NekiToolBar.icon(.iconBellFill) }
         )
         .sheet(item: $store.sheetItem) { item in
-            switch item {
-            case .peopleCountFilter: filterSheetView
-            case .randomPoseCountSelection: randomPoseFilterSheetView
+            Group {
+                switch item {
+                case .peopleCountFilter:
+                    PeopleCountFilterSheet(contentHeight: $sheetHeight, store: store)
+                        .autoSizingDetent($sheetHeight)
+                case .randomPoseCountSelection:
+                    RandomPoseSelectionSheet(contentHeight: $sheetHeight, store: store)
+                        .autoSizingDetent($sheetHeight)
+                }
             }
+            .presentationDetents([.height(sheetHeight)])
+            .presentationCornerRadius(20)
+            .presentationDragIndicator(.hidden)
         }
         .task {
             await store.send(.onAppear).finish()
@@ -138,121 +148,146 @@ private extension PoseView {
             }
         }
     }
-    
-    @ViewBuilder
-    var filterSheetView: some View {
-        VStack(spacing: 4) {
-            Capsule()
-                .frame(width: 45, height: 4)
-                .padding(.horizontal, 165)
-                .padding(.vertical, 10)
-                .foregroundStyle(.gray100)
-            
-            VStack(alignment: .leading, spacing: 24) {
-                Text("인원 수")
-                    .nekiFont(.title20SemiBold)
-                    .foregroundStyle(.gray900)
+}
+
+
+// MARK: - Subviews
+
+private extension PoseView {
+    struct PeopleCountFilterSheet: View {
+        @Binding var contentHeight: CGFloat
+        
+        let store: StoreOf<PoseFeature>
+        
+        var body: some View {
+            VStack(spacing: 4) {
+                Capsule()
+                    .frame(width: 45, height: 4)
+                    .padding(.horizontal, 165)
+                    .padding(.vertical, 10)
+                    .foregroundStyle(.gray100)
                 
-                ForEach(PeopleCountOption.allCases.filter({ $0 != .overQuartet }), id: \.self) { option in
-                    Button {
-                        store.send(.selectPeopleCount(option))
-                    } label: {
-                        HStack(alignment: .center, spacing: 8) {
-                            let isHighlighted = store.selectedCountFilterOption == option
-                            if isHighlighted {
-                                Image(.iconCheckmark)
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("인원 수")
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray900)
+                    
+                    ForEach(PeopleCountOption.allCases.filter({ $0 != .overQuartet }), id: \.self) { option in
+                        Button {
+                            store.send(.selectPeopleCount(option))
+                        } label: {
+                            HStack(alignment: .center, spacing: 8) {
+                                let isHighlighted = store.selectedCountFilterOption == option
+                                if isHighlighted {
+                                    Image(.iconCheckmark)
+                                }
+                                
+                                Text(option.displayName)
+                                    .nekiFont(isHighlighted ? .body16SemiBold : .body16Medium)
+                                    .foregroundStyle(isHighlighted ? .gray900 : .gray600)
                             }
-                            
-                            Text(option.displayName)
-                                .nekiFont(isHighlighted ? .body16SemiBold : .body16Medium)
-                                .foregroundStyle(isHighlighted ? .gray900 : .gray600)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-                
-                Spacer()
+                .padding()
             }
-            .padding()
+            .ignoresSafeArea(.container, edges: .bottom)
+            .safeAreaPadding(.bottom)
+            .presentationBackground(.white)
         }
-        .background(.white)
-        .presentationDetents([.height(308)])
-        .presentationCornerRadius(20)
-        .presentationDragIndicator(.hidden)
     }
     
-    var randomPoseFilterSheetView: some View {
-        VStack(spacing: 4) {
-            Capsule()
-                .frame(width: 45, height: 4)
-                .padding(.horizontal, 165)
-                .padding(.vertical, 10)
-                .foregroundStyle(.gray100)
-            
-            VStack(alignment: .leading, spacing: 24) {
-                Text("랜덤 포즈 추천을 위해\n촬영 중인 인원수를 선택해주세요")
-                    .nekiFont(.title20SemiBold)
-                    .foregroundStyle(.gray900)
+    struct RandomPoseSelectionSheet: View {
+        @Binding var contentHeight: CGFloat
+        
+        let store: StoreOf<PoseFeature>
+        
+        var body: some View {
+            VStack(spacing: 4) {
+                Capsule()
+                    .frame(width: 45, height: 4)
+                    .padding(.horizontal, 165)
+                    .padding(.vertical, 10)
+                    .foregroundStyle(.gray100)
                 
-                ForEach(PeopleCountOption.allCases.filter({ $0 != .overQuartet }), id: \.self) { option in
-                    Button {
-                        store.send(.selectPeopleCountForRandomPose(option))
-                    } label: {
-                        HStack(alignment: .center, spacing: 8) {
-                            let isHighlighted: Bool = store.selectedRandomPoseCountSelectionOption == option
-                            if isHighlighted {
-                                Image(.iconCheckmark)
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("랜덤 포즈 추천을 위해\n촬영 중인 인원수를 선택해주세요")
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray900)
+                    
+                    ForEach(PeopleCountOption.allCases.filter({ $0 != .overQuartet }), id: \.self) { option in
+                        Button {
+                            store.send(.selectPeopleCountForRandomPose(option))
+                        } label: {
+                            HStack(alignment: .center, spacing: 8) {
+                                let isHighlighted: Bool = store.selectedRandomPoseCountSelectionOption == option
+                                if isHighlighted {
+                                    Image(.iconCheckmark)
+                                }
+                                
+                                Text(option.displayName)
+                                    .nekiFont(isHighlighted ? .body16SemiBold : .body16Medium)
+                                    .foregroundStyle(isHighlighted ? .gray900 : .gray600)
                             }
-                            
-                            Text(option.displayName)
-                                .nekiFont(isHighlighted ? .body16SemiBold : .body16Medium)
-                                .foregroundStyle(isHighlighted ? .gray900 : .gray600)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                
-                HStack(spacing: 12) {
-                    let designTotalWidth: CGFloat = 375.0
-                    let designPadding: CGFloat = 20.0 * 2
-                    let designSpacing: CGFloat = 12.0
-                    let contentWidth = designTotalWidth - designPadding - designSpacing
-                    let cancelFactor = 93.0 / contentWidth
-                    let selectFactor = 230.0 / contentWidth
-                    
-                    Button {
-                        store.send(.binding(.set(\.sheetItem, nil)))
-                    } label: {
-                        Text("취소")
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.5)
-                    }
-                    .buttonStyle(.nekiCTA(.secondary))
-                    .containerRelativeFrame(.horizontal) { length, _ in
-                        let availableSpace = length - designPadding - designSpacing
-                        return availableSpace * cancelFactor
                     }
                     
-                    Button {
-                        store.send(.onTapStartRandomPoseCarousel)
-                    } label: {
-                        Text("선택하기")
-                    }
-                    .buttonStyle(.nekiCTA(.primary))
-                    .containerRelativeFrame(.horizontal) { length, _ in
-                        let availableSpace = length - designPadding - designSpacing
-                        return availableSpace * selectFactor
+                    HStack(spacing: 12) {
+                        let designTotalWidth: CGFloat = 375.0
+                        let designPadding: CGFloat = 20.0 * 2
+                        let designSpacing: CGFloat = 12.0
+                        let contentWidth = designTotalWidth - designPadding - designSpacing
+                        let cancelFactor = 93.0 / contentWidth
+                        let selectFactor = 230.0 / contentWidth
+                        
+                        Button {
+                            store.send(.binding(.set(\.sheetItem, nil)))
+                        } label: {
+                            Text("취소")
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.5)
+                        }
+                        .buttonStyle(.nekiCTA(.secondary))
+                        .containerRelativeFrame(.horizontal) { length, _ in
+                            let availableSpace = length - designPadding - designSpacing
+                            return availableSpace * cancelFactor
+                        }
+                        
+                        Button {
+                            store.send(.onTapStartRandomPoseCarousel)
+                        } label: {
+                            Text("선택하기")
+                        }
+                        .buttonStyle(.nekiCTA(.primary))
+                        .containerRelativeFrame(.horizontal) { length, _ in
+                            let availableSpace = length - designPadding - designSpacing
+                            return availableSpace * selectFactor
+                        }
                     }
                 }
-                
-                Spacer()
+                .padding()
             }
-            .padding()
+            .ignoresSafeArea(.container, edges: .bottom)
+            .safeAreaPadding(.bottom)
+            .presentationBackground(.white)
         }
-        .background(.white)
-        .presentationDetents([.height(406)])
-        .presentationCornerRadius(20)
-        .presentationDragIndicator(.hidden)
+    }
+}
+
+
+// MARK: - Helpers
+
+extension View {
+    func autoSizingDetent(_ heightBinding: Binding<CGFloat>) -> some View {
+        self
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self, of: \.size.height) { newHeight in
+                guard newHeight > .zero, abs(heightBinding.wrappedValue - newHeight) > 1 else { return }
+                heightBinding.wrappedValue = newHeight
+            }
+            .presentationDetents([.height(heightBinding.wrappedValue)])
     }
 }
 

@@ -27,6 +27,8 @@ struct ProfileEditFeature {
         var isLoading: Bool = false
         let nicknameLengthLimit: Int = 10
         
+        var isProfileSelectionAlertPresented: Bool = false
+        
         init(user: User) {
             self.user = user
             nickname = user.nickname
@@ -36,6 +38,8 @@ struct ProfileEditFeature {
     
     enum Action: BindableAction {
         // View Actions
+        case openProfileEditAlert
+        case closeProfileEditAlert
         case changeToDefaultProfileImage
         case pickerItemChanged(PhotosPickerItem?)
         case imageLoaded(Data?)
@@ -58,12 +62,21 @@ struct ProfileEditFeature {
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+            case .openProfileEditAlert:
+                state.isProfileSelectionAlertPresented = true
+                return .none
+                
+            case .closeProfileEditAlert:
+                state.isProfileSelectionAlertPresented = false
+                return .none
+                
             case .changeToDefaultProfileImage:
                 state.selectedPickerItem = nil
                 state.selectedProfileImage = nil
                 state.selectedImageData = nil
                 state.currentProfileImageURL = nil
                 state.isDefaultImageSelected = true
+                state.isProfileSelectionAlertPresented = false
                 return .cancel(id: CancelID.imageLoad)
                 
             case let .pickerItemChanged(item):

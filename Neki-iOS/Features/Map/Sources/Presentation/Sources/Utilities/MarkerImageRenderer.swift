@@ -1,91 +1,147 @@
-//
+
 //  MarkerImageRenderer.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 2/5/26.
 //
 
-import UIKit
+import SwiftUI
 import CoreGraphics
 
-/// 마커 오버레이 상수값 네임스페이스
 fileprivate enum MarkerLayout {
-    static let normalImageSize: CGFloat = 36.0
-    static let selectedImageSize: CGFloat = 48.0
-    static let normalPadding: CGFloat = 4.0
+    static let normalBgRadius: CGFloat = 16.2
+    static let normalImageSize: CGFloat = 50.0
+    static let normalImageRadius: CGFloat = 15.0
+    static let normalPadding: CGFloat = 2.0
+    
+    static let selectedBgRadius: CGFloat = 21.6
+    static let selectedImageSize: CGFloat = 60.0
+    static let selectedImageRadius: CGFloat = 18.0
     static let selectedPadding: CGFloat = 6.0
-    static let normalRadius: CGFloat = 12.0
-    static let selectedRadius: CGFloat = 16.0
-    static let triangleWidth: CGFloat = 12.0
-    static let triangleHeight: CGFloat = 10.0
+    
+    static let tailWidth: CGFloat = 12.0
+    static let tailHeight: CGFloat = 10.0
+    
     static let shadowRadius: CGFloat = 2.5
     static let shadowOffset = CGSize(width: 0, height: 1)
     static let shadowColor = UIColor.black.withAlphaComponent(0.4).cgColor
+    
+    static let solidColor: UIColor = .white
+    static let gradientColors: [UIColor] = [.darkGray, .black]
 }
 
 struct MarkerImageRenderer {
-    static func render(brandImage: UIImage?, isSelected: Bool) -> UIImage {
+    
+    static func render(
+        brandImage: UIImage?,
+        isSelected: Bool
+    ) -> UIImage {
         let imageSize = isSelected ? MarkerLayout.selectedImageSize : MarkerLayout.normalImageSize
         let padding = isSelected ? MarkerLayout.selectedPadding : MarkerLayout.normalPadding
+        let imageRadius = isSelected ? MarkerLayout.selectedImageRadius : MarkerLayout.normalImageRadius
+        let bgRadius = isSelected ? MarkerLayout.selectedBgRadius : MarkerLayout.normalBgRadius
+        let tailSize = CGSize(width: MarkerLayout.tailWidth, height: MarkerLayout.tailHeight)
         let bodySize = imageSize + (padding * 2)
         
+        let totalWidth = bodySize
+        let totalHeight = bodySize + tailSize.height - 1
+        
+        let shadowMargin = MarkerLayout.shadowRadius * 4
         let canvasSize = CGSize(
-            width: bodySize + (MarkerLayout.shadowRadius * 2),
-            height: bodySize + MarkerLayout.triangleHeight + (MarkerLayout.shadowRadius * 2)
+            width: totalWidth + shadowMargin * 2,
+            height: totalHeight + shadowMargin * 2
         )
         
         let renderer = UIGraphicsImageRenderer(size: canvasSize)
         
         return renderer.image { context in
-            let context = context.cgContext
-            let offsetX = (canvasSize.width - bodySize) / 2
-            let offsetY = MarkerLayout.shadowRadius
-            let bodyRect = CGRect(x: offsetX, y: offsetY, width: bodySize, height: bodySize)
+            let cgContext = context.cgContext
+            let drawOffsetX = shadowMargin
+            let drawOffsetY = MarkerLayout.shadowRadius
+            let bodyRect = CGRect(
+                x: drawOffsetX,
+                y: drawOffsetY,
+                width: bodySize,
+                height: bodySize
+            )
             
-            // 1. 그림자
-            context.setShadow(offset: MarkerLayout.shadowOffset, blur: MarkerLayout.shadowRadius, color: MarkerLayout.shadowColor)
+            let tailOrigin = CGPoint(
+                x: drawOffsetX + bodySize / 2 - tailSize.width / 2,
+                y: drawOffsetY + bodySize - 1
+            )
             
-            // 2. 배경 (몸통 + 꼬리)
-            let cornerRadius = isSelected ? MarkerLayout.selectedRadius : MarkerLayout.normalRadius
-            let path = UIBezierPath(roundedRect: bodyRect, cornerRadius: cornerRadius)
+            let tailPath = UIBezierPath()
+            tailPath.move(to: .zero)
+            tailPath.addLine(to: CGPoint(x: tailSize.width, y: 0))
+            tailPath.addLine(to: CGPoint(x: tailSize.width / 2, y: tailSize.height))
+            tailPath.close()
             
-            let trianglePath = UIBezierPath()
-            let triangleStart = CGPoint(x: canvasSize.width / 2 - MarkerLayout.triangleWidth / 2, y: bodyRect.maxY)
-            trianglePath.move(to: triangleStart)
-            trianglePath.addLine(to: CGPoint(x: canvasSize.width / 2, y: bodyRect.maxY + MarkerLayout.triangleHeight))
-            trianglePath.addLine(to: CGPoint(x: canvasSize.width / 2 + MarkerLayout.triangleWidth / 2, y: bodyRect.maxY))
-            trianglePath.close()
-            path.append(trianglePath)
-            
+            let bodyPath = UIBezierPath(roundedRect: bodyRect, cornerRadius: bgRadius)
+            cgContext.saveGState()
+            cgContext.setShadow(offset: MarkerLayout.shadowOffset, blur: MarkerLayout.shadowRadius, color: MarkerLayout.shadowColor)
+            UIColor.black.setFill()
+            bodyPath.fill()
+            cgContext.setBlendMode(.clear)
+            bodyPath.fill()
+            cgContext.restoreGState()
+            cgContext.saveGState()
+            cgContext.translateBy(x: tailOrigin.x, y: tailOrigin.y)
+            cgContext.setShadow(offset: MarkerLayout.shadowOffset, blur: MarkerLayout.shadowRadius, color: MarkerLayout.shadowColor)
+            UIColor.black.setFill()
+            tailPath.fill()
+            cgContext.setBlendMode(.clear)
+            tailPath.fill()
+            cgContext.restoreGState()
+            cgContext.saveGState()
             if isSelected {
-                context.saveGState()
-                path.addClip()
-                // 그라디언트 (예시: 다크 그레이 -> 블랙)
-                let colors = [UIColor.darkGray.cgColor, UIColor.black.cgColor]
+                cgContext.addPath(bodyPath.cgPath)
+                cgContext.clip()
+                let colors = MarkerLayout.gradientColors.map { $0.cgColor } as CFArray
                 let colorSpace = CGColorSpaceCreateDeviceRGB()
-                let gradient = CGGradient(colorsSpace: colorSpace, colors: colors as CFArray, locations: [0.0, 1.0])!
-                context.drawLinearGradient(gradient, start: CGPoint(x: 0, y: bodyRect.minY), end: CGPoint(x: 0, y: bodyRect.maxY), options: [])
-                context.restoreGState()
+                if let gradient = CGGradient(colorsSpace: colorSpace, colors: colors, locations: nil) {
+                    cgContext.drawLinearGradient(
+                        gradient,
+                        start: CGPoint(x: bodyRect.midX, y: bodyRect.minY),
+                        end: CGPoint(x: bodyRect.midX, y: bodyRect.maxY),
+                        options: []
+                    )
+                }
             } else {
-                UIColor.white.setFill()
-                path.fill()
+                MarkerLayout.solidColor.setFill()
+                bodyPath.fill()
             }
+            cgContext.restoreGState()
+            cgContext.saveGState()
+            cgContext.translateBy(x: tailOrigin.x, y: tailOrigin.y)
+            let tailFillColor = isSelected ? MarkerLayout.gradientColors[1] : MarkerLayout.solidColor
+            tailFillColor.setFill()
+            tailPath.fill()
+            cgContext.restoreGState()
+            let imageRect = CGRect(
+                x: bodyRect.minX + padding,
+                y: bodyRect.minY + padding,
+                width: imageSize,
+                height: imageSize
+            )
             
-            // 3. 브랜드 이미지
-            context.setShadow(offset: .zero, blur: 0, color: nil)
-            let innerImageRect = bodyRect.insetBy(dx: padding, dy: padding)
-            let imagePath = UIBezierPath(roundedRect: innerImageRect, cornerRadius: isSelected ? 8.0 : 6.0)
+            let imagePath = UIBezierPath(roundedRect: imageRect, cornerRadius: imageRadius)
             
-            context.saveGState()
-            imagePath.addClip()
+            cgContext.saveGState()
+            cgContext.addPath(imagePath.cgPath)
+            cgContext.clip()
             
             if let image = brandImage {
-                image.draw(in: innerImageRect)
+                let aspectRatio = max(imageRect.width / image.size.width, imageRect.height / image.size.height)
+                let drawnSize = CGSize(width: image.size.width * aspectRatio, height: image.size.height * aspectRatio)
+                let offsetX = (drawnSize.width - imageRect.width) / 2
+                let offsetY = (drawnSize.height - imageRect.height) / 2
+                let drawRect = CGRect(x: imageRect.minX - offsetX, y: imageRect.minY - offsetY, width: drawnSize.width, height: drawnSize.height)
+                image.draw(in: drawRect)
             } else {
                 UIColor.systemGray5.setFill()
-                UIRectFill(innerImageRect)
+                UIRectFill(imageRect)
             }
-            context.restoreGState()
+            cgContext.restoreGState()
         }
     }
 }

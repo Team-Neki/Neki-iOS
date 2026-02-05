@@ -182,4 +182,9 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         } ?? []
         return photoBooths
     }
+    
+    func loadBrands() async throws -> [PhotoBoothBrand] {
+        let brands = try await ensureBrandsLoaded()
+        return Array(brands.values)
+    }
 }

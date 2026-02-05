@@ -52,9 +52,6 @@ public struct PhotoBoothListFeature {
                 
             case let .setNearbyBooths(booths):
                 state.photoBooths = booths
-                let uniqueBrands = Set(booths.map(\.brand))
-                let sortedBrands = uniqueBrands.sorted { $0.id < $1.id }
-                state.brands = IdentifiedArray(uniqueElements: sortedBrands)
                 return .none
                 
             case let .setVisibleBooths(booths):

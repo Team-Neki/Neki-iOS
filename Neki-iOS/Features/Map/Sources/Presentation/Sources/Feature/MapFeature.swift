@@ -87,6 +87,9 @@ public struct MapFeature {
         case photoBoothChunkLoaded([PhotoBooth])
         case photoBoothStreamFinished
         case photoBoothStreamFailure(Error)
+        case loadBrands
+        case brandsResponse(Result<[PhotoBoothBrand], Error>)
+        
         // Sheet
         case fetchNearbyPhotoBooths(GeographicCoordinate)
         case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
@@ -124,6 +127,7 @@ public struct MapFeature {
                 // MARK: - Life Cycle & Streams
             case .onAppear:
                 return .merge(
+                    .send(.loadBrands),
                     .run { send in
                         for await status in await mapClient.locationAuthorizationStatus() {
                             await send(.updateLocationAuthorization(status))
@@ -242,6 +246,16 @@ public struct MapFeature {
                 )
                 
                 // MARK: - Data Fetching
+            case .loadBrands:
+                return .run { send in
+                    await send(.brandsResponse(Result { try await photoBoothClient.loadBrands() }))
+                }
+                
+            case let .brandsResponse(.success(brands)):
+                let sortedBrands = brands.sorted { $0.id < $1.id }
+                state.photoBoothListState.brands = IdentifiedArray(uniqueElements: sortedBrands)
+                return .none
+                
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
                 state.photoBooths.removeAll()

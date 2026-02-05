@@ -175,7 +175,7 @@ struct DeviceAuthorizationPreferenceFeature {
                 
             case let .updateCameraStatus(status):
                 state.cameraAuthorizationStatus = status
-                return.none
+                return .none
                 
             case let .updatePhotosStatus(status):
                 state.photosAuthorizationStatus = status

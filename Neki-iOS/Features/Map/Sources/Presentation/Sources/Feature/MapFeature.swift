@@ -295,8 +295,11 @@ public struct MapFeature {
                 }.cancellable(id: CancelID.listFetch, cancelInFlight: true)
                 
             case let .nearbyPhotoBoothResponse(.success(booths)):
-                state.photoBoothListState.photoBooths = IdentifiedArray(uniqueElements: booths)
-                return .send(.startBackgroundCalculation)
+                let nearbyBooths = IdentifiedArray(uniqueElements: booths)
+                return .merge(
+                    .send(.photoBoothListAction(.setNearbyBooths(nearbyBooths))),
+                    .send(.startBackgroundCalculation)
+                )
                 
             case let .nearbyPhotoBoothResponse(.failure(error)):
                 Logger.presentation.error("Nearby PhotoBooths fetch error: \(error)")
@@ -317,8 +320,7 @@ public struct MapFeature {
                 
             case let .didFinishBackgroundCalculation(map, list):
                 state.visiblePhotoBooths = map
-                state.photoBoothListState.visibleBooths = list
-                return .none
+                return .send(.photoBoothListAction(.setVisibleBooths(list)))
                 
             case .didTapGoBackToMapButton:
                 resetToMapMode(&state, for: .first)

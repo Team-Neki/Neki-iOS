@@ -53,7 +53,6 @@ struct PoseView: View {
                         .autoSizingDetent($sheetHeight)
                 }
             }
-            .presentationDetents([.height(sheetHeight)])
             .presentationCornerRadius(20)
             .presentationDragIndicator(.hidden)
         }

@@ -14,6 +14,7 @@ import KakaoSDKUser
 import KakaoSDKCert
 import KakaoSDKCommon
 import os
+import UniformTypeIdentifiers
 
 public enum ProfileImageUpdateAction: Sendable, Equatable {
     case new(Data)
@@ -28,7 +29,7 @@ public struct AuthClient {
     public var autoLogin: @Sendable () async throws -> User
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
-    public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> Void
+    public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User
     public var handleKakaoOpenURL: @Sendable (_ url: URL) -> Void
 }
 
@@ -97,12 +98,29 @@ extension AuthClient: DependencyKey {
             }
         }
         
-        @Sendable func updateProfile(_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> Void {
+        @Sendable func updateProfile(_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User {
             let editAction: ProfileImageEditAction
             switch updateAction {
             case .new(let data):
                 do {
-                    let imageEntity = ImageUploadEntity(data: data, format: .jpeg)
+                    let detectedType = data.detectedContentType
+                    let finalData: Data
+                    let finalFormat: ImageFileFormat
+                    
+                    if let detectedType, detectedType.conforms(to: .png) {
+                        finalData = data
+                        finalFormat = .png
+                    } else {
+                        if let processedImage = await ImageDownsamplingProcessor.process(data: data) {
+                            finalData = processedImage.data
+                            finalFormat = .jpeg
+                        } else {
+                            finalData = data
+                            finalFormat = .jpeg
+                        }
+                    }
+                    
+                    let imageEntity = ImageUploadEntity(data: finalData, format: finalFormat)
                     guard let id = try await imageUploadRepository.upload(items: [imageEntity], mediaType: .userProfile).first else { throw AuthClientError.serverError("프로필 이미지 업로드 실패") }
                     editAction = .update(id)
                 } catch {
@@ -118,6 +136,7 @@ extension AuthClient: DependencyKey {
             
             do {
                 try await authRepository.updateProfile(nickname: nickname, editAction: editAction)
+                return try await authRepository.fetchUser()
             } catch {
                 throw AuthClient.mapError(error)
             }

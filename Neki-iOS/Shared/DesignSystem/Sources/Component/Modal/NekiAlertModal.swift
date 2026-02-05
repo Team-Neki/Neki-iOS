@@ -38,10 +38,11 @@ public struct NekiAlertModal<Content: View, Actions: View>: View {
             
             content
                 .padding(.horizontal, 12)
-            
-            actions
                 .padding(.top, 24)
                 .padding(.bottom, 12)
+            
+            actions
+                .padding(.vertical, 12)
                 .padding(.horizontal, 12)
         }
         .frame(maxWidth: .infinity)

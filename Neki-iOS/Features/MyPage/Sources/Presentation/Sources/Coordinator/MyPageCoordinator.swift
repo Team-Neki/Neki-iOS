@@ -28,8 +28,11 @@ struct MyPageCoordinator {
         enum Delegate {
             case didLogout
             case didWithdraw
+            case profileUpdated(User)
         }
     }
+    
+    @Dependency(\.openURL) private var openURL
     
     var body: some ReducerOf<Self> {
         Scope(state: \.root, action: \.root) { MyPageFeature() }
@@ -37,8 +40,7 @@ struct MyPageCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .root(.cellTapped(cellItem)):
-                routeMyPageCellTapped(state: &state, cellItem)
-                return .none
+                return routeMyPageCellTapped(state: &state, cellItem)
                 
             case .root(.profileTapped):
                 state.path.append(.accountPreference(.init(user: state.root.user)))
@@ -54,6 +56,9 @@ struct MyPageCoordinator {
             case .path(.element(id: _, action: .accountPreference(.didWithdraw))):
                 return .send(.delegate(.didWithdraw))
                 
+            case let .path(.element(id: _, action: .profileEdit(.profileUpdated(user)))):
+                return .send(.delegate(.profileUpdated(user)))
+                
             default:
                 return .none
             }
@@ -61,23 +66,32 @@ struct MyPageCoordinator {
         .forEach(\.path, action: \.path)
     }
     
-    private func routeMyPageCellTapped(state: inout State, _ cellItem: MyPageFeature.SectionCellItem) {
+    private func routeMyPageCellTapped(state: inout State, _ cellItem: MyPageFeature.SectionCellItem) -> Effect<Action> {
         switch cellItem {
         case .deviceAuthorization:
             state.path.append(.deviceAuthorizationPreference(.init()))
+            return .none
             
         case .support:
-            // TODO: 노션 등 외부 웹페이지로 이동
-            break
+            return .run { _ in
+                guard let url = URL(string: "https://tally.so/r/obGpRX") else { return }
+                await openURL(url)
+            }
+            
         case .termsOfService:
-            // TODO: 노션 등 외부 웹페이지로 이동
-            break
+            return .run { _ in
+                guard let url = URL(string: "https://lydian-tip-26b.notion.site/2ee0d9441db0807c8684ce3e2d4b8aca?source=copy_link") else { return }
+                await openURL(url)
+            }
+            
         case .privacyPolicy:
-            // TODO: 노션 등 외부 웹페이지로 이동
-            break
+            return .run { _ in
+                guard let url = URL(string: "https://lydian-tip-26b.notion.site/2ee0d9441db0807cb850f78145db6dd3?pvs=74") else { return }
+                await openURL(url)
+            }
+            
         case .version:
-            // Version 섹션은 라우팅할 수 있는 셀이 아님
-            break
+            return .none
         }
     }
 }

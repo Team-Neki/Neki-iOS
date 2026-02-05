@@ -121,6 +121,11 @@ struct ArchiveView: View {
         .task {
             await store.send(.onAppear).finish()
         }
+        .onTapGesture {
+            if store.showDropDownMenu {
+                store.showDropDownMenu = false
+            }
+        }
     }
 }
 

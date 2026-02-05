@@ -69,7 +69,6 @@ extension MapClient {
         
         func registerAuthStatus(id: UUID, continuation: AsyncStream<CLAuthorizationStatus>.Continuation) {
             authStatusContinuations[id] = continuation
-            continuation.yield(locationManager.authorizationStatus)
         }
         
         func unregisterAuthStatus(id: UUID) {

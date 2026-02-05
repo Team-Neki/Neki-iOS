@@ -56,7 +56,6 @@ struct RandomPoseCarouselView: View {
             if store.isTutorialPresented { tutorialOverlay }
         }
         .animation(.easeInOut, value: store.isTutorialPresented)
-        .animation(.easeInOut(duration: 0.4), value: store.currentPose)
         .task { await store.send(.onAppear).finish() }
         .onDisappear {
             guard store.isDismissing == false else { return }

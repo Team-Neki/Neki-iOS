@@ -128,7 +128,7 @@ private extension DefaultPoseRepository {
             
             guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
             
-            guard excludedIDs.contains(newPose.id) else {
+            guard excludedIDs.contains(newPose.id) == false else {
                 if retryCount < maxRetryCount {
                     return try await fetchRandomPose(retryCount: retryCount + 1, excluding: excludedIDs)
                 } else {

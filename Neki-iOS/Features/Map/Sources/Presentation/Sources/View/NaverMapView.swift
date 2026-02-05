@@ -408,15 +408,15 @@ private extension NaverMapView {
         Button {
             store.send(.didTapSearchHereButton)
         } label: {
-            HStack(spacing: 6.55) {
+            HStack(spacing: 8) {
                 Image(.iconRotate)
                 
                 Text("현 위치에서 탐색")
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
                 Capsule()
                     .fill(.white)

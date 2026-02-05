@@ -13,27 +13,28 @@ struct ArchivePhotoDetailFeature {
     @ObservableState
     struct State {
         @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
-        let itemID: Int
         
-        var item: ArchiveImageItem {
-            get {
-                photos[id: itemID] ?? ArchiveImageItem(
-                    id: itemID,
-                    imageURL: nil,
-                    isFavorite: false,
-                    date: Date(),
-                    folderId: nil
-                )
-            }
-            set {
-                $photos.withLock { $0[id: itemID] = newValue }
+        var currentItemID: Int
+        let folderId: Int?
+        
+        var slidingPhotos: IdentifiedArrayOf<ArchiveImageItem> {
+            if let folderId = folderId {
+                let filteredItems = photos.filter { $0.folderId == folderId }
+                return IdentifiedArray(uniqueElements: filteredItems)
+            } else {
+                return photos
             }
         }
         
+        var currentItem: ArchiveImageItem? {
+            photos[id: currentItemID]
+        }
+        
         var formattedDate: String {
+            guard let date = currentItem?.date else { return "" }
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy.MM.dd"
-            return formatter.string(from: item.date)
+            return formatter.string(from: date)
         }
         
         var isLoading: Bool = false
@@ -72,24 +73,30 @@ struct ArchivePhotoDetailFeature {
                 return .run { _ in await dismiss() }
                 
             case .onTapFavorite:
-                let newStatus = !state.item.isFavorite
-                state.item.isFavorite = newStatus
+                guard let item = state.currentItem else { return .none }
+                let newStatus = !item.isFavorite
+                state.$photos.withLock { $0[id: item.id]?.isFavorite = newStatus }
                 
-                return .run { [id = state.itemID, isFavorite = newStatus] send in
-                    await send(.toggleFavoriteResponse(Result {
+                return .run { [id = item.id, isFavorite = newStatus] send in
+                    do {
                         try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
-                    }))
+                        await send(.toggleFavoriteResponse(.success(())))
+                    } catch {
+                        await send(.toggleFavoriteResponse(.failure(error)))
+                    }
                 }
                 
             case .toggleFavoriteResponse(.success):
                 return .none
                 
             case .toggleFavoriteResponse(.failure):
-                state.item.isFavorite.toggle()
+                if let item = state.currentItem {
+                    state.$photos.withLock { $0[id: item.id]?.isFavorite.toggle() }
+                }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownload:
-                guard let url = state.item.imageURL else {
+                guard let url = state.currentItem?.imageURL else {
                     return .none
                 }
                 
@@ -110,19 +117,37 @@ struct ArchivePhotoDetailFeature {
                 }
                 
             case .onTapDelete:
-                return .run { [id = state.itemID] send in
-                    await send(.deletePhotoResponse(Result {
+                guard let id = state.currentItem?.id else { return .none }
+                return .run { send in
+                    do {
                         try await archiveClient.deletePhotoList(photoIds: [id])
-                    }))
+                        await send(.deletePhotoResponse(.success(())))
+                    } catch {
+                        await send(.deletePhotoResponse(.failure(error)))
+                    }
                 }
                 
             case .deletePhotoResponse(.success):
-                state.$photos.withLock { _ = $0.remove(id: state.itemID) }
+                guard let deletedID = state.currentItem?.id else { return .none }
                 
-                return .run { send in
-                    await send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
-                    await dismiss()
+                let deletedIndex = state.slidingPhotos.index(id: deletedID)
+                
+                state.$photos.withLock { _ = $0.remove(id: deletedID) }
+                
+                if state.slidingPhotos.isEmpty {
+                    return .run { send in
+                        await send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
+                        await dismiss()
+                    }
                 }
+                
+                if let index = deletedIndex, index < state.slidingPhotos.count {
+                    state.currentItemID = state.slidingPhotos[index].id
+                } else if let last = state.slidingPhotos.last {
+                    state.currentItemID = last.id
+                }
+                
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
             case .deletePhotoResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))

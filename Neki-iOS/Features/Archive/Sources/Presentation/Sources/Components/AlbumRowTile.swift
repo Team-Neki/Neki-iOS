@@ -48,6 +48,7 @@ struct AlbumRowTile: View {
                 selectionIndicator
             }
         }
+        .contentShape(Rectangle())
     }
 }
 

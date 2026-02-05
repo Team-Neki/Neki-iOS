@@ -8,6 +8,8 @@
 import SwiftUI
 import ComposableArchitecture
 import NMapsMap
+import Kingfisher
+import os
 
 fileprivate enum Constants {
     // Map Settings
@@ -24,26 +26,6 @@ fileprivate enum Constants {
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
-    /// 마커 이미지 리소스
-    fileprivate enum MarkerImageResources {
-        enum State {
-            case normal, selected
-        }
-        
-        private static let images: [PhotoBoothBrand: [State: NMFOverlayImage]] = [
-            .life4cut: [.normal: NMFOverlayImage(image: .imgLife4CutPin), .selected: NMFOverlayImage(image: .imgLife4CutPinSelected)],
-            .photoism: [.normal: NMFOverlayImage(image: .imgPhotoismPin), .selected: NMFOverlayImage(image: .imgPhotoismPinSelected)],
-            .photogray: [.normal: NMFOverlayImage(image: .imgPhotograyPin), .selected: NMFOverlayImage(image: .imgPhotograyPinSelected)],
-            .photosignature: [.normal: NMFOverlayImage(image: .imgPhotosignaturePin), .selected: NMFOverlayImage(image: .imgPhotosignaturePinSelected)],
-            .harufilm: [.normal: NMFOverlayImage(image: .imgHarufilmPin), .selected: NMFOverlayImage(image: .imgHarufilmPinSelected)],
-            .planBStudio: [.normal: NMFOverlayImage(image: .imgPlanBStudioPin), .selected: NMFOverlayImage(image: .imgPlanBStudioPinSelected)]
-        ]
-        
-        static func image(for brand: PhotoBoothBrand, state: State) -> NMFOverlayImage {
-            return images[brand]?[state] ?? NMFOverlayImage(image: .imgLife4CutPin)
-        }
-    }
-    
     @Bindable var store: StoreOf<MapFeature>
     let isLocationAuthorized: Bool
     
@@ -58,7 +40,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
         configureMapView(view)
         
         // 초기 카메라 이동
-        let startPosition = store.cameraPosition.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) } ?? Constants.defaultInitialPosition
+        let startPosition = isLocationAuthorized ? store.cameraPosition.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) } ?? Constants.defaultInitialPosition : Constants.defaultInitialPosition
         let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition)
         cameraUpdate.animation = .fly
         cameraUpdate.animationDuration = 0.3
@@ -152,6 +134,8 @@ extension NaverMapRepresentable {
         var lastCameraPosition: GeographicCoordinate?
         
         private var markers: [Int: NMFMarker] = [:]
+        private var markerImageTasks: [Int: Task<Void, Never>] = [:]
+        private var renderedImageCache: [String: UIImage] = [:]
         private var lastSelectedBoothID: Int?
         
         let parent: NaverMapRepresentable
@@ -170,6 +154,8 @@ extension NaverMapRepresentable {
             for id in idsToRemove {
                 markers[id]?.mapView = nil
                 markers[id] = nil
+                markerImageTasks[id]?.cancel()
+                markerImageTasks[id] = nil
             }
             
             for booth in photoBooths {
@@ -195,10 +181,11 @@ private extension NaverMapRepresentable.Coordinator {
     func createMarker(for booth: PhotoBooth) -> NMFMarker {
         let marker = NMFMarker()
         marker.position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-        marker.captionText = "\(booth.brand.displayName)\n\(booth.name)"
+        marker.captionText = "\(booth.brand.brandName)\n\(booth.name)"
         marker.captionColor = .init(hex: 0x202227)
         marker.captionHaloColor = .white
         marker.captionTextSize = 12
+        marker.anchor = CGPoint(x: 0.5, y: 1.0)
         
         marker.touchHandler = { [weak self] _ in
             self?.parent.store.send(.didTapBooth(booth))
@@ -211,21 +198,51 @@ private extension NaverMapRepresentable.Coordinator {
         let isFirstRender = marker.userInfo["isSelected"] == nil
         let currentSelectionState = marker.userInfo["isSelected"] as? Bool ?? false
         
-        guard isFirstRender || currentSelectionState != isSelected else { return }
-        let targetImage = MarkerImageResources.image(for: brand, state: isSelected ? .selected : .normal)
-        marker.iconImage = targetImage
-        
-        if isSelected {
-            marker.width = Constants.selectedSize.width
-            marker.height = Constants.selectedSize.height
-            marker.zIndex = Constants.zIndexSelected
-        } else {
-            marker.width = Constants.normalSize.width
-            marker.height = Constants.normalSize.height
-            marker.zIndex = Constants.zIndexNormal
+        guard isFirstRender || currentSelectionState != isSelected || marker.iconImage.image == nil else { return }
+        marker.userInfo["isSelected"] = isSelected
+        marker.zIndex = isSelected ? Constants.zIndexSelected : Constants.zIndexNormal
+        let cacheKey = "\(booth.brand.id)-\(isSelected)"
+        if let cachedRenderedImage = renderedImageCache[cacheKey] {
+            marker.iconImage = NMFOverlayImage(image: cachedRenderedImage)
+            return
         }
         
-        marker.userInfo["isSelected"] = isSelected
+        guard let url = booth.brand.imageURL else {
+            let placeholder = MarkerImageRenderer.render(brandImage: nil, isSelected: isSelected)
+            marker.iconImage = NMFOverlayImage(image: placeholder)
+            return
+        }
+        
+        markerImageTasks[booth.id]?.cancel()
+        let resource = KF.ImageResource(downloadURL: url, cacheKey: url.absoluteString)
+        if KingfisherManager.shared.cache.isCached(forKey: resource.cacheKey) {
+            markerImageTasks[booth.id] = Task { @MainActor in
+                guard let result = try? await KingfisherManager.shared.retrieveImage(with: resource),
+                      Task.isCancelled == false
+                else { return }
+                applyImage(to: marker, image: result.image, isSelected: isSelected, cacheKey: cacheKey)
+            }
+        } else {
+            let placeholder = MarkerImageRenderer.render(brandImage: nil, isSelected: isSelected)
+            marker.iconImage = NMFOverlayImage(image: placeholder)
+            markerImageTasks[booth.brand.id] = Task { @MainActor in
+                do {
+                    let result = try await KingfisherManager.shared.retrieveImage(with: resource)
+                    guard Task.isCancelled == false else { return }
+                    let currentSelected = marker.userInfo["isSelected"] as? Bool ?? isSelected
+                    let currentCacheKey = "\(booth.brand.id)-\(currentSelected)"
+                    applyImage(to: marker, image: result.image, isSelected: currentSelected, cacheKey: currentCacheKey)
+                } catch {
+                    Logger.presentation.error("Image download failed for marker: \(error)")
+                }
+            }
+        }
+    }
+    
+    func applyImage(to marker: NMFMarker, image: UIImage, isSelected: Bool, cacheKey: String) {
+        let renderedIcon = MarkerImageRenderer.render(brandImage: image, isSelected: isSelected)
+        renderedImageCache[cacheKey] = renderedIcon
+        marker.iconImage = NMFOverlayImage(image: renderedIcon)
     }
 }
 
@@ -312,10 +329,18 @@ private extension NaverMapView {
             mapControllers
             
             HStack(spacing: 16) {
-                Image(photoBooth.brand.logoImageResource)
+                KFImage(photoBooth.brand.imageURL)
                     .resizable()
+                    .placeholder {
+                        ProgressView()
+                    }
+                    .onFailure {
+                        // TODO: 에러페이지 필요
+                        Color.gray400
+                    }
                     .frame(width: 64, height: 64)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {

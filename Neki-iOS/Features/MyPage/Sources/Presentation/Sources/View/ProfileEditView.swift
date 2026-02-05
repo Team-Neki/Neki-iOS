@@ -14,7 +14,6 @@ struct ProfileEditView: View {
     @Environment(\.dismiss) private var dismiss
     @FocusState private var isFocused
     @Bindable var store: StoreOf<ProfileEditFeature>
-    @State private var isProfileSelectionAlertPresented: Bool = false
     
     var body: some View {
         ZStack {
@@ -36,7 +35,7 @@ struct ProfileEditView: View {
                     .clipShape(.circle)
                     
                     Button {
-                        isProfileSelectionAlertPresented = true
+                        store.send(.openProfileEditAlert)
                     } label: {
                         Image(.iconProfileCamera)
                     }
@@ -62,7 +61,7 @@ struct ProfileEditView: View {
             center: { NekiToolBar.textCenter("프로필 편집") },
             right: { NekiToolBar.textRight("완료", isEnabled: store.doneButtonDisabled == false) { store.send(.doneButtonTapped) } }
         )
-        .nekiSelectAlert(isPresented: $isProfileSelectionAlertPresented) {
+        .nekiSelectAlert(isPresented: $store.isProfileSelectionAlertPresented) {
             // 별도의 onExit 동작 없음
         } content: {
             VStack(spacing: 4) {
@@ -81,7 +80,7 @@ struct ProfileEditView: View {
                 }
                 .onChange(of: store.selectedPickerItem) { _, newValue in
                     guard newValue != nil else { return }
-                    isProfileSelectionAlertPresented = false
+                    store.send(.closeProfileEditAlert)
                 }
             }
             .padding(.vertical, 12)

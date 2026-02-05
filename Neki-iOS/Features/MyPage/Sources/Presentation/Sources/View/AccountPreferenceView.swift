@@ -74,6 +74,7 @@ private extension AccountPreferenceView {
                 .onFailureImage(.iconDefaultProfile)
                 .scaledToFill()
                 .frame(width: 142, height: 142)
+                .clipShape(.circle)
             
             HStack(spacing: 9) {
                 Text(store.user.nickname)

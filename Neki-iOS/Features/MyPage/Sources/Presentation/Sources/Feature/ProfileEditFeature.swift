@@ -27,6 +27,8 @@ struct ProfileEditFeature {
         var isLoading: Bool = false
         let nicknameLengthLimit: Int = 10
         
+        var isProfileSelectionAlertPresented: Bool = false
+        
         init(user: User) {
             self.user = user
             nickname = user.nickname
@@ -36,17 +38,24 @@ struct ProfileEditFeature {
     
     enum Action: BindableAction {
         // View Actions
+        case openProfileEditAlert
+        case closeProfileEditAlert
         case changeToDefaultProfileImage
         case pickerItemChanged(PhotosPickerItem?)
         case imageLoaded(Data?)
         case doneButtonTapped
         
         // Internal & Network Actions
-        case updateProfileResponse(Result<Void, Error>)
+        case updateProfileResponse(Result<User, Error>)
         
         // Binding Actions
         case binding(BindingAction<State>)
+        
+        // Delegate Actions
+        case profileUpdated(User)
     }
+    
+    private enum CancelID { case imageLoad }
     
     @Dependency(\.dismiss) private var dismiss
     @Dependency(\.authClient) private var authClient
@@ -56,13 +65,22 @@ struct ProfileEditFeature {
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
+            case .openProfileEditAlert:
+                state.isProfileSelectionAlertPresented = true
+                return .none
+                
+            case .closeProfileEditAlert:
+                state.isProfileSelectionAlertPresented = false
+                return .none
+                
             case .changeToDefaultProfileImage:
                 state.selectedPickerItem = nil
                 state.selectedProfileImage = nil
                 state.selectedImageData = nil
                 state.currentProfileImageURL = nil
                 state.isDefaultImageSelected = true
-                return .none
+                state.isProfileSelectionAlertPresented = false
+                return .cancel(id: CancelID.imageLoad)
                 
             case let .pickerItemChanged(item):
                 guard let item else { return .none }
@@ -75,6 +93,7 @@ struct ProfileEditFeature {
                         await send(.imageLoaded(nil))
                     }
                 }
+                .cancellable(id: CancelID.imageLoad, cancelInFlight: true)
             
             case let .imageLoaded(data):
                 guard let data, let image = UIImage(data: data) else { return .none }
@@ -103,16 +122,19 @@ struct ProfileEditFeature {
                 
                 return .run { [user = state.user, nickname = state.nickname, imageAction] send in
                     do {
-                        try await authClient.updateProfile(nickname: user.nickname == nickname ? nil : nickname, updateAction: imageAction)
-                        await send(.updateProfileResponse(.success(())))
+                        let user = try await authClient.updateProfile(nickname: user.nickname == nickname ? nil : nickname, updateAction: imageAction)
+                        await send(.updateProfileResponse(.success(user)))
                     } catch {
                         await send(.updateProfileResponse(.failure(error)))
                     }
                 }
                 
-            case .updateProfileResponse(.success):
+            case let .updateProfileResponse(.success(user)):
                 state.isLoading = false
-                return .run { _ in await dismiss() }
+                return .run { send in
+                    await send(.profileUpdated(user))
+                    await dismiss()
+                }
                 
             case let .updateProfileResponse(.failure(error)):
                 state.isLoading = false

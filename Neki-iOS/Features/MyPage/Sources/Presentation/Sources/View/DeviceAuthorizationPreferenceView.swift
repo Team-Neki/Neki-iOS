@@ -16,15 +16,15 @@ struct DeviceAuthorizationPreferenceView: View {
             Section {
                 VStack(spacing: 24) {
                     cell(for: .camera, isAuthorized: store.isCameraAuthorized) {
-                        // TODO: 카메라 권한 요청 로직 작성
+                        store.send(.cameraCellTapped)
                     }
                     
                     cell(for: .location, isAuthorized: store.isLocationAuthorized) {
-                        // TODO: 위치 권한 요청 로직 작성
+                        store.send(.locationCellTapped)
                     }
                     
                     cell(for: .photos, isAuthorized: store.isPhotosAuthorized) {
-                        // TODO: 사진앱 권한 요청 로직 작성
+                        store.send(.photosCellTapped)
                     }
                     
                     // TODO: 알림 기능부터 구현 필요
@@ -48,7 +48,18 @@ struct DeviceAuthorizationPreferenceView: View {
         } center: {
             NekiToolBar.textCenter("기기 권한")
         }
-
+        .nekiAlert(
+            isPresented: $store.isAlertPresented,
+            style: .cancelable,
+            title: store.alertItem?.title ?? "권한 안내",
+            subtitle: store.alertItem?.description ?? "원활한 서비스 제공을 위해 권한을 허용해주세요.",
+            confirmText: "허용",
+            cancelText: "취소",
+            hasIcon: true,
+            onConfirm: { store.send(.openAppSettings) },
+            onCancel: { store.send(.alertDismissed) }
+        )
+        .onAppear { store.send(.onAppear) }
     }
 }
 

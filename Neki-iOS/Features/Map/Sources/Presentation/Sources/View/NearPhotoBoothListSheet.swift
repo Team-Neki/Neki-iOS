@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct NearPhotoBoothListSheet: View {
     @Bindable var store: StoreOf<PhotoBoothListFeature>
@@ -53,8 +54,9 @@ private extension NearPhotoBoothListSheet {
             store.send(.selectFilterOption(brand))
         } label: {
             VStack(spacing: 8) {
-                Image(brand.logoImageResource)
+                KFImage(brand.imageURL)
                     .resizable()
+                    .onFailureImage(.temporaryBranding)
                     .frame(width: 56, height: 56)
                     .clipShape(.circle)
                     .overlay {
@@ -69,7 +71,7 @@ private extension NearPhotoBoothListSheet {
                         }
                     }
                 
-                Text(brand.displayName)
+                Text(brand.name)
                     .nekiFont(isSelected ? .body14SemiBold : .body14Medium)
                     .foregroundStyle(isSelected ? .primary400 : .gray900)
                     .lineLimit(2)
@@ -116,14 +118,16 @@ private extension NearPhotoBoothListSheet {
     @ViewBuilder
     func nearByPhotoBoothCell(_ photoBooth: PhotoBooth) -> some View {
         HStack(spacing: 16) {
-            Image(photoBooth.brand.logoImageResource)
+            KFImage(photoBooth.brand.imageURL)
                 .resizable()
+                .onFailureImage(.temporaryBranding)
+                .cancelOnDisappear(true)
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text(photoBooth.brand.displayName)
+                    Text(photoBooth.brand.name)
                         .nekiFont(.title18SemiBold)
                         .foregroundStyle(.gray900)
                     

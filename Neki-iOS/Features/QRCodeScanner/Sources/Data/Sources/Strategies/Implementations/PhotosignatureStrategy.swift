@@ -11,7 +11,7 @@ import os
 struct PhotoSignatureStrategy: QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { .native }
     
-    func canHandle(host: String) -> Bool { PhotoBoothBrand.photosignature.hostKeywords.contains { host.contains($0) } }
+    func canHandle(host: String) -> Bool { QRCodeBrand.photosignature.hostKeywords.contains { host.contains($0) } }
     
     func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토시그니처 파싱 시도: \(url.absoluteString)")

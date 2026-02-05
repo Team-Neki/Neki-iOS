@@ -73,7 +73,7 @@ struct QRCodeScanFeature {
                 }
                 
             case let .processResult(.success(parsed)):
-                Logger.domain.info("✅ QR 파싱 성공: \(parsed.brand.displayName)")
+                Logger.domain.info("✅ QR 파싱 성공: \(parsed.brand)")
                 
                 return .run { send in
                     guard let processedID = try await qrScannerClient.processImage(parsed.originalImage).first else {

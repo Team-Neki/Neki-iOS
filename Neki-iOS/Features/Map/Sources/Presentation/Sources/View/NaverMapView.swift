@@ -129,8 +129,6 @@ private extension NaverMapRepresentable {
 extension NaverMapRepresentable {
     @MainActor
     final class Coordinator: NSObject {
-        fileprivate typealias MarkerImageResources = NaverMapRepresentable.MarkerImageResources
-        
         var lastCameraPosition: GeographicCoordinate?
         
         private var markers: [Int: NMFMarker] = [:]
@@ -162,10 +160,10 @@ extension NaverMapRepresentable {
                 let isSelected = (booth.id == selectedBoothID)
                 
                 if let existingMarker = markers[booth.id] {
-                    updateMarkerStyleIfNeeded(existingMarker, brand: booth.brand, isSelected: isSelected)
+                    updateMarkerStyleIfNeeded(existingMarker, booth: booth, isSelected: isSelected)
                 } else {
                     let newMarker = createMarker(for: booth)
-                    updateMarkerStyleIfNeeded(newMarker, brand: booth.brand, isSelected: isSelected)
+                    updateMarkerStyleIfNeeded(newMarker, booth: booth, isSelected: isSelected)
                     newMarker.mapView = mapView
                     markers[booth.id] = newMarker
                 }
@@ -181,7 +179,7 @@ private extension NaverMapRepresentable.Coordinator {
     func createMarker(for booth: PhotoBooth) -> NMFMarker {
         let marker = NMFMarker()
         marker.position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-        marker.captionText = "\(booth.brand.brandName)\n\(booth.name)"
+        marker.captionText = "\(booth.brand.name)\n\(booth.name)"
         marker.captionColor = .init(hex: 0x202227)
         marker.captionHaloColor = .white
         marker.captionTextSize = 12
@@ -194,7 +192,7 @@ private extension NaverMapRepresentable.Coordinator {
         return marker
     }
     
-    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, brand: PhotoBoothBrand, isSelected: Bool) {
+    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, booth: PhotoBooth, isSelected: Bool) {
         let isFirstRender = marker.userInfo["isSelected"] == nil
         let currentSelectionState = marker.userInfo["isSelected"] as? Bool ?? false
         
@@ -334,17 +332,14 @@ private extension NaverMapView {
                     .placeholder {
                         ProgressView()
                     }
-                    .onFailure {
-                        // TODO: 에러페이지 필요
-                        Color.gray400
-                    }
+                    .onFailureImage(.temporaryBranding)
                     .frame(width: 64, height: 64)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
-                        Text(photoBooth.brand.displayName)
+                        Text(photoBooth.brand.name)
                             .nekiFont(.title20SemiBold)
                             .foregroundStyle(.gray900)
                         

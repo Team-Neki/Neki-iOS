@@ -10,10 +10,7 @@ import ComposableArchitecture
 import Kingfisher
 
 struct RandomPoseCarouselView: View {
-    enum SlideDirection { case previous, next, none }
-    
     @Bindable var store: StoreOf<RandomPoseCarouselFeature>
-    @State private var slideDirection: SlideDirection = .none
     
     var body: some View {
         ZStack {
@@ -43,11 +40,11 @@ struct RandomPoseCarouselView: View {
             HStack(spacing: .zero) {
                 Color.clear
                     .contentShape(.rect)
-                    .onTapGesture { slideDirection = .previous; store.send(.tapLeft) }
+                    .onTapGesture { store.send(.tapLeft) }
                 
                 Color.clear
                     .contentShape(.rect)
-                    .onTapGesture { slideDirection = .next; store.send(.tapRight) }
+                    .onTapGesture { store.send(.tapRight) }
             }
             
             controlButtons
@@ -64,13 +61,10 @@ struct RandomPoseCarouselView: View {
     }
     
     private var activeTransition: AnyTransition {
-        switch slideDirection {
-        case .previous:
-            return .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
-        case .next:
-            return .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading))
-        case .none:
-            return .opacity
+        switch store.slideDirection {
+        case .previous: return .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
+        case .next: return .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading))
+        case .none: return .opacity
         }
     }
 }

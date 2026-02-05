@@ -48,7 +48,7 @@ struct ArchivePhotoDetailFeature {
         case downloadImageResponse(successCount: Int)
         
         case onTapFavorite
-        case toggleFavoriteResponse(Result<Void, Error>)
+        case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
         
         case onTapDelete
         case deletePhotoResponse(Result<Void, Error>)
@@ -75,24 +75,24 @@ struct ArchivePhotoDetailFeature {
             case .onTapFavorite:
                 guard let item = state.currentItem else { return .none }
                 let newStatus = !item.isFavorite
+                
                 state.$photos.withLock { $0[id: item.id]?.isFavorite = newStatus }
                 
                 return .run { [id = item.id, isFavorite = newStatus] send in
                     do {
                         try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
-                        await send(.toggleFavoriteResponse(.success(())))
+                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
                     } catch {
-                        await send(.toggleFavoriteResponse(.failure(error)))
+                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
                     }
                 }
                 
-            case .toggleFavoriteResponse(.success):
+            case .toggleFavoriteResponse(_, .success):
                 return .none
                 
-            case .toggleFavoriteResponse(.failure):
-                if let item = state.currentItem {
-                    state.$photos.withLock { $0[id: item.id]?.isFavorite.toggle() }
-                }
+            case let .toggleFavoriteResponse(photoID, .failure):
+                state.$photos.withLock { $0[id: photoID]?.isFavorite.toggle() }
+                
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownload:

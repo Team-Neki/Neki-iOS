@@ -17,6 +17,7 @@ fileprivate enum Constants {
     static let animationDuration: TimeInterval = 0.3
     static let minZoomLevel: Double = 12.0
     static let maxZoomLevel: Double = 20.0
+    static let initialZoomLevel: Double = 14.0
     
     // Marker Size
     static let normalSize = CGSize(width: 54, height: 62)
@@ -40,9 +41,15 @@ struct NaverMapRepresentable: UIViewRepresentable {
         configureMapView(view)
         
         // 초기 카메라 이동
-        let startPosition = isLocationAuthorized ? store.cameraPosition.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) } ?? Constants.defaultInitialPosition : Constants.defaultInitialPosition
-        let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition)
-        cameraUpdate.animation = .fly
+        let startPosition = {
+            if isLocationAuthorized, let current = NMFLocationManager.sharedInstance().currentLatLng() {
+                return current
+            } else {
+                return Constants.defaultInitialPosition
+            }
+        }()
+        let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition, zoomTo: Constants.initialZoomLevel)
+        cameraUpdate.animation = .none
         cameraUpdate.animationDuration = 0.3
         view.mapView.moveCamera(cameraUpdate)
         
@@ -58,7 +65,9 @@ struct NaverMapRepresentable: UIViewRepresentable {
         updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
         
         // State 변경 시 카메라 이동
-        updateCameraPosition(uiView.mapView, context: context)
+        if context.coordinator.isMapLoaded {
+            updateCameraPosition(uiView.mapView, context: context)
+        }
         
         // 마커 업데이트
         context.coordinator.updateMarkers(
@@ -83,6 +92,7 @@ private extension NaverMapRepresentable {
         view.showIndoorLevelPicker = false
         view.mapView.minZoomLevel = Constants.minZoomLevel
         view.mapView.maxZoomLevel = Constants.maxZoomLevel
+        view.mapView.zoomLevel = Constants.initialZoomLevel
         view.mapView.extent = NMGLatLngBounds(southWestLat: 31.43, southWestLng: 122.37, northEastLat: 44.35, northEastLng: 132)
         view.mapView.mapType = .basic
     }
@@ -133,6 +143,7 @@ extension NaverMapRepresentable {
         typealias BrandID = Int
         
         var lastCameraPosition: GeographicCoordinate?
+        var isMapLoaded: Bool = false
         
         private var markers: [BoothID: NMFMarker] = [:]
         private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
@@ -260,7 +271,12 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     
     func mapViewCameraIdle(_ mapView: NMFMapView) {
         let nmapBounds = mapView.contentBounds
-        parent.store.send(.cameraMotionEnded(nmapBounds.toDomain()))
+        let geographicBounds = nmapBounds.toDomain()
+        if isMapLoaded == false {
+            isMapLoaded = true
+            parent.store.send(.mapLoaded(geographicBounds))
+        }
+        parent.store.send(.cameraMotionEnded(geographicBounds))
     }
 }
 

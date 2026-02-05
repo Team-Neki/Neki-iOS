@@ -40,6 +40,10 @@ public struct MapFeature {
         // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
+        var userGeographicCoordinate: GeographicCoordinate? {
+            guard let location = userLocation else { return nil }
+            return .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
+        }
         var isUserTrackingMode: Bool = false
         var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
@@ -77,6 +81,7 @@ public struct MapFeature {
         case didDetectMapInteraction
         
         // Map Logic Actions
+        case mapLoaded(GeographicBoundingBox)
         case cameraMotionStarted
         case cameraMotionEnded(GeographicBoundingBox)
         case updateSearchButtonVisibility(isVisible: Bool)
@@ -177,6 +182,16 @@ public struct MapFeature {
                 }
                 
                 // MARK: - User Location Interaction
+            case let .mapLoaded(bounds):
+                state.isFirstLoad = false
+                state.currentBounds = bounds
+                state.cameraPosition = bounds.center
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
+                return .merge(
+                    .send(.fetchPhotoBooths(bounds: bounds)),
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
+                )
+                
             case .didTapCurrentLocationButton:
                 resetToMapMode(&state, for: .first)
                 switch state.locationAuthorizationStatus {
@@ -211,27 +226,17 @@ public struct MapFeature {
                 // MARK: - Map Camera & Search Logic
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false
-                return .none
-                
-            case .cameraMotionStarted:
                 return .merge(
-                    .send(.updateSearchButtonVisibility(isVisible: true)),
                     .cancel(id: CancelID.mapFetch),
                     .cancel(id: CancelID.listFetch)
                 )
                 
+            case .cameraMotionStarted:
+                return .send(.updateSearchButtonVisibility(isVisible: true))
+                
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
-                
-                if state.isFirstLoad {
-                    state.isFirstLoad = false
-                    return .merge(
-                        .send(.fetchPhotoBooths(bounds: bounds)),
-                        .send(.fetchNearbyPhotoBooths(bounds.center))
-                    )
-                }
-                
                 return .none
                 
             case let .updateSearchButtonVisibility(isVisible):
@@ -240,9 +245,10 @@ public struct MapFeature {
                 
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
                 return .merge(
                     .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(bounds.center))
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
                 )
                 
                 // MARK: - Data Fetching

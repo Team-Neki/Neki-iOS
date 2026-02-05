@@ -57,7 +57,7 @@ private enum TileSystem {
 }
 
 public final actor DefaultPhotoBoothRepository {
-    typealias BrandID = Int
+    typealias BrandID = String
     
     @Dependency(\.networkProvider) private var networkProvider
     
@@ -78,7 +78,7 @@ public final actor DefaultPhotoBoothRepository {
             guard let brandList = responseDTO.data else { return [:] }
             return brandList.reduce(into: [BrandID: PhotoBoothBrand]()) { dict, dto in
                 let brandEntity = dto.toEntity()
-                dict[brandEntity.id] = brandEntity
+                dict[brandEntity.name] = brandEntity
             }
         }
         
@@ -137,7 +137,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                                 let endpoint = MapEndpoint.polygon(dto: requestDTO)
                                 let responseDTO: BaseResponseDTO<FetchPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
                                 let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
-                                    guard let brand = brands[dto.id] else {
+                                    guard let brand = brands[dto.brandName] else {
                                         Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
                                         return nil
                                     }
@@ -177,7 +177,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let endpoint = MapEndpoint.point(dto: requestDTO)
         let responseDTO: BaseResponseDTO<FetchNearbyPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
-            guard let brand = brands[dto.id] else { return nil }
+            guard let brand = brands[dto.brandName] else { return nil }
             return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
         } ?? []
         return photoBooths

@@ -31,6 +31,8 @@ public final actor DefaultPoseRepository {
     private var currentRandomNode: RandomPoseNode?
     private var scrapTasks: [PoseID: Task<Void, Error>] = [:]
     
+    private let maxRetryCount: Int = 7
+    
     @Dependency(\.networkProvider) private var networkProvider
     
     public init() {}
@@ -78,12 +80,9 @@ private extension DefaultPoseRepository {
     
     func prefetchNext(from node: RandomPoseNode) async throws {
         guard node.next == nil else { return }
-        let peopleCountValue: String = convertToRawValue(activeRandomPosePeopleCount)
-        let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
         
         do {
-            let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
-            guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
+            let newPose = try await fetchRandomPose(excluding: node.pose.id)
             let handled = cacheOrUpdate(newPose)
             appendNode(handled, to: node)
         } catch {
@@ -118,6 +117,21 @@ private extension DefaultPoseRepository {
         var currentIDs = lastPage.poseIDs
         currentIDs.append(poseID)
         scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext)
+    }
+    
+    func fetchRandomPose(retryCount: Int = .zero, excluding excludedID: PoseID? = nil) async throws -> Pose {
+        let peopleCountValue = convertToRawValue(activeRandomPosePeopleCount)
+        let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
+        let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
+        
+        guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
+        guard let excludedID, newPose.id == excludedID else { return newPose }
+        guard retryCount < maxRetryCount else {
+            Logger.data.debug("Max retries reached. Returning duplicate pose.")
+            return newPose
+        }
+        
+        return try await fetchRandomPose(retryCount: retryCount + 1, excluding: excludedID)
     }
 }
 
@@ -247,19 +261,18 @@ extension DefaultPoseRepository: PoseRepository {
             return syncNodeWithCache(nextNode)
         }
         
-        let peopleCountValue = convertToRawValue(activeRandomPosePeopleCount)
-        let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
-        let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
-        guard let pose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
-        let handled = cacheOrUpdate(pose)
-        if let existingNext = currentNode.next {
-            appendNode(handled, to: existingNext)
-            currentRandomNode = existingNext
-            return existingNext.pose
+        let handled = try await fetchRandomPose(excluding: currentNode.pose.id)
+        let cachedPose = cacheOrUpdate(handled)
+        
+        guard let existingNext = currentNode.next else {
+            appendNode(cachedPose, to: currentNode)
+            currentRandomNode = currentNode.next
+            return cachedPose
         }
-        appendNode(handled, to: currentNode)
-        currentRandomNode = currentNode.next
-        return handled
+        
+        appendNode(cachedPose, to: existingNext)
+        currentRandomNode = existingNext
+        return existingNext.pose
     }
     
     public func fetchPreviousRandomPose() async throws -> Pose {

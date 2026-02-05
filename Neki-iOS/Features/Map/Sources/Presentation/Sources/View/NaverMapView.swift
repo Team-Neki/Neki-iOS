@@ -129,11 +129,14 @@ private extension NaverMapRepresentable {
 extension NaverMapRepresentable {
     @MainActor
     final class Coordinator: NSObject {
+        typealias BoothID = Int
+        typealias BrandID = Int
+        
         var lastCameraPosition: GeographicCoordinate?
         
-        private var markers: [Int: NMFMarker] = [:]
-        private var markerImageTasks: [Int: Task<Void, Never>] = [:]
-        private var renderedImageCache: [String: UIImage] = [:]
+        private var markers: [BoothID: NMFMarker] = [:]
+        private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
+        private var overlayImageCache: [String: NMFOverlayImage] = [:]
         private var lastSelectedBoothID: Int?
         
         let parent: NaverMapRepresentable
@@ -143,7 +146,7 @@ extension NaverMapRepresentable {
         func updateMarkers(
             mapView: NMFMapView,
             photoBooths: IdentifiedArrayOf<PhotoBooth>,
-            selectedBoothID: Int?
+            selectedBoothID: BoothID?
         ) {
             let newIDs = Set(photoBooths.ids)
             let currentIDs = Set(markers.keys)
@@ -163,9 +166,9 @@ extension NaverMapRepresentable {
                     updateMarkerStyleIfNeeded(existingMarker, booth: booth, isSelected: isSelected)
                 } else {
                     let newMarker = createMarker(for: booth)
-                    updateMarkerStyleIfNeeded(newMarker, booth: booth, isSelected: isSelected)
                     newMarker.mapView = mapView
                     markers[booth.id] = newMarker
+                    updateMarkerStyleIfNeeded(newMarker, booth: booth, isSelected: isSelected, isInitial: true)
                 }
             }
         }
@@ -192,16 +195,14 @@ private extension NaverMapRepresentable.Coordinator {
         return marker
     }
     
-    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, booth: PhotoBooth, isSelected: Bool) {
-        let isFirstRender = marker.userInfo["isSelected"] == nil
+    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, booth: PhotoBooth, isSelected: Bool, isInitial: Bool = false) {
         let currentSelectionState = marker.userInfo["isSelected"] as? Bool ?? false
-        
-        guard isFirstRender || currentSelectionState != isSelected || marker.iconImage.image == nil else { return }
+        if isInitial == false, currentSelectionState == isSelected { return }
         marker.userInfo["isSelected"] = isSelected
         marker.zIndex = isSelected ? Constants.zIndexSelected : Constants.zIndexNormal
-        let cacheKey = "\(booth.brand.id)-\(isSelected)"
-        if let cachedRenderedImage = renderedImageCache[cacheKey] {
-            marker.iconImage = NMFOverlayImage(image: cachedRenderedImage)
+        let cacheKey = createCacheKey(brandID: booth.brand.id, isSelected: isSelected)
+        if let cachedOverlay = overlayImageCache[cacheKey] {
+            marker.iconImage = cachedOverlay
             return
         }
         
@@ -212,35 +213,37 @@ private extension NaverMapRepresentable.Coordinator {
         }
         
         markerImageTasks[booth.id]?.cancel()
-        let resource = KF.ImageResource(downloadURL: url, cacheKey: url.absoluteString)
-        if KingfisherManager.shared.cache.isCached(forKey: resource.cacheKey) {
-            markerImageTasks[booth.id] = Task { @MainActor in
-                guard let result = try? await KingfisherManager.shared.retrieveImage(with: resource),
-                      Task.isCancelled == false
-                else { return }
-                applyImage(to: marker, image: result.image, isSelected: isSelected, cacheKey: cacheKey)
-            }
-        } else {
-            let placeholder = MarkerImageRenderer.render(brandImage: nil, isSelected: isSelected)
-            marker.iconImage = NMFOverlayImage(image: placeholder)
-            markerImageTasks[booth.brand.id] = Task { @MainActor in
-                do {
-                    let result = try await KingfisherManager.shared.retrieveImage(with: resource)
-                    guard Task.isCancelled == false else { return }
-                    let currentSelected = marker.userInfo["isSelected"] as? Bool ?? isSelected
-                    let currentCacheKey = "\(booth.brand.id)-\(currentSelected)"
-                    applyImage(to: marker, image: result.image, isSelected: currentSelected, cacheKey: currentCacheKey)
-                } catch {
-                    Logger.presentation.error("Image download failed for marker: \(error)")
-                }
+        markerImageTasks[booth.id] = Task { [weak self] in
+            guard let self else { return }
+            let resource = KF.ImageResource(downloadURL: url, cacheKey: url.absoluteString)
+            
+            do {
+                let result = try await KingfisherManager.shared.retrieveImage(with: resource)
+                guard Task.isCancelled == false else { return }
+                let renderedOverlay: NMFOverlayImage? = await Task.detached(priority: .userInitiated) {
+                    guard Task.isCancelled == false else { return nil }
+                    let finalImage = MarkerImageRenderer.render(brandImage: result.image, isSelected: isSelected)
+                    return NMFOverlayImage(image: finalImage)
+                }.value
+                
+                guard let overlay = renderedOverlay, Task.isCancelled == false else { return }
+                applyOverlay(to: marker, overlay: overlay, isSelected: isSelected, cacheKey: cacheKey)
+            } catch {
+                guard Task.isCancelled == false else { return }
+                Logger.presentation.error("Brand Image Download Failed for Marker: \(booth.id) - \(error)")
             }
         }
     }
     
-    func applyImage(to marker: NMFMarker, image: UIImage, isSelected: Bool, cacheKey: String) {
-        let renderedIcon = MarkerImageRenderer.render(brandImage: image, isSelected: isSelected)
-        renderedImageCache[cacheKey] = renderedIcon
-        marker.iconImage = NMFOverlayImage(image: renderedIcon)
+    func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, isSelected: Bool, cacheKey: String) {
+        let currentMarkerStats = marker.userInfo["isSelected"] as? Bool ?? isSelected
+        guard currentMarkerStats == isSelected else { return }
+        overlayImageCache[cacheKey] = overlay
+        marker.iconImage = overlay
+    }
+    
+    func createCacheKey(brandID: BrandID, isSelected: Bool) -> String {
+        "brand_\(brandID)_selected_\(isSelected)"
     }
 }
 

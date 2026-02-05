@@ -16,24 +16,32 @@ struct ArchivePhotoDetailView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            KFImage(store.item.imageURL)
-                .resizable()
-                .placeholder {
-                    ProgressView()
+            TabView(selection: $store.currentItemID) {
+                ForEach(store.slidingPhotos) { item in
+                    KFImage(item.imageURL)
+                        .resizable()
+                        .placeholder {
+                            ProgressView()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        }
+                        .retry(maxCount: 3, interval: .seconds(5))
+                        .cancelOnDisappear(true)
+                        .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .tag(item.id)
                 }
-                .retry(maxCount: 3, interval: .seconds(5))
-                .cancelOnDisappear(true)
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        
-            ArchiveImageFooter(
-                isEnabled: true,
-                isFavorite: store.item.isFavorite,
-                onDownload: { store.send(.onTapDownload) },
-                onDelete: { showDeleteAlert = true },
-                onFavorite: { store.send(.onTapFavorite) }
-            )
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            
+            if let currentItem = store.currentItem {
+                ArchiveImageFooter(
+                    isEnabled: true,
+                    isFavorite: currentItem.isFavorite,
+                    onDownload: { store.send(.onTapDownload) },
+                    onDelete: { showDeleteAlert = true },
+                    onFavorite: { store.send(.onTapFavorite) }
+                )
+            }
         }
         .nekiToolbar(
             left: { NekiToolBar.back { store.send(.onTapBackButton) } },

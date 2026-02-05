@@ -43,7 +43,11 @@ struct ArchiveCoordinator {
                 
             case let .root(.imageTapped(item)):
                 state.path.append(.detail(
-                    ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ArchivePhotoDetailFeature.State(
+                        photos: state.root.$photos,
+                        currentItemID: item.id,
+                        folderId: nil
+                    )
                 ))
                 return .none
                 
@@ -98,7 +102,11 @@ struct ArchiveCoordinator {
                 
                 if !allPhotosState.isSelectionMode {
                     state.path.append(.detail(
-                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                        ArchivePhotoDetailFeature.State(
+                            photos: state.root.$photos,
+                            currentItemID: item.id,
+                            folderId: nil
+                        )
                     ))
                 }
                 return .none
@@ -122,7 +130,11 @@ struct ArchiveCoordinator {
                 
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
-                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                        ArchivePhotoDetailFeature.State(
+                            photos: state.root.$photos,
+                            currentItemID: item.id,
+                            folderId: albumDetailState.album.id
+                        )
                     ))
                 }
                 return .none
@@ -132,7 +144,11 @@ struct ArchiveCoordinator {
                 
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
-                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                        ArchivePhotoDetailFeature.State(
+                            photos: state.root.$photos,
+                            currentItemID: item.id,
+                            folderId: albumDetailState.album.id
+                        )
                     ))
                 }
                 return .none

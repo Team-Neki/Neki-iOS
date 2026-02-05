@@ -121,6 +121,11 @@ struct ArchiveView: View {
         .task {
             await store.send(.onAppear).finish()
         }
+        .onTapGesture {
+            if store.showDropDownMenu {
+                store.showDropDownMenu = false
+            }
+        }
     }
 }
 
@@ -191,14 +196,10 @@ private extension ArchiveView {
             }
         }
         .padding(.vertical, 5)
+        .frame(width: 158, height: 130)
         .background(.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(content: {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.gray.opacity(0.5), lineWidth: 1)
-                .shadow(color: .gray.opacity(0.5), radius: 2)
-        })
-        .frame(width: 158, height: 130)
+        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
     }
     
     func dropDownMenuButton(

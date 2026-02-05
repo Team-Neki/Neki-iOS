@@ -137,7 +137,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                                 let endpoint = MapEndpoint.polygon(dto: requestDTO)
                                 let responseDTO: BaseResponseDTO<FetchPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
                                 let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
-                                    guard let brand = brands[dto.brandName] else {
+                                    guard let brand = brands[dto.id] else {
                                         Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
                                         return nil
                                     }
@@ -177,7 +177,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let endpoint = MapEndpoint.point(dto: requestDTO)
         let responseDTO: BaseResponseDTO<FetchNearbyPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
-            guard let brand = brands[dto.brandName] else { return nil }
+            guard let brand = brands[dto.id] else { return nil }
             return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
         } ?? []
         return photoBooths

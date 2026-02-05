@@ -57,7 +57,7 @@ private enum TileSystem {
 }
 
 public final actor DefaultPhotoBoothRepository {
-    typealias BrandID = String
+    typealias BrandID = Int
     
     @Dependency(\.networkProvider) private var networkProvider
     
@@ -75,7 +75,11 @@ public final actor DefaultPhotoBoothRepository {
         let task = Task<[BrandID: PhotoBoothBrand], Error> {
             let endpoint = MapEndpoint.fetchBrands
             let responseDTO: BaseResponseDTO<FetchPhotoBrandsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            return responseDTO.data?.reduce(into: [:]) { $0[$1.brandName] = $1.toEntity() } ?? [:]
+            guard let brandList = responseDTO.data else { return [:] }
+            return brandList.reduce(into: [BrandID: PhotoBoothBrand]()) { dict, dto in
+                let brandEntity = dto.toEntity()
+                dict[brandEntity.id] = brandEntity
+            }
         }
         
         brandFetchTask = task

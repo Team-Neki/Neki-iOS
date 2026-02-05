@@ -43,7 +43,7 @@ struct NekiAlertModifier: ViewModifier {
                     }
                 
                 NekiAlertModal(hasIcon: hasIcon) {
-                    VStack(spacing: 2) {
+                    VStack(spacing: 4) {
                         Text(title)
                             .nekiFont(.title18Bold)
                             .foregroundStyle(.gray900)

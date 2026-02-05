@@ -7,8 +7,6 @@
 
 import SwiftUI
 import ComposableArchitecture
-import KakaoSDKCommon
-import KakaoSDKAuth
 
 @main
 struct Neki_iOSApp: App {

@@ -72,9 +72,10 @@ private extension NearPhotoBoothListSheet {
                     }
                 
                 Text(brand.name)
-                    .nekiFont(isSelected ? .body14SemiBold : .body14Medium)
+                    .font(.neki(isSelected ? .body14SemiBold : .body14Medium))
                     .foregroundStyle(isSelected ? .primary400 : .gray900)
                     .lineLimit(2)
+                    .lineSpacing(4)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }

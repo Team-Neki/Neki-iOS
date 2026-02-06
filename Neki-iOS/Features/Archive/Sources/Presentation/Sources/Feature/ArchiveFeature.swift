@@ -391,14 +391,16 @@ struct ArchiveFeature {
                 
             case let .qrScanner(.presented(.addPhotoFromQRScanner(id))):
                 state.qrScanner = nil
-                let toast = NekiToastItem("이미지를 추가했어요", style: .success)
-                return .merge(
-                    .send(.delegate(.showToast(toast))),
-                    .run { send in
-                        try await archiveClient.registerPhotos(folderId: nil, uploads: [(mediaID: id, memo: nil)])
-                        await send(.fetchPhotos(isRefresh: true))
-                    }
-                )
+                return .run { send in
+                    try await archiveClient.registerPhotos(folderId: nil, uploads: [(mediaID: id, memo: nil)])
+                    let toast = NekiToastItem("이미지를 추가했어요", style: .success)
+                    await send(.delegate(.showToast(toast)))
+                    await send(.fetchPhotos(isRefresh: true))
+                } catch: { error, send in
+                    Logger.presentation.error("사진 등록 실패: \(error)")
+                    let toast = NekiToastItem("사진 등록에 실패했어요", style: .error)
+                    await send(.delegate(.showToast(toast)))
+                }
                 
             default:
                 return .none

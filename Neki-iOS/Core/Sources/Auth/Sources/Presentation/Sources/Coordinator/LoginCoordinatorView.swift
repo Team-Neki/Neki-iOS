@@ -22,7 +22,3 @@ public struct LoginCoordinatorView: View {
         }
     }
 }
-
-#Preview {
-    LoginCoordinatorView(store: .init(initialState: LoginCoordinator.State(), reducer: { LoginCoordinator() }))
-}

@@ -14,19 +14,37 @@ struct AppCoordinator {
     @ObservableState
     struct State {
         @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
+        
+        // 온보딩(앱 최초 실행시) 여부
+        @Shared(.appStorage("hasSeenOnboarding")) var hasSeenOnboarding: Bool = false
+        
         var toastItem: NekiToastItem?
         
         var route: Route.State
         
         init() {
-            var initialStatus: UserSessionStatus
-            guard let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
-                  let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data)
-            else { route = .auth(.init()); return }
-            initialStatus = status
-            switch initialStatus {
-            case let .signedIn(user): self.route = .mainTab(.init(user: user))
-            case .signedOut, .expired: self.route = .auth(.init())
+            //            var initialStatus: UserSessionStatus
+            //            guard let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
+            //                  let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data)
+            //            else { route = .auth(.init()); return }
+            //            initialStatus = status
+            //            switch initialStatus {
+            //            case let .signedIn(user): self.route = .mainTab(.init(user: user))
+            //            case .signedOut, .expired: self.route = .auth(.init())
+            //            }
+            if let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
+               let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data),
+               case let .signedIn(user) = status {
+                self.route = .mainTab(.init(user: user))
+                return
+            }
+            
+            let seenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
+            
+            if seenOnboarding {
+                self.route = .auth(.init())
+            } else {
+                self.route = .onboarding(.init())
             }
         }
     }
@@ -84,6 +102,11 @@ struct AppCoordinator {
                     return .none
                 }
                 
+            case .route(.onboarding(.delegate(.didFinishOnboarding))):
+                state.$hasSeenOnboarding.withLock { $0 = true }
+                state.route = .auth(.init())
+                return .none
+                
             case let .route(.auth(.delegate(.moveToMainTab(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 state.route = .mainTab(.init(user: user))
@@ -110,11 +133,13 @@ extension AppCoordinator {
     struct Route {
         @ObservableState
         enum State {
+            case onboarding(OnboardingCoordinator.State)
             case auth(LoginCoordinator.State)
             case mainTab(MainTabCoordinator.State)
         }
         
         enum Action {
+            case onboarding(OnboardingCoordinator.Action)
             case auth(LoginCoordinator.Action)
             case mainTab(MainTabCoordinator.Action)
         }
@@ -123,6 +148,7 @@ extension AppCoordinator {
             Reduce { (state: inout State, action: Action) -> Effect<Action> in
                 return .none
             }
+            .ifCaseLet(\.onboarding, action: \.onboarding) { OnboardingCoordinator() }
             .ifCaseLet(\.auth, action: \.auth) { LoginCoordinator() }
             .ifCaseLet(\.mainTab, action: \.mainTab) { MainTabCoordinator() }
         }

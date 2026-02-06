@@ -261,6 +261,11 @@ public struct MapFeature {
                 state.photoBoothListState.brands = IdentifiedArray(uniqueElements: brands)
                 return .none
                 
+            case let .brandsResponse(.failure(error)):
+                // TODO: 토스트
+                Logger.presentation.error("브랜드 정보 로드 실패: \(error)")
+                return .none
+                
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
                 state.photoBooths.removeAll()

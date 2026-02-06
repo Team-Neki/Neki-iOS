@@ -15,8 +15,7 @@ public struct TermsAgreementView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Circle()
-                .frame(width: 80, height: 80)
+            Image(.iconGpicAgreement)
             
             terms
             

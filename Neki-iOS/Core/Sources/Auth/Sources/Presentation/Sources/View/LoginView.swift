@@ -45,7 +45,6 @@ public struct LoginView: View {
         VStack(spacing: 10) {
             Image(.imgAppleLogin)
                 .resizable()
-                .scaledToFit()
                 .frame(maxHeight: 52)
                 .overlay {
                     SignInWithAppleButton(.continue) { _ in

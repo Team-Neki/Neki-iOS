@@ -11,7 +11,7 @@ import os
 struct PhotograyStrategy: QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { .htmlCrawling }
     
-    func canHandle(host: String) -> Bool { PhotoBoothBrand.photogray.hostKeywords.contains { host.contains($0) } }
+    func canHandle(host: String) -> Bool { QRCodeBrand.photogray.hostKeywords.contains { host.contains($0) } }
     
     func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토그레이 파싱 시도: \(url.absoluteString)")

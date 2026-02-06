@@ -14,6 +14,9 @@ struct AppCoordinatorView: View {
     var body: some View {
         Group {
             switch store.route {
+            case .splash:
+                SplashView()
+                
             case .onboarding:
                 if let store = store.scope(state: \.route.onboarding, action: \.route.onboarding) {
                     OnboardingCoordinatorView(store: store)

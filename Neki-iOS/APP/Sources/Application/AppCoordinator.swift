@@ -23,35 +23,19 @@ struct AppCoordinator {
         var route: Route.State
         
         init() {
-            //            var initialStatus: UserSessionStatus
-            //            guard let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
-            //                  let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data)
-            //            else { route = .auth(.init()); return }
-            //            initialStatus = status
-            //            switch initialStatus {
-            //            case let .signedIn(user): self.route = .mainTab(.init(user: user))
-            //            case .signedOut, .expired: self.route = .auth(.init())
-            //            }
-            if let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
-               let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data),
-               case let .signedIn(user) = status {
-                self.route = .mainTab(.init(user: user))
-                return
-            }
+            self.route = .splash
             
-            let seenOnboarding = UserDefaults.standard.bool(forKey: "hasSeenOnboarding")
-            
-            if seenOnboarding {
-                self.route = .auth(.init())
-            } else {
-                self.route = .onboarding(.init())
-            }
+            // 디버그용: 온보딩 테스트를 위해 매번 초기화 (필요시 주석 처리)
+            #if DEBUG
+            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
+            #endif
         }
     }
     
     enum Action: BindableAction {
         // View Actions
         case onAppLaunched
+        case splashTimerCompleted
         
         case userSessionStatusChanged(UserSessionStatus)
         
@@ -63,6 +47,7 @@ struct AppCoordinator {
     }
     
     @Dependency(\.authClient) private var authClient
+    @Dependency(\.continuousClock) var clock
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -72,18 +57,37 @@ struct AppCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppLaunched:
-                return .run { [status = state.userSessionStatus] send in
-                    guard case .signedIn = status else { return }
-                    do {
-                        let user = try await authClient.autoLogin()
-                        await send(.userSessionStatusChanged(.signedIn(user)))
-                    } catch {
-                        await send(.userSessionStatusChanged(.signedOut))
+                return .merge(
+                    .run { send in
+                        try await clock.sleep(for: .milliseconds(600))
+                        await send(.splashTimerCompleted)
+                    },
+                    .run { [status = state.userSessionStatus] send in
+                        guard case .signedIn = status else { return }
+                        do {
+                            let user = try await authClient.autoLogin()
+                            await send(.userSessionStatusChanged(.signedIn(user)))
+                        } catch {
+                            await send(.userSessionStatusChanged(.signedOut))
+                        }
                     }
+                )
+                
+            case .splashTimerCompleted:
+                if case let .signedIn(user) = state.userSessionStatus {
+                    state.route = .mainTab(.init(user: user))
+                } else if state.hasSeenOnboarding {
+                    state.route = .auth(.init())
+                } else {
+                    state.route = .onboarding(.init())
                 }
+                return .none
                 
             case let .userSessionStatusChanged(newStatus):
                 if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
+                
+                if case .splash = state.route { return .none }
+                
                 switch newStatus {
                 case let .signedIn(user):
                     if case var .mainTab(mainTabState) = state.route {
@@ -96,7 +100,6 @@ struct AppCoordinator {
                     
                 case .signedOut, .expired:
                     state.route = .auth(.init())
-                    
                     guard case .expired = newStatus else { return .none }
                     state.toastItem = .init("다시 로그인 해주세요.")
                     return .none
@@ -133,12 +136,14 @@ extension AppCoordinator {
     struct Route {
         @ObservableState
         enum State {
+            case splash
             case onboarding(OnboardingCoordinator.State)
             case auth(LoginCoordinator.State)
             case mainTab(MainTabCoordinator.State)
         }
         
         enum Action {
+            case splash
             case onboarding(OnboardingCoordinator.Action)
             case auth(LoginCoordinator.Action)
             case mainTab(MainTabCoordinator.Action)

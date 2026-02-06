@@ -56,8 +56,8 @@ final actor CameraManager {
         let proxy = CameraDelegateProxy(onScan: onScan)
         delegateProxy = proxy
         output.setMetadataObjectsDelegate(proxy, queue: metadataQueue)
-        guard output.availableMetadataObjectTypes.contains([.qr, .microQR]) else { throw .outputError }
-        output.metadataObjectTypes = [.qr, .microQR]
+        guard output.availableMetadataObjectTypes.contains(.qr) else { throw .outputError }
+        output.metadataObjectTypes = [.qr]
         
         do {
             try device.lockForConfiguration()

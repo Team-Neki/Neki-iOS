@@ -80,7 +80,7 @@ private extension DefaultPoseRepository {
     
     func prefetchNext(from node: RandomPoseNode) async throws {
         guard node.next == nil else { return }
-        let recentIDs = checkRecentPoseIDs(limit: maxRetryCount)
+        let recentIDs = checkRecentPoseIDs(from: node, limit: maxRetryCount)
         
         do {
             let newPose = try await fetchRandomPose(excluding: recentIDs)
@@ -151,9 +151,9 @@ private extension DefaultPoseRepository {
         }
     }
     
-    func checkRecentPoseIDs(limit: Int) -> Set<PoseID> {
+    func checkRecentPoseIDs(from anchorNode: RandomPoseNode?, limit: Int) -> Set<PoseID> {
         var ids: Set<PoseID> = []
-        var currentNode = currentRandomNode
+        var currentNode = anchorNode
         var count: Int = .zero
         
         if let current = currentNode { ids.insert(current.pose.id) }
@@ -294,19 +294,19 @@ extension DefaultPoseRepository: PoseRepository {
             return syncNodeWithCache(nextNode)
         }
         
-        let recentIDs = checkRecentPoseIDs(limit: maxRetryCount)
+        let recentIDs = checkRecentPoseIDs(from: currentNode, limit: maxRetryCount)
         let handled = try await fetchRandomPose(excluding: recentIDs)
         let cachedPose = cacheOrUpdate(handled)
         
         guard let existingNext = currentNode.next else {
             appendNode(cachedPose, to: currentNode)
-            currentRandomNode = currentNode.next
-            return cachedPose
+            guard let newNext = currentNode.next else { return cachedPose }
+            currentRandomNode = newNext
+            return newNext.pose
         }
         
-        appendNode(cachedPose, to: existingNext)
         currentRandomNode = existingNext
-        return existingNext.pose
+        return syncNodeWithCache(existingNext)
     }
     
     public func fetchPreviousRandomPose() async throws -> Pose {

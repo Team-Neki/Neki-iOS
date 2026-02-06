@@ -153,11 +153,11 @@ private extension ArchiveView {
                     showDismiss: false
                 )
                 
-                Button {
-                    // TODO: - 알림 이벤트
-                } label: {
-                    Image(.iconBellFill)
-                }
+//                Button {
+//                    // TODO: - 알림 이벤트
+//                } label: {
+//                    Image(.iconBellFill)
+//                }
             }
         }
         .frame(height: 54)

@@ -40,6 +40,10 @@ public struct MapFeature {
         // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
+        var userGeographicCoordinate: GeographicCoordinate? {
+            guard let location = userLocation else { return nil }
+            return .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
+        }
         var isUserTrackingMode: Bool = false
         var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
@@ -77,6 +81,7 @@ public struct MapFeature {
         case didDetectMapInteraction
         
         // Map Logic Actions
+        case mapLoaded(GeographicBoundingBox)
         case cameraMotionStarted
         case cameraMotionEnded(GeographicBoundingBox)
         case updateSearchButtonVisibility(isVisible: Bool)
@@ -87,6 +92,9 @@ public struct MapFeature {
         case photoBoothChunkLoaded([PhotoBooth])
         case photoBoothStreamFinished
         case photoBoothStreamFailure(Error)
+        case loadBrands
+        case brandsResponse(Result<[PhotoBoothBrand], Error>)
+        
         // Sheet
         case fetchNearbyPhotoBooths(GeographicCoordinate)
         case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
@@ -124,6 +132,7 @@ public struct MapFeature {
                 // MARK: - Life Cycle & Streams
             case .onAppear:
                 return .merge(
+                    .send(.loadBrands),
                     .run { send in
                         for await status in await mapClient.locationAuthorizationStatus() {
                             await send(.updateLocationAuthorization(status))
@@ -173,6 +182,16 @@ public struct MapFeature {
                 }
                 
                 // MARK: - User Location Interaction
+            case let .mapLoaded(bounds):
+                state.isFirstLoad = false
+                state.currentBounds = bounds
+                state.cameraPosition = bounds.center
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
+                return .merge(
+                    .send(.fetchPhotoBooths(bounds: bounds)),
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
+                )
+                
             case .didTapCurrentLocationButton:
                 resetToMapMode(&state, for: .first)
                 switch state.locationAuthorizationStatus {
@@ -207,27 +226,17 @@ public struct MapFeature {
                 // MARK: - Map Camera & Search Logic
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false
-                return .none
-                
-            case .cameraMotionStarted:
                 return .merge(
-                    .send(.updateSearchButtonVisibility(isVisible: true)),
                     .cancel(id: CancelID.mapFetch),
                     .cancel(id: CancelID.listFetch)
                 )
                 
+            case .cameraMotionStarted:
+                return .send(.updateSearchButtonVisibility(isVisible: true))
+                
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
-                
-                if state.isFirstLoad {
-                    state.isFirstLoad = false
-                    return .merge(
-                        .send(.fetchPhotoBooths(bounds: bounds)),
-                        .send(.fetchNearbyPhotoBooths(bounds.center))
-                    )
-                }
-                
                 return .none
                 
             case let .updateSearchButtonVisibility(isVisible):
@@ -236,12 +245,27 @@ public struct MapFeature {
                 
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
                 return .merge(
                     .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(bounds.center))
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
                 )
                 
                 // MARK: - Data Fetching
+            case .loadBrands:
+                return .run { send in
+                    await send(.brandsResponse(Result { try await photoBoothClient.loadBrands() }))
+                }
+                
+            case let .brandsResponse(.success(brands)):
+                state.photoBoothListState.brands = IdentifiedArray(uniqueElements: brands)
+                return .none
+                
+            case let .brandsResponse(.failure(error)):
+                // TODO: 토스트
+                Logger.presentation.error("브랜드 정보 로드 실패: \(error)")
+                return .none
+                
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
                 state.photoBooths.removeAll()
@@ -295,8 +319,11 @@ public struct MapFeature {
                 }.cancellable(id: CancelID.listFetch, cancelInFlight: true)
                 
             case let .nearbyPhotoBoothResponse(.success(booths)):
-                state.photoBoothListState.photoBooths = IdentifiedArray(uniqueElements: booths)
-                return .send(.startBackgroundCalculation)
+                let nearbyBooths = IdentifiedArray(uniqueElements: booths)
+                return .merge(
+                    .send(.photoBoothListAction(.setNearbyBooths(nearbyBooths))),
+                    .send(.startBackgroundCalculation)
+                )
                 
             case let .nearbyPhotoBoothResponse(.failure(error)):
                 Logger.presentation.error("Nearby PhotoBooths fetch error: \(error)")
@@ -317,8 +344,7 @@ public struct MapFeature {
                 
             case let .didFinishBackgroundCalculation(map, list):
                 state.visiblePhotoBooths = map
-                state.photoBoothListState.visibleBooths = list
-                return .none
+                return .send(.photoBoothListAction(.setVisibleBooths(list)))
                 
             case .didTapGoBackToMapButton:
                 resetToMapMode(&state, for: .first)

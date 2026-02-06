@@ -8,10 +8,10 @@
 import Foundation
 
 public struct ParsedQRResult: Equatable, Sendable {
-    public let brand: PhotoBoothBrand
+    public let brand: QRCodeBrand
     public let originalImage: Data
     
-    public init(brand: PhotoBoothBrand, originalImage: Data) {
+    public init(brand: QRCodeBrand, originalImage: Data) {
         self.brand = brand
         self.originalImage = originalImage
     }

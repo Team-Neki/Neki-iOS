@@ -30,6 +30,9 @@ struct AlbumCard: View {
                 .retry(maxCount: 3, interval: .seconds(5))
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
+                .overlay(content: {
+                    Color.black.opacity(0.04)
+                })
                 .frame(width: cardWidth, height: cardHeight)
                 .clipped()
             

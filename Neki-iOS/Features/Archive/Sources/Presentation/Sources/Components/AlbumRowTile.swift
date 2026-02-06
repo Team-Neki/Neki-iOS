@@ -28,6 +28,9 @@ struct AlbumRowTile: View {
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 72, height: 72)
+                .overlay(content: {
+                    Color.black.opacity(0.04)
+                })
                 .overlay(favoriteHeartOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .clipped()

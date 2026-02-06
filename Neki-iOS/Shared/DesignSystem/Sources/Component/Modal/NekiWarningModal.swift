@@ -28,7 +28,7 @@ public struct NekiWarningModal: View {
 
     public var body: some View {
         VStack(alignment: .center, spacing: 0) {
-            Image(.iconCircleAlertFill)
+            Image(.iconQuestionmarkAlert)
                 .padding(.top, 20)
             
             Text(titleMessage)

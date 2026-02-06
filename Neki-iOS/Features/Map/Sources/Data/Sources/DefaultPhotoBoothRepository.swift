@@ -185,6 +185,6 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
     
     func loadBrands() async throws -> [PhotoBoothBrand] {
         let brands = try await ensureBrandsLoaded()
-        return Array(brands.values)
+        return Array(brands.values).sorted { $0.id < $1.id }
     }
 }

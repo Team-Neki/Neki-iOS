@@ -258,8 +258,7 @@ public struct MapFeature {
                 }
                 
             case let .brandsResponse(.success(brands)):
-                let sortedBrands = brands.sorted { $0.id < $1.id }
-                state.photoBoothListState.brands = IdentifiedArray(uniqueElements: sortedBrands)
+                state.photoBoothListState.brands = IdentifiedArray(uniqueElements: brands)
                 return .none
                 
             case let .fetchPhotoBooths(bounds):

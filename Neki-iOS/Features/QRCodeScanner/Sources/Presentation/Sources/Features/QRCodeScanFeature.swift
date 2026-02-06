@@ -33,6 +33,7 @@ struct QRCodeScanFeature {
         
         // WebView & Alert Actions
         case openWebViewButtonTapped
+        case closeWebViewButtonTapped
         case webViewImageDownloadResult(Result<Data, Error>)
         
         // Internal Actions
@@ -114,6 +115,10 @@ struct QRCodeScanFeature {
                 state.isWebViewPresented = true
                 return .none
                 
+            case .closeWebViewButtonTapped:
+                state.isWebViewPresented = false
+                state.webViewURL = nil
+                
             case let .webViewImageDownloadResult(.success(data)):
                 state.isWebViewPresented = false
                 state.isLoading = true
@@ -127,7 +132,10 @@ struct QRCodeScanFeature {
                 }
                 
             case let .webViewImageDownloadResult(.failure(error)):
-                print("웹뷰 다운로드 실패: \(error)")
+                // TODO: 에러 토스트 필요
+                state.isLoading = false
+                state.isWebViewPresented = false
+                state.webViewURL = nil
                 return .none
                 
             case .openSuggestBrandPage:

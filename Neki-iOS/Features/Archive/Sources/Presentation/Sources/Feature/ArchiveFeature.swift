@@ -389,11 +389,16 @@ struct ArchiveFeature {
                 }
                 return .none
                 
-            case let .qrScanner(.presented(.imageProcessingResult(processedID))):
+            case let .qrScanner(.presented(.addPhotoFromQRScanner(id))):
                 state.qrScanner = nil
-                // TODO: QR 파싱 후 업로드 끝난 ID를 어떻게 해야하는거지?
                 let toast = NekiToastItem("이미지를 추가했어요", style: .success)
-                return .send(.delegate(.showToast(toast)))
+                return .merge(
+                    .send(.delegate(.showToast(toast))),
+                    .run { send in
+                        try await archiveClient.registerPhotos(folderId: nil, uploads: [(mediaID: id, memo: nil)])
+                        await send(.fetchPhotos(isRefresh: true))
+                    }
+                )
                 
             default:
                 return .none

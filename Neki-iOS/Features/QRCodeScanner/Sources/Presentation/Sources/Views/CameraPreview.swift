@@ -9,8 +9,114 @@ import SwiftUI
 import AVFoundation
 import os
 
+final actor CameraManager {
+    enum Status {
+        case notConfigured
+        case configured
+        case running
+        case stopped
+    }
+    
+    enum CameraError: Error {
+        case deviceUnavailable
+        case inputError
+        case outputError
+    }
+    
+    private var status: Status = .notConfigured
+    private let session = AVCaptureSession()
+    private let output = AVCaptureMetadataOutput()
+    private let device = AVCaptureDevice.default(for: .video)
+    private let metadataQueue = DispatchQueue(label: "com.neki.camera.metadata")
+    private var delegateProxy: CameraDelegateProxy?
+    
+    func configure(onScan: @escaping @MainActor (String) -> Void) throws(CameraError) -> (AVCaptureSession, AVCaptureDevice) {
+        guard status == .notConfigured else {
+            guard let device else { throw .deviceUnavailable }
+            return (session, device)
+        }
+        guard let device = device,
+              let input = try? AVCaptureDeviceInput(device: device)
+        else { throw .deviceUnavailable }
+        
+        session.beginConfiguration()
+        
+        guard session.canAddInput(input) else {
+            session.commitConfiguration()
+            throw .inputError
+        }
+        session.addInput(input)
+        
+        guard session.canAddOutput(output) else {
+            session.commitConfiguration()
+            throw .outputError
+        }
+        session.addOutput(output)
+        
+        let proxy = CameraDelegateProxy(onScan: onScan)
+        delegateProxy = proxy
+        output.setMetadataObjectsDelegate(proxy, queue: metadataQueue)
+        guard output.availableMetadataObjectTypes.contains([.qr, .microQR]) else { throw .outputError }
+        output.metadataObjectTypes = [.qr, .microQR]
+        
+        do {
+            try device.lockForConfiguration()
+            if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
+            if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
+            device.unlockForConfiguration()
+        } catch {
+            session.commitConfiguration()
+            Logger.presentation.debug("Camera Configuration Lost: \(error)")
+        }
+        
+        session.commitConfiguration()
+        status = .configured
+        return (session, device)
+    }
+    
+    func start() {
+        guard status == .configured || status == .stopped else { return }
+        guard session.isRunning == false else { return }
+        session.startRunning()
+        status = .running
+    }
+    
+    func stop() {
+        guard status == .running else { return }
+        guard session.isRunning else { return }
+        session.stopRunning()
+        status = .stopped
+    }
+    
+    func setTorch(on: Bool) {
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            device.torchMode = on ? .on : .off
+            device.unlockForConfiguration()
+        } catch {
+            Logger.presentation.error("Torch could not be used")
+        }
+    }
+}
+
+private final class CameraDelegateProxy: NSObject, AVCaptureMetadataOutputObjectsDelegate {
+    let onScan: @MainActor (String) -> Void
+    
+    init(onScan: @escaping @MainActor (String) -> Void) { self.onScan = onScan }
+    
+    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
+        guard let metadataObject = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+              let stringValue = metadataObject.stringValue
+        else { return }
+        
+        Task { @MainActor in onScan(stringValue) }
+    }
+}
+
 final class CameraView: UIView {
-    var session: AVCaptureSession?
     private var previewLayer: AVCaptureVideoPreviewLayer?
     private var rotationCoordinator: AVCaptureDevice.RotationCoordinator?
     private var observation: NSKeyValueObservation?
@@ -20,17 +126,9 @@ final class CameraView: UIView {
         previewLayer?.frame = bounds
     }
     
-    func stopSession() {
-        observation?.invalidate()
-        observation = nil
-        rotationCoordinator = nil
-        guard let session = session, session.isRunning else { return }
-        Task.detached(priority: .background) { session.stopRunning() }
-    }
-    
     @MainActor
     func setupPreviewLayer(session: AVCaptureSession, device: AVCaptureDevice) {
-        self.session = session
+        guard previewLayer == nil else { return }
         
         let layer = AVCaptureVideoPreviewLayer(session: session)
         layer.videoGravity = .resizeAspectFill
@@ -48,114 +146,59 @@ final class CameraView: UIView {
         }
     }
     
-    func toggleTorch(on: Bool) {
-        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else { return }
-        
-        do {
-            try device.lockForConfiguration()
-            device.torchMode = on ? .on : .off
-            device.unlockForConfiguration()
-        } catch {
-            Logger.presentation.error("Torch could not be used")
-        }
+    func cleanup() {
+        observation?.invalidate()
+        observation = nil
+        rotationCoordinator = nil
     }
 }
 
 struct CameraPreview: UIViewRepresentable {
-    @Binding var isTorchOn: Bool
-    
+    let isTorchOn: Bool
+    let isActive: Bool
     let onScan: (String) -> Void
-    
-    init(isTorchOn: Binding<Bool>, onScan: @escaping (String) -> Void) {
-        self._isTorchOn = isTorchOn
-        self.onScan = onScan
-    }
     
     func makeUIView(context: Context) -> CameraView {
         let cameraView = CameraView()
-        Task.detached(priority: .userInitiated) { [coordinator = context.coordinator] in
-            guard let (session, device) = coordinator.makeSession() else { return }
-            await cameraView.setupPreviewLayer(session: session, device: device)
-            coordinator.startSession(session)
+        Task {
+            guard let (session, device) = try? await context.coordinator.cameraManager.configure(onScan: { code in
+                onScan(code)
+            }) else { return }
+            
+            cameraView.setupPreviewLayer(session: session, device: device)
+            
+            guard isActive else { return }
+            await context.coordinator.cameraManager.start()
         }
         return cameraView
     }
     
     func updateUIView(_ uiView: CameraView, context: Context) {
-        uiView.toggleTorch(on: isTorchOn)
+        Task {
+            let manager = context.coordinator.cameraManager
+            
+            if isActive {
+                await manager.start()
+                await manager.setTorch(on: isTorchOn)
+            } else {
+                await manager.stop()
+            }
+        }
     }
     
-    func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
+    func makeCoordinator() -> Coordinator { Coordinator() }
     
-    static func dismantleUIView(_ uiView: CameraView, coordinator: Coordinator) { uiView.stopSession() }
+    static func dismantleUIView(_ uiView: CameraView, coordinator: Coordinator) {
+        uiView.cleanup()
+        Task { await coordinator.cameraManager.stop() }
+    }
 }
 
 
-// MARK: - CameraPreview + Nested Types
+// MARK: - Nested Types
 
 extension CameraPreview {
-    final class Coordinator: NSObject {
-        private let parent: CameraPreview
-        private let queue = DispatchQueue(label: "com.neki.camera.metadata.serialQueue")
-        private var isScanning = true
-        
-        init(parent: CameraPreview) { self.parent = parent }
-        
-        nonisolated func makeSession() -> (AVCaptureSession, AVCaptureDevice)? {
-            let session = AVCaptureSession()
-            session.beginConfiguration()
-            
-            guard let device = AVCaptureDevice.default(for: .video) else {
-                Logger.presentation.error("No video device available")
-                session.commitConfiguration()
-                return nil
-            }
-            
-            do {
-                try device.lockForConfiguration()
-                if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
-                if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
-                if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
-                device.unlockForConfiguration()
-                
-                let input = try AVCaptureDeviceInput(device: device)
-                if session.canAddInput(input) { session.addInput(input) }
-                let output = AVCaptureMetadataOutput()
-                if session.canAddOutput(output) {
-                    session.addOutput(output)
-                    output.setMetadataObjectsDelegate(self, queue: queue)
-                    output.metadataObjectTypes = output.availableMetadataObjectTypes.filter { $0 == .qr }
-                }
-                
-                session.commitConfiguration()
-                return (session, device)
-            } catch {
-                session.commitConfiguration()
-                Logger.presentation.error("Camera setup failed: \(error)")
-                return nil
-            }
-        }
-        
-        nonisolated func startSession(_ session: AVCaptureSession) {
-            guard session.isRunning == false else { return }
-            session.startRunning()
-        }
-    }
-}
-
-
-// MARK: - CameraPreview.Coordinator + AVCaptureMetadataOutputObjectsDelegate
-
-extension CameraPreview.Coordinator: AVCaptureMetadataOutputObjectsDelegate {
-    func metadataOutput(_ output: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        guard isScanning else { return }
-        
-        guard let metadataObject = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
-              let stringValue = metadataObject.stringValue
-        else { return }
-        
-        isScanning = false
-        
-        Task { @MainActor in parent.onScan(stringValue) }
+    final class Coordinator {
+        let cameraManager = CameraManager()
     }
 }

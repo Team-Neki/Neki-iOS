@@ -66,7 +66,6 @@ final actor CameraManager {
             if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
             device.unlockForConfiguration()
         } catch {
-            session.commitConfiguration()
             Logger.presentation.debug("Camera Configuration Lost: \(error)")
         }
         

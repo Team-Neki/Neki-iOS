@@ -12,7 +12,7 @@ import ComposableArchitecture
 public struct PhotoBoothListFeature {
     @ObservableState
     public struct State {
-        let brands = PhotoBoothBrand.allCases
+        var brands: IdentifiedArrayOf<PhotoBoothBrand> = []
         var filteredBrands: Set<PhotoBoothBrand> = []
         
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -25,6 +25,10 @@ public struct PhotoBoothListFeature {
         // View Actions
         case selectFilterOption(PhotoBoothBrand)
         case toggleTooltip
+        
+        // Internal Actions
+        case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
+        case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
         
         // Delegate Actions
         case didTapBooth(PhotoBooth)
@@ -44,6 +48,14 @@ public struct PhotoBoothListFeature {
                 
             case .toggleTooltip:
                 state.$isTooltipPresented.withLock { $0.toggle() }
+                return .none
+                
+            case let .setNearbyBooths(booths):
+                state.photoBooths = booths
+                return .none
+                
+            case let .setVisibleBooths(booths):
+                state.visibleBooths = booths
                 return .none
                 
             default:

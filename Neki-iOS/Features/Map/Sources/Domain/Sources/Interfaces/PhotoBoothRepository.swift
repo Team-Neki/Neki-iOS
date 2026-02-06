@@ -18,6 +18,10 @@ protocol PhotoBoothRepository {
     /// - Parameter coordinate: 기준 좌표
     /// - Returns: 거리순으로 정렬된 포토부스 배열
     func readNearbyPhotoBooths(coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
+    
+    /// 브랜드들의 정보를 가져옵니다.
+    /// - Returns: 우선순위로 정렬된 브랜드 배열
+    func loadBrands() async throws -> [PhotoBoothBrand]
 }
 
 private enum PhotoBoothRepositoryKey: DependencyKey {

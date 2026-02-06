@@ -11,7 +11,7 @@ import os
 struct HaruFilmStrategy: QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { .native }
     
-    func canHandle(host: String) -> Bool { PhotoBoothBrand.harufilm.hostKeywords.contains { host.contains($0) } }
+    func canHandle(host: String) -> Bool { QRCodeBrand.harufilm.hostKeywords.contains { host.contains($0) } }
     
     func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("하루필름 파싱 시도: \(url.absoluteString)")

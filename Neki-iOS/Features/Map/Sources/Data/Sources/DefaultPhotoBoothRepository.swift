@@ -75,14 +75,18 @@ public final actor DefaultPhotoBoothRepository {
         let task = Task<[BrandID: PhotoBoothBrand], Error> {
             let endpoint = MapEndpoint.fetchBrands
             let responseDTO: BaseResponseDTO<FetchPhotoBrandsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            return responseDTO.data?.reduce(into: [:]) { $0[$1.brandName] = $1.toEntity() } ?? [:]
+            guard let brandList = responseDTO.data else { return [:] }
+            return brandList.reduce(into: [BrandID: PhotoBoothBrand]()) { dict, dto in
+                let brandEntity = dto.toEntity()
+                dict[brandEntity.name] = brandEntity
+            }
         }
         
         brandFetchTask = task
         
         do {
             let map = try await task.value
-            brandMap = map
+            if map.isEmpty == false { brandMap = map }
             brandFetchTask = nil
             return map
         } catch {
@@ -177,5 +181,10 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
         } ?? []
         return photoBooths
+    }
+    
+    func loadBrands() async throws -> [PhotoBoothBrand] {
+        let brands = try await ensureBrandsLoaded()
+        return Array(brands.values).sorted { $0.id < $1.id }
     }
 }

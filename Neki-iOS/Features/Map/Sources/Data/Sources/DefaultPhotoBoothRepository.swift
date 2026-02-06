@@ -86,7 +86,7 @@ public final actor DefaultPhotoBoothRepository {
         
         do {
             let map = try await task.value
-            brandMap = map
+            if map.isEmpty == false { brandMap = map }
             brandFetchTask = nil
             return map
         } catch {

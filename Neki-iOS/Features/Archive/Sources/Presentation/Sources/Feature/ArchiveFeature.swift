@@ -36,7 +36,7 @@ struct ArchiveFeature {
             maxCount: 10,
             mediaType: .photoBooth // 테스트를 위한 temp, .photoBooth로 변경 예정
         )
-        var isLoading: Bool = false // 업로드 시 로딩
+        var isLoading: Bool = true // 업로드 시 로딩
         
         var currentPage: Int = 0
         var hasNext: Bool = true

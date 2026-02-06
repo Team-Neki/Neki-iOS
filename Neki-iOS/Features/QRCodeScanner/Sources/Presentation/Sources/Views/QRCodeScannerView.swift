@@ -17,9 +17,10 @@ struct QRCodeScannerView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            CameraPreview(isTorchOn: $store.isLightOn) { urlString in
+            CameraPreview(isTorchOn: store.isLightOn, isActive: store.isCameraActive) { urlString in
                 store.send(.codeScanned(urlString))
-            }.ignoresSafeArea()
+            }
+            .ignoresSafeArea()
             
             Color.gray900.opacity(0.6)
                 .ignoresSafeArea()

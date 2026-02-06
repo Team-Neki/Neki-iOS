@@ -162,7 +162,22 @@ struct QRCodeScanFeature {
             Logger.presentation.notice("⚠️ 비지원 브랜드")
             state.isUnsupportedBrandAlertPresented = true
             
-        default:
+        case .invalidURL:
+            // TODO: 토스트 또는 로그 등 에러 추적하기
+            break
+        case .parsingFailed:
+            // TODO: 토스트 또는 로그 등 에러 추적하기
+            break
+        case .urlConstructionFailed:
+            // TODO: 토스트 또는 로그 등 에러 추적하기
+            break
+        case .networkError(_):
+            // TODO: 토스트 또는 로그 등 에러 추적하기
+            break
+        case .imageDownloadFailed:
+            // TODO: 토스트 또는 로그 등 에러 추적하기
+            break
+        @unknown default:
             break
         }
         return .none

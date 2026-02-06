@@ -63,8 +63,8 @@ extension OnboardingView {
                     .background(.primary25)
                     .clipShape(Capsule())
                 
-                Text(content.title)
-                    .font(.system(size: 24, weight: .bold))
+                highlightedTitle(content: content)
+                    .nekiFont(.title28SemiBold)
                     .foregroundStyle(.gray900)
                     .multilineTextAlignment(.leading)
             }
@@ -80,6 +80,16 @@ extension OnboardingView {
             
             Spacer()
         }
+    }
+    
+    private func highlightedTitle(content: OnboardingItem) -> Text {
+        var attributedString = AttributedString(content.title)
+        
+        if let range = attributedString.range(of: content.highlightTitle) {
+            attributedString[range].font = .neki(.title28Bold)
+        }
+        
+        return Text(attributedString)
     }
 }
 

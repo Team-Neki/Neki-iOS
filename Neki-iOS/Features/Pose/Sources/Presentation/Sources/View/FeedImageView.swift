@@ -12,8 +12,17 @@ import os
 struct FeedImageView: View {
     
     //MARK: - Properties
-
+    
     let item: Pose
+    
+    let gradientColor: LinearGradient = LinearGradient(
+        colors: [
+            .black.opacity(0),
+            .black
+        ],
+        startPoint: UnitPoint(x: 0.54, y: 0.42),
+        endPoint: UnitPoint(x: 0.54, y: 0.05)
+    )
     
     //MARK: - Main Body
     
@@ -30,6 +39,12 @@ struct FeedImageView: View {
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fit)
         }
+        .overlay(content: {
+            Color.black.opacity(0.04)
+        })
+        .overlay(content: {
+            gradientColor.opacity(0.2)
+        })
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()
     }

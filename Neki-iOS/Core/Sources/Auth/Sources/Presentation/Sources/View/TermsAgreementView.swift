@@ -15,8 +15,7 @@ public struct TermsAgreementView: View {
     
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Circle()
-                .frame(width: 80, height: 80)
+            Image(.iconGpicAgreement)
             
             terms
             
@@ -39,7 +38,7 @@ public struct TermsAgreementView: View {
     }
     
     private var terms: some View {
-        VStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 24) {
             Text("편리한 네키 이용을 위한\n필수 약관에 동의해주세요.")
                 .nekiFont(.title24SemiBold)
                 .foregroundStyle(.gray900)
@@ -49,14 +48,15 @@ public struct TermsAgreementView: View {
         }
     }
     
-    // TODO: 선택상태 바뀔 때마다 애니메이션 튀는 현상 해결, 특히 체크마크 아이콘
     private var options: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             Button {
                 store.send(.toggleAllAgreements)
             } label: {
-                HStack(spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     Image(store.isAllAgreed ? .iconCheckmark : .iconCheckmarkGray)
+                        .scaledToFit()
+                        .frame(width: 24, height: 24)
                     
                     Text("약관 전체 동의")
                         .nekiFont(.title18SemiBold)
@@ -73,17 +73,19 @@ public struct TermsAgreementView: View {
                 )
             }
             
-            VStack(alignment: .leading, spacing: .zero) {
+            VStack(alignment: .leading, spacing: 0) {
                 ForEach(TermsType.allCases) { type in
-                    HStack(spacing: .zero) {
+                    HStack(alignment: .center, spacing: 0) {
                         Button {
                             store.send(.toggleAgreement(type))
                         } label: {
                             HStack(spacing: 10) {
                                 if let agreement = store.agreements[id: type] {
                                     Image(agreement.isAgreed ? .iconCheckmark : .iconCheckmarkGray)
+                                        .scaledToFit()
+                                        .frame(width: 24, height: 24)
                                     
-                                    HStack {
+                                    HStack(alignment: .center, spacing: 0) {
                                         Text(agreement.isRequired ? "(필수)" : "(선택)")
                                             .nekiFont(.body14Medium)
                                             .foregroundStyle(.gray500)

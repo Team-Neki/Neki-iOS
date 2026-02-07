@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import Kingfisher
+import Lottie
 
 struct ArchiveView: View {
     
@@ -153,11 +154,11 @@ private extension ArchiveView {
                     showDismiss: false
                 )
                 
-                Button {
-                    // TODO: - 알림 이벤트
-                } label: {
-                    Image(.iconBellFill)
-                }
+//                Button {
+//                    // TODO: - 알림 이벤트
+//                } label: {
+//                    Image(.iconBellFill)
+//                }
             }
         }
         .frame(height: 54)
@@ -322,11 +323,15 @@ private extension ArchiveView {
             Color.gray900.opacity(0.5)
                 .ignoresSafeArea()
             
-            VStack(spacing: 20) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(.white)
-                    .scaleEffect(2)
+            VStack(spacing: 0) {
+                LottieView(animation: .named("ios_loading"))
+                    .configure { lottieAnimationView in
+                        lottieAnimationView.contentMode = .scaleAspectFill
+                        lottieAnimationView.shouldRasterizeWhenIdle = false
+                    }
+                    .playbackMode(.playing(.toProgress(1, loopMode: .loop)))
+                    .frame(width: 150, height: 150)
+                    .aspectRatio(contentMode: .fill)
                 
                 Text("사진을 업로드하고 있어요")
                     .nekiFont(.body16Medium)

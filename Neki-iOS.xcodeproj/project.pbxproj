@@ -15,6 +15,7 @@
 		5970335E2F2482E1000B8194 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335D2F2482E1000B8194 /* KakaoSDKCommon */; };
 		597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335F2F2482E1000B8194 /* KakaoSDKUser */; };
 		59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 59D1D21A2F168EE800F50EB5 /* Kingfisher */; };
+		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +69,7 @@
 			files = (
 				59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */,
 				5970335E2F2482E1000B8194 /* KakaoSDKCommon in Frameworks */,
+				6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */,
 				592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */,
 				5970335C2F2482E1000B8194 /* KakaoSDKCertCore in Frameworks */,
 				597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */,
@@ -140,6 +142,7 @@
 				5970335B2F2482E1000B8194 /* KakaoSDKCertCore */,
 				5970335D2F2482E1000B8194 /* KakaoSDKCommon */,
 				5970335F2F2482E1000B8194 /* KakaoSDKUser */,
+				6C4D99E42F365E1700E93BF0 /* Lottie */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -223,6 +226,7 @@
 				592F345A2F0E1F1700802BB7 /* XCRemoteSwiftPackageReference "SPM-NMapsMap" */,
 				59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				597033562F2482E1000B8194 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
+				6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6C4998DE2EF7EF62006BE1DB /* Products */;
@@ -682,6 +686,14 @@
 				minimumVersion = 8.6.2;
 			};
 		};
+		6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/airbnb/lottie-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 4.6.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -724,6 +736,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
+		};
+		6C4D99E42F365E1700E93BF0 /* Lottie */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */;
+			productName = Lottie;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

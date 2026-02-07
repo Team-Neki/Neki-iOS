@@ -164,7 +164,3 @@ private extension QRCodeScannerView {
         }
     }
 }
-
-#Preview {
-    QRCodeScannerView(store: .init(initialState: QRCodeScanFeature.State(), reducer: { QRCodeScanFeature() }))
-}

@@ -40,7 +40,7 @@ struct PoseView: View {
         }
         .nekiToolbar(
             left: { NekiToolBar.textLeft("포즈") },
-            right: { NekiToolBar.icon(.iconBellFill) }
+            right: { /*NekiToolBar.icon(.iconBellFill)*/ }
         )
         .sheet(item: $store.sheetItem) { item in
             Group {

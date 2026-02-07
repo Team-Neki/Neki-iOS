@@ -19,17 +19,20 @@ struct AlbumCard: View {
         ZStack(alignment: .bottom) {
             KFImage(album.coverImageURL)
                 .placeholder({
-                    Image(.temporaryBranding)
+                    Image(.temporaryBrandingImageLong)
                         .resizable()
+                        .frame(height: cardHeight)
+                        .frame(maxWidth: .infinity)
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: cardWidth, height: cardHeight)
                         .clipped()
                 })
-                .onFailureImage(.temporaryBranding)
                 .resizable()
                 .retry(maxCount: 3, interval: .seconds(5))
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
+                .overlay(content: {
+                    Color.black.opacity(0.04)
+                })
                 .frame(width: cardWidth, height: cardHeight)
                 .clipped()
             
@@ -75,9 +78,6 @@ struct AlbumCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
-
-
-// MARK: - 익성님이 공유해준 앨범 커버 만드는 로직
 
 private extension AlbumCard {
     struct UnionShape: Shape {

@@ -1,5 +1,5 @@
 //
-//  ArchiveAlbumEmptyView.swift
+//  ArchiveEmptyView.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/21/26.
@@ -11,10 +11,8 @@ struct ArchiveEmptyView: View {
     let description: String
     
     var body: some View {
-        VStack(alignment: .center, spacing: 20) {
-            Circle()
-                .fill(.gray50)
-                .frame(width: 104, height: 104)
+        VStack(alignment: .center, spacing: 16) {
+            Image(.iconEmpty)
             
             Text(description)
                 .nekiFont(.body14Medium)

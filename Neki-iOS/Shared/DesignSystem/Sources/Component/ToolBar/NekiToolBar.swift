@@ -73,7 +73,7 @@ extension NekiToolBar {
             
             var content: some View {
                 Text(title)
-                    .nekiFont(.title18SemiBold)
+                    .nekiFont(.title20SemiBold)
                     .foregroundStyle(.gray900)
             }
         }

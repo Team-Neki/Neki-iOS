@@ -31,7 +31,7 @@ public final actor DefaultPoseRepository {
     private var currentRandomNode: RandomPoseNode?
     private var scrapTasks: [PoseID: Task<Void, Error>] = [:]
     
-    private let maxRetryCount: Int = 7
+    private let maxRetryCount: Int = 3
     
     @Dependency(\.networkProvider) private var networkProvider
     

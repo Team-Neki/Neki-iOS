@@ -123,22 +123,32 @@ private extension DefaultPoseRepository {
         let peopleCountValue = convertToRawValue(activeRandomPosePeopleCount)
         let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
         
-        do {
+        @Sendable func requestSinglePose() async throws -> Pose {
             let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
-            
             guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
-            
-            guard excludedIDs.contains(newPose.id) == false else {
-                if retryCount < maxRetryCount {
-                    return try await fetchRandomPose(retryCount: retryCount + 1, excluding: excludedIDs)
-                } else {
-                    Logger.data.debug("Max retries reached. Returning duplicate pose.")
-                    return newPose
-                }
-            }
             return newPose
+        }
+        
+        do {
+            let firstPose = try await requestSinglePose()
+            if excludedIDs.contains(firstPose.id) == false { return firstPose }
+            
+            return try await withThrowingTaskGroup(of: Pose.self) { group in
+                for _ in 0..<maxRetryCount {
+                    group.addTask { try await requestSinglePose() }
+                }
+                
+                for try await pose in group {
+                    guard excludedIDs.contains(pose.id) == false else { continue }
+                    group.cancelAll()
+                    return pose
+                }
+                
+                Logger.data.debug("All parallel retries were duplicates. Fallback to cache.")
+                throw PoseRepositoryError.noHistory
+            }
         } catch {
-            Logger.data.error("Random Pose Fetch Failed: \(error)")
+            Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
             guard cache.isEmpty == false else { throw error }
             let validCachedPoses = cache.values.filter { excludedIDs.contains($0.id) == false }
             

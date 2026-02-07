@@ -8,6 +8,8 @@
 import SwiftUI
 import ComposableArchitecture
 import NMapsMap
+import Kingfisher
+import os
 
 fileprivate enum Constants {
     // Map Settings
@@ -15,6 +17,7 @@ fileprivate enum Constants {
     static let animationDuration: TimeInterval = 0.3
     static let minZoomLevel: Double = 12.0
     static let maxZoomLevel: Double = 20.0
+    static let initialZoomLevel: Double = 14.0
     
     // Marker Size
     static let normalSize = CGSize(width: 54, height: 62)
@@ -24,26 +27,6 @@ fileprivate enum Constants {
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
-    /// 마커 이미지 리소스
-    fileprivate enum MarkerImageResources {
-        enum State {
-            case normal, selected
-        }
-        
-        private static let images: [PhotoBoothBrand: [State: NMFOverlayImage]] = [
-            .life4cut: [.normal: NMFOverlayImage(image: .imgLife4CutPin), .selected: NMFOverlayImage(image: .imgLife4CutPinSelected)],
-            .photoism: [.normal: NMFOverlayImage(image: .imgPhotoismPin), .selected: NMFOverlayImage(image: .imgPhotoismPinSelected)],
-            .photogray: [.normal: NMFOverlayImage(image: .imgPhotograyPin), .selected: NMFOverlayImage(image: .imgPhotograyPinSelected)],
-            .photosignature: [.normal: NMFOverlayImage(image: .imgPhotosignaturePin), .selected: NMFOverlayImage(image: .imgPhotosignaturePinSelected)],
-            .harufilm: [.normal: NMFOverlayImage(image: .imgHarufilmPin), .selected: NMFOverlayImage(image: .imgHarufilmPinSelected)],
-            .planBStudio: [.normal: NMFOverlayImage(image: .imgPlanBStudioPin), .selected: NMFOverlayImage(image: .imgPlanBStudioPinSelected)]
-        ]
-        
-        static func image(for brand: PhotoBoothBrand, state: State) -> NMFOverlayImage {
-            return images[brand]?[state] ?? NMFOverlayImage(image: .imgLife4CutPin)
-        }
-    }
-    
     @Bindable var store: StoreOf<MapFeature>
     let isLocationAuthorized: Bool
     
@@ -58,9 +41,15 @@ struct NaverMapRepresentable: UIViewRepresentable {
         configureMapView(view)
         
         // 초기 카메라 이동
-        let startPosition = store.cameraPosition.map { NMGLatLng(lat: $0.latitude, lng: $0.longitude) } ?? Constants.defaultInitialPosition
-        let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition)
-        cameraUpdate.animation = .fly
+        let startPosition = {
+            if isLocationAuthorized, let current = NMFLocationManager.sharedInstance().currentLatLng() {
+                return current
+            } else {
+                return Constants.defaultInitialPosition
+            }
+        }()
+        let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition, zoomTo: Constants.initialZoomLevel)
+        cameraUpdate.animation = .none
         cameraUpdate.animationDuration = 0.3
         view.mapView.moveCamera(cameraUpdate)
         
@@ -76,7 +65,9 @@ struct NaverMapRepresentable: UIViewRepresentable {
         updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
         
         // State 변경 시 카메라 이동
-        updateCameraPosition(uiView.mapView, context: context)
+        if context.coordinator.isMapLoaded {
+            updateCameraPosition(uiView.mapView, context: context)
+        }
         
         // 마커 업데이트
         context.coordinator.updateMarkers(
@@ -101,6 +92,7 @@ private extension NaverMapRepresentable {
         view.showIndoorLevelPicker = false
         view.mapView.minZoomLevel = Constants.minZoomLevel
         view.mapView.maxZoomLevel = Constants.maxZoomLevel
+        view.mapView.zoomLevel = Constants.initialZoomLevel
         view.mapView.extent = NMGLatLngBounds(southWestLat: 31.43, southWestLng: 122.37, northEastLat: 44.35, northEastLng: 132)
         view.mapView.mapType = .basic
     }
@@ -147,11 +139,15 @@ private extension NaverMapRepresentable {
 extension NaverMapRepresentable {
     @MainActor
     final class Coordinator: NSObject {
-        fileprivate typealias MarkerImageResources = NaverMapRepresentable.MarkerImageResources
+        typealias BoothID = Int
+        typealias BrandID = Int
         
         var lastCameraPosition: GeographicCoordinate?
+        var isMapLoaded: Bool = false
         
-        private var markers: [Int: NMFMarker] = [:]
+        private var markers: [BoothID: NMFMarker] = [:]
+        private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
+        private var overlayImageCache: [String: NMFOverlayImage] = [:]
         private var lastSelectedBoothID: Int?
         
         let parent: NaverMapRepresentable
@@ -161,7 +157,7 @@ extension NaverMapRepresentable {
         func updateMarkers(
             mapView: NMFMapView,
             photoBooths: IdentifiedArrayOf<PhotoBooth>,
-            selectedBoothID: Int?
+            selectedBoothID: BoothID?
         ) {
             let newIDs = Set(photoBooths.ids)
             let currentIDs = Set(markers.keys)
@@ -170,18 +166,20 @@ extension NaverMapRepresentable {
             for id in idsToRemove {
                 markers[id]?.mapView = nil
                 markers[id] = nil
+                markerImageTasks[id]?.cancel()
+                markerImageTasks[id] = nil
             }
             
             for booth in photoBooths {
                 let isSelected = (booth.id == selectedBoothID)
                 
                 if let existingMarker = markers[booth.id] {
-                    updateMarkerStyleIfNeeded(existingMarker, brand: booth.brand, isSelected: isSelected)
+                    updateMarkerStyleIfNeeded(existingMarker, booth: booth, isSelected: isSelected)
                 } else {
                     let newMarker = createMarker(for: booth)
-                    updateMarkerStyleIfNeeded(newMarker, brand: booth.brand, isSelected: isSelected)
                     newMarker.mapView = mapView
                     markers[booth.id] = newMarker
+                    updateMarkerStyleIfNeeded(newMarker, booth: booth, isSelected: isSelected, isInitial: true)
                 }
             }
         }
@@ -195,10 +193,11 @@ private extension NaverMapRepresentable.Coordinator {
     func createMarker(for booth: PhotoBooth) -> NMFMarker {
         let marker = NMFMarker()
         marker.position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-        marker.captionText = "\(booth.brand.displayName)\n\(booth.name)"
+        marker.captionText = "\(booth.brand.name)\n\(booth.name)"
         marker.captionColor = .init(hex: 0x202227)
         marker.captionHaloColor = .white
         marker.captionTextSize = 12
+        marker.anchor = CGPoint(x: 0.5, y: 1.0)
         
         marker.touchHandler = { [weak self] _ in
             self?.parent.store.send(.didTapBooth(booth))
@@ -207,25 +206,55 @@ private extension NaverMapRepresentable.Coordinator {
         return marker
     }
     
-    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, brand: PhotoBoothBrand, isSelected: Bool) {
-        let isFirstRender = marker.userInfo["isSelected"] == nil
+    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, booth: PhotoBooth, isSelected: Bool, isInitial: Bool = false) {
         let currentSelectionState = marker.userInfo["isSelected"] as? Bool ?? false
-        
-        guard isFirstRender || currentSelectionState != isSelected else { return }
-        let targetImage = MarkerImageResources.image(for: brand, state: isSelected ? .selected : .normal)
-        marker.iconImage = targetImage
-        
-        if isSelected {
-            marker.width = Constants.selectedSize.width
-            marker.height = Constants.selectedSize.height
-            marker.zIndex = Constants.zIndexSelected
-        } else {
-            marker.width = Constants.normalSize.width
-            marker.height = Constants.normalSize.height
-            marker.zIndex = Constants.zIndexNormal
+        if isInitial == false, currentSelectionState == isSelected { return }
+        marker.userInfo["isSelected"] = isSelected
+        marker.zIndex = isSelected ? Constants.zIndexSelected : Constants.zIndexNormal
+        let cacheKey = createCacheKey(brandID: booth.brand.id, isSelected: isSelected)
+        if let cachedOverlay = overlayImageCache[cacheKey] {
+            marker.iconImage = cachedOverlay
+            return
         }
         
-        marker.userInfo["isSelected"] = isSelected
+        guard let url = booth.brand.imageURL else {
+            let placeholder = MarkerImageRenderer.render(brandImage: nil, isSelected: isSelected)
+            marker.iconImage = NMFOverlayImage(image: placeholder)
+            return
+        }
+        
+        markerImageTasks[booth.id]?.cancel()
+        markerImageTasks[booth.id] = Task { [weak self] in
+            guard let self else { return }
+            let resource = KF.ImageResource(downloadURL: url, cacheKey: url.absoluteString)
+            
+            do {
+                let result = try await KingfisherManager.shared.retrieveImage(with: resource)
+                guard Task.isCancelled == false else { return }
+                let renderedOverlay: NMFOverlayImage? = await Task.detached(priority: .userInitiated) {
+                    guard Task.isCancelled == false else { return nil }
+                    let finalImage = MarkerImageRenderer.render(brandImage: result.image, isSelected: isSelected)
+                    return NMFOverlayImage(image: finalImage)
+                }.value
+                
+                guard let overlay = renderedOverlay, Task.isCancelled == false else { return }
+                applyOverlay(to: marker, overlay: overlay, isSelected: isSelected, cacheKey: cacheKey)
+            } catch {
+                guard Task.isCancelled == false else { return }
+                Logger.presentation.error("Brand Image Download Failed for Marker: \(booth.id) - \(error)")
+            }
+        }
+    }
+    
+    func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, isSelected: Bool, cacheKey: String) {
+        let currentMarkerStats = marker.userInfo["isSelected"] as? Bool ?? isSelected
+        guard currentMarkerStats == isSelected else { return }
+        overlayImageCache[cacheKey] = overlay
+        marker.iconImage = overlay
+    }
+    
+    func createCacheKey(brandID: BrandID, isSelected: Bool) -> String {
+        "brand_\(brandID)_selected_\(isSelected)"
     }
 }
 
@@ -242,7 +271,12 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     
     func mapViewCameraIdle(_ mapView: NMFMapView) {
         let nmapBounds = mapView.contentBounds
-        parent.store.send(.cameraMotionEnded(nmapBounds.toDomain()))
+        let geographicBounds = nmapBounds.toDomain()
+        if isMapLoaded == false {
+            isMapLoaded = true
+            parent.store.send(.mapLoaded(geographicBounds))
+        }
+        parent.store.send(.cameraMotionEnded(geographicBounds))
     }
 }
 
@@ -312,14 +346,19 @@ private extension NaverMapView {
             mapControllers
             
             HStack(spacing: 16) {
-                Image(photoBooth.brand.logoImageResource)
+                KFImage(photoBooth.brand.imageURL)
                     .resizable()
+                    .placeholder {
+                        ProgressView()
+                    }
+                    .onFailureImage(.temporaryBranding)
                     .frame(width: 64, height: 64)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
+                    
                 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 4) {
-                        Text(photoBooth.brand.displayName)
+                        Text(photoBooth.brand.name)
                             .nekiFont(.title20SemiBold)
                             .foregroundStyle(.gray900)
                         
@@ -385,15 +424,15 @@ private extension NaverMapView {
         Button {
             store.send(.didTapSearchHereButton)
         } label: {
-            HStack(spacing: 6.55) {
+            HStack(spacing: 8) {
                 Image(.iconRotate)
                 
                 Text("현 위치에서 탐색")
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .background(
                 Capsule()
                     .fill(.white)

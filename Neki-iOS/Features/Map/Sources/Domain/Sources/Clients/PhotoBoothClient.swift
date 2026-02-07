@@ -14,6 +14,8 @@ public struct PhotoBoothClient {
     public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncStream<[PhotoBooth]>
     /// 중심 좌표 주변 거리순으로 포토부스 데이터를 가져옵니다.
     public var fetchNearbyPhotoBooths: @Sendable (_ coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
+    /// 지원 브랜드 정보 조회
+    public var loadBrands: @Sendable () async throws -> [PhotoBoothBrand]
 }
 
 
@@ -27,6 +29,8 @@ extension PhotoBoothClient: DependencyKey {
             await photoBoothRepository.readPhotoBooths(in: bounds)
         } fetchNearbyPhotoBooths: { coordinate in
             try await photoBoothRepository.readNearbyPhotoBooths(coordinate: coordinate)
+        } loadBrands: {
+            try await photoBoothRepository.loadBrands()
         }
     }()
 }

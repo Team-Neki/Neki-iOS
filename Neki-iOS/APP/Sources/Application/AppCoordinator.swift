@@ -26,10 +26,10 @@ struct AppCoordinator {
             self.route = .splash
             
             // 디버그용: 온보딩 테스트를 위해 매번 초기화
-//            #if DEBUG
-//            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
-//            UserDefaults.standard.removeObject(forKey: "OnboardingNeeded")
-//            #endif
+            #if DEBUG
+            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
+            UserDefaults.standard.removeObject(forKey: "OnboardingNeeded")
+            #endif
         }
     }
     

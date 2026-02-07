@@ -35,7 +35,7 @@ struct RandomPoseCarouselView: View {
                         .transition(activeTransition)
                 }
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.8, blendDuration: 0), value: store.currentPose)
+            .animation(.spring(response: 0.35, dampingFraction: 0.7, blendDuration: 0), value: store.currentPose)
             
             HStack(spacing: .zero) {
                 Color.clear

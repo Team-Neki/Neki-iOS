@@ -98,7 +98,7 @@ struct QRCodeScanFeature {
                 }
                 
             case let .parseQRResult(.success(parsed)):
-                Logger.domain.info("✅ QR 파싱 성공: \(parsed.brand.displayName)")
+                Logger.domain.info("✅ QR 파싱 성공: \(parsed.brand.description)")
                 return .send(.requestImageProcessing(parsed.originalImage))
                 
             case let .parseQRResult(.failure(error)):

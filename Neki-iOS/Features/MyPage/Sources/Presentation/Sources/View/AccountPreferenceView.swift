@@ -98,7 +98,7 @@ private extension AccountPreferenceView {
                 .frame(maxWidth: .infinity, alignment: .leading)
             
             Text("로그아웃")
-                .nekiFont(.body16Medium)
+                .nekiFont(.title18Medium)
                 .foregroundStyle(.gray900)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -106,7 +106,7 @@ private extension AccountPreferenceView {
                 .onTapGesture { isLogoutAlertPresented.toggle() }
             
             Text("탈퇴하기")
-                .nekiFont(.body16Medium)
+                .nekiFont(.title18Medium)
                 .foregroundStyle(.gray900)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)

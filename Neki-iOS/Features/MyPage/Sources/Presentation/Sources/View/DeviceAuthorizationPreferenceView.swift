@@ -34,7 +34,7 @@ struct DeviceAuthorizationPreferenceView: View {
                 }
             } header: {
                 Text("권한 설정")
-                    .nekiFont(.caption12Medium)
+                    .nekiFont(.body14Medium)
                     .foregroundStyle(.gray400)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -71,11 +71,11 @@ private extension DeviceAuthorizationPreferenceView {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(type.cellTitle)
-                    .nekiFont(.body16Medium)
+                    .nekiFont(.title18Medium)
                     .foregroundStyle(.gray900)
                 
                 Text(type.cellSubtitle)
-                    .nekiFont(.caption12Medium)
+                    .nekiFont(.body14Medium)
                     .foregroundStyle(.gray400)
             }
             

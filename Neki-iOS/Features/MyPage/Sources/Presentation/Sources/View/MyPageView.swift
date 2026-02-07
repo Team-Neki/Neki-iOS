@@ -85,7 +85,7 @@ private extension MyPageView {
         VStack(alignment: .leading, spacing: 4) {
             // Header
             Text(item.title)
-                .nekiFont(.caption12Medium)
+                .nekiFont(.body14Medium)
                 .foregroundStyle(.gray400)
                 .padding(.top, 12)
             
@@ -102,7 +102,7 @@ private extension MyPageView {
     func sectionCell(_ item: SectionCellItem) -> some View {
         HStack {
             Text(item.title)
-                .nekiFont(.body16Medium)
+                .nekiFont(.title18Medium)
                 .foregroundStyle(.gray900)
             
             Spacer()

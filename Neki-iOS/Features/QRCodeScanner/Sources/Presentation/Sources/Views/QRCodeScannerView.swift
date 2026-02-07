@@ -17,9 +17,10 @@ struct QRCodeScannerView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            CameraPreview(isTorchOn: $store.isLightOn) { urlString in
+            CameraPreview(isTorchOn: store.isLightOn, isActive: store.isCameraActive) { urlString in
                 store.send(.codeScanned(urlString))
-            }.ignoresSafeArea()
+            }
+            .ignoresSafeArea()
             
             Color.gray900.opacity(0.6)
                 .ignoresSafeArea()
@@ -106,11 +107,25 @@ struct QRCodeScannerView: View {
     }
     
     private func webViewLayer(url: URL) -> some View {
-        DownloadableWebView(url: url) { data in
-            store.send(.webViewImageDownloadResult(.success(data)))
-        } onError: { error in
-            store.send(.webViewImageDownloadResult(.failure(error)))
+        ZStack {
+            Color.white.ignoresSafeArea()
+            
+            VStack {
+                DownloadableWebView(url: url) { data in
+                    store.send(.webViewImageDownloadResult(.success(data)))
+                } onError: { error in
+                    store.send(.webViewImageDownloadResult(.failure(error)))
+                }
+                
+                Button {
+                    store.send(.closeWebViewButtonTapped)
+                } label: {
+                    Text("닫기")
+                }
+            }
         }
+        .transition(.move(edge: .bottom))
+        .zIndex(2)
     }
 }
 

@@ -7,6 +7,7 @@
 
 import Foundation
 import ComposableArchitecture
+import os
 
 @Reducer
 public struct TermsAgreementFeature {
@@ -15,6 +16,7 @@ public struct TermsAgreementFeature {
         var agreements: IdentifiedArrayOf<UserAgreement>
         var isAllAgreed: Bool { agreements.allSatisfy(\.isAgreed) }
         var isConfirmButtonEnabled: Bool { agreements.filter(\.isRequired).allSatisfy(\.isAgreed) }
+        var isLoading: Bool = false
         
         public init() {
             self.agreements = [
@@ -32,6 +34,9 @@ public struct TermsAgreementFeature {
         case confirmButtonTapped
         case termPageLinkTapped(TermsType)
         
+        // Internal Actions
+        case agreeTermsResponse(Result<Void, Error>)
+        
         // Delegate Actions
         case didFinishOnboarding
         
@@ -40,6 +45,7 @@ public struct TermsAgreementFeature {
     }
     
     @Dependency(\.openURL) private var openURL
+    @Dependency(\.authClient) private var authClient
     
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -47,17 +53,31 @@ public struct TermsAgreementFeature {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .toggleAgreement(type):
-                state.agreements[id: type]?.isAgreed.toggle()
+                state.agreements[id: type.id]?.isAgreed.toggle()
                 return .none
                 
             case .toggleAllAgreements:
                 let shouldAgreeAll = state.isAllAgreed == false
-                for type in TermsType.allCases { state.agreements[id: type]?.isAgreed = shouldAgreeAll }
+                for type in TermsType.allCases { state.agreements[id: type.id]?.isAgreed = shouldAgreeAll }
                 return .none
                 
             case .confirmButtonTapped:
-                guard state.isConfirmButtonEnabled else { return .none }
+                guard state.isConfirmButtonEnabled, state.isLoading == false else { return .none }
+                state.isLoading = true
+                let agreementsToSend: [TermAgreement] = state.agreements.map { (id: $0.id, agreed: $0.isAgreed) }
+                
+                return .run { send in
+                    await send(.agreeTermsResponse(Result { try await authClient.agreeWithTerms(agreementsToSend) }))
+                }
+                
+            case .agreeTermsResponse(.success):
+                state.isLoading = false
                 return .send(.didFinishOnboarding)
+                
+            case let .agreeTermsResponse(.failure(error)):
+                state.isLoading = false
+                Logger.presentation.error("Error occured while agreeing to terms: \(error)")
+                return .none
                 
             case let .termPageLinkTapped(type):
                 let urlString: String

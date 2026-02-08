@@ -33,33 +33,31 @@ public struct LoginCoordinator {
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
-            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding))):
-                if let user = state.pendingUser {
-                    UserDefaults.standard.set(true, forKey: "TermsAgreed_\(user.id)")
-                }
-                
-                guard let user = state.pendingUser else {
-                    Logger.presentation.error("온보딩 과정 중 중단됨.")
-                    return .none
-                }
-                state.pendingUser = nil
-                state.path.pop(from: id)
-                return .send(.delegate(.moveToMainTab(user)))
-                
+                // MARK: - Login Flow
             case let .root(.loginResponse(.success(user))):
-                let hasAgreedTerms = UserDefaults.standard.bool(forKey: "TermsAgreed_\(user.id)")
-                
-                if !hasAgreedTerms {
+                if user.allRequiredTermsAgreed {
+                    return .send(.delegate(.moveToMainTab(user)))
+                } else {
                     state.pendingUser = user
                     state.path.append(.termsAgreement(.init()))
                     return .none
-                } else {
-                    return .send(.delegate(.moveToMainTab(user)))
                 }
                 
             case let .root(.loginResponse(.failure(error))):
                 Logger.presentation.error("로그인 과정 중 에러 발생: \(error)")
                 return .none
+                
+                // MARK: - Onboarding Flow
+            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding))):
+                guard var user = state.pendingUser else {
+                    Logger.presentation.error("온보딩 과정 중 중단됨.")
+                    return .none
+                }
+                
+                user.allRequiredTermsAgreed = true
+                state.pendingUser = nil
+                state.path.pop(from: id)
+                return .send(.delegate(.moveToMainTab(user)))
                 
             default:
                 return .none

@@ -84,7 +84,7 @@ public struct TermsAgreementView: View {
                             store.send(.toggleAgreement(type))
                         } label: {
                             HStack(alignment: .center, spacing: 0) {
-                                if let agreement = store.agreements[id: type] {
+                                if let agreement = store.agreements[id: type.id] {
                                     Image(agreement.isAgreed ? .iconCheckmark : .iconCheckmarkGray)
                                         .frame(width: 44, height: 44)
                                         .scaledToFit()

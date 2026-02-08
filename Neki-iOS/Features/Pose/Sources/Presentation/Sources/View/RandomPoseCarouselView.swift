@@ -46,6 +46,18 @@ struct RandomPoseCarouselView: View {
                     .contentShape(.rect)
                     .onTapGesture { store.send(.tapRight) }
             }
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        let horizontalAmount = value.translation.width
+                        
+                        if horizontalAmount < 0 {
+                            store.send(.tapRight)
+                        } else {
+                            store.send(.tapLeft)
+                        }
+                    }
+            )
             
             controlButtons
                 .frame(maxHeight: .infinity, alignment: .bottom)

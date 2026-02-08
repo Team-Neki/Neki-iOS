@@ -7,6 +7,7 @@
 
 import ImageIO
 import UniformTypeIdentifiers
+import os
 
 public struct ImageDownsamplingProcessor: Sendable {
     public struct ProcessedImage: Sendable {
@@ -21,22 +22,34 @@ public struct ImageDownsamplingProcessor: Sendable {
     private init() {}
     
     nonisolated public static func process(data: Data) async -> ProcessedImage? {
-        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
+            Logger.domain.error("❌ ImageDownsamplingProcessor: 이미지 소스 생성 실패")
+            return nil
+        }
+        
+        guard CGImageSourceGetCount(imageSource) > .zero else {
+            Logger.domain.error("❌ ImageDownsamplingProcessor: 이미지 소스 내 이미지 개수 0")
+            return nil
+        }
+        
         let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, .zero, nil) as? [CFString: Any]
         let width = properties?[kCGImagePropertyPixelWidth] as? CGFloat ?? .zero
         let height = properties?[kCGImagePropertyPixelHeight] as? CGFloat ?? .zero
         let maxSide = max(width, height)
         
-        let targetPixelSize: CGFloat = maxSide > .zero ? (maxSide > maxDimensionInPixels) ? maxDimensionInPixels : maxSide : maxDimensionInPixels
+        let targetPixelSize: Int = maxSide > .zero ? Int((maxSide > maxDimensionInPixels) ? maxDimensionInPixels : maxSide) : Int(maxDimensionInPixels)
         
         let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: targetPixelSize
+            kCGImageSourceCreateThumbnailFromImageAlways: kCFBooleanTrue as Any,
+            kCGImageSourceShouldCacheImmediately: kCFBooleanTrue as Any,
+            kCGImageSourceCreateThumbnailWithTransform: kCFBooleanTrue as Any,
+            kCGImageSourceThumbnailMaxPixelSize: targetPixelSize as CFNumber
         ]
         
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, .zero, options as CFDictionary) else { return nil }
+        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, .zero, options as CFDictionary) else {
+            Logger.domain.error("❌ ImageDownsamplingProcessor: 썸네일 생성 실패")
+            return nil
+        }
         let mutableData = NSMutableData()
         
         guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }

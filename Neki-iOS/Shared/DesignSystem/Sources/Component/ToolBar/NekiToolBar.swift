@@ -49,15 +49,17 @@ extension NekiToolBar {
             let action: () -> Void
             var body: some View {
                 Button(action: action) { Image(.iconChevronLeft) }
+                    .frame(width: 52, height: 52)
+                    .contentShape(Rectangle())
             }
         }
         
         struct Close: View {
             let action: () -> Void
             var body: some View {
-                Button(action: action) {
-                    Image(.iconXmarkBlack)
-                }
+                Button(action: action) { Image(.iconXmarkBlack) }
+                    .frame(width: 52, height: 52)
+                    .contentShape(Rectangle())
             }
         }
         
@@ -105,6 +107,8 @@ extension NekiToolBar {
                 } label: {
                     Image(uiImage: image)
                 }
+                .frame(width: 52, height: 52)
+                .contentShape(Rectangle())
             }
         }
     }
@@ -132,8 +136,6 @@ public struct NekiToolbarLayout<Left: View, Center: View, Right: View>: View {
         ZStack(alignment: .center) {
             HStack(alignment: .center, spacing: 0) {
                 left
-                    .frame(width: 52, height: 52)
-                    .contentShape(Rectangle())
                 Spacer()
                 right
             }

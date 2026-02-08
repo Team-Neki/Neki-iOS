@@ -17,7 +17,7 @@ public enum NekiToolBar {
     }
     
     public static func textLeft(_ title: String, action: (() -> Void)? = nil) -> some View {
-        Items.Title(title: title, action: action)
+        Items.Title(title: title, action: action).padding(.leading, 12)
     }
     
     public static func textCenter(_ title: String, action: (() -> Void)? = nil) -> some View {

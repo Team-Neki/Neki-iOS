@@ -54,7 +54,7 @@ extension DownloadableWebView {
             Logger.presentation.debug("🌐 Blob 다운로드 시작: \(url.absoluteString)")
             
             let script = """
-                const targetUrl = "\(url.absoluteString)";
+                const targetUrl = targetUrlArg;
 
                 // 1. 유효성 검사 (undefined 체크)
                 if (!targetUrl) {
@@ -98,7 +98,7 @@ extension DownloadableWebView {
             
             webView.callAsyncJavaScript(
                 script,
-                arguments: [:],
+                arguments: ["targetUrlArg": url.absoluteString],
                 in: nil,
                 in: .page
             ) { [weak self] (result: Result<Any, Error>) in

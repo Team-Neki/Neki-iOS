@@ -69,6 +69,14 @@ struct QRCodeScannerView: View {
             onConfirm: { store.send(.addPhotoFromGalleryButtonTapped) },
             onSecondary: { store.send(.openSuggestBrandPage) }
         )
+        .nekiAlert(
+            isPresented: $store.isExpiredAlertPresented,
+            style: .plain,
+            title: "만료된 QR 코드예요.",
+            subtitle: "만료되지 않은 네컷사진만 저장할 수 있어요.",
+            confirmText: "확인",
+            onConfirm: { store.send(.closeExpiredAlertButtonTapped) }
+        )
     }
     
     private var header: some View {

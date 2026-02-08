@@ -21,6 +21,7 @@ struct QRCodeScanFeature {
         
         var isManualDownloadNeededAlertPresented: Bool = false
         var isUnsupportedBrandAlertPresented: Bool = false
+        var isExpiredAlertPresented: Bool = false
         var isWebViewPresented: Bool = false
         
         var isCameraActive: Bool {
@@ -35,6 +36,7 @@ struct QRCodeScanFeature {
         case openSuggestBrandPage
         case openWebViewButtonTapped
         case closeWebViewButtonTapped
+        case closeExpiredAlertButtonTapped
         
         // System & Alert Actions
         case codeScanned(String)
@@ -86,6 +88,10 @@ struct QRCodeScanFeature {
                     guard let url = URL(string: "https://tally.so/r/0QekXy") else { return }
                     await openURL(url)
                 }
+                
+            case .closeExpiredAlertButtonTapped:
+                state.isExpiredAlertPresented = false
+                return .none
                 
                 // MARK: - Scanning Flow
             case .codeScanned(let urlString):
@@ -165,18 +171,23 @@ struct QRCodeScanFeature {
         case .invalidURL:
             // TODO: 토스트 또는 로그 등 에러 추적하기
             break
+            
         case .parsingFailed:
             // TODO: 토스트 또는 로그 등 에러 추적하기
             break
+            
         case .urlConstructionFailed:
             // TODO: 토스트 또는 로그 등 에러 추적하기
             break
+            
         case .networkError(_):
             // TODO: 토스트 또는 로그 등 에러 추적하기
             break
+            
         case .imageDownloadFailed:
-            // TODO: 토스트 또는 로그 등 에러 추적하기
-            break
+            Logger.presentation.notice("⚠️ 만료된 QR 코드")
+            state.isExpiredAlertPresented = true
+            
         @unknown default:
             break
         }

@@ -143,7 +143,7 @@ extension NaverMapRepresentable {
         typealias BrandID = Int
         
         private let defaultBrandImage: UIImage = UIImage(resource: .imgDefaultBrandOriginal)
-        private lazy var defaultNormarOverlay: NMFOverlayImage = {
+        private lazy var defaultNormalOverlay: NMFOverlayImage = {
             let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: false)
             return NMFOverlayImage(image: image)
         }()
@@ -264,7 +264,7 @@ private extension NaverMapRepresentable.Coordinator {
     }
     
     func applyDefaultOverlay(to marker: NMFMarker, isSelected: Bool) {
-        let targetOverlay = isSelected ? defaultSelectedOverlay : defaultNormarOverlay
+        let targetOverlay = isSelected ? defaultSelectedOverlay : defaultNormalOverlay
         marker.iconImage = targetOverlay
     }
     

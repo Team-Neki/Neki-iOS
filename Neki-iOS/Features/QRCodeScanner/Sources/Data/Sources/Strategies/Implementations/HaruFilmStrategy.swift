@@ -46,8 +46,8 @@ struct HaruFilmStrategy: QRCodeParsingStrategy {
             return ParsedQRResult(brand: .harufilm, originalImage: data)
             
         } catch {
-            Logger.domain.notice("이미지 다운로드 연결 실패. 웹뷰 폴백 시도.")
-            throw .fallbackToWebView(url)
+            Logger.network.warning("이미지 없음(404 등). 만료 확인.")
+            throw .imageDownloadFailed
         }
     }
 }

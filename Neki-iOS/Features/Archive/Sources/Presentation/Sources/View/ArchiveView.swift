@@ -81,8 +81,8 @@ struct ArchiveView: View {
             
             if store.showDropDownMenu {
                 dropDownMenu
-                    .padding(.top, 42)
-                    .padding(.trailing, 60)
+                    .padding(.top, 46)
+                    .padding(.trailing, 16)
             }
             
         }

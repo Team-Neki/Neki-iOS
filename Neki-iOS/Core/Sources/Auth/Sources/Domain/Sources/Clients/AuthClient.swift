@@ -27,6 +27,7 @@ public struct AuthClient {
     public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
     public var loginWithKakao: @Sendable () async throws -> User
     public var autoLogin: @Sendable () async throws -> User
+    public var agreeWithTerms: @Sendable (_ agreements: [TermAgreement]) async throws -> Void
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
     public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User
@@ -75,6 +76,14 @@ extension AuthClient: DependencyKey {
             do {
                 let user = try await authRepository.restoreSession()
                 return user
+            } catch {
+                throw AuthClient.mapError(error)
+            }
+        }
+        
+        @Sendable func agreeWithTerms(agreements: [TermAgreement]) async throws -> Void {
+            do {
+                try await authRepository.agreeWithTerms(agreements: agreements)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -150,6 +159,7 @@ extension AuthClient: DependencyKey {
             loginWithApple: loginWithApple,
             loginWithKakao: loginWithKakao,
             autoLogin: autoLogin,
+            agreeWithTerms: agreeWithTerms,
             signOut: signOut,
             withdraw: withdraw,
             updateProfile: updateProfile,

@@ -11,6 +11,7 @@ import os
 enum AuthEndpoint {
     case reissueToken
     case login(dto: SocialLoginDTO.Request, provider: ProviderType)
+    case agreeWithTerms(dto: AgreeTermsDTO.Request)
     
     case withdraw
     case editNickname(dto: EditNicknameDTO.Request)
@@ -26,7 +27,7 @@ extension AuthEndpoint: Endpoint {
         switch self {
         case .reissueToken: return .reissue
         case .login: return .none
-        case .withdraw, .editNickname, .editProfileImage, .fetchUserInfo: return .bearer
+        case .agreeWithTerms, .withdraw, .editNickname, .editProfileImage, .fetchUserInfo: return .bearer
         }
     }
     
@@ -44,6 +45,7 @@ extension AuthEndpoint: Endpoint {
         switch self {
         case .reissueToken: return "auth/refresh"
         case let .login(_, provider): return "auth/\(provider.name)/login"
+        case .agreeWithTerms: return "terms/agreements"
         case .withdraw: return "users/me"
         case .editNickname: return "users/me"
         case .editProfileImage: return "users/me/profile-image"
@@ -53,7 +55,7 @@ extension AuthEndpoint: Endpoint {
     
     var method: HTTPMethodType {
         switch self {
-        case .reissueToken, .login: return .post
+        case .reissueToken, .login, .agreeWithTerms: return .post
         case .withdraw: return .delete
         case .editNickname, .editProfileImage: return .patch
         case .fetchUserInfo: return .get
@@ -64,6 +66,7 @@ extension AuthEndpoint: Endpoint {
         switch self {
         case .reissueToken, .fetchUserInfo, .withdraw: return nil
         case let .login(dto, _): return dto
+        case let .agreeWithTerms(dto): return dto
         case let .editNickname(dto): return dto
         case let .editProfileImage(dto): return dto
         }

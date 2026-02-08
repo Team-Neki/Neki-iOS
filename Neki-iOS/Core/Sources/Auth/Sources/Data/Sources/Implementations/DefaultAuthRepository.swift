@@ -42,7 +42,7 @@ public struct DefaultAuthRepository: AuthRepository {
             else { throw AuthRepositoryError.networkError(.responseDecodingError) }
             
             let profileImageURL = URL(string: data.profileImageURLString ?? "")
-            return User(id: data.id, nickname: data.nickname, email: data.email, profileImageURL: profileImageURL, providerType: providerType)
+            return User(id: data.id, nickname: data.nickname, email: data.email, profileImageURL: profileImageURL, providerType: providerType, allRequiredTermsAgreed: data.agreedTerms)
         } catch let error as NetworkError {
             throw .networkError(error)
         } catch {
@@ -99,6 +99,20 @@ public struct DefaultAuthRepository: AuthRepository {
         } catch {
             try? tokenStorage.delete()
             throw .unauthorized
+        }
+    }
+    
+    public func agreeWithTerms(agreements: [TermAgreement]) async throws(AuthRepositoryError) {
+        let agreements = agreements.map { AgreementsDTO(termID: $0.id, agreed: $0.agreed) }
+        let dto = AgreeTermsDTO.Request(agreements: agreements)
+        let endpoint = AuthEndpoint.agreeWithTerms(dto: dto)
+        
+        do {
+            let _: BaseResponseDTO<AgreeTermsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        } catch let error as NetworkError {
+            throw .networkError(error)
+        } catch {
+            throw .unknown
         }
     }
 }

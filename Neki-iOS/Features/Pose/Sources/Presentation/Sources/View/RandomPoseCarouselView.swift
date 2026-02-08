@@ -54,10 +54,6 @@ struct RandomPoseCarouselView: View {
         }
         .animation(.easeInOut, value: store.isTutorialPresented)
         .task { await store.send(.onAppear).finish() }
-        .onDisappear {
-            guard store.isDismissing == false else { return }
-            store.send(.onDisappear)
-        }
         .nekiToolbar(
             isOverlay: true, left: {
                 NekiToolBar.close {

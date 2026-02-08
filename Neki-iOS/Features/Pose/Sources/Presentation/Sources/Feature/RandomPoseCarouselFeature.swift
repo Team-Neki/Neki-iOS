@@ -30,7 +30,6 @@ struct RandomPoseCarouselFeature {
     enum Action {
         // Lifecycle Actions
         case onAppear
-        case onDisappear
         
         // View Actions
         case closeTutorialOverlay
@@ -69,16 +68,15 @@ struct RandomPoseCarouselFeature {
                     await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }))
                 }
                 
-            case .onDisappear:
-                if state.isDismissing { return .none }
-                return .send(.flushResources)
-                
             case .closeTutorialOverlay:
                 state.$isTutorialPresented.withLock { $0 = false }
                 return .none
                 
             case .onTapClose:
-                return .run { _ in await dismiss() }
+                return .run { send in
+                    await dismiss()
+                    await send(.flushResources)
+                }
                 
             case .tapLeft:
                 state.slideDirection = .previous
@@ -131,7 +129,6 @@ struct RandomPoseCarouselFeature {
                 // MARK: - Navigation
             case let .onTapDetail(pose):
                 return .run { send in
-                    await send(.flushResources)
                     await send(.delegate(.routeToDetail(pose)))
                 }
                 

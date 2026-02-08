@@ -151,7 +151,7 @@ struct QRCodeScanFeature {
     }
     
     private func handleError(_ error: Error, state: inout State) -> Effect<Action> {
-        Logger.domain.error("QR 파싱 실패: \(error.localizedDescription)")
+        Logger.domain.error("QR 파싱 실패: \(error)")
         
         guard let qrError = error as? QRParseError else {
             // TODO: 알 수 없는 에러 경우에 토스트

@@ -58,6 +58,15 @@ struct RandomPoseCarouselView: View {
             guard store.isDismissing == false else { return }
             store.send(.onDisappear)
         }
+        .nekiToolbar(
+            isOverlay: true, left: {
+                NekiToolBar.close {
+                    store.send(.onTapClose)
+                }
+            }, center: {
+                NekiToolBar.textCenter("랜덤포즈")
+            }
+        )
     }
     
     private var activeTransition: AnyTransition {

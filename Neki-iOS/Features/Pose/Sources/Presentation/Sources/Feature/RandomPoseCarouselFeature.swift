@@ -74,8 +74,8 @@ struct RandomPoseCarouselFeature {
                 
             case .onTapClose:
                 return .run { send in
-                    await dismiss()
                     await send(.flushResources)
+                    await dismiss()
                 }
                 
             case .tapLeft:

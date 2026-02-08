@@ -198,7 +198,7 @@ private extension RandomPoseCarouselView {
             .padding()
         }
         .transition(.opacity)
-        .zIndex(1)
+        .zIndex(10)
     }
     
     func mainContentView(for pose: Pose) -> some View {

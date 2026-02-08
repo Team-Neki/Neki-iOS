@@ -120,7 +120,3 @@ public struct TermsAgreementView: View {
         }
     }
 }
-
-#Preview {
-    TermsAgreementView(store: .init(initialState: TermsAgreementFeature.State(), reducer: { TermsAgreementFeature() }))
-}

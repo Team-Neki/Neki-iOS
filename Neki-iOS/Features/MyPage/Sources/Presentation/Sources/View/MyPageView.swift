@@ -120,7 +120,3 @@ private extension MyPageView {
         .onTapGesture { store.send(.cellTapped(item)) }
     }
 }
-
-#Preview {
-    MyPageView(store: .init(initialState: MyPageFeature.State(user: .init(id: 1, nickname: "Swain", email: "dsad", profileImageURL: nil, providerType: .apple)), reducer: { MyPageFeature() }))
-}

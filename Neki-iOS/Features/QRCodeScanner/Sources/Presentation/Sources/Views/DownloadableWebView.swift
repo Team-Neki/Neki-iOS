@@ -111,6 +111,7 @@ extension DownloadableWebView {
                           let data = Data(base64Encoded: String(dataString[dataString.index(after: commaIndex)...]))
                     else {
                         Logger.presentation.error("❌ Blob Error: Base64 문자열 변환 실패")
+                        self.parent.onError(QRParseError.parsingFailed)
                         return
                     }
                     

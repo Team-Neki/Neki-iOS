@@ -142,6 +142,16 @@ extension NaverMapRepresentable {
         typealias BoothID = Int
         typealias BrandID = Int
         
+        private let defaultBrandImage: UIImage = UIImage(resource: .imgDefaultBrandOriginal)
+        private lazy var defaultNormalOverlay: NMFOverlayImage = {
+            let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: false)
+            return NMFOverlayImage(image: image)
+        }()
+        private lazy var defaultSelectedOverlay: NMFOverlayImage = {
+            let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: true)
+            return NMFOverlayImage(image: image)
+        }()
+        
         var lastCameraPosition: GeographicCoordinate?
         var isMapLoaded: Bool = false
         
@@ -218,8 +228,7 @@ private extension NaverMapRepresentable.Coordinator {
         }
         
         guard let url = booth.brand.imageURL else {
-            let placeholder = MarkerImageRenderer.render(brandImage: nil, isSelected: isSelected)
-            marker.iconImage = NMFOverlayImage(image: placeholder)
+            applyDefaultOverlay(to: marker, isSelected: isSelected)
             return
         }
         
@@ -242,6 +251,7 @@ private extension NaverMapRepresentable.Coordinator {
             } catch {
                 guard Task.isCancelled == false else { return }
                 Logger.presentation.error("Brand Image Download Failed for Marker: \(booth.id) - \(error)")
+                applyDefaultOverlay(to: marker, isSelected: isSelected)
             }
         }
     }
@@ -251,6 +261,11 @@ private extension NaverMapRepresentable.Coordinator {
         guard currentMarkerStats == isSelected else { return }
         overlayImageCache[cacheKey] = overlay
         marker.iconImage = overlay
+    }
+    
+    func applyDefaultOverlay(to marker: NMFMarker, isSelected: Bool) {
+        let targetOverlay = isSelected ? defaultSelectedOverlay : defaultNormalOverlay
+        marker.iconImage = targetOverlay
     }
     
     func createCacheKey(brandID: BrandID, isSelected: Bool) -> String {
@@ -351,7 +366,7 @@ private extension NaverMapView {
                     .placeholder {
                         ProgressView()
                     }
-                    .onFailureImage(.temporaryBranding)
+                    .onFailureImage(.imgDefaultBrandOriginal)
                     .frame(width: 64, height: 64)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                     

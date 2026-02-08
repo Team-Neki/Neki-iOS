@@ -126,11 +126,9 @@ struct RandomPoseCarouselFeature {
                 
                 // MARK: - Navigation
             case let .onTapDetail(pose):
-                state.isDismissing = true
                 return .run { send in
                     await send(.flushResources)
                     await send(.delegate(.routeToDetail(pose)))
-                    await dismiss()
                 }
                 
             case .flushResources:

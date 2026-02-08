@@ -14,15 +14,18 @@ struct PoseCoordinatorView: View {
     var body: some View {
         NavigationStack(path: $store.scope(state: \.path, action: \.path)) {
             PoseView(store: store.scope(state: \.root, action: \.root))
+                .navigationBarBackButtonHidden(true)
         } destination: { store in
             switch store.case {
             case .detail(let store):
                 PoseDetailView(store: store)
                     .toolbar(.hidden, for: .tabBar)
+                    .navigationBarBackButtonHidden(true)
+            case .randomPose(let store):
+                RandomPoseCarouselView(store: store)
+                    .toolbar(.hidden, for: .tabBar)
+                    .navigationBarBackButtonHidden(true)
             }
-        }
-        .fullScreenCover(item: $store.scope(state: \.randomPose, action: \.randomPose)) { store in
-            RandomPoseCarouselView(store: store)
         }
     }
 }

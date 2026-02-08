@@ -127,7 +127,7 @@ private extension RandomPoseCarouselView {
     
     var tutorialOverlay: some View {
         ZStack {
-            Color.gray900
+            Color.gray900.opacity(0.8)
                 .ignoresSafeArea()
             
             VStack {

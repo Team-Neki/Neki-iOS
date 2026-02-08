@@ -60,6 +60,10 @@ struct RandomPoseCarouselFeature {
             switch action {
                 // MARK: - Lifecycle & View Actions
             case .onAppear:
+                if state.currentPose != nil {
+                    return .none
+                }
+                
                 state.isLoading = true
                 return .run { [count = state.activePeopleCount] send in
                     await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }))

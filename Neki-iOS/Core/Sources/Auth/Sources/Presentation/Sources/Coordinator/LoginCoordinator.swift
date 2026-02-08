@@ -13,7 +13,6 @@ import os
 public struct LoginCoordinator {
     @ObservableState
     public struct State {
-        @Shared(.appStorage("OnboardingNeeded")) var isOnboardingNeeded: Bool = true
         var root = LoginFeature.State()
         var path = StackState<Path.State>()
         var pendingUser: User?
@@ -35,7 +34,10 @@ public struct LoginCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding))):
-                state.$isOnboardingNeeded.withLock { $0 = false }
+                if let user = state.pendingUser {
+                    UserDefaults.standard.set(true, forKey: "TermsAgreed_\(user.id)")
+                }
+                
                 guard let user = state.pendingUser else {
                     Logger.presentation.error("온보딩 과정 중 중단됨.")
                     return .none
@@ -45,7 +47,9 @@ public struct LoginCoordinator {
                 return .send(.delegate(.moveToMainTab(user)))
                 
             case let .root(.loginResponse(.success(user))):
-                if state.isOnboardingNeeded {
+                let hasAgreedTerms = UserDefaults.standard.bool(forKey: "TermsAgreed_\(user.id)")
+                
+                if !hasAgreedTerms {
                     state.pendingUser = user
                     state.path.append(.termsAgreement(.init()))
                     return .none

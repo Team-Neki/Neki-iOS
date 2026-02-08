@@ -192,7 +192,6 @@ extension AppCoordinator {
 private extension AppCoordinator.State {
     func initializeUserDefaults() {
         UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding") // 최초 온보딩
-        UserDefaults.standard.removeObject(forKey: "OnboardingNeeded")  // 약관동의
         UserDefaults.standard.removeObject(forKey: "showTooltip")       // 아카이빙 홈 툴팁
         UserDefaults.standard.removeObject(forKey: "isTutorialPresented")   // 랜덤포즈 튜토리얼
     }

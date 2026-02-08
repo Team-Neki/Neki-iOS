@@ -41,8 +41,11 @@ struct AccountPreferenceFeature {
                 }
                 
             case .unregisterButtonTapped:
-                return .run { send in
+                return .run { [userId = state.user.id] send in
                     try await authClient.withdraw()
+                    
+                    UserDefaults.standard.removeObject(forKey: "TermsAgreed_\(userId)")
+                    
                     await send(.didWithdraw)
                 } catch: { error, _ in
                     Logger.presentation.error("회원탈퇴 과정 중 에러 발생: \(error)")

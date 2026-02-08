@@ -12,7 +12,6 @@ import Lottie
 
 struct ArchiveView: View {
     
-    @State var showTooltip: Bool = false          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
     @State var addAlbumSheetPresented: Bool = false
     @State var showScrollToTopButton: Bool = false
     
@@ -72,11 +71,11 @@ struct ArchiveView: View {
             }
             
             // 툴팁이 보여져 있을 경우 화면 어디든 누르면 사라지게
-            if showTooltip {
+            if store.showTooltip {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        showTooltip = false
+                        store.showTooltip = false
                     }
             }
             
@@ -147,7 +146,7 @@ private extension ArchiveView {
                     Image(.iconPlusRed)
                 }
                 .nekiTooltip(
-                    isPresented: $showTooltip,
+                    isPresented: $store.showTooltip,
                     "버튼을 눌러 네컷을 추가할 수 있어요",
                     position: .bottom,
                     style: .dark,

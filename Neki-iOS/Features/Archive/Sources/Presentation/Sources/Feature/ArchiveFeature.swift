@@ -19,6 +19,8 @@ struct ArchiveFeature {
         @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
         
+        @Shared(.appStorage("showTooltip")) var showTooltip: Bool = true
+        
         @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
         @Presents var qrScanner: QRCodeScanFeature.State?
         

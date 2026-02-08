@@ -25,10 +25,9 @@ struct AppCoordinator {
         init() {
             self.route = .splash
             
-            // 디버그용: 온보딩 테스트를 위해 매번 초기화
+            // QA처럼 최초 1회성 뷰들을 매번 보여줘야 할 때 사용
             #if DEBUG
-            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
-            UserDefaults.standard.removeObject(forKey: "OnboardingNeeded")
+            initializeUserDefaults()
             #endif
         }
     }
@@ -60,7 +59,7 @@ struct AppCoordinator {
             case .onAppLaunched:
                 return .merge(
                     .run { send in
-                        try await clock.sleep(for: .milliseconds(600))
+                        try await clock.sleep(for: .milliseconds(1500))
                         await send(.splashTimerCompleted)
                     },
                     .run { [status = state.userSessionStatus] send in
@@ -99,7 +98,13 @@ struct AppCoordinator {
                     state.route = .mainTab(.init(user: user))
                     return .none
                     
-                case .signedOut, .expired:
+                case .signedOut:
+                    state.route = .auth(.init())
+                    guard case .expired = newStatus else { return .none }
+                    state.toastItem = .init("다시 로그인 해주세요.")
+                    return .none
+                    
+                case .expired:
                     state.route = .auth(.init())
                     guard case .expired = newStatus else { return .none }
                     state.toastItem = .init("다시 로그인 해주세요.")
@@ -158,5 +163,17 @@ extension AppCoordinator {
             .ifCaseLet(\.auth, action: \.auth) { LoginCoordinator() }
             .ifCaseLet(\.mainTab, action: \.mainTab) { MainTabCoordinator() }
         }
+    }
+}
+
+
+// MARK: - UserDefault로 지닌 값들 초기화 함수
+
+private extension AppCoordinator.State {
+    func initializeUserDefaults() {
+        UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding") // 최초 온보딩
+        UserDefaults.standard.removeObject(forKey: "OnboardingNeeded")  // 약관동의
+        UserDefaults.standard.removeObject(forKey: "showTooltip")       // 아카이빙 홈 툴팁
+        UserDefaults.standard.removeObject(forKey: "isTutorialPresented")   // 랜덤포즈 튜토리얼
     }
 }

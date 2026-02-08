@@ -56,7 +56,7 @@ private extension NearPhotoBoothListSheet {
             VStack(spacing: 8) {
                 KFImage(brand.imageURL)
                     .resizable()
-                    .onFailureImage(.temporaryBranding)
+                    .onFailureImage(.imgDefaultBrandOriginal)
                     .frame(width: 56, height: 56)
                     .clipShape(.circle)
                     .overlay {
@@ -118,7 +118,7 @@ private extension NearPhotoBoothListSheet {
         HStack(spacing: 16) {
             KFImage(photoBooth.brand.imageURL)
                 .resizable()
-                .onFailureImage(.temporaryBranding)
+                .onFailureImage(.imgDefaultBrandOriginal)
                 .cancelOnDisappear(true)
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 8))

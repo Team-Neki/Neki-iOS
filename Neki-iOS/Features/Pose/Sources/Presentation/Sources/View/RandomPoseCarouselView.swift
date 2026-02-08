@@ -14,7 +14,7 @@ struct RandomPoseCarouselView: View {
     
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.gray50.ignoresSafeArea()
             
             VStack {
                 Spacer()

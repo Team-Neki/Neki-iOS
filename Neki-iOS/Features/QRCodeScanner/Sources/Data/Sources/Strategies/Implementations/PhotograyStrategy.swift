@@ -74,8 +74,8 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
             
             return ParsedQRResult(brand: .photogray, originalImage: imageData)
         } catch {
-            Logger.domain.notice("이미지 다운로드 중 에러 발생. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            Logger.network.warning("이미지 없음(404 등). 만료 확인.")
+            throw .imageDownloadFailed
         }
     }
 }

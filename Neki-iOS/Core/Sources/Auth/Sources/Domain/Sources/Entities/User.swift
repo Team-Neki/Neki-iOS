@@ -14,4 +14,5 @@ public struct User: Sendable, Equatable, Codable {
     let email: String?
     let profileImageURL: URL?
     let providerType: ProviderType
+    var allRequiredTermsAgreed: Bool
 }

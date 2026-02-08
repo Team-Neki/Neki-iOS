@@ -17,7 +17,7 @@ public enum NekiToolBar {
     }
     
     public static func textLeft(_ title: String, action: (() -> Void)? = nil) -> some View {
-        Items.Title(title: title, action: action)
+        Items.Title(title: title, action: action).padding(.leading, 12)
     }
     
     public static func textCenter(_ title: String, action: (() -> Void)? = nil) -> some View {
@@ -49,6 +49,8 @@ extension NekiToolBar {
             let action: () -> Void
             var body: some View {
                 Button(action: action) { Image(.iconChevronLeft) }
+                    .frame(width: 52, height: 52)
+                    .contentShape(Rectangle())
             }
         }
         
@@ -56,6 +58,8 @@ extension NekiToolBar {
             let action: () -> Void
             var body: some View {
                 Button(action: action) { Image(.iconXmarkBlack) }
+                    .frame(width: 52, height: 52)
+                    .contentShape(Rectangle())
             }
         }
         
@@ -103,6 +107,8 @@ extension NekiToolBar {
                 } label: {
                     Image(uiImage: image)
                 }
+                .frame(width: 52, height: 52)
+                .contentShape(Rectangle())
             }
         }
     }
@@ -133,7 +139,7 @@ public struct NekiToolbarLayout<Left: View, Center: View, Right: View>: View {
                 Spacer()
                 right
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 8)
             .frame(height: 54)
             
             center

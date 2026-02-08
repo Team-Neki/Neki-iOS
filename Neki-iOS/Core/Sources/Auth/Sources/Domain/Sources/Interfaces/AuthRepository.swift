@@ -38,4 +38,6 @@ public protocol AuthRepository {
     func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void
     /// 자동 로그인 (유저 세션 복구)
     func restoreSession() async throws(AuthRepositoryError) -> User
+    /// 이용약관 동의
+    func agreeWithTerms(agreements: [TermAgreement]) async throws(AuthRepositoryError) -> Void
 }

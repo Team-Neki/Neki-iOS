@@ -14,11 +14,13 @@ enum UserInfoDTO {
         let email: String?
         let profileImageURLString: String?
         let providerType: String
+        let agreedTerms: Bool
         
         enum CodingKeys: String, CodingKey {
             case id = "userId"
             case nickname = "name"
             case profileImageURLString = "profileImageUrl"
+            case agreedTerms = "agreeTerms"
             case email, providerType
         }
     }

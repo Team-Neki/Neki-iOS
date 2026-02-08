@@ -25,18 +25,18 @@ struct AppCoordinator {
         init() {
             self.route = .splash
             
-            // 디버그용: 온보딩 테스트를 위해 매번 초기화
-            #if DEBUG
-            UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding")
-            UserDefaults.standard.removeObject(forKey: "OnboardingNeeded")
-            #endif
+            // QA처럼 최초 1회성 뷰들을 매번 보여줘야 할 때 사용
+//#if DEBUG
+//            initializeUserDefaults()
+//#endif
         }
     }
     
     enum Action: BindableAction {
         // View Actions
         case onAppLaunched
-        case splashTimerCompleted
+        
+        case splashSequenceCompleted(UserSessionStatus)
         
         case userSessionStatusChanged(UserSessionStatus)
         
@@ -58,29 +58,42 @@ struct AppCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppLaunched:
-                return .merge(
-                    .run { send in
-                        try await clock.sleep(for: .milliseconds(600))
-                        await send(.splashTimerCompleted)
-                    },
-                    .run { [status = state.userSessionStatus] send in
-                        guard case .signedIn = status else { return }
+                return .run { [currentStatus = state.userSessionStatus] send in
+                    async let timer: Void = clock.sleep(for: .milliseconds(1500))
+                    
+                    async let nextStatus: UserSessionStatus = {
+                        guard case .signedIn = currentStatus else { return currentStatus }
+                        
                         do {
                             let user = try await authClient.autoLogin()
-                            await send(.userSessionStatusChanged(.signedIn(user)))
+                            return .signedIn(user)
                         } catch {
-                            await send(.userSessionStatusChanged(.signedOut))
+                            return .signedOut
                         }
-                    }
-                )
+                    }()
+                    
+                    let (_, finalStatus) = try await (timer, nextStatus)
+                    
+                    await send(.splashSequenceCompleted(finalStatus))
+                }
                 
-            case .splashTimerCompleted:
-                if case let .signedIn(user) = state.userSessionStatus {
+            case let .splashSequenceCompleted(finalStatus):
+                state.$userSessionStatus.withLock { $0 = finalStatus }
+                
+                switch finalStatus {
+                case let .signedIn(user):
                     state.route = .mainTab(.init(user: user))
-                } else if state.hasSeenOnboarding {
-                    state.route = .auth(.init())
-                } else {
-                    state.route = .onboarding(.init())
+                    
+                case .signedOut, .expired:
+                    if state.hasSeenOnboarding {
+                        state.route = .auth(.init())
+                        
+                        if case .expired = finalStatus {
+                            state.toastItem = .init("다시 로그인 해주세요.")
+                        }
+                    } else {
+                        state.route = .onboarding(.init())
+                    }
                 }
                 return .none
                 
@@ -99,7 +112,13 @@ struct AppCoordinator {
                     state.route = .mainTab(.init(user: user))
                     return .none
                     
-                case .signedOut, .expired:
+                case .signedOut:
+                    state.route = .auth(.init())
+                    guard case .expired = newStatus else { return .none }
+                    state.toastItem = .init("다시 로그인 해주세요.")
+                    return .none
+                    
+                case .expired:
                     state.route = .auth(.init())
                     guard case .expired = newStatus else { return .none }
                     state.toastItem = .init("다시 로그인 해주세요.")
@@ -118,8 +137,14 @@ struct AppCoordinator {
                 
             case .route(.mainTab(.delegate(.signedOut))):
                 state.$userSessionStatus.withLock { $0 = .signedOut }
-                state.route = .auth(.init())
-                return .none
+                state.route = .splash
+                return .send(.onAppLaunched)
+                
+            case .route(.mainTab(.delegate(.withdraw))):
+                state.$userSessionStatus.withLock { $0 = .signedOut }
+                state.initializeUserDefaults()
+                state.route = .splash
+                return .send(.onAppLaunched)
                 
             case let .route(.mainTab(.delegate(.profileUpdated(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
@@ -158,5 +183,16 @@ extension AppCoordinator {
             .ifCaseLet(\.auth, action: \.auth) { LoginCoordinator() }
             .ifCaseLet(\.mainTab, action: \.mainTab) { MainTabCoordinator() }
         }
+    }
+}
+
+
+// MARK: - UserDefault로 지닌 값들 초기화 함수
+
+private extension AppCoordinator.State {
+    func initializeUserDefaults() {
+        UserDefaults.standard.removeObject(forKey: "hasSeenOnboarding") // 최초 온보딩
+        UserDefaults.standard.removeObject(forKey: "showTooltip")       // 아카이빙 홈 툴팁
+        UserDefaults.standard.removeObject(forKey: "isTutorialPresented")   // 랜덤포즈 튜토리얼
     }
 }

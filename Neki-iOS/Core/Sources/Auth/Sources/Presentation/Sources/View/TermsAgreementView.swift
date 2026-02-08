@@ -16,8 +16,11 @@ public struct TermsAgreementView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Image(.iconGpicAgreement)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
             
             terms
+                .padding(.horizontal, 20)
             
             Spacer()
             
@@ -28,8 +31,9 @@ public struct TermsAgreementView: View {
             }
             .buttonStyle(.nekiCTA())
             .disabled(store.isConfirmButtonEnabled == false)
+            .padding(.horizontal, 20)
+            
         }
-        .padding()
         .nekiToolbar {
             NekiToolBar.back { dismiss() }
         } center: {
@@ -64,7 +68,7 @@ public struct TermsAgreementView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.vertical)
                 }
-                .padding(.horizontal, 16)
+                .padding(.leading, 16)
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 12)
@@ -79,13 +83,13 @@ public struct TermsAgreementView: View {
                         Button {
                             store.send(.toggleAgreement(type))
                         } label: {
-                            HStack(spacing: 10) {
-                                if let agreement = store.agreements[id: type] {
+                            HStack(alignment: .center, spacing: 0) {
+                                if let agreement = store.agreements[id: type.id] {
                                     Image(agreement.isAgreed ? .iconCheckmark : .iconCheckmarkGray)
+                                        .frame(width: 44, height: 44)
                                         .scaledToFit()
-                                        .frame(width: 24, height: 24)
                                     
-                                    HStack(alignment: .center, spacing: 0) {
+                                    HStack(alignment: .center, spacing: 2) {
                                         Text(agreement.isRequired ? "(필수)" : "(선택)")
                                             .nekiFont(.body14Medium)
                                             .foregroundStyle(.gray500)
@@ -100,6 +104,8 @@ public struct TermsAgreementView: View {
                             }
                         }
                         
+                        Spacer()
+                        
                         Button {
                             store.send(.termPageLinkTapped(type))
                         } label: {
@@ -110,10 +116,7 @@ public struct TermsAgreementView: View {
                     }
                 }
             }
+            
         }
     }
-}
-
-#Preview {
-    TermsAgreementView(store: .init(initialState: TermsAgreementFeature.State(), reducer: { TermsAgreementFeature() }))
 }

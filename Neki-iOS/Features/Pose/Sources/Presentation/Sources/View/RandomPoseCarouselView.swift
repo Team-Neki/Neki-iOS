@@ -14,7 +14,7 @@ struct RandomPoseCarouselView: View {
     
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.gray50.ignoresSafeArea()
             
             VStack {
                 Spacer()
@@ -46,6 +46,18 @@ struct RandomPoseCarouselView: View {
                     .contentShape(.rect)
                     .onTapGesture { store.send(.tapRight) }
             }
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        let horizontalAmount = value.translation.width
+                        
+                        if horizontalAmount < 0 {
+                            store.send(.tapRight)
+                        } else {
+                            store.send(.tapLeft)
+                        }
+                    }
+            )
             
             controlButtons
                 .frame(maxHeight: .infinity, alignment: .bottom)
@@ -54,10 +66,15 @@ struct RandomPoseCarouselView: View {
         }
         .animation(.easeInOut, value: store.isTutorialPresented)
         .task { await store.send(.onAppear).finish() }
-        .onDisappear {
-            guard store.isDismissing == false else { return }
-            store.send(.onDisappear)
-        }
+        .nekiToolbar(
+            isOverlay: true, left: {
+                NekiToolBar.close {
+                    store.send(.onTapClose)
+                }
+            }, center: {
+                NekiToolBar.textCenter("랜덤포즈")
+            }
+        )
     }
     
     private var activeTransition: AnyTransition {
@@ -127,7 +144,7 @@ private extension RandomPoseCarouselView {
     
     var tutorialOverlay: some View {
         ZStack {
-            Color.gray900
+            Color.gray900.opacity(0.8)
                 .ignoresSafeArea()
             
             VStack {
@@ -198,7 +215,7 @@ private extension RandomPoseCarouselView {
             .padding()
         }
         .transition(.opacity)
-        .zIndex(1)
+        .zIndex(10)
     }
     
     func mainContentView(for pose: Pose) -> some View {

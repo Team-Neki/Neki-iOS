@@ -46,6 +46,7 @@ struct MainTabCoordinator {
         case delegate(Delegate)
         enum Delegate {
             case signedOut
+            case withdraw
             case profileUpdated(User)
         }
     }
@@ -79,8 +80,17 @@ struct MainTabCoordinator {
                 state.toast = item
                 return .none
                 
-            case .myPage(.delegate(.didLogout)), .myPage(.delegate(.didWithdraw)):
-                return .send(.delegate(.signedOut))
+            case .myPage(.delegate(.didLogout)):
+                return .run { send in
+                    await send(.archive(.root(.clearData)))
+                    await send(.delegate(.signedOut))
+                }
+                
+            case .myPage(.delegate(.didWithdraw)):
+                return .run { send in
+                    await send(.archive(.root(.clearData)))
+                    await send(.delegate(.withdraw))
+                }
                 
             case let .myPage(.delegate(.profileUpdated(user))):
                 return .send(.delegate(.profileUpdated(user)))

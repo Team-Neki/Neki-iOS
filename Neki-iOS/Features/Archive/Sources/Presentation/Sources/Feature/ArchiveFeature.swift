@@ -19,6 +19,8 @@ struct ArchiveFeature {
         @Shared(.inMemory("archive-photos")) var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         @Shared(.inMemory("archive-albums")) var albums: IdentifiedArrayOf<AlbumItem> = []
         
+        @Shared(.appStorage("showTooltip")) var showTooltip: Bool = true
+        
         @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
         @Presents var qrScanner: QRCodeScanFeature.State?
         
@@ -45,6 +47,8 @@ struct ArchiveFeature {
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        
+        case clearData
         
         // View Life Cycle Action
         case onAppear
@@ -107,6 +111,11 @@ struct ArchiveFeature {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             /// 화면전환과 관련된 액션은 default를 이용해 무시하고 나머지 case만 사용
             switch action {
+                
+            case .clearData:
+                state.$photos.withLock { $0.removeAll() }
+                state.$albums.withLock { $0.removeAll() }
+                return .none
                 
                 // MARK: - View Life Cycle Action
                 

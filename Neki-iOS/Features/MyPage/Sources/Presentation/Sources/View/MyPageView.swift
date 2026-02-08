@@ -21,11 +21,13 @@ struct MyPageView: View {
             
             divider(isLarge: true)
             
-            section(.authorizationSettings)
-            
-            divider(isLarge: false)
-            
-            section(.support)
+            VStack(spacing: 10) {
+                section(.authorizationSettings)
+                
+                divider(isLarge: false)
+                
+                section(.support)
+            }
             
             Spacer()
         }
@@ -87,10 +89,11 @@ private extension MyPageView {
             Text(item.title)
                 .nekiFont(.body14Medium)
                 .foregroundStyle(.gray400)
-                .padding(.top, 12)
+                .padding(.top, 16)
+                .padding(.bottom, 4)
             
             // Content
-            VStack(spacing: 12) {
+            VStack(spacing: .zero) {
                 ForEach(item.includedItems) { cellItem in
                     sectionCell(cellItem)
                 }

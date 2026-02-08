@@ -150,14 +150,20 @@ private extension DefaultPoseRepository {
         } catch {
             Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
             guard cache.isEmpty == false else { throw error }
-            let validCachedPoses = cache.values.filter { excludedIDs.contains($0.id) == false }
+            
+            let validCachedPoses = cache.values.filter {
+                excludedIDs.contains($0.id) == false &&
+                $0.peopleCountOption == activeRandomPosePeopleCount
+            }
             
             if let randomFallbackPose = validCachedPoses.randomElement() {
                 return randomFallbackPose
             } else {
-                guard let anyCached = cache.values.randomElement() else { throw error }
-                return anyCached
+                let anyCountMatch = cache.values.filter { $0.peopleCountOption == activeRandomPosePeopleCount }
+                guard let fallback = anyCountMatch.randomElement() else { throw error }
+                return fallback
             }
+            
         }
     }
     

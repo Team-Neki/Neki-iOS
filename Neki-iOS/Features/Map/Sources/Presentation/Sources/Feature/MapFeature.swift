@@ -12,6 +12,10 @@ import os
 
 @Reducer
 public struct MapFeature {
+    enum Constants {
+        static let defaultInitialPosition: CLLocation = .init(latitude: 37.498095, longitude: 127.027610)
+    }
+    
     enum SheetStage {
         case first, second, third, photoBoothSelected
         
@@ -172,8 +176,17 @@ public struct MapFeature {
                 case .notDetermined:
                     return state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
                     
-                default:
+                case .denied, .restricted:
                     state.isUserTrackingMode = false
+                    
+                    guard state.isFirstLoad, let bounds = state.currentBounds else { return .none }
+                    state.isFirstLoad = false
+                    return .merge(
+                        .send(.fetchPhotoBooths(bounds: bounds)),
+                        .send(.fetchNearbyPhotoBooths(bounds.center))
+                    )
+                    
+                @unknown default:
                     return .none
                 }
                 
@@ -194,14 +207,9 @@ public struct MapFeature {
                 
                 // MARK: - User Location Interaction
             case let .mapLoaded(bounds):
-                state.isFirstLoad = false
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
-                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
-                return .merge(
-                    .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
-                )
+                return .none
                 
             case .didTapCurrentLocationButton:
                 resetToMapMode(&state, for: .first)
@@ -221,9 +229,11 @@ public struct MapFeature {
             case let .updateUserLocation(.success(location)):
                 state.userLocation = location
                 
-                guard state.isUserTrackingMode else { return .none }
-                updateCameraPosition(&state, to: location.coordinate)
-                state.isSearchHereButtonVisible = false
+                if state.isFirstLoad || state.isUserTrackingMode {
+                    updateCameraPosition(&state, to: location.coordinate)
+                    guard state.isFirstLoad else { return .none }
+                    state.isSearchHereButtonVisible = false
+                }
                 return .none
                 
             case .updateUserLocation(.failure):
@@ -248,7 +258,25 @@ public struct MapFeature {
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
-                return .none
+                
+                guard state.isFirstLoad else { return .none }
+                guard state.locationAuthorizationStatus != .notDetermined else { return .none }
+                let targetCoordinate: CLLocation
+                if state.isLocationAuthorized {
+                    guard let userLocation = state.userLocation else { return .none }
+                    targetCoordinate = userLocation
+                } else {
+                    targetCoordinate = Constants.defaultInitialPosition
+                }
+                
+                let currentCameraLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
+                guard currentCameraLocation.distance(from: targetCoordinate) <= 200 else { return .none }
+                state.isFirstLoad = false
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
+                return .merge(
+                    .send(.fetchPhotoBooths(bounds: bounds)),
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
+                )
                 
             case let .updateSearchButtonVisibility(isVisible):
                 state.isSearchHereButtonVisible = isVisible

@@ -41,16 +41,9 @@ struct NaverMapRepresentable: UIViewRepresentable {
         configureMapView(view)
         
         // 초기 카메라 이동
-        let startPosition = {
-            if isLocationAuthorized, let current = NMFLocationManager.sharedInstance().currentLatLng() {
-                return current
-            } else {
-                return Constants.defaultInitialPosition
-            }
-        }()
+        let startPosition = Constants.defaultInitialPosition
         let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition, zoomTo: Constants.initialZoomLevel)
         cameraUpdate.animation = .none
-        cameraUpdate.animationDuration = 0.3
         view.mapView.moveCamera(cameraUpdate)
         
         // 델리게이트 연결

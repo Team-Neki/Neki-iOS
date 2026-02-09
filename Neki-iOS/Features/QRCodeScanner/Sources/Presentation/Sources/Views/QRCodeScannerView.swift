@@ -65,7 +65,7 @@ struct QRCodeScannerView: View {
             title: "지원하지 않는 브랜드예요.",
             subtitle: "갤러리에서 사진을 추가해 바로 저장할 수 있어요.\n원하는 브랜드가 있다면 제안해주세요!",
             confirmText: "갤러리에서 추가하기",
-            secondaryText: "텍스트 버튼",
+            secondaryText: "브랜드 제안하기",
             onConfirm: { store.send(.addPhotoFromGalleryButtonTapped) },
             onSecondary: { store.send(.openSuggestBrandPage) }
         )

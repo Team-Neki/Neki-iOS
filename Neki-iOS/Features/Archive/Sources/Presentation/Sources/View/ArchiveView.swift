@@ -115,6 +115,16 @@ struct ArchiveView: View {
         .fullScreenCover(item: $store.scope(state: \.qrScanner, action: \.qrScanner)) { store in
             QRCodeScannerView(store: store)
         }
+        .nekiAlert(
+            isPresented: $store.showPermissionAlert,
+            style: .cancelable,
+            title: "카메라 권한",
+            subtitle: "QR 인식을 위해 카메라 접근이 필요해요",
+            confirmText: "허용",
+            cancelText: "취소",
+            onConfirm: { store.send(.openAppSettings) },
+            onCancel: { store.send(.closePermissionAlert) }
+        )
         .transaction { transaction in
             transaction.disablesAnimations = true
         }

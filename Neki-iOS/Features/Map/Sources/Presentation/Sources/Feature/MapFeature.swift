@@ -32,6 +32,7 @@ public struct MapFeature {
         var detent: NekiSheetDetent = SheetStage.first.detent
         var isSearchHereButtonVisible: Bool = false
         var isFirstLoad: Bool = true
+        var isPermissionAlertPresented: Bool = false
         
         // Map State
         var cameraPosition: GeographicCoordinate?
@@ -72,6 +73,7 @@ public struct MapFeature {
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
         case didTapSearchHereButton
+        case dismissPermissionAlert
         
         // Internal Logic Actions
         case updateLocationAuthorization(CLAuthorizationStatus)
@@ -79,6 +81,7 @@ public struct MapFeature {
         case updateUserLocation(Result<CLLocation, Error>)
         case setUserTrackingMode(Bool)
         case didDetectMapInteraction
+        case presentPermissionAlert
         
         // Map Logic Actions
         case mapLoaded(GeographicBoundingBox)
@@ -174,8 +177,16 @@ public struct MapFeature {
                     return .none
                 }
                 
+            case .presentPermissionAlert:
+                state.isPermissionAlertPresented = true
+                return .none
+                
+            case .dismissPermissionAlert:
+                state.isPermissionAlertPresented = false
+                return .none
+                
             case .openAppSettings:
-                // TODO: 설정 앱 동작 전에 안내문구 따위를 보여주도록 해야하는데 디자인 가이드가 없습니다.
+                state.isPermissionAlertPresented = false
                 return .run { _ in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)

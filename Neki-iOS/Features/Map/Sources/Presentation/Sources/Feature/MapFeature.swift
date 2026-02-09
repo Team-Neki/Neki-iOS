@@ -217,7 +217,7 @@ public struct MapFeature {
                 case .notDetermined:
                     return .send(.requestPermission)
                 case .restricted, .denied:
-                    return .send(.openAppSettings)
+                    return .send(.presentPermissionAlert)
                 case .authorizedAlways, .authorizedWhenInUse, .authorized:
                     state.isUserTrackingMode = true
                     if let location = state.userLocation { updateCameraPosition(&state, to: location.coordinate) }

@@ -41,16 +41,9 @@ struct NaverMapRepresentable: UIViewRepresentable {
         configureMapView(view)
         
         // 초기 카메라 이동
-        let startPosition = {
-            if isLocationAuthorized, let current = NMFLocationManager.sharedInstance().currentLatLng() {
-                return current
-            } else {
-                return Constants.defaultInitialPosition
-            }
-        }()
+        let startPosition = Constants.defaultInitialPosition
         let cameraUpdate = NMFCameraUpdate(scrollTo: startPosition, zoomTo: Constants.initialZoomLevel)
         cameraUpdate.animation = .none
-        cameraUpdate.animationDuration = 0.3
         view.mapView.moveCamera(cameraUpdate)
         
         // 델리게이트 연결
@@ -344,6 +337,16 @@ public struct NaverMapView: View {
         }
         .animation(.easeInOut, value: store.detent)
         .animation(.easeInOut, value: store.selectedBooth?.id)
+        .nekiAlert(
+            isPresented: $store.isPermissionAlertPresented,
+            style: .cancelable,
+            title: "위치 권한",
+            subtitle: "주변 포토부스를 찾기 위해 위치 사용 권한이 필요해요",
+            confirmText: "허용",
+            cancelText: "취소",
+            onConfirm: { store.send(.openAppSettings) },
+            onCancel: { store.send(.dismissPermissionAlert) }
+        )
     }
 }
 

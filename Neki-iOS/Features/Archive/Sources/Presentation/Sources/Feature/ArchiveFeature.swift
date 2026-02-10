@@ -33,6 +33,7 @@ struct ArchiveFeature {
         }
         
         var showDropDownMenu: Bool = false
+        var showPermissionAlert: Bool = false
         
         var imagePicker = ImagePickerFeature.State(
             maxCount: 10,
@@ -59,6 +60,8 @@ struct ArchiveFeature {
         case onTapAllPhotos
         case onTapAllAlbums
         case onTapQRScan
+        case closePermissionAlert
+        case openAppSettings
         
         // Add Folder Action
         case onTapCancelAddAlbum
@@ -100,6 +103,7 @@ struct ArchiveFeature {
     
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.qrScannerClient) private var qrScannerClient
+    @Dependency(\.openURL) private var openURL
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -384,6 +388,21 @@ struct ArchiveFeature {
                 
             case .loadMorePhotos:
                 return .send(.fetchPhotos(isRefresh: false))
+                
+            case .showPermissionAlert:
+                state.showPermissionAlert = true
+                return .none
+                
+            case .closePermissionAlert:
+                state.showPermissionAlert = false
+                return .none
+                
+            case .openAppSettings:
+                state.showPermissionAlert = false
+                return .run { _ in
+                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                    await openURL(url)
+                }
                 
                 
                 // MARK: - Binding Action

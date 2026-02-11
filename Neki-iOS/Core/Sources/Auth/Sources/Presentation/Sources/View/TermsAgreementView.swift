@@ -25,7 +25,7 @@ public struct TermsAgreementView: View {
             Spacer()
             
             Button {
-                store.send(.didFinishOnboarding)
+                store.send(.confirmButtonTapped)
             } label: {
                 Text("다음으로")
             }

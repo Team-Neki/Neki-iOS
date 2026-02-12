@@ -8,7 +8,6 @@
 import SwiftUI
 import ComposableArchitecture
 import os
-import AVFoundation
 //import Core
 
 @Reducer
@@ -22,7 +21,6 @@ struct ArchiveFeature {
         @Shared(.appStorage("showTooltip")) var showTooltip: Bool = true
         
         @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
-        @Presents var qrScanner: QRCodeScanFeature.State?
         
         var newAlbumTitle: String = ""
         
@@ -33,7 +31,6 @@ struct ArchiveFeature {
         }
         
         var showDropDownMenu: Bool = false
-        var showPermissionAlert: Bool = false
         
         var imagePicker = ImagePickerFeature.State(
             maxCount: 10,
@@ -59,7 +56,6 @@ struct ArchiveFeature {
         case closeDropDownMenu
         case onTapAllPhotos
         case onTapAllAlbums
-        case onTapQRScan
         case closePermissionAlert
         case openAppSettings
         
@@ -86,24 +82,19 @@ struct ArchiveFeature {
         case imageTapped(ArchiveImageItem)
         case albumTapped(AlbumItem)
         case afterUploadNavigateToAlbumDetail(AlbumItem)
-        case qrScannerPresented
         
         // Internal Action
         case showPermissionAlert
+        case addPhotoFromQRScanner(imageID: Int)
         
         // Delegate Action
         case delegate(DelegateAction)
         enum DelegateAction {
             case showToast(NekiToastItem)
         }
-        
-        // Child Action
-        case qrScanner(PresentationAction<QRCodeScanFeature.Action>)
     }
     
     @Dependency(\.archiveClient) var archiveClient
-    @Dependency(\.qrScannerClient) private var qrScannerClient
-    @Dependency(\.openURL) private var openURL
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -142,26 +133,6 @@ struct ArchiveFeature {
                 state.showDropDownMenu = false
                 return .none
                 
-            case .onTapQRScan:
-                defer { state.showDropDownMenu = false }
-                switch qrScannerClient.checkAuthorizationStatus() {
-                case .authorized:
-                    return .send(.qrScannerPresented)
-                    
-                case .notDetermined:
-                    return .run { send in
-                        let isAuthorized = await qrScannerClient.requestAccess()
-                        guard isAuthorized else { return await send(.showPermissionAlert) }
-                        await send(.qrScannerPresented)
-                    }
-                    
-                case .denied, .restricted:
-                    return .send(.showPermissionAlert)
-                    
-                @unknown default:
-                    return .none
-                }
-                
                 
                 // MARK: - Add Folder Action
                 
@@ -198,10 +169,6 @@ struct ArchiveFeature {
                 
                 
                 // MARK: - Image Upload Action
-                
-            case .qrScannerPresented:
-                state.qrScanner = QRCodeScanFeature.State()
-                return .none
                 
             case .imagePicker(.uploadStarted):
                 state.isLoading = true
@@ -389,21 +356,6 @@ struct ArchiveFeature {
             case .loadMorePhotos:
                 return .send(.fetchPhotos(isRefresh: false))
                 
-            case .showPermissionAlert:
-                state.showPermissionAlert = true
-                return .none
-                
-            case .closePermissionAlert:
-                state.showPermissionAlert = false
-                return .none
-                
-            case .openAppSettings:
-                state.showPermissionAlert = false
-                return .run { _ in
-                    guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
-                    await openURL(url)
-                }
-                
                 
                 // MARK: - Binding Action
                 
@@ -417,10 +369,9 @@ struct ArchiveFeature {
                 }
                 return .none
                 
-            case let .qrScanner(.presented(.addPhotoFromQRScanner(id))):
-                state.qrScanner = nil
+            case let .addPhotoFromQRScanner(imageID):
                 return .run { send in
-                    try await archiveClient.registerPhotos(folderId: nil, uploads: [(mediaID: id, memo: nil)])
+                    try await archiveClient.registerPhotos(folderId: nil, uploads: [(mediaID: imageID, memo: nil)])
                     let toast = NekiToastItem("이미지를 추가했어요", style: .success)
                     await send(.delegate(.showToast(toast)))
                     await send(.fetchPhotos(isRefresh: true))
@@ -436,9 +387,6 @@ struct ArchiveFeature {
         }
         .ifLet(\.$selectUploadAlbum, action: \.selectUploadAlbum) {
             SelectUploadAlbumFeature()
-        }
-        .ifLet(\.$qrScanner, action: \.qrScanner) {
-            QRCodeScanFeature()
         }
     }
 }

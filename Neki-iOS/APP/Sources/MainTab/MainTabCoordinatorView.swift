@@ -23,6 +23,9 @@ struct MainTabCoordinatorView: View {
                 case .pose:
                     PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
                     
+                case .qrScan:
+                    EmptyView()
+                    
                 case .map:
                     MapCoordinatorView(store: store.scope(state: \.map, action: \.map))
 
@@ -32,11 +35,22 @@ struct MainTabCoordinatorView: View {
             }
             
             if !store.isTabbarHidden {
-                NekiTabBar(selectedTab: $store.selectedTab)
+                NekiTabBar(selectedTab: $store.selectedTab) { store.send(.onTapQRScan) }
             }
         }
         .nekiToast(item: $store.toast)
-        
-        // TODO: - 탭 이동 시 화면 초기화 되는지 기디 물어보기. 그리고 탭 한 번 더 누르면 초기화면으로 가는지도
+        .fullScreenCover(item: $store.scope(state: \.qrScan, action: \.qrScan)) { qrStore in
+            QRCodeScannerView(store: qrStore)
+        }
+        .nekiAlert(
+            isPresented: $store.isPermissionAlertPresented,
+            style: .cancelable,
+            title: "카메라 권한",
+            subtitle: "QR 인식을 위해 카메라 접근이 필요해요",
+            confirmText: "허용",
+            cancelText: "취소",
+            onConfirm: { store.send(.openAppSettings) },
+            onCancel: { store.send(.dismissPermissionAlert) }
+        )
     }
 }

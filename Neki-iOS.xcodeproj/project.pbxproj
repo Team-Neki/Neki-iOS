@@ -426,7 +426,7 @@
 		6C4998FF2EF7EF64006BE1DB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
-			baseConfigurationReferenceRelativePath = APP/Sources/Resources/AppSecret.xcconfig;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Release.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -455,7 +455,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.1;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-dev";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = dev_neki;
@@ -476,7 +476,7 @@
 		6C4999002EF7EF64006BE1DB /* Release */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
-			baseConfigurationReferenceRelativePath = APP/Sources/Resources/AppSecret.xcconfig;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Release.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

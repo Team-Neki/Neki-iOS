@@ -1,15 +1,12 @@
 {
   "images" : [
     {
-      "filename" : "ic_tab_map.svg",
+      "filename" : "ic_scan.svg",
       "idiom" : "universal"
     }
   ],
   "info" : {
     "author" : "xcode",
     "version" : 1
-  },
-  "properties" : {
-    "preserves-vector-representation" : true
   }
 }

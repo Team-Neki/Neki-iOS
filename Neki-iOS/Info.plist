@@ -30,14 +30,14 @@
 	<dict>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>photoqr3.kr</key>
+			<key>mx2.co.kr</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 				<key>NSIncludesSubdomains</key>
 				<true/>
 			</dict>
-			<key>mx2.co.kr</key>
+			<key>photoqr3.kr</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>

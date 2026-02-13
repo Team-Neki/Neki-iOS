@@ -25,6 +25,7 @@ struct ArchiveCoordinator {
         // 상위 코디네이터(MainTab)로 보낼 신호
         enum Delegate {
             case showToast(NekiToastItem)
+            case requestQRScan
         }
     }
     
@@ -37,6 +38,9 @@ struct ArchiveCoordinator {
             /// 화면전환과 관련된 액션 case만 사용하고 나머지는 default를 이용해 무시
             switch action {
                 // root action
+            case .root(.delegate(.requestQRScan)):
+                return .send(.delegate(.requestQRScan))
+                
             case .root(.addPhotoFromQRScanner):
                 state.path.removeAll()
                 return .none

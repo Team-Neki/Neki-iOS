@@ -24,11 +24,10 @@ struct MainTabCoordinator {
         var archive = ArchiveCoordinator.State()
         var map = MapCoordinator.State()
         var myPage: MyPageCoordinator.State
-        @Presents var qrScan: QRCodeScanFeature.State?
+        var imagePicker = ImagePickerFeature.State(mediaType: .photoBooth)
+        @Presents var destination: Destination.State?
         
         var isTabbarHidden: Bool = false
-        
-        // 토스트메세지 상태
         var toast: NekiToastItem? = nil
         var isPermissionAlertPresented: Bool = false
         
@@ -47,9 +46,11 @@ struct MainTabCoordinator {
         case archive(ArchiveCoordinator.Action)
         case map(MapCoordinator.Action)
         case myPage(MyPageCoordinator.Action)
-        case qrScan(PresentationAction<QRCodeScanFeature.Action>)
+        case imagePicker(ImagePickerFeature.Action)
+        case destination(PresentationAction<Destination.Action>)
         
         // View Actions
+        case onTapAddButton
         case onTapQRScan
         
         // Internal Actions
@@ -88,13 +89,22 @@ struct MainTabCoordinator {
             MyPageCoordinator()
         }
         
+        Scope(state: \.imagePicker, action: \.imagePicker) {
+            ImagePickerFeature()
+        }
+        
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .binding:
                 return .none
                 
+            case .onTapAddButton:
+                state.destination = .uploadSelection
+                return .none
+                
                 // MARK: - QR Scan Logic
             case .onTapQRScan:
+                state.destination = nil
                 switch qrScannerClient.checkAuthorizationStatus() {
                 case .authorized:
                     return .send(.qrScannerPresented)
@@ -114,7 +124,7 @@ struct MainTabCoordinator {
                 }
                 
             case .qrScannerPresented:
-                state.qrScan = QRCodeScanFeature.State()
+                state.destination = .qrScan(QRCodeScanFeature.State())
                 return .none
                 
             case .presentPermissionAlert:
@@ -134,7 +144,10 @@ struct MainTabCoordinator {
                 
                 
                 // MARK: - Child Features Logic
-                // 아카이브뷰에서 토스트 메세지 띄움
+            case .archive(.delegate(.requestQRScan)):
+                state.destination = nil
+                return .send(.onTapQRScan)
+                
             case let .archive(.delegate(.showToast(item))):
                 state.toast = item
                 return .none
@@ -154,10 +167,17 @@ struct MainTabCoordinator {
             case let .myPage(.delegate(.profileUpdated(user))):
                 return .send(.delegate(.profileUpdated(user)))
                 
+            case let .imagePicker(.uploadCompleted(imageIDs)):
+                state.selectedTab = .archive
+                guard imageIDs.isEmpty == false else { return .none }
+                return .send(.archive(.root(.processUploadImages(imageIDs: imageIDs))))
                 
-                // MARK: - Delegate Logic
-            case let .qrScan(.presented(.addPhotoFromQRScanner(imageID))):
-                state.qrScan = nil
+            case .imagePicker(.uploadFailed):
+                state.toast = NekiToastItem("이미지 업로드에 실패했어요.", style: .error)
+                return .none
+                
+            case let .destination(.presented(.qrScan(.addPhotoFromQRScanner(imageID)))):
+                state.destination = nil
                 state.selectedTab = .archive
                 return .send(.archive(.root(.addPhotoFromQRScanner(imageID: imageID))))
                 
@@ -165,7 +185,7 @@ struct MainTabCoordinator {
                 return .none
             }
         }
-        .ifLet(\.$qrScan, action: \.qrScan) { QRCodeScanFeature() }
+        .ifLet(\.$destination, action: \.destination)
         
         /// 피그마 확인 결과 탭바가 사라지는 모든 case는 depth가 1 이상일 경우더라구요
         /// 즉, 메인 홈 화면에서 depth가 추가되어 넘어가는 뷰들은 전부 탭바가 사라집니다.
@@ -179,7 +199,7 @@ struct MainTabCoordinator {
             case .pose:
                 state.isTabbarHidden = !state.pose.path.isEmpty
                 
-            case .qrScan:
+            case .add:
                 return .none
                 
             case .map:
@@ -191,5 +211,16 @@ struct MainTabCoordinator {
             
             return .none
         }
+    }
+}
+
+
+// MARK: - Child Reducer
+
+extension MainTabCoordinator {
+    @Reducer
+    enum Destination {
+        case uploadSelection
+        case qrScan(QRCodeScanFeature)
     }
 }

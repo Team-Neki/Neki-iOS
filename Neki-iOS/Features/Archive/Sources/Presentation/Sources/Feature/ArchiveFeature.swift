@@ -56,13 +56,15 @@ struct ArchiveFeature {
         case closeDropDownMenu
         case onTapAllPhotos
         case onTapAllAlbums
-        case closePermissionAlert
         case openAppSettings
         
         // Add Folder Action
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
         case addFolderResponse(Result<Int, Error>)
+        
+        // QR Scanner Action
+        case onTapQRScan
         
         // Fetch Album(Folder) Action
         case fetchAlbums
@@ -84,13 +86,14 @@ struct ArchiveFeature {
         case afterUploadNavigateToAlbumDetail(AlbumItem)
         
         // Internal Action
-        case showPermissionAlert
         case addPhotoFromQRScanner(imageID: Int)
+        case processUploadImages(imageIDs: [Int])
         
         // Delegate Action
         case delegate(DelegateAction)
         enum DelegateAction {
             case showToast(NekiToastItem)
+            case requestQRScan
         }
     }
     
@@ -168,6 +171,12 @@ struct ArchiveFeature {
                 return .send(.delegate(.showToast(toastItem)))
                 
                 
+                // MARK: - QR Scanner Action
+                
+            case .onTapQRScan:
+                return .send(.delegate(.requestQRScan))
+                
+                
                 // MARK: - Image Upload Action
                 
             case .imagePicker(.uploadStarted):
@@ -176,13 +185,12 @@ struct ArchiveFeature {
                 return .none
                 
             case let .imagePicker(.uploadCompleted(ids)):
-                state.isLoading = false
-                if ids.isEmpty { return .none }
+                return .send(.processUploadImages(imageIDs: ids))
                 
-                state.selectUploadAlbum = SelectUploadAlbumFeature.State(
-                    uploadedImageIds: ids,
-                    albums: state.albums
-                )
+            case let .processUploadImages(imageIDs):
+                state.isLoading = false
+                guard imageIDs.isEmpty == false else { return .none }
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(uploadedImageIds: imageIDs, albums: state.albums)
                 return .none
                 
             case let .selectUploadAlbum(.presented(.delegate(delegateAction))):

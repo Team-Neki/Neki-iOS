@@ -12,6 +12,7 @@ import ComposableArchitecture
 
 struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
+    @State private var sheetHeight: CGFloat = 1
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -23,7 +24,7 @@ struct MainTabCoordinatorView: View {
                 case .pose:
                     PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
                     
-                case .qrScan:
+                case .add:
                     EmptyView()
                     
                 case .map:
@@ -35,13 +36,10 @@ struct MainTabCoordinatorView: View {
             }
             
             if !store.isTabbarHidden {
-                NekiTabBar(selectedTab: $store.selectedTab) { store.send(.onTapQRScan) }
+                NekiTabBar(selectedTab: $store.selectedTab) { store.send(.onTapAddButton) }
             }
         }
         .nekiToast(item: $store.toast)
-        .fullScreenCover(item: $store.scope(state: \.qrScan, action: \.qrScan)) { qrStore in
-            QRCodeScannerView(store: qrStore)
-        }
         .nekiAlert(
             isPresented: $store.isPermissionAlertPresented,
             style: .cancelable,
@@ -52,5 +50,65 @@ struct MainTabCoordinatorView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.dismissPermissionAlert) }
         )
+        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) { _ in
+            UploadSelectionSheet(store: store)
+        }
+        .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in
+            QRCodeScannerView(store: qrStore)
+        }
+    }
+}
+
+
+// MARK: - Subviews
+
+extension MainTabCoordinatorView {
+    struct UploadSelectionSheet: View {
+        @Bindable var store: StoreOf<MainTabCoordinator>
+        @State private var sheetHeight: CGFloat = 1
+        
+        var body: some View {
+            VStack(spacing: 4) {
+                Capsule()
+                    .frame(width: 45, height: 4)
+                    .padding(.horizontal, 165)
+                    .padding(.vertical, 10)
+                    .foregroundStyle(.gray100)
+                
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("네컷사진 추가")
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray900)
+                    
+                    HStack(spacing: 36) {
+                        Button {
+                            store.send(.onTapQRScan)
+                        } label: {
+                            VStack(spacing:  8) {
+                                Image(.iconAddQr)
+                                Text("QR로 추가")
+                            }
+                        }
+                        
+                        NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                            VStack(spacing:  8) {
+                                Image(.iconAddGallery)
+                                Text("갤러리에서 추가")
+                            }
+                        }
+                    }
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray700)
+                    .frame(maxWidth: .infinity)
+                }
+                .padding()
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
+            .safeAreaPadding(.bottom)
+            .presentationBackground(.white)
+            .presentationCornerRadius(20)
+            .presentationDragIndicator(.hidden)
+            .autoSizingDetent($sheetHeight)
+        }
     }
 }

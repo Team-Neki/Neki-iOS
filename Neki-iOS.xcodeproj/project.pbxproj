@@ -18,27 +18,8 @@
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXContainerItemProxy section */
-		6C4998EB2EF7EF64006BE1DB /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 6C4998D52EF7EF62006BE1DB /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 6C4998DC2EF7EF62006BE1DB;
-			remoteInfo = "Neki-iOS";
-		};
-		6C4998F52EF7EF64006BE1DB /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 6C4998D52EF7EF62006BE1DB /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 6C4998DC2EF7EF62006BE1DB;
-			remoteInfo = "Neki-iOS";
-		};
-/* End PBXContainerItemProxy section */
-
 /* Begin PBXFileReference section */
 		6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Neki-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		6C4998EA2EF7EF64006BE1DB /* Neki-iOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Neki-iOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		6C4998F42EF7EF64006BE1DB /* Neki-iOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Neki-iOSUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -79,20 +60,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		6C4998E72EF7EF64006BE1DB /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6C4998F12EF7EF64006BE1DB /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -108,8 +75,6 @@
 			isa = PBXGroup;
 			children = (
 				6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */,
-				6C4998EA2EF7EF64006BE1DB /* Neki-iOSTests.xctest */,
-				6C4998F42EF7EF64006BE1DB /* Neki-iOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -148,46 +113,6 @@
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
-		6C4998E92EF7EF64006BE1DB /* Neki-iOSTests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 6C4999012EF7EF64006BE1DB /* Build configuration list for PBXNativeTarget "Neki-iOSTests" */;
-			buildPhases = (
-				6C4998E62EF7EF64006BE1DB /* Sources */,
-				6C4998E72EF7EF64006BE1DB /* Frameworks */,
-				6C4998E82EF7EF64006BE1DB /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				6C4998EC2EF7EF64006BE1DB /* PBXTargetDependency */,
-			);
-			name = "Neki-iOSTests";
-			packageProductDependencies = (
-			);
-			productName = "Neki-iOSTests";
-			productReference = 6C4998EA2EF7EF64006BE1DB /* Neki-iOSTests.xctest */;
-			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		6C4998F32EF7EF64006BE1DB /* Neki-iOSUITests */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 6C4999042EF7EF64006BE1DB /* Build configuration list for PBXNativeTarget "Neki-iOSUITests" */;
-			buildPhases = (
-				6C4998F02EF7EF64006BE1DB /* Sources */,
-				6C4998F12EF7EF64006BE1DB /* Frameworks */,
-				6C4998F22EF7EF64006BE1DB /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				6C4998F62EF7EF64006BE1DB /* PBXTargetDependency */,
-			);
-			name = "Neki-iOSUITests";
-			packageProductDependencies = (
-			);
-			productName = "Neki-iOSUITests";
-			productReference = 6C4998F42EF7EF64006BE1DB /* Neki-iOSUITests.xctest */;
-			productType = "com.apple.product-type.bundle.ui-testing";
-		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -200,15 +125,6 @@
 				TargetAttributes = {
 					6C4998DC2EF7EF62006BE1DB = {
 						CreatedOnToolsVersion = 26.2;
-					};
-					6C4998E92EF7EF64006BE1DB = {
-						CreatedOnToolsVersion = 26.2;
-						LastSwiftMigration = 2600;
-						TestTargetID = 6C4998DC2EF7EF62006BE1DB;
-					};
-					6C4998F32EF7EF64006BE1DB = {
-						CreatedOnToolsVersion = 26.2;
-						TestTargetID = 6C4998DC2EF7EF62006BE1DB;
 					};
 				};
 			};
@@ -234,28 +150,12 @@
 			projectRoot = "";
 			targets = (
 				6C4998DC2EF7EF62006BE1DB /* Neki-iOS */,
-				6C4998E92EF7EF64006BE1DB /* Neki-iOSTests */,
-				6C4998F32EF7EF64006BE1DB /* Neki-iOSUITests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		6C4998DB2EF7EF62006BE1DB /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6C4998E82EF7EF64006BE1DB /* Resources */ = {
-			isa = PBXResourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6C4998F22EF7EF64006BE1DB /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -272,38 +172,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		6C4998E62EF7EF64006BE1DB /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		6C4998F02EF7EF64006BE1DB /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXTargetDependency section */
-		6C4998EC2EF7EF64006BE1DB /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 6C4998DC2EF7EF62006BE1DB /* Neki-iOS */;
-			targetProxy = 6C4998EB2EF7EF64006BE1DB /* PBXContainerItemProxy */;
-		};
-		6C4998F62EF7EF64006BE1DB /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 6C4998DC2EF7EF62006BE1DB /* Neki-iOS */;
-			targetProxy = 6C4998F52EF7EF64006BE1DB /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		6C4998FC2EF7EF64006BE1DB /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Debug.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -368,6 +243,8 @@
 		};
 		6C4998FD2EF7EF64006BE1DB /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Release.xcconfig;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -426,23 +303,24 @@
 		6C4998FF2EF7EF64006BE1DB /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
-			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Release.xcconfig;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Debug.xcconfig;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon_Dev;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "Neki-iOS/Neki-iOS.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "$(NSCameraUsageDescription)";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(NSLocationWhenInUseUsageDescription)";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(NSPhotoLibraryUsageDescription)";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -454,7 +332,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-dev";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -484,15 +362,16 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
-				INFOPLIST_KEY_NSCameraUsageDescription = "$(NSCameraUsageDescription)";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(NSLocationWhenInUseUsageDescription)";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(NSPhotoLibraryUsageDescription)";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -504,7 +383,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.1;
+				MARKETING_VERSION = 1.1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -520,95 +399,6 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
-			};
-			name = Release;
-		};
-		6C4999022EF7EF64006BE1DB /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 586LZSS32L;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOSTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Neki-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Neki-iOS";
-			};
-			name = Debug;
-		};
-		6C4999032EF7EF64006BE1DB /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				BUNDLE_LOADER = "$(TEST_HOST)";
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 586LZSS32L;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOSTests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Neki-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Neki-iOS";
-			};
-			name = Release;
-		};
-		6C4999052EF7EF64006BE1DB /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 586LZSS32L;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOSUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "Neki-iOS";
-			};
-			name = Debug;
-		};
-		6C4999062EF7EF64006BE1DB /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 586LZSS32L;
-				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOSUITests";
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				STRING_CATALOG_GENERATE_SYMBOLS = NO;
-				SWIFT_APPROACHABLE_CONCURRENCY = YES;
-				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = "Neki-iOS";
 			};
 			name = Release;
 		};
@@ -629,24 +419,6 @@
 			buildConfigurations = (
 				6C4998FF2EF7EF64006BE1DB /* Debug */,
 				6C4999002EF7EF64006BE1DB /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		6C4999012EF7EF64006BE1DB /* Build configuration list for PBXNativeTarget "Neki-iOSTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				6C4999022EF7EF64006BE1DB /* Debug */,
-				6C4999032EF7EF64006BE1DB /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		6C4999042EF7EF64006BE1DB /* Build configuration list for PBXNativeTarget "Neki-iOSUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				6C4999052EF7EF64006BE1DB /* Debug */,
-				6C4999062EF7EF64006BE1DB /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -25,19 +25,19 @@
 		<string>kakaokompassauth</string>
 	</array>
 	<key>NMFNcpKeyId</key>
-	<string>${NAVER_MAPS_CLIENT_ID}</string>
+	<string>$(NAVER_MAPS_CLIENT_ID)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>photoqr3.kr</key>
+			<key>mx2.co.kr</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>
 				<key>NSIncludesSubdomains</key>
 				<true/>
 			</dict>
-			<key>mx2.co.kr</key>
+			<key>photoqr3.kr</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>

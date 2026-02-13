@@ -57,5 +57,11 @@
 	</array>
 	<key>UIDesignRequiresCompatibility</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>$(LOCATION_USAGE_DESCRIPTION)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>$(PHOTO_LIBRARY_USAGE_DESCRIPTION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>$(CAMERA_USAGE_DESCRIPTION)</string>
 </dict>
 </plist>

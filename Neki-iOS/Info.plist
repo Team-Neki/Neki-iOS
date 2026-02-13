@@ -25,7 +25,7 @@
 		<string>kakaokompassauth</string>
 	</array>
 	<key>NMFNcpKeyId</key>
-	<string>${NAVER_MAPS_CLIENT_ID}</string>
+	<string>$(NAVER_MAPS_CLIENT_ID)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

@@ -311,7 +311,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
 				ENABLE_PREVIEWS = YES;
@@ -319,7 +319,7 @@
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DSECRIPTION)";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -362,7 +362,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
 				CODE_SIGN_STYLE = Manual;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
 				ENABLE_PREVIEWS = YES;
@@ -370,7 +370,7 @@
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DSECRIPTION)";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

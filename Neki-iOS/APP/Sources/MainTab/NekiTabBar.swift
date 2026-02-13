@@ -49,7 +49,7 @@ struct NekiTabBar: View {
                                 Color.clear.frame(width: 26, height: 26)
                                     .overlay {
                                         Image(tab.icon(isSelected: true))
-                                            .offset(y: -6)
+                                            .offset(y: -8)
                                     }
                             } else {
                                 Image(tab.icon(isSelected: selectedTab == tab))
@@ -66,5 +66,6 @@ struct NekiTabBar: View {
             }
         }
         .background(.white)
+        .shadow(color: .black.opacity(0.05), radius: 2, y: -2)
     }
 }

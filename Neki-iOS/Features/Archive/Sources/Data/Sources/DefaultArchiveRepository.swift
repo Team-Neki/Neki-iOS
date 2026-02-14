@@ -14,16 +14,19 @@ actor DefaultArchiveRepository: ArchiveRepository {
     
     // MARK: - Cache
     
-    private var photoCache: [Int?: [PhotoEntity]] = [:]
-    private var albumCache: [AlbumEntity] = []
-    private var favoritePhotoCache: [PhotoEntity] = []
-    private var favoriteAlbumInfoCache: FavoriteAlbumEntity?
+    private var photoCache: [Int?: [PhotoEntity]] = [:] // 사진들 캐시(앨범별), 앨범을 nil로 줄 경우 전체 사진
+    private var currentSortOrder: [Int?: String] = [:]  // 앨범별 정렬 (최신순, 오래된 순)
+
+    private var albumCache: [AlbumEntity] = []  // 앨범들 정보 캐시
+    private var favoritePhotoCache: [PhotoEntity] = []  // 즐겨찾기 사진들 캐시
+    private var favoriteAlbumInfoCache: FavoriteAlbumEntity?    // 즐겨찾기 앨범 정보 캐시
+    
     
     // Dirty Flags (데이터 유효성 검사)
-    private var isPhotoCacheDirty: [Int?: Bool] = [:]
-    private var isAlbumCacheDirty: Bool = true
-    private var isFavoriteCacheDirty: Bool = true
-    private var isFavoriteAlbumInfoDirty: Bool = true
+    private var isPhotoCacheDirty: [Int?: Bool] = [:]   // 사진 변경사항 플래그
+    private var isAlbumCacheDirty: Bool = true  // 앨범 변경사항 플래그
+    private var isFavoriteCacheDirty: Bool = true   // 즐겨찾는 사진 변경사항 플래그
+    private var isFavoriteAlbumInfoDirty: Bool = true   // 즐겨찾기 앨범 정보 변경사항 플래그
     
     
     // MARK: - Pagination State
@@ -74,11 +77,19 @@ extension DefaultArchiveRepository {
         let isDirty = isPhotoCacheDirty[folderID] ?? true
         let currentCache = photoCache[folderID] ?? []
         
-        if isDirty || currentCache.isEmpty {
+        // 요청한 정렬 순서 (기본값 DESC)
+        let requestSortOrder = sortOrder ?? "DESC"
+        // 기존에 저장된 정렬 순서
+        let cachedSortOrder = currentSortOrder[folderID]
+        // 정렬이 바뀌었으면 무조건 Dirty로 간주하여 초기화
+        let isSortChanged = (cachedSortOrder != nil) && (cachedSortOrder != requestSortOrder)
+        
+        if isDirty || currentCache.isEmpty || isSortChanged {
             currentPhotoPage[folderID] = 0
             hasNextPhoto[folderID] = true
             photoCache[folderID] = []
             isPhotoCacheDirty[folderID] = false
+            currentSortOrder[folderID] = requestSortOrder
         }
         
         // 마지막 페이지면 실행

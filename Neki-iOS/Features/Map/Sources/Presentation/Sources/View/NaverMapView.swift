@@ -442,19 +442,20 @@ private extension NaverMapView {
         Button {
             store.send(.didTapSearchHereButton)
         } label: {
-            HStack(spacing: 8) {
+            HStack(spacing: 7) {
                 Image(.iconRotate)
                 
-                Text("현 위치에서 탐색")
+                Text("이 지역 재검색")
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 13)
             .padding(.vertical, 10)
             .background(
                 Capsule()
                     .fill(.white)
-                    .strokeBorder(.gray100)
+                    .strokeBorder(.primary400)
+                    .shadow(radius: 2)
             )
         }
         .safeAreaPadding(.top)

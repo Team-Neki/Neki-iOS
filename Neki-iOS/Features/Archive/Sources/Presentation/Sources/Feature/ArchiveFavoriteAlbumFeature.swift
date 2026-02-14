@@ -12,30 +12,23 @@ import SwiftUI
 struct ArchiveFavoriteAlbumFeature {
     @ObservableState
     struct State {
-        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
+        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         let album: AlbumItem
         
         var selectedIDs: Set<Int> = []
         var isSelectionMode: Bool = false
         
-        var currentPage: Int = 0
-        var hasNext: Bool = true
         var isFetchingPhotos: Bool = false
         
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
-        
-        var filteredItems: IdentifiedArrayOf<ArchiveImageItem> {
-            let items = photos.filter { $0.isFavorite == true }
-            return IdentifiedArray(uniqueElements: items)
-        }
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         
         case onAppear
-        case fetchFavoritePhotos(isRefresh: Bool)
-        case favoritePhotoListResponse(Result<(photos: [PhotoEntity], hasNext: Bool), Error>)
+        case fetchFavoritePhotos
+        case favoritePhotoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
         
         case onTapBackButton
@@ -70,36 +63,26 @@ struct ArchiveFavoriteAlbumFeature {
                 return .run { _ in await dismiss() }
                 
             case .onAppear:
-                return .send(.fetchFavoritePhotos(isRefresh: true))
+                return .send(.fetchFavoritePhotos)
                 
-            case let .fetchFavoritePhotos(isRefresh):
-                if isRefresh {
-                    state.currentPage = 0
-                    state.hasNext = true
-                }
+            case .fetchFavoritePhotos:
                 
-                guard state.hasNext, !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
                 
-                return .run { [page = state.currentPage] send in
+                return .run { send in
                     await send(.favoritePhotoListResponse(
                         Result {
-                            try await archiveClient.fetchFavoritePhotoList(
-                                page: page,
-                                size: 20,
-                                sortOrder: "DESC"
-                            )
+                            try await archiveClient.fetchFavoritePhotoList(20, "DESC")
                         }
                     ))
                 }
                 
             case let .favoritePhotoListResponse(.success(result)):
                 state.isFetchingPhotos = false
-                state.hasNext = result.hasNext
                 
                 let currentAlbumId = state.album.id
                 
-                let newItems = result.photos.map { entity in
+                let newItems = result.map { entity in
                     ArchiveImageItem(
                         id: entity.photoID,
                         imageURLString: entity.imageURL,
@@ -109,13 +92,7 @@ struct ArchiveFavoriteAlbumFeature {
                     )
                 }
                 
-                state.$photos.withLock { sharedPhotos in
-                    for item in newItems {
-                        sharedPhotos.updateOrAppend(item)
-                    }
-                }
-                
-                state.currentPage += 1
+                state.photos = IdentifiedArray(uniqueElements: newItems)
                 return .none
                 
             case .favoritePhotoListResponse(.failure):
@@ -123,7 +100,7 @@ struct ArchiveFavoriteAlbumFeature {
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
             case .loadMorePhotos:
-                return .send(.fetchFavoritePhotos(isRefresh: false))
+                return .send(.fetchFavoritePhotos)
                 
             case .onTapSelectButton:
                 state.isSelectionMode = true
@@ -154,16 +131,16 @@ struct ArchiveFavoriteAlbumFeature {
                 return .send(.deletePhotos)
                 
             case .deletePhotos:
-                return .run { [ids = state.selectedIDs] send in
+                let idsToDelete = Array(state.selectedIDs)
+                return .run { send in
                     await send(.deletePhotosResponse(Result {
-                        try await archiveClient.deletePhotoList(photoIds: Array(ids))
+                        try await archiveClient.deletePhotoList(idsToDelete)
                     }))
                 }
                 
             case .deletePhotosResponse(.success):
-                state.$photos.withLock { photos in
-                    photos.removeAll { state.selectedIDs.contains($0.id) }
-                }
+                let idsToRemove = state.selectedIDs
+                state.photos.removeAll { idsToRemove.contains($0.id) }
                 
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()

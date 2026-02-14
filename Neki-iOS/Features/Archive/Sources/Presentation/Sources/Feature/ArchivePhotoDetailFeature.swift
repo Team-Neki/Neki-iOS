@@ -12,19 +12,10 @@ import ComposableArchitecture
 struct ArchivePhotoDetailFeature {
     @ObservableState
     struct State {
-        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
+        var photos: IdentifiedArrayOf<ArchiveImageItem>
         
         var currentItemID: Int
         let folderId: Int?
-        
-        var slidingPhotos: IdentifiedArrayOf<ArchiveImageItem> {
-            if let folderId = folderId {
-                let filteredItems = photos.filter { $0.folderId == folderId }
-                return IdentifiedArray(uniqueElements: filteredItems)
-            } else {
-                return photos
-            }
-        }
         
         var currentItem: ArchiveImageItem? {
             photos[id: currentItemID]
@@ -76,7 +67,7 @@ struct ArchivePhotoDetailFeature {
                 guard let item = state.currentItem else { return .none }
                 let newStatus = !item.isFavorite
                 
-                state.$photos.withLock { $0[id: item.id]?.isFavorite = newStatus }
+                state.photos[id: item.id]?.isFavorite = newStatus
                 
                 return .run { [id = item.id, isFavorite = newStatus] send in
                     do {
@@ -91,8 +82,7 @@ struct ArchivePhotoDetailFeature {
                 return .none
                 
             case let .toggleFavoriteResponse(photoID, .failure):
-                state.$photos.withLock { $0[id: photoID]?.isFavorite.toggle() }
-                
+                state.photos[id: photoID]?.isFavorite.toggle()
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownload:
@@ -130,20 +120,20 @@ struct ArchivePhotoDetailFeature {
             case .deletePhotoResponse(.success):
                 guard let deletedID = state.currentItem?.id else { return .none }
                 
-                let deletedIndex = state.slidingPhotos.index(id: deletedID)
+                let deletedIndex = state.photos.index(id: deletedID)
                 
-                state.$photos.withLock { _ = $0.remove(id: deletedID) }
+                state.photos.remove(id: deletedID)
                 
-                if state.slidingPhotos.isEmpty {
+                if state.photos.isEmpty {
                     return .run { send in
                         await send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                         await dismiss()
                     }
                 }
                 
-                if let index = deletedIndex, index < state.slidingPhotos.count {
-                    state.currentItemID = state.slidingPhotos[index].id
-                } else if let last = state.slidingPhotos.last {
+                if let index = deletedIndex, index < state.photos.count {
+                    state.currentItemID = state.photos[index].id
+                } else if let last = state.photos.last {
                     state.currentItemID = last.id
                 }
                 

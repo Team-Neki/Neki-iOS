@@ -59,6 +59,7 @@ struct ArchiveAllAlbumsView: View {
             }
             
         }
+        .task { await store.send(.onAppear).finish() }
         .sheet(isPresented: $addAlbumSheetPresented) {
             ArchiveAddAlbumSheet(
                 text: $store.newAlbumTitle,

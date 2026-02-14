@@ -13,8 +13,7 @@ struct ArchiveAllAlbumsFeature {
     
     @ObservableState
     struct State {
-        @Shared var albums: IdentifiedArrayOf<AlbumItem>
-        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
+        var albums: IdentifiedArrayOf<AlbumItem> = []
         
         var isSelectMode: Bool = false
         var selectedAlbumIDs: Set<Int> = []
@@ -30,6 +29,7 @@ struct ArchiveAllAlbumsFeature {
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         
+        case onAppear
         case onTapBackButton
         
         case onTapAlbum(AlbumItem)
@@ -41,9 +41,6 @@ struct ArchiveAllAlbumsFeature {
         // 앨범 삭제 액션
         case onTapExecuteDelete(option: ArchiveAlbumDeleteOption)
         case deleteFoldersResponse(Result<Void, Error>)
-        
-        case fetchPhotos
-        case photoListResponse(Result<[ArchiveImageItem], Error>)
         
         // 앨범 생성 액션
         case onTapCancelAddAlbum
@@ -67,10 +64,12 @@ struct ArchiveAllAlbumsFeature {
     var body: some ReducerOf<Self> {
         BindingReducer()
         
-        Reduce {
-            state,
-            action in
+        Reduce { state, action in
             switch action {
+                
+            case .onAppear:
+                return .send(.fetchAlbums)
+                
             case .onTapBackButton:
                 if state.isSelectMode {
                     return .send(.onTapExitDeleteMode)
@@ -104,17 +103,18 @@ struct ArchiveAllAlbumsFeature {
                 }
                 
                 let shouldDeletePhotos = (option == .withPhotos)
+                let idsToDelete = Array(state.selectedAlbumIDs)
                 
-                return .run { [ids = state.selectedAlbumIDs] send in
+                return .run { send in
                     await send(.deleteFoldersResponse(Result {
-                        try await archiveClient.deleteFolders(folderIDs: Array(ids), deletePhotos: shouldDeletePhotos)
+                        try await archiveClient.deleteFolders(idsToDelete, shouldDeletePhotos)
                     }))
                 }
                 
             case .deleteFoldersResponse(.success):
-                state.$albums.withLock { albums in
-                    albums.removeAll { state.selectedAlbumIDs.contains($0.id) }
-                }
+                let idsToRemove = state.selectedAlbumIDs
+                state.albums.removeAll { idsToRemove.contains($0.id) }
+                
                 state.isSelectMode = false
                 state.selectedAlbumIDs.removeAll()
                 
@@ -122,41 +122,12 @@ struct ArchiveAllAlbumsFeature {
                 
                 return .merge(
                     .send(.delegate(.showToast(toastItem))),
-                    .send(.fetchAlbums),
-                    .send(.fetchPhotos)
+                    .send(.fetchAlbums)
                 )
                 
             case .deleteFoldersResponse(.failure):
                 let toastItem = NekiToastItem("앨범을 삭제하지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
-                
-            case .fetchPhotos:
-                return .run { send in
-                    await send(.photoListResponse(Result {
-                        let result = try await archiveClient.fetchPhotoList(folderId: nil, page: 0, size: 20, sortOrder: nil)
-                        
-                        let isoFormatter = ISO8601DateFormatter()
-                        isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                        
-                        return result.photos.map { entity in
-                            ArchiveImageItem(
-                                id: entity.photoID,
-                                imageURLString: entity.imageURL,
-                                isFavorite: entity.isfavorite,
-                                date: isoFormatter.date(from: entity.createdAt) ?? Date()
-                            )
-                        }
-                    }))
-                }
-                
-            case let .photoListResponse(.success(newPhotos)):
-                state.$photos.withLock { sharedPhotos in
-                    sharedPhotos = IdentifiedArray(uniqueElements: newPhotos)
-                }
-                return .none
-                
-            case .photoListResponse(.failure):
-                return .none
                 
             case .onTapCancelAddAlbum:
                 state.newAlbumTitle = ""
@@ -208,20 +179,14 @@ struct ArchiveAllAlbumsFeature {
                 }
                 
             case let .albumListResponse(.success(newAlbums)):
-                state.$albums.withLock { existing in
-                    var favoriteAlbum: AlbumItem?
-                    if let first = existing.first,
-                       first.isFavorite {
-                        favoriteAlbum = first
-                    }
-                    
-                    var mergedAlbums: [AlbumItem] = []
-                    if let fav = favoriteAlbum {
-                        mergedAlbums.append(fav)
-                    }
-                    mergedAlbums.append(contentsOf: newAlbums)
-                    existing = IdentifiedArray(uniqueElements: mergedAlbums)
+                let favoriteAlbum = state.albums.first(where: { $0.isFavorite })
+                
+                var mergedAlbums: [AlbumItem] = []
+                if let fav = favoriteAlbum {
+                    mergedAlbums.append(fav)
                 }
+                mergedAlbums.append(contentsOf: newAlbums)
+                state.albums = IdentifiedArray(uniqueElements: mergedAlbums)
                 return .none
                 
             case .albumListResponse(.failure):

@@ -48,7 +48,7 @@ struct ArchiveCoordinator {
             case let .root(.imageTapped(item)):
                 state.path.append(.detail(
                     ArchivePhotoDetailFeature.State(
-                        photos: state.root.$photos,
+                        photos: state.root.photos,
                         currentItemID: item.id,
                         folderId: nil
                     )
@@ -56,28 +56,20 @@ struct ArchiveCoordinator {
                 return .none
                 
             case .root(.onTapAllPhotos):
-                state.path.append(.allPhotos(
-                    ArchiveAllPhotosFeature.State(photos: state.root.$photos)
-                ))
+                state.path.append(.allPhotos(ArchiveAllPhotosFeature.State()))
                 return .none
                 
             case .root(.onTapAllAlbums):
-                state.path.append(.allAlbums(
-                    ArchiveAllAlbumsFeature.State(albums: state.root.$albums, photos: state.root.$photos)
-                ))
+                state.path.append(.allAlbums(ArchiveAllAlbumsFeature.State()))
                 return .none
                 
             case let .root(.albumTapped(album)):
                 let isFirstAlbum = state.root.albums.first?.id == album.id
                 
                 if isFirstAlbum {
-                    state.path.append(.favoriteAlbum(
-                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
-                    ))
+                    state.path.append(.favoriteAlbum(ArchiveFavoriteAlbumFeature.State(album: album)))
                 } else {
-                    state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
-                    ))
+                    state.path.append(.albumDetail(ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
@@ -85,13 +77,9 @@ struct ArchiveCoordinator {
                 let isFirstAlbum = state.root.albums.first?.id == album.id
                 
                 if isFirstAlbum {
-                    state.path.append(.favoriteAlbum(
-                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
-                    ))
+                    state.path.append(.favoriteAlbum(ArchiveFavoriteAlbumFeature.State(album: album)))
                 } else {
-                    state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
-                    ))
+                    state.path.append(.albumDetail(ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
@@ -104,7 +92,7 @@ struct ArchiveCoordinator {
                 if !allPhotosState.isSelectionMode {
                     state.path.append(.detail(
                         ArchivePhotoDetailFeature.State(
-                            photos: state.root.$photos,
+                            photos: state.root.photos,
                             currentItemID: item.id,
                             folderId: nil
                         )
@@ -117,12 +105,11 @@ struct ArchiveCoordinator {
                 
                 if isFirstAlbum {
                     state.path.append(.favoriteAlbum(
-                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                        ArchiveFavoriteAlbumFeature.State(album: album)
                     ))
                 } else {
                     state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
-                    ))
+                        ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
@@ -132,7 +119,7 @@ struct ArchiveCoordinator {
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
                         ArchivePhotoDetailFeature.State(
-                            photos: state.root.$photos,
+                            photos: state.root.photos,
                             currentItemID: item.id,
                             folderId: albumDetailState.album.id
                         )
@@ -146,7 +133,7 @@ struct ArchiveCoordinator {
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
                         ArchivePhotoDetailFeature.State(
-                            photos: state.root.$photos,
+                            photos: state.root.photos,
                             currentItemID: item.id,
                             folderId: albumDetailState.album.id
                         )

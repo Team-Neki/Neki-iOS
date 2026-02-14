@@ -13,8 +13,7 @@ struct ArchiveAlbumDetailFeature {
     
     @ObservableState
     struct State {
-        @Shared var photos: IdentifiedArrayOf<ArchiveImageItem>
-        @Shared var sharedAlbums: IdentifiedArrayOf<AlbumItem>
+        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         
         let album: AlbumItem
         
@@ -23,12 +22,9 @@ struct ArchiveAlbumDetailFeature {
         var isSelectionMode: Bool = false
         
         var filteredAlbumPhotos: IdentifiedArrayOf<ArchiveImageItem> {
-            let items = photos.filter { $0.folderId == album.id }
-            return IdentifiedArray(uniqueElements: items)
+            return photos
         }
         
-        var currentPage: Int = 0
-        var hasNext: Bool = true
         var isFetchingPhotos: Bool = false
         
         var isLoading: Bool = false
@@ -50,13 +46,10 @@ struct ArchiveAlbumDetailFeature {
         case downloadImagesResponse(successCount: Int)
         
         case onTapDeleteButton(option: ArchivePhotoDeleteOption)
-        case deletePhotosResponse(ArchivePhotoDeleteOption, Result<Void, Error>)
+        case deletePhotosResponse(Result<Void, Error>)
         
-        case fetchAlbums
-        case albumListResponse(Result<[AlbumItem], Error>)
-        
-        case fetchPhotos(isRefresh: Bool)
-        case photoListResponse(Result<(photos: [PhotoEntity], hasNext: Bool), Error>)
+        case fetchPhotos
+        case photoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
         
         // 네비게이션
@@ -81,23 +74,16 @@ struct ArchiveAlbumDetailFeature {
                 return .run { _ in await dismiss() }
                 
             case .onAppear:
-                return .send(.fetchPhotos(isRefresh: true))
+                return .send(.fetchPhotos)
                 
-            case let .fetchPhotos(isRefresh):
-                if isRefresh {
-                    state.currentPage = 0
-                    state.hasNext = true
-                }
-                
-                guard state.hasNext, !state.isFetchingPhotos else { return .none }
+            case .fetchPhotos:
                 state.isFetchingPhotos = true
                 
-                return .run { [page = state.currentPage, albumId = state.album.id] send in
+                return .run { [albumId = state.album.id] send in
                     await send(.photoListResponse(
                         Result {
                             try await archiveClient.fetchPhotoList(
                                 folderId: albumId,
-                                page: page,
                                 size: 20,
                                 sortOrder: nil
                             )
@@ -105,13 +91,12 @@ struct ArchiveAlbumDetailFeature {
                     ))
                 }
                 
-            case let .photoListResponse(.success(result)):
+            case let .photoListResponse(.success(entities)):
                 state.isFetchingPhotos = false
-                state.hasNext = result.hasNext
                 
                 let currentAlbumId = state.album.id
                 
-                let newItems = result.photos.map { entity in
+                let newItems = entities.map { entity in
                     ArchiveImageItem(
                         id: entity.photoID,
                         imageURLString: entity.imageURL,
@@ -121,21 +106,15 @@ struct ArchiveAlbumDetailFeature {
                     )
                 }
                 
-                state.$photos.withLock { sharedPhotos in
-                    for item in newItems {
-                        sharedPhotos.updateOrAppend(item)
-                    }
-                }
-                
-                state.currentPage += 1
+                state.photos = IdentifiedArray(uniqueElements: newItems)
                 return .none
                 
-            case .photoListResponse:
+            case .photoListResponse(.failure):
                 state.isFetchingPhotos = false
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
             case .loadMorePhotos:
-                return .send(.fetchPhotos(isRefresh: false))
+                return .send(.fetchPhotos)
                 
             case .onTapSelectButton:
                 state.isSelectionMode = true
@@ -159,18 +138,11 @@ struct ArchiveAlbumDetailFeature {
             case .onTapDownloadButton:
                 guard !state.selectedIDs.isEmpty else { return .none }
                 state.isLoading = true
-
-                let selectedURLs: [URL] = state.selectedIDs.compactMap { id in
-                        return state.photos[id: id]?.imageURL
-                    }
                 
-                guard !selectedURLs.isEmpty else {
-                    state.isLoading = false
-                    return .none
-                }
+                let urls = state.selectedIDs.compactMap { state.photos[id: $0]?.imageURL }
                 
                 return .run { send in
-                    let count = try await imageDownloadClient.downloadImages(urls: selectedURLs)
+                    let count = try await imageDownloadClient.downloadImages(urls: urls)
                     await send(.downloadImagesResponse(successCount: count))
                 }
                 
@@ -188,82 +160,32 @@ struct ArchiveAlbumDetailFeature {
             case let .onTapDeleteButton(option):
                 guard !state.selectedIDs.isEmpty else { return .none }
                 
-                return .run { [ids = state.selectedIDs, albumId = state.album.id] send in
+                let selectedIDs = Array(state.selectedIDs)
+                let albumID = state.album.id
+                
+                return .run { send in
                     await send(.deletePhotosResponse(
-                        option,
                         Result {
                             if option == .fromAlbumOnly {
-                                try await archiveClient.excludePhotosInAlbum(albumID: albumId, photoIDs: Array(ids))
+                                try await archiveClient.excludePhotosInAlbum(albumID, selectedIDs)
                             } else {
-                                try await archiveClient.deletePhotoList(photoIds: Array(ids))
+                                try await archiveClient.deletePhotoList(selectedIDs)
                             }
                         }
                     ))
                 }
                 
-            case let .deletePhotosResponse(option, .success):
-                
-                state.$photos.withLock { photos in
-                    if option == .fromAlbumOnly {
-                        for id in state.selectedIDs {
-                            photos[id: id]?.folderId = nil
-                        }
-                    } else {
-                        photos.removeAll { state.selectedIDs.contains($0.id) }
-                    }
-                }
+            case .deletePhotosResponse(.success):
+                let idsToDelete = state.selectedIDs
+                state.photos.removeAll { idsToDelete.contains($0.id) }
                 
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 
-                let toastItem = NekiToastItem("사진을 삭제했어요", style: .success)
+                return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
-                return .merge(
-                    .send(.delegate(.showToast(toastItem))),
-                    .send(.fetchPhotos(isRefresh: true)),
-                    .send(.fetchAlbums)
-                )
-                
-            case .deletePhotosResponse(_, .failure):
+            case .deletePhotosResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
-                
-            case .fetchAlbums:
-                return .run { send in
-                    await send(.albumListResponse(Result {
-                        let entities = try await archiveClient.getAlbumList()
-                        return entities.map {
-                            AlbumItem(
-                                id: $0.id,
-                                title: $0.name,
-                                count: $0.photoCount,
-                                coverImageURL: URL(string: $0.coverImageURLString),
-                                isFavorite: false
-                            )
-                        }
-                    }))
-                }
-                
-            case let .albumListResponse(.success(newAlbums)):
-                state.$sharedAlbums.withLock { existing in
-                    var favoriteAlbum: AlbumItem?
-                    if let first = existing.first, first.isFavorite {
-                        favoriteAlbum = first
-                    }
-                    
-                    var mergedAlbums: [AlbumItem] = []
-                    
-                    if let fav = favoriteAlbum {
-                        mergedAlbums.append(fav)
-                    }
-                    
-                    mergedAlbums.append(contentsOf: newAlbums)
-                    
-                    existing = IdentifiedArray(uniqueElements: mergedAlbums)
-                }
-                return .none
-                
-            case .albumListResponse(.failure):
-                return .none
                 
             default:
                 return .none

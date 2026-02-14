@@ -17,7 +17,7 @@ struct ArchivePhotoDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             TabView(selection: $store.currentItemID) {
-                ForEach(store.slidingPhotos) { item in
+                ForEach(store.photos) { item in
                     KFImage(item.imageURL)
                         .resizable()
                         .placeholder {

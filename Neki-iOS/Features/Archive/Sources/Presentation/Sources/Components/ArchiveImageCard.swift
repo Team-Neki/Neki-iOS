@@ -60,7 +60,7 @@ struct ArchiveImageCard: View {
                 })
                 .overlay(alignment: .topTrailing) {
                     if item.isFavorite {
-                        Image(.iconHeart20)
+                        Image(.iconHeart20White)
                             .padding(10)
                     }
                 }

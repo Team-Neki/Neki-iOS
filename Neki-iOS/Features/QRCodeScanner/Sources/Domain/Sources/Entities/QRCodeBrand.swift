@@ -10,7 +10,7 @@ import Foundation
 
 // MARK: - PhotoBoothBrand + URLHosts
 
-public enum QRCodeBrand: CustomStringConvertible {
+public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case life4cut
     case photoism
     case photogray

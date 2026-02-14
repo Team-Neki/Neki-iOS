@@ -79,11 +79,11 @@ struct ArchiveView: View {
                     }
             }
             
-            if store.showDropDownMenu {
-                dropDownMenu
-                    .padding(.top, 46)
-                    .padding(.trailing, 16)
-            }
+//            if store.showDropDownMenu {
+//                dropDownMenu
+//                    .padding(.top, 46)
+//                    .padding(.trailing, 16)
+//            }
             
         }
         .sheet(isPresented: $addAlbumSheetPresented) {
@@ -112,19 +112,6 @@ struct ArchiveView: View {
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
         }
-        .fullScreenCover(item: $store.scope(state: \.qrScanner, action: \.qrScanner)) { store in
-            QRCodeScannerView(store: store)
-        }
-        .nekiAlert(
-            isPresented: $store.showPermissionAlert,
-            style: .cancelable,
-            title: "카메라 권한",
-            subtitle: "QR 인식을 위해 카메라 접근이 필요해요",
-            confirmText: "허용",
-            cancelText: "취소",
-            onConfirm: { store.send(.openAppSettings) },
-            onCancel: { store.send(.closePermissionAlert) }
-        )
         .transaction { transaction in
             transaction.disablesAnimations = true
         }
@@ -149,68 +136,68 @@ private extension ArchiveView {
             
             Spacer()
             
-            HStack(alignment: .center, spacing: 12) {
-                Button {
-                    store.send(.toggleDropDownMenu)
-                } label: {
-                    Image(.iconPlusRed)
-                }
-                .nekiTooltip(
-                    isPresented: $store.showTooltip,
-                    "버튼을 눌러 네컷을 추가할 수 있어요",
-                    position: .bottom,
-                    style: .dark,
-                    showDismiss: false
-                )
+//            HStack(alignment: .center, spacing: 12) {
+//                Button {
+//                    store.send(.toggleDropDownMenu)
+//                } label: {
+//                    Image(.iconPlusRed)
+//                }
+//                .nekiTooltip(
+//                    isPresented: $store.showTooltip,
+//                    "버튼을 눌러 네컷을 추가할 수 있어요",
+//                    position: .bottom,
+//                    style: .dark,
+//                    showDismiss: false
+//                )
                 
 //                Button {
 //                    // TODO: - 알림 이벤트
 //                } label: {
 //                    Image(.iconBellFill)
 //                }
-            }
+//            }
         }
         .frame(height: 54)
         .padding(.horizontal, 20)
     }
     
-    var dropDownMenu: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
-                store.send(.onTapQRScan)
-            }
-            
-            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-                HStack(alignment: .center, spacing: 6) {
-                    Image(uiImage: .iconRoundAddPhotoAlternate)
-                    
-                    Text("갤러리에서 추가")
-                        .nekiFont(.body16Medium)
-                        .foregroundStyle(.gray900)
-                    
-                    Spacer()
-                }
-                .padding(.leading, 12)
-                .padding(.vertical, 5)
-                .frame(height: 34)
-                .contentShape(Rectangle())
-            }
-            
-            Divider()
-                .background(.gray50)
-                .padding(.vertical, 4)
-            
-            dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
-                addAlbumSheetPresented = true
-                store.send(.onTapCancelAddAlbum)
-            }
-        }
-        .padding(.vertical, 5)
-        .frame(width: 158, height: 130)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
-    }
+//    var dropDownMenu: some View {
+//        VStack(alignment: .leading, spacing: 0) {
+//            dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
+//                store.send(.onTapQRScan)
+//            }
+//            
+//            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+//                HStack(alignment: .center, spacing: 6) {
+//                    Image(uiImage: .iconRoundAddPhotoAlternate)
+//                    
+//                    Text("갤러리에서 추가")
+//                        .nekiFont(.body16Medium)
+//                        .foregroundStyle(.gray900)
+//                    
+//                    Spacer()
+//                }
+//                .padding(.leading, 12)
+//                .padding(.vertical, 5)
+//                .frame(height: 34)
+//                .contentShape(Rectangle())
+//            }
+//            
+//            Divider()
+//                .background(.gray50)
+//                .padding(.vertical, 4)
+//            
+//            dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
+//                addAlbumSheetPresented = true
+//                store.send(.onTapCancelAddAlbum)
+//            }
+//        }
+//        .padding(.vertical, 5)
+//        .frame(width: 158, height: 130)
+//        .background(.white)
+//        .clipShape(RoundedRectangle(cornerRadius: 12))
+//        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
+//    }
     
     func dropDownMenuButton(
         title: String,

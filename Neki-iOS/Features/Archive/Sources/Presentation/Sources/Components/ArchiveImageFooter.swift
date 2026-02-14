@@ -51,7 +51,7 @@ struct ArchiveImageFooter: View {
             
             if let isFavorite = isFavorite, let onFavorite = onFavorite {
                 Button(action: onFavorite) {
-                    Image(isFavorite ? .iconHeartFill28 : .iconHeart28)
+                    Image(isFavorite ? .iconHeart28Fill : .iconHeart28Gray)
                         .renderingMode(.template)
                         .foregroundStyle(isFavorite ? .red : .gray300)
                 }

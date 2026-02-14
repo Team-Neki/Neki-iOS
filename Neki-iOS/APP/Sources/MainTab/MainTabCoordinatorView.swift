@@ -12,6 +12,7 @@ import ComposableArchitecture
 
 struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
+    @State private var sheetHeight: CGFloat = 1
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -23,6 +24,9 @@ struct MainTabCoordinatorView: View {
                 case .pose:
                     PoseCoordinatorView(store: store.scope(state: \.pose, action: \.pose))
                     
+                case .add:
+                    EmptyView()
+                    
                 case .map:
                     MapCoordinatorView(store: store.scope(state: \.map, action: \.map))
 
@@ -32,11 +36,79 @@ struct MainTabCoordinatorView: View {
             }
             
             if !store.isTabbarHidden {
-                NekiTabBar(selectedTab: $store.selectedTab)
+                NekiTabBar(selectedTab: $store.selectedTab) { store.send(.onTapAddButton) }
             }
         }
         .nekiToast(item: $store.toast)
+        .nekiAlert(
+            isPresented: $store.isPermissionAlertPresented,
+            style: .cancelable,
+            title: "카메라 권한",
+            subtitle: "QR 인식을 위해 카메라 접근이 필요해요",
+            confirmText: "허용",
+            cancelText: "취소",
+            onConfirm: { store.send(.openAppSettings) },
+            onCancel: { store.send(.dismissPermissionAlert) }
+        )
+        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) { _ in
+            UploadSelectionSheet(store: store)
+        }
+        .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in
+            QRCodeScannerView(store: qrStore)
+        }
+    }
+}
+
+
+// MARK: - Subviews
+
+extension MainTabCoordinatorView {
+    struct UploadSelectionSheet: View {
+        @Bindable var store: StoreOf<MainTabCoordinator>
+        @State private var sheetHeight: CGFloat = 1
         
-        // TODO: - 탭 이동 시 화면 초기화 되는지 기디 물어보기. 그리고 탭 한 번 더 누르면 초기화면으로 가는지도
+        var body: some View {
+            VStack(spacing: 4) {
+                Capsule()
+                    .frame(width: 45, height: 4)
+                    .padding(.horizontal, 165)
+                    .padding(.vertical, 10)
+                    .foregroundStyle(.gray100)
+                
+                VStack(alignment: .leading, spacing: 24) {
+                    Text("네컷사진 추가")
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray900)
+                    
+                    HStack(spacing: 36) {
+                        Button {
+                            store.send(.onTapQRScan)
+                        } label: {
+                            VStack(spacing:  8) {
+                                Image(.iconAddQr)
+                                Text("QR로 추가")
+                            }
+                        }
+                        
+                        NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                            VStack(spacing:  8) {
+                                Image(.iconAddGallery)
+                                Text("갤러리에서 추가")
+                            }
+                        }
+                    }
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray700)
+                    .frame(maxWidth: .infinity)
+                }
+                .padding()
+            }
+            .ignoresSafeArea(.container, edges: .bottom)
+            .safeAreaPadding(.bottom)
+            .presentationBackground(.white)
+            .presentationCornerRadius(20)
+            .presentationDragIndicator(.hidden)
+            .autoSizingDetent($sheetHeight)
+        }
     }
 }

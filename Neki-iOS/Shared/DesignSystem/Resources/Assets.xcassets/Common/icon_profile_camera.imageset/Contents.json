@@ -1,17 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "profileCamera.svg",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "profile_camera.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

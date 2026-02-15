@@ -123,7 +123,7 @@ private extension PoseView {
                 )
             )
             
-            Button("스크랩") {
+            Button("북마크") {
                 store.send(.onTapScrapMode)
             }
             .buttonStyle(

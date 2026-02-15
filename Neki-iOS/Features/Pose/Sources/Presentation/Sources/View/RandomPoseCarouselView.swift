@@ -67,13 +67,8 @@ struct RandomPoseCarouselView: View {
         .animation(.easeInOut, value: store.isTutorialPresented)
         .task { await store.send(.onAppear).finish() }
         .nekiToolbar(
-            isOverlay: true, left: {
-                NekiToolBar.close {
-                    store.send(.onTapClose)
-                }
-            }, center: {
-                NekiToolBar.textCenter("랜덤포즈")
-            }
+            isOverlay: true,
+            center: { NekiToolBar.textCenter("랜덤포즈") }
         )
     }
     

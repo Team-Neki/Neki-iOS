@@ -98,7 +98,7 @@ private extension NearPhotoBoothListSheet {
             }
         } header: {
             HStack {
-                Text("가까운").foregroundStyle(.primary400) + Text("  네컷 사진 브랜드")
+                Text("가까운").foregroundStyle(.primary400) + Text("  포토부스")
                 
                 Spacer()
                 

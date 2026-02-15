@@ -39,12 +39,14 @@ struct FeedImageView: View {
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fit)
         }
-        .overlay(content: {
-            Color.black.opacity(0.04)
-        })
-        .overlay(content: {
-            gradientColor.opacity(0.2)
-        })
+        .overlay { Color.black.opacity(0.04) }
+        .overlay { gradientColor.opacity(0.2) }
+        .overlay(alignment: .topTrailing) {
+            if item.isScrapped {
+                Image(.iconBookmarkFill)
+                    .padding()
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()
     }

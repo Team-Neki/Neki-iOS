@@ -40,7 +40,20 @@ struct PoseView: View {
         }
         .nekiToolbar(
             left: { NekiToolBar.textLeft("포즈") },
-            right: { /*NekiToolBar.icon(.iconBellFill)*/ }
+            right: { NekiToolBar.items {
+                Button {
+                    store.send(.qrScanButtonTapped)
+                } label: {
+                    Image(.iconQrCode)
+                }
+                
+                // 알림
+//                Button {
+//                    
+//                } label: {
+//                    Image(.iconBellFill)
+//                }
+            } }
         )
         .sheet(item: $store.sheetItem) { item in
             Group {
@@ -302,4 +315,8 @@ extension PoseView {
         
         var id: Self { self }
     }
+}
+
+#Preview {
+    MainTabCoordinatorView(store: Store(initialState: MainTabCoordinator.State.init(user: .mock), reducer: { MainTabCoordinator() }))
 }

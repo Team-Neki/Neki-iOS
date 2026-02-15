@@ -56,6 +56,7 @@ struct PoseFeature {
         case onTapStartRandomPoseCarousel
         case imageTapped(Pose)
         case onRefresh
+        case qrScanButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
@@ -66,6 +67,7 @@ struct PoseFeature {
         enum Delegate {
             case didTapImage(Pose)
             case didTapStartRandomPose(PeopleCountOption)
+            case qrScanButtonTapped
         }
         
         // Binding Action
@@ -128,6 +130,9 @@ struct PoseFeature {
                 
             case let .imageTapped(pose):
                 return .send(.delegate(.didTapImage(pose)))
+                
+            case .qrScanButtonTapped:
+                return .send(.delegate(.qrScanButtonTapped))
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):

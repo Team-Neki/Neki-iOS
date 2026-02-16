@@ -84,6 +84,8 @@ struct ProfileEditFeature {
                 
             case let .pickerItemChanged(item):
                 guard let item else { return .none }
+                state.isLoading = true
+                
                 return .run { send in
                     do {
                         let data = try await item.loadTransferable(type: Data.self)
@@ -96,6 +98,7 @@ struct ProfileEditFeature {
                 .cancellable(id: CancelID.imageLoad, cancelInFlight: true)
             
             case let .imageLoaded(data):
+                state.isLoading = false
                 guard let data, let image = UIImage(data: data) else { return .none }
                 state.selectedImageData = data
                 state.selectedProfileImage = image

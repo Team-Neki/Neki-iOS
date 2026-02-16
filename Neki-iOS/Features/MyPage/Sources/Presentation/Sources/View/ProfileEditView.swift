@@ -52,9 +52,8 @@ struct ProfileEditView: View {
                 
                 Spacer()
             }
-            
-            if store.isLoading { ProgressView().controlSize(.large) }
         }
+        .overlay { if store.isLoading { LoadingView() } }
         .disabled(store.isLoading)
         .nekiToolbar(
             left: { NekiToolBar.back { dismiss() } },

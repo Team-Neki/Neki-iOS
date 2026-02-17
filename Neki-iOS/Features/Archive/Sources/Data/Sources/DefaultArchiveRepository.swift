@@ -70,7 +70,7 @@ extension DefaultArchiveRepository {
 
 extension DefaultArchiveRepository {
     
-    func fetchPhotoList(folderID: Int?, size: Int?, sortOrder: String?) async throws -> [PhotoEntity] {
+    func fetchPhotoList(folderID: Int?, size: Int? = 20, sortOrder: String? = "DESC") async throws -> [PhotoEntity] {
         
         /// 캐시가 더렵혀졌거나(변경사항이 있거나) 비어있으면 실행
         /// 첫 페이지부터 다시 불러오고 기존에 저장되어 있던 캐시들 삭제
@@ -78,7 +78,7 @@ extension DefaultArchiveRepository {
         let currentCache = photoCache[folderID] ?? []
         
         // 요청한 정렬 순서 (기본값 DESC)
-        let requestSortOrder = sortOrder ?? "DESC"
+        let requestSortOrder = sortOrder
         // 기존에 저장된 정렬 순서
         let cachedSortOrder = currentSortOrder[folderID]
         // 정렬이 바뀌었으면 무조건 Dirty로 간주하여 초기화
@@ -98,7 +98,7 @@ extension DefaultArchiveRepository {
         }
         
         let page = currentPhotoPage[folderID] ?? 0
-        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size ?? 20, sortOrder: sortOrder)
+        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: sortOrder)
         let endpoint = ArchiveEndpoint.getPhotoList(request: request)
         let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
         
@@ -164,7 +164,7 @@ extension DefaultArchiveRepository {
         return entity
     }
     
-    func fetchFavoritePhotoList(size: Int?, sortOrder: String?) async throws -> [PhotoEntity] {
+    func fetchFavoritePhotoList(size: Int? = 20, sortOrder: String?) async throws -> [PhotoEntity] {
         
         if isFavoriteCacheDirty || favoritePhotoCache.isEmpty {
             currentFavoritePage = 0
@@ -175,7 +175,7 @@ extension DefaultArchiveRepository {
         
         if !hasNextFavorite { return favoritePhotoCache }
         
-        let request = PhotoListDTO.Request(folderId: nil, page: currentFavoritePage, size: size ?? 20, sortOrder: sortOrder)
+        let request = PhotoListDTO.Request(folderId: nil, page: currentFavoritePage, size: size, sortOrder: sortOrder)
         let endpoint = ArchiveEndpoint.getFavoritePhotoList(request: request)
         let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
         

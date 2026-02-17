@@ -10,6 +10,9 @@ import ComposableArchitecture
 
 @Reducer
 struct AppCoordinator {
+    enum Constants {
+        static let versionCheckInterval: TimeInterval = 60 *  60 * 24 // 1일
+    }
     
     @ObservableState
     struct State {
@@ -30,6 +33,7 @@ struct AppCoordinator {
             }
         }
         var pendingSessionStatus: UserSessionStatus?
+        var lastVersionCheckedTime: Date?
         
         init() {
             self.route = .splash
@@ -50,6 +54,8 @@ struct AppCoordinator {
         // Internal Actions
         case splashSequenceCompleted(UserSessionStatus, AppVersionClient.VersionResult)
         case userSessionStatusChanged(UserSessionStatus)
+        case scenePhaseChanged(ScenePhase)
+        case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
         
         // Binding Actions
         case binding(BindingAction<State>)
@@ -62,6 +68,7 @@ struct AppCoordinator {
     @Dependency(\.appVersionClient) private var appVersionClient
     @Dependency(\.continuousClock) var clock
     @Dependency(\.openURL) private var openURL
+    @Dependency(\.date.now) private var now
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -71,6 +78,8 @@ struct AppCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppLaunched:
+                state.lastVersionCheckedTime = now
+                
                 return .run { [currentStatus = state.userSessionStatus] send in
                     async let timer: Void = clock.sleep(for: .milliseconds(1500))
                     
@@ -97,6 +106,37 @@ struct AppCoordinator {
                     let (_, finalStatus, finalVersionResult) = try await (timer, nextStatus, versionResult)
                     
                     await send(.splashSequenceCompleted(finalStatus, finalVersionResult))
+                }
+                
+            case let .scenePhaseChanged(phase):
+                guard phase == .active else { return .none }
+                if state.versionAlert == .updateNeeded { return .none }
+                if let lastTime = state.lastVersionCheckedTime, now.timeIntervalSince(lastTime) < Constants.versionCheckInterval { return .none }
+                return .run { send in
+                    do {
+                        let result = try await appVersionClient.checkVersion()
+                        await send(.backgroundVersionCheckResult(.success(result)))
+                    } catch {
+                        await send(.backgroundVersionCheckResult(.failure(error)))
+                    }
+                }
+                
+            case let .backgroundVersionCheckResult(result):
+                guard case let .success(version) = result else { return .none }
+                state.lastVersionCheckedTime = now
+                
+                switch version.status {
+                case .mustUpdate:
+                    state.versionAlert = .updateNeeded
+                    return .none
+                    
+                case .optionalUpdate:
+                    guard state.versionAlert == nil else { return .none }
+                    state.versionAlert = .updateAvailable
+                    return .none
+                    
+                case .upToDate:
+                    return .none
                 }
                 
             case let .splashSequenceCompleted(finalStatus, finalVersionResult):

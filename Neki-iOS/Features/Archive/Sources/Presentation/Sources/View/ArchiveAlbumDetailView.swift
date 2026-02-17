@@ -36,6 +36,7 @@ struct ArchiveAlbumDetailView: View {
                 }
             }
         }
+        .task { await store.send(.onAppear).finish() }
         .nekiToolbar(
             left: { NekiToolBar.back { store.send(.onTapBackButton) } },
             center: { NekiToolBar.textCenter(store.album.title) },
@@ -47,7 +48,6 @@ struct ArchiveAlbumDetailView: View {
                 }
             }
         )
-        
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
                 initialOption: .fromAlbumOnly,
@@ -64,9 +64,6 @@ struct ArchiveAlbumDetailView: View {
             )
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
-        }
-        .task {
-            await store.send(.onAppear).finish()
         }
         .background(.white)
         

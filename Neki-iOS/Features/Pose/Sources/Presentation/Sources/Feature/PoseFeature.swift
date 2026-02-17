@@ -55,12 +55,14 @@ struct PoseFeature {
         case onTapRandomPoseRecommend
         case onTapStartRandomPoseCarousel
         case imageTapped(Pose)
+        case onTapBookmark(Pose)
         case onRefresh
         case qrScanButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
         case updatePoseInList(Pose)
+        case bookmarkResponse(id: Int, isBookmarked: Bool, Result<Void, Error>)
         
         // Delegate Action
         case delegate(Delegate)
@@ -134,6 +136,14 @@ struct PoseFeature {
             case .qrScanButtonTapped:
                 return .send(.delegate(.qrScanButtonTapped))
                 
+            case let .onTapBookmark(pose):
+                var updatedPose = pose
+                updatedPose.isScrapped.toggle()
+                return .run { [updatedPose] send in
+                    await send(.bookmarkResponse(id: pose.id, isBookmarked: updatedPose.isScrapped, Result { try await poseClient.scrapPose(pose.id) }))
+                }
+                .merge(with: .send(.updatePoseInList(updatedPose)))
+                
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
                 if state.generalPoses.contains(where: { $0.id == pose.id }) { state.generalPoses[id: pose.id] = pose }
@@ -178,6 +188,16 @@ struct PoseFeature {
                 state.isLoading = false
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
+                
+            case let .bookmarkResponse(id, isBookmarked, .success):
+                return .none
+                
+            case let .bookmarkResponse(id, isBookmarked, .failure(error)):
+                Logger.presentation.error("Bookmark toggle failed: \(error)")
+                guard let index = state.generalPoses.index(id: id) else { return .none }
+                var rolledBackPose = state.generalPoses[index]
+                rolledBackPose.isScrapped = !isBookmarked
+                return .send(.updatePoseInList(rolledBackPose))
                 
                 // MARK: - Default
             default:

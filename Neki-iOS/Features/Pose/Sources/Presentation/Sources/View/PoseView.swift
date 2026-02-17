@@ -86,7 +86,7 @@ private extension PoseView {
                 items: Array(store.filteredPoses),
                 columns: 2
             ) { item in
-                FeedImageView(item: item)
+                FeedImageView(item: item, onTapBookmark: { store.send(.onTapBookmark(item)) })
                     .onTapGesture {
                         store.send(.imageTapped(item))
                     }

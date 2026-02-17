@@ -38,5 +38,16 @@ struct AppCoordinatorView: View {
             store.send(.userSessionStatusChanged(newValue))
         }
         .nekiToast(item: $store.toastItem)
+        .nekiAlert(
+            isPresented: $store.isAlertPresented,
+            style: store.versionAlert?.style ?? .cancelable,
+            title: store.versionAlert?.title ?? "",
+            subtitle: store.versionAlert?.subtitle ?? "",
+            confirmText: store.versionAlert?.confirmText ?? "",
+            cancelText: store.versionAlert?.cancelText,
+            hasIcon: true,
+            onConfirm: { store.send(.didTapUpdateAlert) },
+            onCancel: { store.send(.didTapLaterAlert) }
+        )
     }
 }

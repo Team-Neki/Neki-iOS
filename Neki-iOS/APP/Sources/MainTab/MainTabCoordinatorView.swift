@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import PhotosUI
 // import Pose
 // import Archive
 
@@ -14,7 +15,7 @@ struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
     @State private var sheetHeight: CGFloat = 1
     
-    var body: some View {
+    var body: some View { // The compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
         ZStack(alignment: .bottom) {
             Group {
                 switch store.selectedTab {
@@ -56,6 +57,12 @@ struct MainTabCoordinatorView: View {
         .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in
             QRCodeScannerView(store: qrStore)
         }
+        .photosPicker(
+            isPresented: $store.isPhotoPickerPresented.sending(\.setPhotosPickerPresented),
+            selection: $store.imagePicker.pickerItems.sending(\.imagePicker.pickerItemsChanged),
+            maxSelectionCount: store.imagePicker.remainingCount,
+            matching: .images
+        )
     }
 }
 
@@ -90,7 +97,9 @@ extension MainTabCoordinatorView {
                             }
                         }
                         
-                        NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                        Button {
+                            store.send(.onTapGallery)
+                        } label: {
                             VStack(spacing:  8) {
                                 Image(.iconAddGallery)
                                 Text("갤러리에서 추가")

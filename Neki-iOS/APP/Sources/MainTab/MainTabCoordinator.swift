@@ -25,6 +25,8 @@ struct MainTabCoordinator {
         var map = MapCoordinator.State()
         var myPage: MyPageCoordinator.State
         var imagePicker = ImagePickerFeature.State(mediaType: .photoBooth)
+        var isPhotoPickerPresented: Bool = false
+        
         @Presents var destination: Destination.State?
         
         var isTabbarHidden: Bool = false
@@ -52,9 +54,11 @@ struct MainTabCoordinator {
         // View Actions
         case onTapAddButton
         case onTapQRScan
+        case onTapGallery
         
         // Internal Actions
         case qrScannerPresented
+        case setPhotosPickerPresented(Bool)
         case presentPermissionAlert
         case dismissPermissionAlert
         case openAppSettings
@@ -69,6 +73,7 @@ struct MainTabCoordinator {
     
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.openURL) private var openURL
+    @Dependency(\.continuousClock) private var clock
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -100,6 +105,19 @@ struct MainTabCoordinator {
                 
             case .onTapAddButton:
                 state.destination = .uploadSelection
+                return .none
+                
+                
+                // MARK: - Gallary Logic
+            case .onTapGallery:
+                state.destination = nil
+                return .run { send in
+                    try await clock.sleep(for: .seconds(0.3)) // 사진 추가 방법 선택 시트 퇴장 대기
+                    await send(.setPhotosPickerPresented(true))
+                }
+                
+            case let .setPhotosPickerPresented(isPresented):
+                state.isPhotoPickerPresented = isPresented
                 return .none
                 
                 // MARK: - QR Scan Logic
@@ -168,11 +186,13 @@ struct MainTabCoordinator {
                 return .send(.delegate(.profileUpdated(user)))
                 
             case let .imagePicker(.uploadCompleted(imageIDs)):
+                state.isPhotoPickerPresented = false
                 state.selectedTab = .archive
                 guard imageIDs.isEmpty == false else { return .none }
                 return .send(.archive(.root(.processUploadImages(imageIDs: imageIDs))))
                 
             case .imagePicker(.uploadFailed):
+                state.isPhotoPickerPresented = false
                 state.toast = NekiToastItem("이미지 업로드에 실패했어요.", style: .error)
                 return .none
                 

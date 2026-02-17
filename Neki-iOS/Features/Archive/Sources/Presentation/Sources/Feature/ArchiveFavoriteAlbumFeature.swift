@@ -66,7 +66,7 @@ struct ArchiveFavoriteAlbumFeature {
                 return .send(.fetchFavoritePhotos)
                 
             case .fetchFavoritePhotos:
-                
+                guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
                 
                 return .run { send in

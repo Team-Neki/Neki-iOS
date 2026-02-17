@@ -316,7 +316,3 @@ extension PoseView {
         var id: Self { self }
     }
 }
-
-#Preview {
-    MainTabCoordinatorView(store: Store(initialState: MainTabCoordinator.State.init(user: .mock), reducer: { MainTabCoordinator() }))
-}

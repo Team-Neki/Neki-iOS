@@ -65,9 +65,6 @@ struct ArchiveAlbumDetailView: View {
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
         }
-        .task {
-            await store.send(.onAppear).finish()
-        }
         .background(.white)
         
     }

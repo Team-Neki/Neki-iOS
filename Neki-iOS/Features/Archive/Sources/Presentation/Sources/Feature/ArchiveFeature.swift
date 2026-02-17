@@ -135,7 +135,7 @@ struct ArchiveFeature {
                 
             case .onTapConfirmAddAlbum:
                 guard state.isConfirmButtonEnabled else { return .none }
-                let title = state.newAlbumTitle.trimmingCharacters(in: .whitespaces)
+                let title = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 
@@ -309,7 +309,7 @@ struct ArchiveFeature {
                 // MARK: - Binding
                 
             case .binding(\.newAlbumTitle):
-                let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespaces)
+                let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 if state.albums.contains(where: { $0.title == inputTitle }) {
                     state.albumTitleErrorMessage = "이미 사용 중인 앨범명이에요."
                 } else {

@@ -48,6 +48,7 @@ struct FeedImageView: View {
             } label: {
                 Image(item.isScrapped ? .iconBookmarkFill : .iconBookmark)
             }
+            .padding()
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()

@@ -8,7 +8,7 @@
 import Foundation
 import Dependencies
 
-actor DefaultArchiveRepository: ArchiveRepository {
+final actor DefaultArchiveRepository: ArchiveRepository {
     
     @Dependency(\.networkProvider) var networkProvider
     

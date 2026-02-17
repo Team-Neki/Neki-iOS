@@ -38,6 +38,7 @@ struct MyPageView: View {
                 // NekiToolBar.icon(.iconBellFill)
             }
         )
+        .task { await store.send(.onAppear).finish() }
     }
 }
 
@@ -113,7 +114,7 @@ private extension MyPageView {
             if item.hasLink {
                 Image(.iconChevronRight)
             } else {
-                Text("v.1.3.1") // TODO: 실제 버전정보 표시하도록 해야함
+                Text("v.\(store.appVersion.value)")
                     .nekiFont(.body14Medium)
                     .foregroundStyle(.gray500)
             }

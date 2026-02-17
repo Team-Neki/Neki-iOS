@@ -8,7 +8,6 @@
 import SwiftUI
 import ComposableArchitecture
 import Kingfisher
-import Lottie
 
 struct ArchiveView: View {
     
@@ -105,8 +104,7 @@ struct ArchiveView: View {
             .presentationCornerRadius(20)
         }
         .fullScreenCover(isPresented: $store.isLoading, content: {
-            loadingView
-                .presentationBackground(.clear)
+            LoadingView(message: "사진을 업로드하고 있어요.")
         })
         .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
@@ -312,28 +310,6 @@ private extension ArchiveView {
             }
         }
         .padding(.horizontal, 20)
-    }
-    
-    var loadingView: some View {
-        ZStack {
-            Color.gray900.opacity(0.5)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 0) {
-                LottieView(animation: .named("ios_loading"))
-                    .configure { lottieAnimationView in
-                        lottieAnimationView.contentMode = .scaleAspectFill
-                        lottieAnimationView.shouldRasterizeWhenIdle = false
-                    }
-                    .playbackMode(.playing(.toProgress(1, loopMode: .loop)))
-                    .frame(width: 150, height: 150)
-                    .aspectRatio(contentMode: .fill)
-                
-                Text("사진을 업로드하고 있어요")
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.white)
-            }
-        }
     }
 }
 

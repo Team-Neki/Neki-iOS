@@ -13,9 +13,6 @@ struct AccountPreferenceView: View {
     @Environment(\.dismiss) private var dismiss
     @Bindable var store: StoreOf<AccountPreferenceFeature>
     
-    @State private var isLogoutAlertPresented: Bool = false
-    @State private var isUnregisterAlertPresented: Bool = false
-    
     var body: some View {
         VStack {
             profileArea
@@ -30,8 +27,11 @@ struct AccountPreferenceView: View {
             left: { NekiToolBar.back(action: { dismiss() }) },
             center: { NekiToolBar.textCenter("계정 설정") }
         )
+        .overlay {
+            if store.isLoading { LoadingView() }
+        }
         .nekiAlert(
-            isPresented: $isLogoutAlertPresented,
+            isPresented: $store.isLogoutAlertPresented,
             style: .cancelable,
             title: "로그아웃 하시겠습니까?",
             subtitle: "다시 로그인해야 서비스를 이용할 수 있어요.",
@@ -40,10 +40,10 @@ struct AccountPreferenceView: View {
             isProcessing: false,
             hasIcon: false,
             onConfirm: { store.send(.logoutButtonTapped) },
-            onCancel: { isLogoutAlertPresented = false }
+            onCancel: { store.send(.cancelButtonTapped) }
         )
         .nekiAlert(
-            isPresented: $isUnregisterAlertPresented,
+            isPresented: $store.isUnregisterAlertPresented,
             style: .cancelable,
             title: "정말 탈퇴하시겠어요?",
             subtitle: "계정을 탈퇴하면 사진과 정보가 모두 삭제되며, 삭제된 데이터는 복구할 수 없어요.",
@@ -52,7 +52,7 @@ struct AccountPreferenceView: View {
             isProcessing: false,
             hasIcon: false,
             onConfirm: { store.send(.unregisterButtonTapped) },
-            onCancel: { isUnregisterAlertPresented = false }
+            onCancel: { store.send(.cancelButtonTapped) }
         )
     }
 }
@@ -103,7 +103,7 @@ private extension AccountPreferenceView {
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect)
-                .onTapGesture { isLogoutAlertPresented.toggle() }
+                .onTapGesture { store.send(.logoutMenuTapped) }
             
             Text("탈퇴하기")
                 .nekiFont(.title18Medium)
@@ -111,7 +111,7 @@ private extension AccountPreferenceView {
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(.rect)
-                .onTapGesture { isUnregisterAlertPresented.toggle() }
+                .onTapGesture { store.send(.unregisterMenuTapped) }
         }
         .padding(.horizontal)
     }

@@ -38,14 +38,6 @@ struct QRCodeScannerView: View {
                     .padding(.top, 40)
             }
             
-            if store.isLoading {
-                Color.gray900.opacity(0.6)
-                
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(.white)
-            }
-            
             if store.isWebViewPresented, let url = store.webViewURL {
                 webViewLayer(url: url)
             }
@@ -77,6 +69,7 @@ struct QRCodeScannerView: View {
             confirmText: "확인",
             onConfirm: { store.send(.closeExpiredAlertButtonTapped) }
         )
+        .fullScreenCover(isPresented: $store.isLoading) { LoadingView() }
     }
     
     private var header: some View {

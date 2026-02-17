@@ -106,7 +106,7 @@ struct QRCodeScannerView: View {
         Button {
             store.send(.lightButtonTapped)
         } label: {
-            Image(.iconLightOff) // TODO: 현재 토치 온오프 아이콘이 동일한데 에셋 필요, 버튼 디자인 변경 예정
+            Image(store.isLightOn ? .iconLightOff : .iconLightOn)
                 .padding(.horizontal, 13.5)
                 .padding(.vertical, 15)
                 .background(.ultraThinMaterial)

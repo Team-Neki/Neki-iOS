@@ -187,6 +187,6 @@ public extension CGFloat {
             .first { $0.isKeyWindow }
         
         // 탭바 순수 높이(49) + 하단 Safe Area
-        return 49 + (window?.safeAreaInsets.bottom ?? 0)
+        return 40 + (window?.safeAreaInsets.bottom ?? 0)
     }
 }

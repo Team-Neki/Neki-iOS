@@ -28,6 +28,7 @@ struct PoseCoordinator {
         case delegate(Delegate)
         enum Delegate {
             case logout
+            case requestQRScan
         }
     }
     
@@ -47,6 +48,9 @@ struct PoseCoordinator {
             case let .root(.delegate(.didTapStartRandomPose(option))):
                 state.path.append(.randomPose(RandomPoseCarouselFeature.State(peopleCount: option)))
                 return .none
+                
+            case let .root(.delegate(.qrScanButtonTapped)):
+                return .send(.delegate(.requestQRScan))
                 
                 // MARK: - Data Synchronization (Coordinator's Main Job)
             case let .path(.element(_, action: .detail(.delegate(.poseUpdated(pose))))):

@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct AppVersion: Equatable, Sendable {
+struct AppVersion: Sendable {
     let value: String
     
     init(value: String) { self.value = value }
@@ -15,10 +15,14 @@ struct AppVersion: Equatable, Sendable {
 }
 
 
-// MARK: - AppVersion + Comparable
+// MARK: - AppVersion + Comparable & Equatable
 
-extension AppVersion: Comparable {
+extension AppVersion: Comparable, Equatable {
     private var versionComponents: [Int] { value.split(separator: ".").compactMap { Int($0) } }
+    
+    static func == (lhs: AppVersion, rhs: AppVersion) -> Bool {
+        lhs.versionComponents == rhs.versionComponents
+    }
     
     static func < (lhs: AppVersion, rhs: AppVersion) -> Bool {
         let lhsComponents = lhs.versionComponents

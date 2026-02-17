@@ -44,7 +44,7 @@ struct AppCoordinatorView: View {
             title: store.versionAlert?.title ?? "",
             subtitle: store.versionAlert?.subtitle ?? "",
             confirmText: store.versionAlert?.confirmText ?? "",
-            cancelText: store.versionAlert?.cancelText ?? "",
+            cancelText: store.versionAlert?.cancelText,
             hasIcon: true,
             onConfirm: { store.send(.didTapUpdateAlert) },
             onCancel: { store.send(.didTapLaterAlert) }

@@ -15,7 +15,7 @@ struct MainTabCoordinatorView: View {
     @Bindable var store: StoreOf<MainTabCoordinator>
     @State private var sheetHeight: CGFloat = 1
     
-    var body: some View { // The compiler is unable to type-check this expression in reasonable time; try breaking up the expression into distinct sub-expressions
+    var body: some View {
         ZStack(alignment: .bottom) {
             Group {
                 switch store.selectedTab {

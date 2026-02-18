@@ -111,6 +111,7 @@ struct MainTabCoordinator {
                 
                 // MARK: - Gallary Logic
             case .onTapGallery:
+                guard state.destination != nil else { return .none }
                 state.pendingPresentation = .gallery
                 state.destination = nil
                 return .none

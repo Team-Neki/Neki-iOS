@@ -22,15 +22,13 @@ public struct NekiImagePicker<Label: View>: View {
     }
     
     public var body: some View {
-        let remaining = max(0, store.maxCount - store.selectedImages.count)
-        
         PhotosPicker(
             selection: $store.pickerItems.sending(\.pickerItemsChanged),
-            maxSelectionCount: remaining,
+            maxSelectionCount: store.remainingCount,
             matching: .images
         ) {
             label()
         }
-        .disabled(remaining <= 0)
+        .disabled(store.remainingCount <= 0 || store.isLoading)
     }
 }

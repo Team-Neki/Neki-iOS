@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import PhotosUI
 // import Pose
 // import Archive
 
@@ -50,12 +51,20 @@ struct MainTabCoordinatorView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.dismissPermissionAlert) }
         )
-        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) { _ in
+        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) {
+            store.send(.uploadSelectionSheetDismissed)
+        } content: { _ in
             UploadSelectionSheet(store: store)
         }
         .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in
             QRCodeScannerView(store: qrStore)
         }
+        .photosPicker(
+            isPresented: $store.isPhotoPickerPresented.sending(\.setPhotosPickerPresented),
+            selection: $store.imagePicker.pickerItems.sending(\.imagePicker.pickerItemsChanged),
+            maxSelectionCount: store.imagePicker.remainingCount,
+            matching: .images
+        )
     }
 }
 
@@ -90,7 +99,9 @@ extension MainTabCoordinatorView {
                             }
                         }
                         
-                        NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                        Button {
+                            store.send(.onTapGallery)
+                        } label: {
                             VStack(spacing:  8) {
                                 Image(.iconAddGallery)
                                 Text("갤러리에서 추가")

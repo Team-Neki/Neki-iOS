@@ -14,6 +14,7 @@ struct FeedImageView: View {
     //MARK: - Properties
     
     let item: Pose
+    let onTapBookmark: (() -> Void)?
     
     let gradientColor: LinearGradient = LinearGradient(
         colors: [
@@ -42,10 +43,12 @@ struct FeedImageView: View {
         .overlay { Color.black.opacity(0.04) }
         .overlay { gradientColor.opacity(0.2) }
         .overlay(alignment: .topTrailing) {
-            if item.isScrapped {
-                Image(.iconBookmarkFill)
-                    .padding()
+            Button {
+                onTapBookmark?()
+            } label: {
+                Image(item.isScrapped ? .iconBookmarkFill : .iconBookmark)
             }
+            .padding()
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()

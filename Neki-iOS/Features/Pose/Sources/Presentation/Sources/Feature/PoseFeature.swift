@@ -55,12 +55,14 @@ struct PoseFeature {
         case onTapRandomPoseRecommend
         case onTapStartRandomPoseCarousel
         case imageTapped(Pose)
+        case onTapBookmark(Pose)
         case onRefresh
         case qrScanButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
         case updatePoseInList(Pose)
+        case bookmarkResponse(Pose, Result<Void, Error>)
         
         // Delegate Action
         case delegate(Delegate)
@@ -134,15 +136,22 @@ struct PoseFeature {
             case .qrScanButtonTapped:
                 return .send(.delegate(.qrScanButtonTapped))
                 
+            case let .onTapBookmark(pose):
+                var updatedPose = pose
+                updatedPose.isScrapped.toggle()
+                return .run { [updatedPose] send in
+                    await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) }))
+                }
+                .merge(with: .send(.updatePoseInList(updatedPose)))
+                
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
                 if state.generalPoses.contains(where: { $0.id == pose.id }) { state.generalPoses[id: pose.id] = pose }
                 if pose.isScrapped {
-                    if state.scrappedPoses.contains(where: { $0.id == pose.id }) == false {
-                        guard state.scrappedPoses.isEmpty == false else { return .none }
-                        state.scrappedPoses.append(pose)
-                    } else {
+                    if state.scrappedPoses.contains(where: { $0.id == pose.id }) {
                         state.scrappedPoses[id: pose.id] = pose
+                    } else {
+                        state.scrappedPoses.insert(pose, at: .zero)
                     }
                 } else {
                     state.scrappedPoses.remove(id: pose.id)
@@ -178,6 +187,15 @@ struct PoseFeature {
                 state.isLoading = false
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
+                
+            case .bookmarkResponse(_, .success):
+                return .none
+                
+            case let .bookmarkResponse(pose, .failure(error)):
+                Logger.presentation.error("Bookmark toggle failed: \(error)")
+                var rolledBackPose = pose
+                rolledBackPose.isScrapped.toggle()
+                return .send(.updatePoseInList(rolledBackPose))
                 
                 // MARK: - Default
             default:

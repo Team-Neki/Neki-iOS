@@ -62,7 +62,7 @@ struct PoseFeature {
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
         case updatePoseInList(Pose)
-        case bookmarkResponse(id: Int, isBookmarked: Bool, Result<Void, Error>)
+        case bookmarkResponse(Pose, Result<Void, Error>)
         
         // Delegate Action
         case delegate(Delegate)
@@ -140,7 +140,7 @@ struct PoseFeature {
                 var updatedPose = pose
                 updatedPose.isScrapped.toggle()
                 return .run { [updatedPose] send in
-                    await send(.bookmarkResponse(id: pose.id, isBookmarked: updatedPose.isScrapped, Result { try await poseClient.scrapPose(pose.id) }))
+                    await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) }))
                 }
                 .merge(with: .send(.updatePoseInList(updatedPose)))
                 
@@ -148,11 +148,10 @@ struct PoseFeature {
             case let .updatePoseInList(pose):
                 if state.generalPoses.contains(where: { $0.id == pose.id }) { state.generalPoses[id: pose.id] = pose }
                 if pose.isScrapped {
-                    if state.scrappedPoses.contains(where: { $0.id == pose.id }) == false {
-                        guard state.scrappedPoses.isEmpty == false else { return .none }
-                        state.scrappedPoses.append(pose)
-                    } else {
+                    if state.scrappedPoses.contains(where: { $0.id == pose.id }) {
                         state.scrappedPoses[id: pose.id] = pose
+                    } else {
+                        state.scrappedPoses.insert(pose, at: .zero)
                     }
                 } else {
                     state.scrappedPoses.remove(id: pose.id)
@@ -189,14 +188,13 @@ struct PoseFeature {
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
                 
-            case let .bookmarkResponse(id, isBookmarked, .success):
+            case .bookmarkResponse(_, .success):
                 return .none
                 
-            case let .bookmarkResponse(id, isBookmarked, .failure(error)):
+            case let .bookmarkResponse(pose, .failure(error)):
                 Logger.presentation.error("Bookmark toggle failed: \(error)")
-                guard let index = state.generalPoses.index(id: id) else { return .none }
-                var rolledBackPose = state.generalPoses[index]
-                rolledBackPose.isScrapped = !isBookmarked
+                var rolledBackPose = pose
+                rolledBackPose.isScrapped.toggle()
                 return .send(.updatePoseInList(rolledBackPose))
                 
                 // MARK: - Default

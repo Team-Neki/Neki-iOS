@@ -51,7 +51,9 @@ struct MainTabCoordinatorView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.dismissPermissionAlert) }
         )
-        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) { _ in
+        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) {
+            store.send(.uploadSelectionSheetDismissed)
+        } content: { _ in
             UploadSelectionSheet(store: store)
         }
         .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in

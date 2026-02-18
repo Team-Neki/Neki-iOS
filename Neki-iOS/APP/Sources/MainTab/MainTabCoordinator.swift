@@ -26,6 +26,7 @@ struct MainTabCoordinator {
         var myPage: MyPageCoordinator.State
         var imagePicker = ImagePickerFeature.State(mediaType: .photoBooth)
         var isPhotoPickerPresented: Bool = false
+        var pendingPresentation: PendingPresentation?
         
         @Presents var destination: Destination.State?
         
@@ -55,6 +56,7 @@ struct MainTabCoordinator {
         case onTapAddButton
         case onTapQRScan
         case onTapGallery
+        case uploadSelectionSheetDismissed
         
         // Internal Actions
         case qrScannerPresented
@@ -73,7 +75,6 @@ struct MainTabCoordinator {
     
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.openURL) private var openURL
-    @Dependency(\.continuousClock) private var clock
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -110,10 +111,17 @@ struct MainTabCoordinator {
                 
                 // MARK: - Gallary Logic
             case .onTapGallery:
+                state.pendingPresentation = .gallery
                 state.destination = nil
-                return .run { send in
-                    try await clock.sleep(for: .seconds(0.3)) // 사진 추가 방법 선택 시트 퇴장 대기
-                    await send(.setPhotosPickerPresented(true))
+                return .none
+                
+            case .uploadSelectionSheetDismissed:
+                guard let pendingPresentation = state.pendingPresentation else { return .none }
+                state.pendingPresentation = nil
+                
+                switch pendingPresentation {
+                case .gallery:
+                    return .send(.setPhotosPickerPresented(true))
                 }
                 
             case let .setPhotosPickerPresented(isPresented):
@@ -242,5 +250,14 @@ extension MainTabCoordinator {
     enum Destination {
         case uploadSelection
         case qrScan(QRCodeScanFeature)
+    }
+}
+
+
+// MARK: - Nested Types
+
+extension MainTabCoordinator {
+    enum PendingPresentation {
+        case gallery
     }
 }

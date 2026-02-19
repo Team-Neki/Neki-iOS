@@ -109,10 +109,3 @@ struct NekiTooltipView: View {
             .zIndex(1)
     }
 }
-
-import ComposableArchitecture
-#Preview {
-    TabView {
-        NaverMapView(store: Store(initialState: MapFeature.State(), reducer: { MapFeature() }))
-    }
-}

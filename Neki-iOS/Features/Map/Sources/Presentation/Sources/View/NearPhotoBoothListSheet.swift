@@ -12,6 +12,8 @@ import Kingfisher
 struct NearPhotoBoothListSheet: View {
     @Bindable var store: StoreOf<PhotoBoothListFeature>
     
+    private let brandNameFormatter = PhotoBoothNameFormatter()
+    
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }
     
     var body: some View {
@@ -71,7 +73,7 @@ private extension NearPhotoBoothListSheet {
                         }
                     }
                 
-                Text(brand.name)
+                Text(brandNameFormatter.format(brand: brand))
                     .font(.neki(isSelected ? .body14SemiBold : .body14Medium))
                     .foregroundStyle(isSelected ? .primary400 : .gray900)
                     .lineLimit(2)

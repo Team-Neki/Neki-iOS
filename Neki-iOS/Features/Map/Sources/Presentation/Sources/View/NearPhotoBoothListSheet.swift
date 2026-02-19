@@ -99,7 +99,11 @@ private extension NearPhotoBoothListSheet {
         } header: {
             HStack {
                 HStack(spacing: 2) {
-                    Text("가까운").foregroundStyle(.primary400) + Text("  포토 부스")
+                    Text("가까운").foregroundStyle(.primary400) +
+                    Text(" ") +
+                    Text("포토") +
+                    Text(" ") +
+                    Text("부스")
                     
                     Image(.iconPinClip)
                 }

@@ -106,8 +106,7 @@ private extension NearPhotoBoothListSheet {
                 
                 Spacer()
                 
-                Image(systemName: "exclamationmark.circle")
-                    .foregroundStyle(.gray400)
+                Image(.iconExclamationMarkGray)
                     .onTapGesture { store.send(.toggleTooltip) }
                     .nekiTooltip(isPresented: $store.isTooltipPresented, "가까운 네컷 사진 브랜드는\n1Km 기준으로 표시돼요.")
             }

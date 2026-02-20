@@ -79,24 +79,6 @@ struct ArchiveView: View {
             }
             
         }
-        .sheet(isPresented: $addAlbumSheetPresented) {
-            ArchiveAddAlbumSheet(
-                text: $store.newAlbumTitle,
-                errorMessage: store.albumTitleErrorMessage,
-                isConfirmEnabled: store.isConfirmButtonEnabled,
-                onCancel: {
-                    store.send(.onTapCancelAddAlbum)
-                    addAlbumSheetPresented = false
-                },
-                onConfirm: {
-                    store.send(.onTapConfirmAddAlbum)
-                    addAlbumSheetPresented = false
-                }
-            )
-            .presentationDetents([.height(266)])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(20)
-        }
         .fullScreenCover(isPresented: $store.isLoading, content: {
             LoadingView(message: "사진을 업로드하고 있어요.")
         })
@@ -106,6 +88,28 @@ struct ArchiveView: View {
         }
         .transaction { transaction in
             transaction.disablesAnimations = true
+        }
+        .sheet(isPresented: $addAlbumSheetPresented) {
+            ArchiveAddAlbumSheet(
+                text: $store.newAlbumTitle,
+                errorMessage: store.albumTitleErrorMessage,
+                isConfirmEnabled: store.isConfirmButtonEnabled,
+                onCancel: {
+                    store.send(.onTapCancelAddAlbum)
+                    withAnimation {
+                        addAlbumSheetPresented = false
+                    }
+                },
+                onConfirm: {
+                    store.send(.onTapConfirmAddAlbum)
+                    withAnimation {
+                        addAlbumSheetPresented = false
+                    }
+                }
+            )
+            .presentationDetents([.height(266)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
         }
         .task {
             await store.send(.onAppear).finish()
@@ -137,11 +141,11 @@ private extension ArchiveView {
                     showDismiss: false
                 )
                 
-//                Button {
-//                    // TODO: - 알림 이벤트
-//                } label: {
-//                    Image(.iconBellFill)
-//                }
+                //                Button {
+                //                    // TODO: - 알림 이벤트
+                //                } label: {
+                //                    Image(.iconBellFill)
+                //                }
             }
         }
         .frame(height: 54)
@@ -174,12 +178,35 @@ private extension ArchiveView {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(store.albums) { album in
+                    ForEach(store.previewAlbums) { album in
                         AlbumCard(album: album)
                             .onTapGesture {
                                 store.send(.albumTapped(album))
                             }
                     }
+                    
+                    Button {
+                        withAnimation {
+                            addAlbumSheetPresented = true
+                        }
+                    } label: {
+                        VStack(alignment: .center, spacing: 8) {
+                            Image(.iconPlusRed)
+                            
+                            Text("새 앨범 추가")
+                                .nekiFont(.body14Medium)
+                        }
+                        .frame(width: 124, height: 166)
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.primary400)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(content: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(.primary400 , style: StrokeStyle(lineWidth: 2, lineCap: .round,
+                                                                           dash: [5, 5], dashPhase: 0))
+                    })
+                    
                 }
                 .padding(.horizontal, 20)
             }

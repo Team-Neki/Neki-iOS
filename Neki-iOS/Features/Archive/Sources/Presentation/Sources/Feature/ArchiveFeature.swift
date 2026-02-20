@@ -17,6 +17,10 @@ struct ArchiveFeature {
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         var albums: IdentifiedArrayOf<AlbumItem> = []
         
+        var previewAlbums: IdentifiedArrayOf<AlbumItem> {
+            return IdentifiedArray(uniqueElements: albums.prefix(5))
+        }
+        
         @Shared(.appStorage("showTooltip")) var showTooltip: Bool = true
         @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
         

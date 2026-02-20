@@ -78,12 +78,6 @@ struct ArchiveView: View {
                     }
             }
             
-//            if store.showDropDownMenu {
-//                dropDownMenu
-//                    .padding(.top, 46)
-//                    .padding(.trailing, 16)
-//            }
-            
         }
         .sheet(isPresented: $addAlbumSheetPresented) {
             ArchiveAddAlbumSheet(
@@ -116,11 +110,6 @@ struct ArchiveView: View {
         .task {
             await store.send(.onAppear).finish()
         }
-        .onTapGesture {
-            if store.showDropDownMenu {
-                store.showDropDownMenu = false
-            }
-        }
     }
 }
 
@@ -134,88 +123,29 @@ private extension ArchiveView {
             
             Spacer()
             
-//            HStack(alignment: .center, spacing: 12) {
-//                Button {
-//                    store.send(.toggleDropDownMenu)
-//                } label: {
-//                    Image(.iconPlusRed)
-//                }
-//                .nekiTooltip(
-//                    isPresented: $store.showTooltip,
-//                    "버튼을 눌러 네컷을 추가할 수 있어요",
-//                    position: .bottom,
-//                    style: .dark,
-//                    showDismiss: false
-//                )
+            HStack(alignment: .center, spacing: 12) {
+                Button {
+                    store.send(.toggleDropDownMenu)
+                } label: {
+                    Image(.iconQrCode)
+                }
+                .nekiTooltip(
+                    isPresented: $store.showTooltip,
+                    "QR스캔으로 빠르게 네컷을 추가해보세요!",
+                    position: .bottom,
+                    style: .dark,
+                    showDismiss: false
+                )
                 
 //                Button {
 //                    // TODO: - 알림 이벤트
 //                } label: {
 //                    Image(.iconBellFill)
 //                }
-//            }
+            }
         }
         .frame(height: 54)
         .padding(.horizontal, 20)
-    }
-    
-//    var dropDownMenu: some View {
-//        VStack(alignment: .leading, spacing: 0) {
-//            dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
-//                store.send(.onTapQRScan)
-//            }
-//            
-//            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-//                HStack(alignment: .center, spacing: 6) {
-//                    Image(uiImage: .iconRoundAddPhotoAlternate)
-//                    
-//                    Text("갤러리에서 추가")
-//                        .nekiFont(.body16Medium)
-//                        .foregroundStyle(.gray900)
-//                    
-//                    Spacer()
-//                }
-//                .padding(.leading, 12)
-//                .padding(.vertical, 5)
-//                .frame(height: 34)
-//                .contentShape(Rectangle())
-//            }
-//            
-//            Divider()
-//                .background(.gray50)
-//                .padding(.vertical, 4)
-//            
-//            dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
-//                addAlbumSheetPresented = true
-//                store.send(.onTapCancelAddAlbum)
-//            }
-//        }
-//        .padding(.vertical, 5)
-//        .frame(width: 158, height: 130)
-//        .background(.white)
-//        .clipShape(RoundedRectangle(cornerRadius: 12))
-//        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
-//    }
-    
-    func dropDownMenuButton(
-        title: String,
-        icon: UIImage,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(alignment: .center, spacing: 6) {
-                Image(uiImage: icon)
-                
-                Text(title)
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray900)
-                
-                Spacer()
-            }
-            .padding(.leading, 12)
-            .padding(.vertical, 5)
-            .frame(height: 34)
-        }
     }
     
     var albumSection: some View {

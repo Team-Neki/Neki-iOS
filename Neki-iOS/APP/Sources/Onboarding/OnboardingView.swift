@@ -11,21 +11,19 @@ import ComposableArchitecture
 struct OnboardingView: View {
     @Bindable var store: StoreOf<OnboardingCoordinator>
     
-    let contents = OnboardingItem.list
-    
     var body: some View {
         VStack(spacing: 0) {
+            
             TabView(selection: $store.currentPage) {
-                ForEach(contents.indices, id: \.self) { index in
-                    onboardingPageView(content: contents[index])
+                ForEach(store.loopedContents.indices, id: \.self) { index in
+                    onboardingPageView(content: store.loopedContents[index])
                         .tag(index)
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            .indexViewStyle(.page(backgroundDisplayMode: .never))
-            .onAppear {
-                setupPageControlAppearance()
-            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            
+            customPageControl
+                .padding(.bottom, 24)
             
             Button {
                 store.send(.startButtonTapped)
@@ -43,10 +41,19 @@ struct OnboardingView: View {
         }
     }
     
-    // 인디케이터 색상
-    private func setupPageControlAppearance() {
-        UIPageControl.appearance().currentPageIndicatorTintColor = UIColor(.primary400)
-        UIPageControl.appearance().pageIndicatorTintColor = UIColor(.gray50)
+    private var customPageControl: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<store.originalCount, id: \.self) { index in
+                let isCurrent = (store.currentPage == index + 1) ||
+                                (store.currentPage == 0 && index == store.originalCount - 1) ||
+                                (store.currentPage == store.originalCount + 1 && index == 0)
+                
+                Circle()
+                    .fill(isCurrent ? Color.primary400 : Color.gray50)
+                    .frame(width: 8, height: 8)
+                    .animation(.easeInOut(duration: 0.2), value: store.currentPage)
+            }
+        }
     }
 }
 
@@ -94,7 +101,9 @@ extension OnboardingView {
 }
 
 #Preview {
-    OnboardingCoordinatorView(store: .init(initialState: OnboardingCoordinator.State(), reducer: {
-        OnboardingCoordinator()
-    }))
+    OnboardingView(
+        store: Store(initialState: OnboardingCoordinator.State()) {
+            OnboardingCoordinator()
+        }
+    )
 }

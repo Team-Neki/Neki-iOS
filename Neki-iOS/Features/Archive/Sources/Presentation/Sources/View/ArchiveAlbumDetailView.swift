@@ -45,6 +45,10 @@ struct ArchiveAlbumDetailView: View {
                     )
                 }
             }
+            
+            if store.isLoading {
+                LoadingView(message: "사진을 업로드하고 있어요.")
+            }
         }
         .task { await store.send(.onAppear).finish() }
         .sheet(isPresented: $deleteAlbumSheetPresented) {
@@ -145,9 +149,7 @@ private extension ArchiveAlbumDetailView {
             .padding(.leading, 12)
             .contentShape(Rectangle())
 
-            Button {
-                // TODO: - 앨범 내 사진 추가 연결
-            } label: {
+            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
                 Text("사진 추가")
                     .nekiFont(.body16Medium)
                     .foregroundStyle(.gray900)

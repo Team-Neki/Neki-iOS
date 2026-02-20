@@ -20,6 +20,9 @@ struct ArchiveFavoriteAlbumFeature {
         var selectedIDs: Set<Int> = []
         var isSelectionMode: Bool = false
         
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
+        var isLoading: Bool = false
+        
         var isFetchingPhotos: Bool = false
         
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
@@ -45,6 +48,12 @@ struct ArchiveFavoriteAlbumFeature {
         case onTapDownloadButton
         case downloadImagesResponse(successCount: Int)
         
+        case imagePicker(ImagePickerFeature.Action)
+        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
+        case processUploadImages(imageIDs: [Int])
+        case registerPhotos(imageIDs: [Int])
+        case registerPhotosResponse(Result<Void, Error>)
+        
         case onTapDeleteButton
         case deletePhotos
         case deletePhotosResponse(Result<Void, Error>)
@@ -65,6 +74,10 @@ struct ArchiveFavoriteAlbumFeature {
     var body: some ReducerOf<Self> {
         BindingReducer()
         
+        Scope(state: \.imagePicker, action: \.imagePicker) {
+            ImagePickerFeature()
+        }
+        
         Reduce { state, action in
             switch action {
             case .onTapBackButton:
@@ -80,6 +93,48 @@ struct ArchiveFavoriteAlbumFeature {
             case .closeDropDownMenu:
                 state.showDropDownMenu = false
                 return .none
+                
+                // MARK: - Image Upload
+                
+            case .imagePicker(.uploadStarted):
+                state.isLoading = true
+                return .send(.closeDropDownMenu)
+                
+            case let .imagePicker(.uploadCompleted(ids)):
+                return .send(.processUploadImages(imageIDs: ids))
+                
+            case .imagePicker(.uploadFailed):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
+                
+            case let .processUploadImages(imageIDs):
+                state.isLoading = false
+                guard !imageIDs.isEmpty else { return .none }
+                return .send(.registerPhotos(imageIDs: imageIDs))
+                
+            case let .registerPhotos(imageIDs):
+                return .run { [mediaIds = imageIDs] send in
+                    await send(.registerPhotosResponse(
+                        Result {
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
+                            try await archiveClient.registerPhotos(
+                                folderId: nil,
+                                uploads: uploads
+                            )
+                        }
+                    ))
+                }
+                
+            case .registerPhotosResponse(.success):
+                state.isLoading = false
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
+                    await send(.fetchFavoritePhotos)
+                }
+                
+            case .registerPhotosResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
             case .fetchFavoritePhotos:
                 guard !state.isFetchingPhotos else { return .none }

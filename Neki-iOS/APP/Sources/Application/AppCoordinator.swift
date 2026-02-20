@@ -209,13 +209,13 @@ struct AppCoordinator {
             case .route(.mainTab(.delegate(.signedOut))):
                 state.$userSessionStatus.withLock { $0 = .signedOut }
                 state.route = .auth(.init())
-                return .send(.onAppLaunched)
+                return .none
                 
             case .route(.mainTab(.delegate(.withdraw))):
                 state.$userSessionStatus.withLock { $0 = .signedOut }
                 state.initializeUserDefaults()
                 state.route = .auth(.init())
-                return .send(.onAppLaunched)
+                return .none
                 
             case let .route(.mainTab(.delegate(.profileUpdated(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }

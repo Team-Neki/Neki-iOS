@@ -53,11 +53,10 @@ extension DefaultArchiveRepository {
             self.isPhotoCacheDirty[folderID] = true
             self.isAlbumCacheDirty = true
         }
-        if let favorite = favorite {
-            if favorite {
-                self.isFavoriteCacheDirty = true
-                self.isFavoriteAlbumInfoDirty = true
-            }
+        
+        if favorite == true {
+            self.isFavoriteCacheDirty = true
+            self.isFavoriteAlbumInfoDirty = true
         }
     }
     

@@ -41,9 +41,9 @@ final actor DefaultArchiveRepository: ArchiveRepository {
 // MARK: - Create Logic
 
 extension DefaultArchiveRepository {
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)]) async throws {
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool? = false) async throws {
         let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo) }
-        let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData)
+        let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
         let endpoint = ArchiveEndpoint.registerPhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
         
@@ -53,11 +53,16 @@ extension DefaultArchiveRepository {
             self.isPhotoCacheDirty[folderID] = true
             self.isAlbumCacheDirty = true
         }
+        
+        if favorite == true {
+            self.isFavoriteCacheDirty = true
+            self.isFavoriteAlbumInfoDirty = true
+        }
     }
     
     func addFolder(name: String) async throws -> Int {
-        let request = AddFolderDTO.Request(name: name)
-        let result: BaseResponseDTO<AddFolderDTO.Response> = try await networkProvider.request(endpoint: ArchiveEndpoint.addFolder(request: request))
+        let request = FolderDTO.Request(name: name)
+        let result: BaseResponseDTO<FolderDTO.Response> = try await networkProvider.request(endpoint: ArchiveEndpoint.addFolder(request: request))
         guard let data = result.data else { throw NetworkError.responseDecodingError }
         
         self.isAlbumCacheDirty = true
@@ -236,6 +241,14 @@ extension DefaultArchiveRepository {
         
         self.isAlbumCacheDirty = true
         self.isPhotoCacheDirty[albumID] = true
+    }
+    
+    func editAlbumName(albumID: Int, name: String) async throws {
+        let request = FolderDTO.Request(name: name)
+        let endpoint = ArchiveEndpoint.editFolderName(albumID: albumID, request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        self.isAlbumCacheDirty = true
     }
 }
 

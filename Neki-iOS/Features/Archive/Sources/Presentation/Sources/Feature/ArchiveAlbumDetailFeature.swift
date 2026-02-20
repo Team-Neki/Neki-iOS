@@ -17,7 +17,16 @@ struct ArchiveAlbumDetailFeature {
         
         let album: AlbumItem
         
+        var showDropDownMenu: Bool = false
+        
         var selectedIDs: Set<Int> = []
+        
+        var newAlbumTitle: String = ""
+        var albumTitleErrorMessage: String? = nil
+        var isConfirmButtonEnabled: Bool {
+            let trimmed = newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && trimmed != album.title && albumTitleErrorMessage == nil
+        }
         
         var isSelectionMode: Bool = false
         
@@ -27,9 +36,16 @@ struct ArchiveAlbumDetailFeature {
         
         var isFetchingPhotos: Bool = false
         
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
         var isLoading: Bool = false
         
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
+        
+        init(photos: IdentifiedArrayOf<ArchiveImageItem> = [], album: AlbumItem) {
+            self.photos = photos
+            self.album = album
+            self.newAlbumTitle = album.title
+        }
     }
     
     enum Action: BindableAction {
@@ -37,9 +53,25 @@ struct ArchiveAlbumDetailFeature {
         
         case onAppear
         
+        case toggleDropDownMenu
+        case closeDropDownMenu
+        
         case onTapBackButton
         case onTapSelectButton
         case onTapCancelSelectButton
+        
+        case onTapFavorite(item: ArchiveImageItem)
+        case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
+        
+        case onTapCancelEditAlbum
+        case onTapConfirmEditAlbum
+        case editAlbumResponse(Result<Void, Error>)
+        
+        case imagePicker(ImagePickerFeature.Action)
+        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
+        case processUploadImages(imageIDs: [Int])
+        case registerPhotos(imageIDs: [Int])
+        case registerPhotosResponse(Result<Void, Error>)
         
         // 기능 액션
         case onTapDownloadButton
@@ -68,6 +100,10 @@ struct ArchiveAlbumDetailFeature {
     var body: some ReducerOf<Self> {
         BindingReducer()
         
+        Scope(state: \.imagePicker, action: \.imagePicker) {
+            ImagePickerFeature()
+        }
+        
         Reduce { state, action in
             switch action {
             case .onTapBackButton:
@@ -75,6 +111,107 @@ struct ArchiveAlbumDetailFeature {
                 
             case .onAppear:
                 return .send(.fetchPhotos)
+                
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
+                
+            case let .onTapFavorite(item):
+                let newStatus = !item.isFavorite
+                
+                state.photos[id: item.id]?.isFavorite = newStatus
+                
+                return .run { [id = item.id, isFavorite = newStatus] send in
+                    do {
+                        try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
+                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
+                    } catch {
+                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
+                    }
+                }
+                
+            case .toggleFavoriteResponse(_, .success):
+                return .none
+                
+            case let .toggleFavoriteResponse(photoID, .failure):
+                state.photos[id: photoID]?.isFavorite.toggle()
+                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
+                
+                // MARK: - Image Upload
+                
+            case .imagePicker(.uploadStarted):
+                state.isLoading = true
+                return .send(.closeDropDownMenu)
+                
+            case let .imagePicker(.uploadCompleted(ids)):
+                return .send(.processUploadImages(imageIDs: ids))
+                
+            case .imagePicker(.uploadFailed):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
+                
+            case let .processUploadImages(imageIDs):
+                state.isLoading = false
+                guard !imageIDs.isEmpty else { return .none }
+                return .send(.registerPhotos(imageIDs: imageIDs))
+                
+            case let .registerPhotos(imageIDs):
+                let albumId = state.album.id
+                
+                return .run { [mediaIds = imageIDs, albumId] send in
+                    await send(.registerPhotosResponse(
+                        Result {
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
+                            try await archiveClient.registerPhotos(
+                                folderId: albumId,
+                                uploads: uploads,
+                                favorite: false
+                            )
+                        }
+                    ))
+                }
+                
+            case .registerPhotosResponse(.success):
+                state.isLoading = false
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
+                    await send(.fetchPhotos)
+                }
+                
+            case .registerPhotosResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
+                
+                // MARK: - Edit Album Action
+                
+            case .onTapCancelEditAlbum:
+                state.newAlbumTitle = state.album.title
+                state.albumTitleErrorMessage = nil
+                return .none
+                
+            case .onTapConfirmEditAlbum:
+                guard state.isConfirmButtonEnabled else { return .none }
+                let title = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                state.albumTitleErrorMessage = nil
+                
+                return .run { [albumId = state.album.id] send in
+                    await send(.editAlbumResponse(Result {
+                        try await archiveClient.editAlbumName(albumId, title)
+                    }))
+                }
+                
+            case .editAlbumResponse(.success):
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경했어요", style: .success))))
+                }
+                
+            case .editAlbumResponse(.failure):
+                state.newAlbumTitle = state.album.title
+                return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경하지 못했어요", style: .error))))
                 
             case .fetchPhotos:
                 state.isFetchingPhotos = true
@@ -117,6 +254,7 @@ struct ArchiveAlbumDetailFeature {
                 return .send(.fetchPhotos)
                 
             case .onTapSelectButton:
+                state.showDropDownMenu = false
                 state.isSelectionMode = true
                 return .none
                 

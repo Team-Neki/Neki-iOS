@@ -13,14 +13,16 @@ public enum ArchiveEndpoint {
     case deletePhoto(request: DeletePhotoRequestDTO)
     case getFavoriteAlbumInfo
     case getAlbumList
-    case addFolder(request: AddFolderDTO.Request)
+    case addFolder(request: FolderDTO.Request)
     case deleteFolders(request: DeleteFoldersRequestDTO, deletePhotos: Bool)
     case getFavoritePhotoList(request: PhotoListDTO.Request)
     case toggleFavorite(photoID: Int, request: ToggleFavoriteDTO)
     case excludePhotosInAlbum(albumID: Int, request: DeletePhotoRequestDTO)
+    case editFolderName(albumID: Int, request: FolderDTO.Request)
 }
 
 extension ArchiveEndpoint: Endpoint {
+    
     public var authorizationType: AuthorizationType { return .bearer }
     
     public var contentType: HTTPContentType { return .json }
@@ -54,6 +56,8 @@ extension ArchiveEndpoint: Endpoint {
             return "photos/\(id)/favorite"
         case .excludePhotosInAlbum(let albumID, _):
             return "folders/\(albumID)/photos"
+        case .editFolderName(let albumID, _):
+            return "folders/\(albumID)"
         }
     }
     
@@ -61,7 +65,7 @@ extension ArchiveEndpoint: Endpoint {
         switch self {
         case .getPhotoList(let request):
             var params: [String: String] = [:]
-
+            
             if let folderId = request.folderId { params["folderId"] = String(folderId) }
             if let page = request.page { params["page"] = String(page) }
             if let size = request.size { params["size"] = String(size) }
@@ -71,7 +75,7 @@ extension ArchiveEndpoint: Endpoint {
             
         case .getFavoritePhotoList(let request):
             var params: [String: String] = [:]
-
+            
             if let page = request.page { params["page"] = String(page) }
             if let size = request.size { params["size"] = String(size) }
             if let sortOrder = request.sortOrder { params["sortOrder"] = sortOrder }
@@ -111,6 +115,8 @@ extension ArchiveEndpoint: Endpoint {
             return .patch
         case .excludePhotosInAlbum:
             return .delete
+        case .editFolderName:
+            return .patch
         }
     }
     
@@ -135,6 +141,8 @@ extension ArchiveEndpoint: Endpoint {
         case .toggleFavorite(_, let request):
             return request
         case .excludePhotosInAlbum(_, let request):
+            return request
+        case .editFolderName(_, let request):
             return request
         }
     }

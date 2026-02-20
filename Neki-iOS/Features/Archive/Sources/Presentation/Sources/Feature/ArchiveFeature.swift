@@ -17,6 +17,10 @@ struct ArchiveFeature {
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         var albums: IdentifiedArrayOf<AlbumItem> = []
         
+        var previewAlbums: IdentifiedArrayOf<AlbumItem> {
+            return IdentifiedArray(uniqueElements: albums.prefix(5))
+        }
+        
         @Shared(.appStorage("showTooltip")) var showTooltip: Bool = true
         @Presents var selectUploadAlbum: SelectUploadAlbumFeature.State?
         
@@ -27,7 +31,6 @@ struct ArchiveFeature {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
         
-        var showDropDownMenu: Bool = false
         var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
         var isLoading: Bool = false
         
@@ -43,11 +46,12 @@ struct ArchiveFeature {
         case onAppear
         
         // User Action
-        case toggleDropDownMenu
-        case closeDropDownMenu
         case onTapAllPhotos
         case onTapAllAlbums
         case openAppSettings
+        
+        case onTapFavorite(item: ArchiveImageItem)
+        case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
         
         // Add Folder Action
         case onTapCancelAddAlbum
@@ -115,20 +119,33 @@ struct ArchiveFeature {
                     .send(.fetchPhotos)
                 )
                 
-                // MARK: - User Action
+            case let .onTapFavorite(item):
+                let newStatus = !item.isFavorite
                 
-            case .toggleDropDownMenu:
-                state.showDropDownMenu.toggle()
-                return .none
+                state.photos[id: item.id]?.isFavorite = newStatus
                 
-            case .closeDropDownMenu:
-                state.showDropDownMenu = false
-                return .none
+                return .run { [id = item.id, isFavorite = newStatus] send in
+                    do {
+                        try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
+                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
+                    } catch {
+                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
+                    }
+                }
+                
+            case .toggleFavoriteResponse(_, .success):
+                return .merge(
+                    .send(.fetchAlbums),
+                    .send(.fetchPhotos)
+                )
+                
+            case let .toggleFavoriteResponse(photoID, .failure):
+                state.photos[id: photoID]?.isFavorite.toggle()
+                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
                 // MARK: - Add Folder Action
                 
             case .onTapCancelAddAlbum:
-                state.showDropDownMenu = false
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 return .none
@@ -254,7 +271,6 @@ struct ArchiveFeature {
                 
             case .imagePicker(.uploadStarted):
                 state.isLoading = true
-                state.showDropDownMenu = false
                 return .none
                 
             case let .imagePicker(.uploadCompleted(ids)):
@@ -298,7 +314,7 @@ struct ArchiveFeature {
                 
             case let .addPhotoFromQRScanner(imageID):
                 return .run { send in
-                    try await archiveClient.registerPhotos(nil, [(imageID, nil)])
+                    try await archiveClient.registerPhotos(nil, [(imageID, nil)], false)
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
                 } catch: { error, send in

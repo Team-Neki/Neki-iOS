@@ -1,5 +1,5 @@
 //
-//  ArchiveAddAlbumSheet.swift
+//  ArchiveAlbumInputSheet.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/20/26.
@@ -7,10 +7,37 @@
 
 import SwiftUI
 
-struct ArchiveAddAlbumSheet: View {
+struct ArchiveAlbumInputSheet: View {
+    
+    enum Style {
+        case add
+        case edit
+        
+        var title: String {
+            switch self {
+            case .add: return "새 앨범 추가"
+            case .edit: return "앨범 이름 변경"
+            }
+        }
+        
+        var subtitle: String {
+            switch self {
+            case .add: return "네컷사진을 모을 앨범명을 입력하세요"
+            case .edit: return "변경할 앨범 이름을 입력하세요"
+            }
+        }
+        
+        var confirmButtonTitle: String {
+            switch self {
+            case .add: return "추가하기"
+            case .edit: return "이름 변경"
+            }
+        }
+    }
     
     // MARK: - Properties
     
+    let style: Style
     @Binding var text: String
     let errorMessage: String?
     let isConfirmEnabled: Bool
@@ -23,14 +50,14 @@ struct ArchiveAddAlbumSheet: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("새 앨범 추가")
+            Text(style.title)
                 .nekiFont(.title20SemiBold)
                 .foregroundStyle(.gray900)
                 .frame(height: 28)
                 .padding(.top, 24)
                 .padding(.bottom, 2)
             
-            Text("네컷사진을 모을 앨범명을 입력하세요")
+            Text(style.subtitle)
                 .nekiFont(.body14Regular)
                 .foregroundStyle(.gray700)
                 .frame(height: 20)
@@ -38,14 +65,14 @@ struct ArchiveAddAlbumSheet: View {
             
             HStack(alignment: .center, spacing: 0) {
                 TextField("앨범명을 입력하세요", text: $text)
-                    .maxLength(16, text: $text)
+                    .maxLength(10, text: $text)
                     .nekiFont(.body16Medium)
                     .foregroundStyle(.gray900)
                     .frame(height: 50)
                 
                 Spacer()
                 
-                Text("\(text.count)/16")
+                Text("\(text.count)/10")
                     .nekiFont(.caption12Regular)
                     .foregroundStyle(.gray300)
             }
@@ -87,7 +114,7 @@ struct ArchiveAddAlbumSheet: View {
                     }
                     
                     Button(action: onConfirm) {
-                        Text("추가하기")
+                        Text(style.confirmButtonTitle)
                             .nekiFont(.body16SemiBold)
                             .foregroundStyle(.white)
                             .frame(width: addWidth)
@@ -107,7 +134,7 @@ struct ArchiveAddAlbumSheet: View {
     }
 }
 
-private extension TextField {
+fileprivate extension TextField {
     func maxLength(_ length: Int, text: Binding<String>) -> some View {
         self.onChange(of: text.wrappedValue) { _, newValue in
             if newValue.count > length {

@@ -92,7 +92,7 @@ struct SelectUploadAlbumFeature {
                     await send(.registerPhotosResponse(
                         Result {
                             let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
-                            try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads)
+                            try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads, favorite: false)
                             
                             return albumId
                         }

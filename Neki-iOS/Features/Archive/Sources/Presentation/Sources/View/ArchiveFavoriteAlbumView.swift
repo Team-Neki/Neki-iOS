@@ -26,6 +26,12 @@ struct ArchiveFavoriteAlbumView: View {
                 }
             }
             
+            if store.showDropDownMenu && !store.isSelectionMode {
+                dropDownButton
+                    .padding(.top, 47)
+                    .padding(.trailing, 20)
+            }
+            
             if store.isSelectionMode {
                 VStack {
                     Spacer()

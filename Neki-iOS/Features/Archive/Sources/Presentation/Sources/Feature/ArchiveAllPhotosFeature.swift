@@ -43,7 +43,9 @@ struct ArchiveAllPhotosFeature {
         case onTapBackButton
         case onTapSelectButton
         case onTapCancelSelectButton
+        
         case onTapDownloadButton
+        case downloadImagesResponse(successCount: Int)
         
         // Delete Action
         case onTapDeleteButton
@@ -69,6 +71,7 @@ struct ArchiveAllPhotosFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -96,13 +99,24 @@ struct ArchiveAllPhotosFeature {
                 return .none
                 
             case .onTapDownloadButton:
-                // TODO: - 다운로드 로직 구현
-                let selectedItems = state.photos.filter { state.selectedIDs.contains($0.id) }
-                print("다운로드할 항목: \(selectedItems.count)개")
-                let toast = NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success)
+                guard !state.selectedIDs.isEmpty else { return .none }
+                
+                let urls = state.selectedIDs.compactMap { state.photos[id: $0]?.imageURL }
+                
+                return .run { send in
+                    let count = try await imageDownloadClient.downloadImages(urls: urls)
+                    await send(.downloadImagesResponse(successCount: count))
+                }
+                
+            case let .downloadImagesResponse(count):
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(toast)))
+                
+                if count > 0 {
+                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                } else {
+                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
+                }
                 
                 
                 // MARK: - Delete Action

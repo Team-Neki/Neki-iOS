@@ -37,6 +37,7 @@ struct ArchiveFavoriteAlbumFeature {
         
         // 기능 액션
         case onTapDownloadButton
+        case downloadImagesResponse(successCount: Int)
         
         case onTapDeleteButton
         case deletePhotos
@@ -53,6 +54,7 @@ struct ArchiveFavoriteAlbumFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -122,9 +124,24 @@ struct ArchiveFavoriteAlbumFeature {
                 return .none
                 
             case .onTapDownloadButton:
+                guard !state.selectedIDs.isEmpty else { return .none }
+                
+                let urls = state.selectedIDs.compactMap { state.photos[id: $0]?.imageURL }
+                
+                return .run { send in
+                    let count = try await imageDownloadClient.downloadImages(urls: urls)
+                    await send(.downloadImagesResponse(successCount: count))
+                }
+                
+            case let .downloadImagesResponse(count):
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                
+                if count > 0 {
+                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                } else {
+                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
+                }
                 
             case .onTapDeleteButton:
                 guard !state.selectedIDs.isEmpty else { return .none }

@@ -69,7 +69,8 @@ struct ArchiveAlbumDetailView: View {
             .presentationCornerRadius(20)
         }
         .sheet(isPresented: $editAlbumNameSheetPresented) {
-            EditAlbumNameSheet(
+            ArchiveAlbumInputSheet(
+                style: .edit,
                 text: $store.newAlbumTitle,
                 errorMessage: store.albumTitleErrorMessage,
                 isConfirmEnabled: store.isConfirmButtonEnabled,

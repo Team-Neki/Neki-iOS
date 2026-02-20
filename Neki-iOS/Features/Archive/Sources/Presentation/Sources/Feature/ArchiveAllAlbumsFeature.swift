@@ -50,6 +50,7 @@ struct ArchiveAllAlbumsFeature {
         // 앨범 목록 갱신 Action
         case fetchAlbums
         case albumListResponse(Result<[AlbumItem], Error>)
+        case favoriteAlbumResponse(Result<AlbumItem, Error>)
         
         // Delegate (부모 코디네이터로 전달)
         case delegate(Delegate)
@@ -160,37 +161,57 @@ struct ArchiveAllAlbumsFeature {
                 return .send(.delegate(.showToast(toastItem)))
                 
             case .fetchAlbums:
-                return .run { send in
-                    await send(
-                        .albumListResponse(
-                            Result {
-                                let entities = try await archiveClient.getAlbumList()
-                                return entities.map {
-                                    AlbumItem(
-                                        id: $0.id,
-                                        title: $0.name,
-                                        count: $0.photoCount,
-                                        coverImageURL: URL(string: $0.coverImageURLString),
-                                        isFavorite: false
-                                    )
-                                }
-                            })
-                    )
-                }
+                return .merge(
+                    .run { send in
+                        do {
+                            let entity = try await archiveClient.getFavoriteAlbumInfo()
+                            let favoriteAlbum = AlbumItem(
+                                id: 0,
+                                title: "즐겨찾기",
+                                count: entity.totalCount,
+                                coverImageURL: URL(string: entity.latestImageURL),
+                                isFavorite: true
+                            )
+                            await send(.favoriteAlbumResponse(.success(favoriteAlbum)))
+                        } catch {
+                            await send(.favoriteAlbumResponse(.failure(error)))
+                        }
+                    },
+                    .run { send in
+                        await send(.albumListResponse(Result {
+                            let entities = try await archiveClient.getAlbumList()
+                            return entities.map {
+                                AlbumItem(
+                                    id: $0.id,
+                                    title: $0.name,
+                                    count: $0.photoCount,
+                                    coverImageURL: URL(string: $0.coverImageURLString),
+                                    isFavorite: false
+                                )
+                            }
+                        }))
+                    }
+                )
                 
-            case let .albumListResponse(.success(newAlbums)):
-                let favoriteAlbum = state.albums.first(where: { $0.isFavorite })
+            case let .favoriteAlbumResponse(.success(album)):
+                state.albums.removeAll(where: { $0.isFavorite })
+                state.albums.insert(album, at: 0)
+                return .none
                 
-                var mergedAlbums: [AlbumItem] = []
-                if let fav = favoriteAlbum {
-                    mergedAlbums.append(fav)
-                }
-                mergedAlbums.append(contentsOf: newAlbums)
-                state.albums = IdentifiedArray(uniqueElements: mergedAlbums)
+            case .favoriteAlbumResponse(.failure):
+                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 앨범을 불러오지 못했어요", style: .error))))
+                
+            case let .albumListResponse(.success(fetchedAlbums)):
+                let favorite = state.albums.first(where: { $0.isFavorite })
+                var newAlbums: [AlbumItem] = []
+                if let fav = favorite { newAlbums.append(fav) }
+                newAlbums.append(contentsOf: fetchedAlbums)
+                
+                state.albums = IdentifiedArray(uniqueElements: newAlbums)
                 return .none
                 
             case .albumListResponse(.failure):
-                return .none
+                return .send(.delegate(.showToast(NekiToastItem("앨범을 불러오지 못했어요", style: .error))))
                 
                 
                 // MARK: - Binding Action

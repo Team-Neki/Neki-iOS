@@ -44,6 +44,9 @@ struct ArchiveAllPhotosFeature {
         case onTapSelectButton
         case onTapCancelSelectButton
         
+        case onTapFavorite(item: ArchiveImageItem)
+        case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
+        
         case onTapDownloadButton
         case downloadImagesResponse(successCount: Int)
         
@@ -97,6 +100,27 @@ struct ArchiveAllPhotosFeature {
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .none
+                
+            case let .onTapFavorite(item):
+                let newStatus = !item.isFavorite
+                
+                state.photos[id: item.id]?.isFavorite = newStatus
+                
+                return .run { [id = item.id, isFavorite = newStatus] send in
+                    do {
+                        try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
+                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
+                    } catch {
+                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
+                    }
+                }
+                
+            case .toggleFavoriteResponse(_, .success):
+                return .none
+                
+            case let .toggleFavoriteResponse(photoID, .failure):
+                state.photos[id: photoID]?.isFavorite.toggle()
+                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownloadButton:
                 guard !state.selectedIDs.isEmpty else { return .none }

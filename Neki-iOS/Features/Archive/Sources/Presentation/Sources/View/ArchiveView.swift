@@ -244,7 +244,7 @@ private extension ArchiveView {
                     items: Array(store.photos),
                     columns: 2
                 ) { item in
-                    ArchiveImageCard(item: item)
+                    ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
                         .onTapGesture {
                             store.send(.imageTapped(item))
                         }

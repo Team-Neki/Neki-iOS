@@ -36,6 +36,9 @@ struct ArchiveFavoriteAlbumFeature {
         case toggleDropDownMenu
         case closeDropDownMenu
         
+        case onTapFavorite(item: ArchiveImageItem)
+        case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
+        
         case fetchFavoritePhotos
         case favoritePhotoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
@@ -93,6 +96,27 @@ struct ArchiveFavoriteAlbumFeature {
             case .closeDropDownMenu:
                 state.showDropDownMenu = false
                 return .none
+                
+            case let .onTapFavorite(item):
+                let newStatus = !item.isFavorite
+                
+                state.photos[id: item.id]?.isFavorite = newStatus
+                
+                return .run { [id = item.id, isFavorite = newStatus] send in
+                    do {
+                        try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
+                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
+                    } catch {
+                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
+                    }
+                }
+                
+            case .toggleFavoriteResponse(_, .success):
+                return .none
+                
+            case let .toggleFavoriteResponse(photoID, .failure):
+                state.photos[id: photoID]?.isFavorite.toggle()
+                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
                 // MARK: - Image Upload
                 

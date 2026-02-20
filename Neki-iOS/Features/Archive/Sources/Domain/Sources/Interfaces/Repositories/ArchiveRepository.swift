@@ -21,6 +21,7 @@ protocol ArchiveRepository: Sendable {
     // Update
     func toggleFavorite(photoID: Int, request: Bool) async throws
     func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws
+    func editAlbumName(albumID: Int, name: String) async throws
     
     // Delete
     func deletePhotoList(photoIDs: [Int]) async throws

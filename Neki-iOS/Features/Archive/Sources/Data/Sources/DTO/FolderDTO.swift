@@ -1,5 +1,5 @@
 //
-//  AddFolderDTO.swift
+//  FolderDTO.swift
 //  Neki-iOS
 //
 //  Created by OneTen on 1/28/26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum AddFolderDTO {
+public enum FolderDTO {
     public struct Request: Encodable {
         let name: String
     }

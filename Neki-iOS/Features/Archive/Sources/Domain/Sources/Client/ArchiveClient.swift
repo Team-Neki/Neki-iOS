@@ -21,6 +21,7 @@ struct ArchiveClient {
     public var fetchFavoritePhotoList: (_ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
     public var toggleFavorite: (_ photoID: Int, _ request: Bool) async throws -> Void
     public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
+    public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -57,6 +58,9 @@ extension ArchiveClient: DependencyKey {
             },
             excludePhotosInAlbum: { albumID, photoIDs in
                 try await archiveRepository.excludePhotosInAlbum(albumID: albumID, photoIDs: photoIDs)
+            },
+            editAlbumName: { albumID, name in
+                try await archiveRepository.editAlbumName(albumID: albumID, name: name)
             }
         )
     }

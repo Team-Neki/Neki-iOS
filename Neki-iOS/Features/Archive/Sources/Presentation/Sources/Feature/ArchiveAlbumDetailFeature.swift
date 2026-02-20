@@ -144,7 +144,8 @@ struct ArchiveAlbumDetailFeature {
                             let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
                             try await archiveClient.registerPhotos(
                                 folderId: albumId,
-                                uploads: uploads
+                                uploads: uploads,
+                                favorite: false
                             )
                         }
                     ))

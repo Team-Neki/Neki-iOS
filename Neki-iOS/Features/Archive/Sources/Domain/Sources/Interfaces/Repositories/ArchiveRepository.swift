@@ -10,7 +10,7 @@ import Foundation
 protocol ArchiveRepository: Sendable {
     // Create
     func addFolder(name: String) async throws -> Int
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)]) async throws
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool?) async throws
     
     // Read
     func fetchPhotoList(folderID: Int?, size: Int?, sortOrder: String?) async throws -> [PhotoEntity]

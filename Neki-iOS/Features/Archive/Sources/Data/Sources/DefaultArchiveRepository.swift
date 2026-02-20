@@ -41,9 +41,9 @@ final actor DefaultArchiveRepository: ArchiveRepository {
 // MARK: - Create Logic
 
 extension DefaultArchiveRepository {
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)]) async throws {
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool? = false) async throws {
         let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo) }
-        let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData)
+        let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
         let endpoint = ArchiveEndpoint.registerPhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
         
@@ -52,6 +52,12 @@ extension DefaultArchiveRepository {
         if let folderID = folderID {        // 앨범을 선택해 업로드 했다면 해당 앨범내 사진 캐시와 전체 앨범 캐시에도 변경 신호
             self.isPhotoCacheDirty[folderID] = true
             self.isAlbumCacheDirty = true
+        }
+        if let favorite = favorite {
+            if favorite {
+                self.isFavoriteCacheDirty = true
+                self.isFavoriteAlbumInfoDirty = true
+            }
         }
     }
     

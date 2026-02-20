@@ -17,6 +17,8 @@ struct ArchiveAlbumDetailFeature {
         
         let album: AlbumItem
         
+        var showDropDownMenu: Bool = false
+        
         var selectedIDs: Set<Int> = []
         
         var isSelectionMode: Bool = false
@@ -36,6 +38,9 @@ struct ArchiveAlbumDetailFeature {
         case binding(BindingAction<State>)
         
         case onAppear
+        
+        case toggleDropDownMenu
+        case closeDropDownMenu
         
         case onTapBackButton
         case onTapSelectButton
@@ -75,6 +80,14 @@ struct ArchiveAlbumDetailFeature {
                 
             case .onAppear:
                 return .send(.fetchPhotos)
+                
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
                 
             case .fetchPhotos:
                 state.isFetchingPhotos = true
@@ -117,6 +130,7 @@ struct ArchiveAlbumDetailFeature {
                 return .send(.fetchPhotos)
                 
             case .onTapSelectButton:
+                state.showDropDownMenu = false
                 state.isSelectionMode = true
                 return .none
                 

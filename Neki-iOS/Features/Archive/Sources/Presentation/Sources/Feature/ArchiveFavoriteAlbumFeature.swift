@@ -15,6 +15,8 @@ struct ArchiveFavoriteAlbumFeature {
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         let album: AlbumItem
         
+        var showDropDownMenu: Bool = false
+        
         var selectedIDs: Set<Int> = []
         var isSelectionMode: Bool = false
         
@@ -27,6 +29,10 @@ struct ArchiveFavoriteAlbumFeature {
         case binding(BindingAction<State>)
         
         case onAppear
+        
+        case toggleDropDownMenu
+        case closeDropDownMenu
+        
         case fetchFavoritePhotos
         case favoritePhotoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
@@ -67,6 +73,14 @@ struct ArchiveFavoriteAlbumFeature {
             case .onAppear:
                 return .send(.fetchFavoritePhotos)
                 
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
+                
             case .fetchFavoritePhotos:
                 guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
@@ -105,6 +119,7 @@ struct ArchiveFavoriteAlbumFeature {
                 return .send(.fetchFavoritePhotos)
                 
             case .onTapSelectButton:
+                state.showDropDownMenu = false
                 state.isSelectionMode = true
                 return .none
                 

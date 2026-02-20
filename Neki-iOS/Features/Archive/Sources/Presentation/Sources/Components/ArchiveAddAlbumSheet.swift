@@ -38,14 +38,14 @@ struct ArchiveAddAlbumSheet: View {
             
             HStack(alignment: .center, spacing: 0) {
                 TextField("앨범명을 입력하세요", text: $text)
-                    .maxLength(16, text: $text)
+                    .maxLength(10, text: $text)
                     .nekiFont(.body16Medium)
                     .foregroundStyle(.gray900)
                     .frame(height: 50)
                 
                 Spacer()
                 
-                Text("\(text.count)/16")
+                Text("\(text.count)/10")
                     .nekiFont(.caption12Regular)
                     .foregroundStyle(.gray300)
             }

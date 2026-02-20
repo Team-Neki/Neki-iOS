@@ -252,21 +252,6 @@ private extension ArchiveView {
     }
 }
 
-// MARK: - 텍스트필드 글자 수 제한 extension
-
-private extension TextField {
-    ///글자 수 제한
-    func maxLength(_ length: Int, text: Binding<String>) -> some View {
-        self
-            .onChange(of: text.wrappedValue) { _, newValue in
-                if newValue.count > length {
-                    text.wrappedValue = String(newValue.prefix(length))
-                }
-            }
-    }
-}
-
-
 #Preview {
     ArchiveCoordinatorView(store: .init(initialState: ArchiveCoordinator.State(), reducer: { ArchiveCoordinator() }))
 }

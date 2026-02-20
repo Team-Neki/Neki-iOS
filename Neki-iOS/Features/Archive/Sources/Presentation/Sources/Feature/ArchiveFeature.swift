@@ -27,7 +27,6 @@ struct ArchiveFeature {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
         
-        var showDropDownMenu: Bool = false
         var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
         var isLoading: Bool = false
         
@@ -43,8 +42,6 @@ struct ArchiveFeature {
         case onAppear
         
         // User Action
-        case toggleDropDownMenu
-        case closeDropDownMenu
         case onTapAllPhotos
         case onTapAllAlbums
         case openAppSettings
@@ -115,20 +112,9 @@ struct ArchiveFeature {
                     .send(.fetchPhotos)
                 )
                 
-                // MARK: - User Action
-                
-            case .toggleDropDownMenu:
-                state.showDropDownMenu.toggle()
-                return .none
-                
-            case .closeDropDownMenu:
-                state.showDropDownMenu = false
-                return .none
-                
                 // MARK: - Add Folder Action
                 
             case .onTapCancelAddAlbum:
-                state.showDropDownMenu = false
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 return .none
@@ -254,7 +240,6 @@ struct ArchiveFeature {
                 
             case .imagePicker(.uploadStarted):
                 state.isLoading = true
-                state.showDropDownMenu = false
                 return .none
                 
             case let .imagePicker(.uploadCompleted(ids)):

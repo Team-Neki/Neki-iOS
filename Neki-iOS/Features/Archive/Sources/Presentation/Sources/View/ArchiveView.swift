@@ -125,7 +125,7 @@ private extension ArchiveView {
             
             HStack(alignment: .center, spacing: 12) {
                 Button {
-                    store.send(.toggleDropDownMenu)
+                    store.send(.onTapQRScan)
                 } label: {
                     Image(.iconQrCode)
                 }

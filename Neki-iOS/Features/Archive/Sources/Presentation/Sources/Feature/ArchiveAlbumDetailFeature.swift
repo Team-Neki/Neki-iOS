@@ -21,6 +21,13 @@ struct ArchiveAlbumDetailFeature {
         
         var selectedIDs: Set<Int> = []
         
+        var newAlbumTitle: String = ""
+        var albumTitleErrorMessage: String? = nil
+        var isConfirmButtonEnabled: Bool {
+            let trimmed = newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && trimmed != album.title && albumTitleErrorMessage == nil
+        }
+        
         var isSelectionMode: Bool = false
         
         var filteredAlbumPhotos: IdentifiedArrayOf<ArchiveImageItem> {
@@ -32,6 +39,12 @@ struct ArchiveAlbumDetailFeature {
         var isLoading: Bool = false
         
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
+        
+        init(photos: IdentifiedArrayOf<ArchiveImageItem> = [], album: AlbumItem) {
+            self.photos = photos
+            self.album = album
+            self.newAlbumTitle = album.title
+        }
     }
     
     enum Action: BindableAction {
@@ -45,6 +58,10 @@ struct ArchiveAlbumDetailFeature {
         case onTapBackButton
         case onTapSelectButton
         case onTapCancelSelectButton
+        
+        case onTapCancelEditAlbum
+        case onTapConfirmEditAlbum
+        case editAlbumResponse(Result<Void, Error>)
         
         // 기능 액션
         case onTapDownloadButton
@@ -88,6 +105,33 @@ struct ArchiveAlbumDetailFeature {
             case .closeDropDownMenu:
                 state.showDropDownMenu = false
                 return .none
+                
+                // MARK: - Edit Album Action
+                
+            case .onTapCancelEditAlbum:
+                state.newAlbumTitle = state.album.title
+                state.albumTitleErrorMessage = nil
+                return .none
+                
+            case .onTapConfirmEditAlbum:
+                guard state.isConfirmButtonEnabled else { return .none }
+                let title = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                state.albumTitleErrorMessage = nil
+                
+                return .run { [albumId = state.album.id] send in
+                    await send(.editAlbumResponse(Result {
+                        try await archiveClient.editAlbumName(albumId, title)
+                    }))
+                }
+                
+            case .editAlbumResponse(.success):
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경했어요", style: .success))))
+                }
+                
+            case .editAlbumResponse(.failure):
+                state.newAlbumTitle = state.album.title
+                return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경하지 못했어요", style: .error))))
                 
             case .fetchPhotos:
                 state.isFetchingPhotos = true

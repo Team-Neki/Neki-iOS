@@ -14,6 +14,7 @@ struct ArchiveAlbumDetailView: View {
     @State private var isFilterBarVisible: Bool = true
     @State private var lastDragPoint: CGFloat = 0
     @State var deleteAlbumSheetPresented: Bool = false
+    @State var editAlbumNameSheetPresented: Bool = false
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -63,6 +64,28 @@ struct ArchiveAlbumDetailView: View {
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
         }
+        .sheet(isPresented: $editAlbumNameSheetPresented) {
+            EditAlbumNameSheet(
+                text: $store.newAlbumTitle,
+                errorMessage: store.albumTitleErrorMessage,
+                isConfirmEnabled: store.isConfirmButtonEnabled,
+                onCancel: {
+                    store.send(.onTapCancelEditAlbum)
+                    withAnimation {
+                        editAlbumNameSheetPresented = false
+                    }
+                },
+                onConfirm: {
+                    store.send(.onTapConfirmEditAlbum)
+                    withAnimation {
+                        editAlbumNameSheetPresented = false
+                    }
+                }
+            )
+            .presentationDetents([.height(266)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
+        }
         .background(.white)
         
     }
@@ -100,7 +123,8 @@ private extension ArchiveAlbumDetailView {
                 }
             }
             
-            Text(store.album.title)
+            // 수정되는 모습이 바로바로 보여서 이렇게 해뒀는데, QA 후 별로라는 의견 나오면 별도 title로 관리
+            Text(store.newAlbumTitle)
                 .nekiFont(.title18SemiBold)
                 .foregroundStyle(.gray900)
         }
@@ -133,7 +157,8 @@ private extension ArchiveAlbumDetailView {
             .contentShape(Rectangle())
 
             Button {
-                // TODO: - 앨범 이름 변경 연결
+                store.send(.closeDropDownMenu)
+                editAlbumNameSheetPresented = true
             } label: {
                 Text("앨범 이름 변경")
                     .nekiFont(.body16Medium)
@@ -208,8 +233,7 @@ private extension ArchiveAlbumDetailView {
                     ArchiveImageItem(id: 9, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
                     ArchiveImageItem(id: 10, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1)
                 ],
-                album: AlbumItem(id: 1, title: "제주도 여행", count: 3, coverImageURL: nil, isFavorite: false),
-                selectedIDs: []
+                album: AlbumItem(id: 1, title: "제주도 여행", count: 3, coverImageURL: nil, isFavorite: false)
             ),
             reducer: {
                 ArchiveAlbumDetailFeature()

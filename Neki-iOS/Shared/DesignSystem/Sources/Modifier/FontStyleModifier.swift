@@ -42,3 +42,18 @@ public extension Font {
         .custom(style.fontName, size: style.fontSize, relativeTo: style.textStyle)
     }
 }
+
+public extension UIFont {
+    static func neki(_ style: FontStyle) -> UIFont {
+        guard let font = UIFont(name: style.fontName, size: style.fontSize) else {
+            let weight: UIFont.Weight
+            
+            if style.fontName.contains("Bold") { weight = .bold }
+            else if style.fontName.contains("SemiBold") { weight = .semibold }
+            else if style.fontName.contains("Medium") { weight = .medium }
+            else { weight = .regular }
+            return .systemFont(ofSize: style.fontSize, weight: weight)
+        }
+        return font
+    }
+}

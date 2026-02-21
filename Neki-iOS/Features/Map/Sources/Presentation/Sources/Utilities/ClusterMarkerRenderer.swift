@@ -24,7 +24,7 @@ fileprivate enum ClusteringLayout {
 }
 
 struct ClusterMarkerRenderer {
-    static func render() -> UIImage {
+    static func render(_ text: String) -> UIImage {
         let bodySize = ClusteringLayout.imageSize + (ClusteringLayout.padding * 2)
         let shadowMargin = ClusteringLayout.shadowRadius * 4
         let sideLength = bodySize + shadowMargin * 2
@@ -71,6 +71,26 @@ struct ClusterMarkerRenderer {
             ClusteringLayout.primaryColor.setFill()
             innerPath.fill()
             cgContext.restoreGState()
+            
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.alignment = .center
+            
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.neki(.title20SemiBold),
+                .foregroundColor: UIColor.white,
+                .paragraphStyle: paragraphStyle
+            ]
+            
+            let text = text as NSString
+            let textSize = text.size(withAttributes: attributes)
+            let textRect = CGRect(
+                x: innerRect.midX - (textSize.width / 2.0),
+                y: innerRect.midY - (textSize.height / 2.0),
+                width: textSize.width,
+                height: textSize.height
+            )
+            
+            text.draw(in: textRect, withAttributes: attributes)
         }
     }
 }

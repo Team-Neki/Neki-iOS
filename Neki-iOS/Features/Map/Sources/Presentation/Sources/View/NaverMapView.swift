@@ -244,16 +244,16 @@ extension NaverMapRepresentable {
             if clusterer == nil { setupClusterer(mapView: mapView) }
             leafUpdater.updateState(photoBooths: photoBooths, selectedBoothID: selectedBoothID)
             
-            let newIDs = Set(photoBooths.ids)
-            let toRemoveIDs = currentKeyByID.keys.filter { newIDs.contains($0) == false }
-            let toRemoveKeys = toRemoveIDs.compactMap { currentKeyByID[$0] }
-            
-            if toRemoveKeys.isEmpty == false { clusterer?.removeAll(toRemoveKeys) }
-            
             let oldSelected = lastSelectedBoothID
             let selectionChanged = oldSelected != selectedBoothID
             
-            var keyMap: [BoothClusteringKey: NSObject] = [:]
+            var keysToAdd: [BoothClusteringKey: NSObject] = [:]
+            var keysToRemove: [BoothClusteringKey] = []
+            
+            let newIDs = Set(photoBooths.ids)
+            let toRemoveIDs = currentKeyByID.keys.filter { newIDs.contains($0) == false }
+            keysToRemove.append(contentsOf: toRemoveIDs.compactMap { currentKeyByID[$0] })
+            
             for booth in photoBooths {
                 let isNew = currentKeyByID.keys.contains(booth.id) == false
                 let isSelectedAffected = selectionChanged && (booth.id == selectedBoothID || booth.id == oldSelected)
@@ -261,12 +261,18 @@ extension NaverMapRepresentable {
                 if isNew || isSelectedAffected {
                     let position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
                     let key = BoothClusteringKey(identifier: booth.id, brandID: booth.brand.id, position: position)
-                    keyMap[key] = NSNumber(value: booth.brand.id)
+                    
+                    if isSelectedAffected, let oldKey = currentKeyByID[booth.id] {
+                        keysToRemove.append(oldKey)
+                    }
+                    
+                    keysToAdd[key] = NSNumber(value: booth.brand.id)
                     currentKeyByID[booth.id] = key
                 }
             }
             
-            if keyMap.isEmpty == false { clusterer?.addAll(keyMap) }
+            if keysToRemove.isEmpty == false { clusterer?.removeAll(keysToRemove) }
+            if keysToAdd.isEmpty == false { clusterer?.addAll(keysToAdd) }
             
             for id in toRemoveIDs {
                 currentKeyByID.removeValue(forKey: id)

@@ -174,6 +174,7 @@ extension NaverMapRepresentable {
         
         private func setupClusterer(mapView: NMFMapView) {
             let builder = NMCComplexBuilder<BoothClusteringKey>()
+            builder.markerManager = BoothMarkerManager()
             builder.leafMarkerUpdater = leafUpdater
             builder.clusterMarkerUpdater = BoothClusterMarkerUpdater(mapView: mapView)
             builder.maxClusteringZoom = Constants.clusterMaxZoom
@@ -345,7 +346,9 @@ extension NaverMapRepresentable {
             marker.captionText = "\(booth.brand.name)\n\(booth.name)"
             marker.captionColor = .init(hex: Constants.captionColorHex)
             marker.captionHaloColor = .white
+            marker.captionAligns = [NMFAlignType.bottom]
             marker.captionTextSize = 12
+            marker.captionOffset = -8
             marker.anchor = CGPoint(x: 0.5, y: 1.0)
             marker.zIndex = isSelected ? Constants.zIndexSelected : Constants.zIndexNormal
             marker.touchHandler = { [weak self] _ in
@@ -359,38 +362,42 @@ extension NaverMapRepresentable {
     
     final class BoothClusterMarkerUpdater: NMCDefaultClusterMarkerUpdater {
         private weak var mapView: NMFMapView?
+        private var clusterImageCache: [String: NMFOverlayImage] = [:]
         
         init(mapView: NMFMapView) {
             self.mapView = mapView
             super.init()
         }
         
-        private lazy var baseClusterOverlay: NMFOverlayImage = {
-            let image = ClusterMarkerRenderer.render()
-            return NMFOverlayImage(image: image)
-        }()
-        
         override func updateClusterMarker(_ info: NMCClusterMarkerInfo, _ marker: NMFMarker) {
             guard let mapView else { return }
+            let text = info.size > 50 ? "50+" : "\(info.size)"
             let currentZoom = mapView.zoomLevel
             
+            var cacheKey = "default_\(text)"
+            
             if currentZoom < Constants.brandClusteringThreshold {
-                marker.iconImage = baseClusterOverlay
-                marker.captionText = info.size > 50 ? "50+" : "\(info.size)"
+                cacheKey = "default_\(text)"
             } else {
                 // TODO: 이곳에서 브랜드별로 클러스터링된 이미지를 보여줄 수도 있습니다. 물론 지금은 디자인없음.
-                marker.iconImage = baseClusterOverlay
                 // TODO: 태크 병합 전략 적용하여 어떤 브랜드끼리 클러스터링된 건지 표시할 수 있습니다.
-                // marker.captionText = "\(info.tag)"
-                marker.captionText = info.size > 50 ? "50+" : "\(info.size)"
+                cacheKey = "default_\(text)"
             }
             
+            let overlayImage: NMFOverlayImage
+            if let cached = clusterImageCache[cacheKey] {
+                overlayImage = cached
+            } else {
+                let rendered = ClusterMarkerRenderer.render(text)
+                let overlay = NMFOverlayImage(image: rendered)
+                clusterImageCache[cacheKey] = overlay
+                overlayImage = overlay
+            }
+            
+            marker.iconImage = overlayImage
+            marker.captionText = ""
             marker.captionAligns = [NMFAlignType.center]
-            marker.captionTextSize = 20
-            marker.captionColor = .white
-            marker.captionHaloColor = .clear
             marker.anchor = CGPoint(x: 0.5, y: 0.5)
-            marker.captionOffset = -27
             marker.zIndex = 50
             
             marker.touchHandler = { _ in
@@ -402,6 +409,16 @@ extension NaverMapRepresentable {
                 mapView.moveCamera(cameraUpdate)
                 return true
             }
+        }
+    }
+    
+    final class BoothMarkerManager: NMCDefaultMarkerManager {
+        override func createMarker() -> NMFMarker {
+            let marker = super.createMarker()
+            marker.isHideCollidedSymbols = true
+            marker.isHideCollidedMarkers = false
+            marker.isHideCollidedCaptions = false
+            return marker
         }
     }
     

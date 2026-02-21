@@ -11,6 +11,8 @@ import os
 
 @Reducer
 struct RandomPoseCarouselFeature {
+    enum SlideDirection { case previous, next, none }
+    
     @ObservableState
     struct State {
         @Shared(.appStorage("RandomPoseTutorial")) var isTutorialPresented: Bool = true
@@ -19,8 +21,8 @@ struct RandomPoseCarouselFeature {
         var isLoading: Bool = false
         var activePeopleCount: PeopleCountOption
         var isScrapped: Bool { currentPose?.isScrapped ?? false }
-        
         var isDismissing: Bool = false
+        var slideDirection: SlideDirection = .none
         
         init(peopleCount: PeopleCountOption) { activePeopleCount = peopleCount }
     }
@@ -28,7 +30,6 @@ struct RandomPoseCarouselFeature {
     enum Action {
         // Lifecycle Actions
         case onAppear
-        case onDisappear
         
         // View Actions
         case closeTutorialOverlay
@@ -58,28 +59,33 @@ struct RandomPoseCarouselFeature {
             switch action {
                 // MARK: - Lifecycle & View Actions
             case .onAppear:
+                if state.currentPose != nil {
+                    return .none
+                }
+                
                 state.isLoading = true
                 return .run { [count = state.activePeopleCount] send in
                     await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }))
                 }
-                
-            case .onDisappear:
-                if state.isDismissing { return .none }
-                return .send(.flushResources)
                 
             case .closeTutorialOverlay:
                 state.$isTutorialPresented.withLock { $0 = false }
                 return .none
                 
             case .onTapClose:
-                return .run { _ in await dismiss() }
+                return .run { send in
+                    await send(.flushResources)
+                    await dismiss()
+                }
                 
             case .tapLeft:
+                state.slideDirection = .previous
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }))
                 }
                 
             case .tapRight:
+                state.slideDirection = .next
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
                 }
@@ -122,11 +128,8 @@ struct RandomPoseCarouselFeature {
                 
                 // MARK: - Navigation
             case let .onTapDetail(pose):
-                state.isDismissing = true
                 return .run { send in
-                    await send(.flushResources)
                     await send(.delegate(.routeToDetail(pose)))
-                    await dismiss()
                 }
                 
             case .flushResources:

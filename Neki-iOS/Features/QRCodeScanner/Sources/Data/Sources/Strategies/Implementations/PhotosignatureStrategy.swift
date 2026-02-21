@@ -11,7 +11,7 @@ import os
 struct PhotoSignatureStrategy: QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { .native }
     
-    func canHandle(host: String) -> Bool { PhotoBoothBrand.photosignature.hostKeywords.contains { host.contains($0) } }
+    func canHandle(host: String) -> Bool { QRCodeBrand.photosignature.hostKeywords.contains { host.contains($0) } }
     
     func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토시그니처 파싱 시도: \(url.absoluteString)")
@@ -29,15 +29,15 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
             let (data, response) = try await URLSession.shared.data(from: imageURL)
             
             if let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) == false {
-                Logger.network.warning("이미지 없음(404 등). 웹뷰 폴백.")
+                Logger.domain.notice("이미지 다운로드 에러. 웹뷰 폴백.")
                 throw QRParseError.fallbackToWebView(url)
             }
             
             return ParsedQRResult(brand: .photosignature, originalImage: data)
             
         } catch {
-            Logger.domain.notice("이미지 다운로드 에러. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            Logger.network.warning("이미지 없음(404 등). 만료 확인.")
+            throw .imageDownloadFailed
         }
     }
 }

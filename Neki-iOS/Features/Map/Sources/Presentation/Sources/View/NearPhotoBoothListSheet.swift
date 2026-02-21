@@ -7,9 +7,12 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 struct NearPhotoBoothListSheet: View {
     @Bindable var store: StoreOf<PhotoBoothListFeature>
+    
+    private let brandNameFormatter = PhotoBoothNameFormatter()
     
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }
     
@@ -53,8 +56,9 @@ private extension NearPhotoBoothListSheet {
             store.send(.selectFilterOption(brand))
         } label: {
             VStack(spacing: 8) {
-                Image(brand.logoImageResource)
+                KFImage(brand.imageURL)
                     .resizable()
+                    .onFailureImage(.imgDefaultBrandOriginal)
                     .frame(width: 56, height: 56)
                     .clipShape(.circle)
                     .overlay {
@@ -69,10 +73,11 @@ private extension NearPhotoBoothListSheet {
                         }
                     }
                 
-                Text(brand.displayName)
-                    .nekiFont(isSelected ? .body14SemiBold : .body14Medium)
+                Text(brandNameFormatter.format(brand: brand))
+                    .font(.neki(isSelected ? .body14SemiBold : .body14Medium))
                     .foregroundStyle(isSelected ? .primary400 : .gray900)
                     .lineLimit(2)
+                    .lineSpacing(4)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -95,15 +100,19 @@ private extension NearPhotoBoothListSheet {
             }
         } header: {
             HStack {
-                Text("가까운")
-                    .foregroundStyle(.primary400)
-                
-                Text("네컷 사진 브랜드")
+                HStack(spacing: 2) {
+                    Text("가까운").foregroundStyle(.primary400) +
+                    Text(" ") +
+                    Text("포토") +
+                    Text(" ") +
+                    Text("부스")
+                    
+                    Image(.iconPinClip)
+                }
                 
                 Spacer()
                 
-                Image(systemName: "exclamationmark.circle")
-                    .foregroundStyle(.gray400)
+                Image(.iconExclamationMarkGray)
                     .onTapGesture { store.send(.toggleTooltip) }
                     .nekiTooltip(isPresented: $store.isTooltipPresented, "가까운 네컷 사진 브랜드는\n1Km 기준으로 표시돼요.")
             }
@@ -116,14 +125,16 @@ private extension NearPhotoBoothListSheet {
     @ViewBuilder
     func nearByPhotoBoothCell(_ photoBooth: PhotoBooth) -> some View {
         HStack(spacing: 16) {
-            Image(photoBooth.brand.logoImageResource)
+            KFImage(photoBooth.brand.imageURL)
                 .resizable()
+                .onFailureImage(.imgDefaultBrandOriginal)
+                .cancelOnDisappear(true)
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 4) {
-                    Text(photoBooth.brand.displayName)
+                    Text(photoBooth.brand.name)
                         .nekiFont(.title18SemiBold)
                         .foregroundStyle(.gray900)
                     

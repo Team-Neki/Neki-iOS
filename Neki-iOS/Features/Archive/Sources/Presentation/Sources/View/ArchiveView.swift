@@ -11,7 +11,6 @@ import Kingfisher
 
 struct ArchiveView: View {
     
-    @State var showTooltip: Bool = false          // TODO: - UserDefault로 앱 첫 실행인지 여부 관리하기
     @State var addAlbumSheetPresented: Bool = false
     @State var showScrollToTopButton: Bool = false
     
@@ -71,52 +70,47 @@ struct ArchiveView: View {
             }
             
             // 툴팁이 보여져 있을 경우 화면 어디든 누르면 사라지게
-            if showTooltip {
+            if store.showTooltip {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        showTooltip = false
+                        store.showTooltip = false
                     }
             }
             
-            if store.showDropDownMenu {
-                dropDownMenu
-                    .padding(.top, 42)
-                    .padding(.trailing, 60)
-            }
-            
-        }
-        .sheet(isPresented: $addAlbumSheetPresented) {
-            ArchiveAddAlbumSheet(
-                text: $store.newAlbumTitle,
-                errorMessage: store.albumTitleErrorMessage,
-                isConfirmEnabled: store.isConfirmButtonEnabled,
-                onCancel: {
-                    store.send(.onTapCancelAddAlbum)
-                    addAlbumSheetPresented = false
-                },
-                onConfirm: {
-                    store.send(.onTapConfirmAddAlbum)
-                    addAlbumSheetPresented = false
-                }
-            )
-            .presentationDetents([.height(266)])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(20)
         }
         .fullScreenCover(isPresented: $store.isLoading, content: {
-            loadingView
-                .presentationBackground(.clear)
+            LoadingView(message: "사진을 업로드하고 있어요.")
         })
         .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
         }
-        .fullScreenCover(item: $store.scope(state: \.qrScanner, action: \.qrScanner)) { store in
-            QRCodeScannerView(store: store)
-        }
         .transaction { transaction in
             transaction.disablesAnimations = true
+        }
+        .sheet(isPresented: $addAlbumSheetPresented) {
+            ArchiveAlbumInputSheet(
+                style: .add,
+                text: $store.newAlbumTitle,
+                errorMessage: store.albumTitleErrorMessage,
+                isConfirmEnabled: store.isConfirmButtonEnabled,
+                onCancel: {
+                    store.send(.onTapCancelAddAlbum)
+                    withAnimation {
+                        addAlbumSheetPresented = false
+                    }
+                },
+                onConfirm: {
+                    store.send(.onTapConfirmAddAlbum)
+                    withAnimation {
+                        addAlbumSheetPresented = false
+                    }
+                }
+            )
+            .presentationDetents([.height(266)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
         }
         .task {
             await store.send(.onAppear).finish()
@@ -136,90 +130,27 @@ private extension ArchiveView {
             
             HStack(alignment: .center, spacing: 12) {
                 Button {
-                    store.send(.toggleDropDownMenu)
+                    store.send(.onTapQRScan)
                 } label: {
-                    Image(.iconPlusRed)
+                    Image(.iconQrCode)
                 }
                 .nekiTooltip(
-                    isPresented: $showTooltip,
-                    "버튼을 눌러 네컷을 추가할 수 있어요",
+                    isPresented: $store.showTooltip,
+                    "QR스캔으로 빠르게 네컷을 추가해보세요!",
                     position: .bottom,
                     style: .dark,
                     showDismiss: false
                 )
                 
-                Button {
-                    // TODO: - 알림 이벤트
-                } label: {
-                    Image(.iconBellFill)
-                }
+                //                Button {
+                //                    // TODO: - 알림 이벤트
+                //                } label: {
+                //                    Image(.iconBellFill)
+                //                }
             }
         }
         .frame(height: 54)
         .padding(.horizontal, 20)
-    }
-    
-    var dropDownMenu: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
-                store.send(.onTapQRScan)
-            }
-            
-            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-                HStack(alignment: .center, spacing: 6) {
-                    Image(uiImage: .iconRoundAddPhotoAlternate)
-                    
-                    Text("갤러리에서 추가")
-                        .nekiFont(.body16Medium)
-                        .foregroundStyle(.gray900)
-                    
-                    Spacer()
-                }
-                .padding(.leading, 12)
-                .padding(.vertical, 5)
-                .frame(height: 34)
-                .contentShape(Rectangle())
-            }
-            
-            Divider()
-                .background(.gray50)
-                .padding(.vertical, 4)
-            
-            dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
-                addAlbumSheetPresented = true
-                store.send(.onTapCancelAddAlbum)
-            }
-        }
-        .padding(.vertical, 5)
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(content: {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(.gray.opacity(0.5), lineWidth: 1)
-                .shadow(color: .gray.opacity(0.5), radius: 2)
-        })
-        .frame(width: 158, height: 130)
-    }
-    
-    func dropDownMenuButton(
-        title: String,
-        icon: UIImage,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(alignment: .center, spacing: 6) {
-                Image(uiImage: icon)
-                
-                Text(title)
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray900)
-                
-                Spacer()
-            }
-            .padding(.leading, 12)
-            .padding(.vertical, 5)
-            .frame(height: 34)
-        }
     }
     
     var albumSection: some View {
@@ -248,12 +179,35 @@ private extension ArchiveView {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(store.albums) { album in
+                    ForEach(store.previewAlbums) { album in
                         AlbumCard(album: album)
                             .onTapGesture {
                                 store.send(.albumTapped(album))
                             }
                     }
+                    
+                    Button {
+                        withAnimation {
+                            addAlbumSheetPresented = true
+                        }
+                    } label: {
+                        VStack(alignment: .center, spacing: 8) {
+                            Image(.iconPlusRed)
+                            
+                            Text("새 앨범 추가")
+                                .nekiFont(.body14Medium)
+                        }
+                        .frame(width: 124, height: 166)
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.primary400)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(content: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(.primary400 , style: StrokeStyle(lineWidth: 2, lineCap: .round,
+                                                                           dash: [5, 5], dashPhase: 0))
+                    })
+                    
                 }
                 .padding(.horizontal, 20)
             }
@@ -283,21 +237,26 @@ private extension ArchiveView {
             }
             .padding(.bottom, 12)
             
-            MasonryGridView(
-                items: Array(store.photos),
-                columns: 2
-            ) { item in
-                ArchiveImageCard(item: item)
-                    .onTapGesture {
-                        store.send(.imageTapped(item))
-                    }
-                    .onAppear {
-                        if item == store.photos.last {
-                            store.send(.loadMorePhotos)
+            if store.photos.isEmpty {
+                ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n찍은 네컷을 네키에 저장해보세요!")
+                    .padding(.top, 70)
+            } else {
+                MasonryGridView(
+                    items: Array(store.photos),
+                    columns: 2
+                ) { item in
+                    ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
+                        .onTapGesture {
+                            store.send(.imageTapped(item))
                         }
-                    }
+                        .onAppear {
+                            if item == store.photos.last {
+                                store.send(.loadMorePhotos)
+                            }
+                        }
+                }
+                .padding(.bottom, 76)
             }
-            .padding(.bottom, 76)
             
             if store.isFetchingPhotos && !store.photos.isEmpty {
                 HStack {
@@ -310,24 +269,6 @@ private extension ArchiveView {
         }
         .padding(.horizontal, 20)
     }
-    
-    var loadingView: some View {
-        ZStack {
-            Color.gray900.opacity(0.5)
-                .ignoresSafeArea()
-            
-            VStack(spacing: 20) {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .tint(.white)
-                    .scaleEffect(2)
-                
-                Text("사진을 업로드하고 있어요")
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.white)
-            }
-        }
-    }
 }
 
 private extension ArchiveView {
@@ -338,21 +279,6 @@ private extension ArchiveView {
         }
     }
 }
-
-// MARK: - 텍스트필드 글자 수 제한 extension
-
-private extension TextField {
-    ///글자 수 제한
-    func maxLength(_ length: Int, text: Binding<String>) -> some View {
-        self
-            .onChange(of: text.wrappedValue) { _, newValue in
-                if newValue.count > length {
-                    text.wrappedValue = String(newValue.prefix(length))
-                }
-            }
-    }
-}
-
 
 #Preview {
     ArchiveCoordinatorView(store: .init(initialState: ArchiveCoordinator.State(), reducer: { ArchiveCoordinator() }))

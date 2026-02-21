@@ -25,6 +25,7 @@ struct ArchiveCoordinator {
         // 상위 코디네이터(MainTab)로 보낼 신호
         enum Delegate {
             case showToast(NekiToastItem)
+            case requestQRScan
         }
     }
     
@@ -37,39 +38,38 @@ struct ArchiveCoordinator {
             /// 화면전환과 관련된 액션 case만 사용하고 나머지는 default를 이용해 무시
             switch action {
                 // root action
-            case .root(.qrScannerPresented):
-                state.path.append(.qrScanner(QRCodeScanFeature.State()))
+            case .root(.delegate(.requestQRScan)):
+                return .send(.delegate(.requestQRScan))
+                
+            case .root(.addPhotoFromQRScanner):
+                state.path.removeAll()
                 return .none
                 
             case let .root(.imageTapped(item)):
                 state.path.append(.detail(
-                    ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                    ArchivePhotoDetailFeature.State(
+                        photos: state.root.photos,
+                        currentItemID: item.id,
+                        folderId: nil
+                    )
                 ))
                 return .none
                 
             case .root(.onTapAllPhotos):
-                state.path.append(.allPhotos(
-                    ArchiveAllPhotosFeature.State(photos: state.root.$photos)
-                ))
+                state.path.append(.allPhotos(ArchiveAllPhotosFeature.State()))
                 return .none
                 
             case .root(.onTapAllAlbums):
-                state.path.append(.allAlbums(
-                    ArchiveAllAlbumsFeature.State(albums: state.root.$albums, photos: state.root.$photos)
-                ))
+                state.path.append(.allAlbums(ArchiveAllAlbumsFeature.State()))
                 return .none
                 
             case let .root(.albumTapped(album)):
                 let isFirstAlbum = state.root.albums.first?.id == album.id
                 
                 if isFirstAlbum {
-                    state.path.append(.favoriteAlbum(
-                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
-                    ))
+                    state.path.append(.favoriteAlbum(ArchiveFavoriteAlbumFeature.State(album: album)))
                 } else {
-                    state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
-                    ))
+                    state.path.append(.albumDetail(ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
@@ -77,28 +77,25 @@ struct ArchiveCoordinator {
                 let isFirstAlbum = state.root.albums.first?.id == album.id
                 
                 if isFirstAlbum {
-                    state.path.append(.favoriteAlbum(
-                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
-                    ))
+                    state.path.append(.favoriteAlbum(ArchiveFavoriteAlbumFeature.State(album: album)))
                 } else {
-                    state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
-                    ))
+                    state.path.append(.albumDetail(ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
                 
                 // path action
-            case let .path(.element(id, action: .qrScanner(.closeButtonTapped))):
-                state.path.pop(from: id)
-                return .none
                 
             case let .path(.element(id: id, action: .allPhotos(.imageTapped(item)))):
                 guard case let .allPhotos(allPhotosState) = state.path[id: id] else { return .none }
                 
                 if !allPhotosState.isSelectionMode {
                     state.path.append(.detail(
-                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                        ArchivePhotoDetailFeature.State(
+                            photos: state.root.photos,
+                            currentItemID: item.id,
+                            folderId: nil
+                        )
                     ))
                 }
                 return .none
@@ -108,12 +105,11 @@ struct ArchiveCoordinator {
                 
                 if isFirstAlbum {
                     state.path.append(.favoriteAlbum(
-                        ArchiveFavoriteAlbumFeature.State(photos: state.root.$photos, album: album)
+                        ArchiveFavoriteAlbumFeature.State(album: album)
                     ))
                 } else {
                     state.path.append(.albumDetail(
-                        ArchiveAlbumDetailFeature.State(photos: state.root.$photos, sharedAlbums: state.root.$albums, album: album)
-                    ))
+                        ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
@@ -122,7 +118,11 @@ struct ArchiveCoordinator {
                 
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
-                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                        ArchivePhotoDetailFeature.State(
+                            photos: state.root.photos,
+                            currentItemID: item.id,
+                            folderId: albumDetailState.album.id
+                        )
                     ))
                 }
                 return .none
@@ -132,7 +132,11 @@ struct ArchiveCoordinator {
                 
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
-                        ArchivePhotoDetailFeature.State(photos: state.root.$photos, itemID: item.id)
+                        ArchivePhotoDetailFeature.State(
+                            photos: state.root.photos,
+                            currentItemID: item.id,
+                            folderId: albumDetailState.album.id
+                        )
                     ))
                 }
                 return .none
@@ -173,6 +177,5 @@ extension ArchiveCoordinator {
         case allAlbums(ArchiveAllAlbumsFeature)
         case albumDetail(ArchiveAlbumDetailFeature)
         case favoriteAlbum(ArchiveFavoriteAlbumFeature)
-        case qrScanner(QRCodeScanFeature)
     }
 }

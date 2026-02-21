@@ -17,9 +17,10 @@ struct QRCodeScannerView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
-            CameraPreview(isTorchOn: $store.isLightOn) { urlString in
+            CameraPreview(isTorchOn: store.isLightOn, isActive: store.isCameraActive) { urlString in
                 store.send(.codeScanned(urlString))
-            }.ignoresSafeArea()
+            }
+            .ignoresSafeArea()
             
             Color.gray900.opacity(0.6)
                 .ignoresSafeArea()
@@ -35,14 +36,6 @@ struct QRCodeScannerView: View {
                 
                 footer
                     .padding(.top, 40)
-            }
-            
-            if store.isLoading {
-                Color.gray900.opacity(0.6)
-                
-                ProgressView()
-                    .controlSize(.large)
-                    .tint(.white)
             }
             
             if store.isWebViewPresented, let url = store.webViewURL {
@@ -64,10 +57,19 @@ struct QRCodeScannerView: View {
             title: "지원하지 않는 브랜드예요.",
             subtitle: "갤러리에서 사진을 추가해 바로 저장할 수 있어요.\n원하는 브랜드가 있다면 제안해주세요!",
             confirmText: "갤러리에서 추가하기",
-            secondaryText: "텍스트 버튼",
+            secondaryText: "브랜드 제안하기",
             onConfirm: { store.send(.addPhotoFromGalleryButtonTapped) },
             onSecondary: { store.send(.openSuggestBrandPage) }
         )
+        .nekiAlert(
+            isPresented: $store.isExpiredAlertPresented,
+            style: .plain,
+            title: "만료된 QR 코드예요.",
+            subtitle: "만료되지 않은 네컷사진만 저장할 수 있어요.",
+            confirmText: "확인",
+            onConfirm: { store.send(.closeExpiredAlertButtonTapped) }
+        )
+        .fullScreenCover(isPresented: $store.isLoading) { LoadingView() }
     }
     
     private var header: some View {
@@ -97,7 +99,7 @@ struct QRCodeScannerView: View {
         Button {
             store.send(.lightButtonTapped)
         } label: {
-            Image(.iconLightOff) // TODO: 현재 토치 온오프 아이콘이 동일한데 에셋 필요, 버튼 디자인 변경 예정
+            Image(store.isLightOn ? .iconLightOff : .iconLightOn)
                 .padding(.horizontal, 13.5)
                 .padding(.vertical, 15)
                 .background(.ultraThinMaterial)
@@ -106,11 +108,25 @@ struct QRCodeScannerView: View {
     }
     
     private func webViewLayer(url: URL) -> some View {
-        DownloadableWebView(url: url) { data in
-            store.send(.webViewImageDownloadResult(.success(data)))
-        } onError: { error in
-            store.send(.webViewImageDownloadResult(.failure(error)))
+        ZStack {
+            Color.white.ignoresSafeArea()
+            
+            VStack {
+                DownloadableWebView(url: url) { data in
+                    store.send(.webViewImageDownloadResult(.success(data)))
+                } onError: { error in
+                    store.send(.webViewImageDownloadResult(.failure(error)))
+                }
+                
+                Button {
+                    store.send(.closeWebViewButtonTapped)
+                } label: {
+                    Text("닫기")
+                }
+            }
         }
+        .transition(.move(edge: .bottom))
+        .zIndex(2)
     }
 }
 
@@ -148,8 +164,4 @@ private extension QRCodeScannerView {
             .frame(width: frameSize.width, height: frameSize.height)
         }
     }
-}
-
-#Preview {
-    QRCodeScannerView(store: .init(initialState: QRCodeScanFeature.State(), reducer: { QRCodeScanFeature() }))
 }

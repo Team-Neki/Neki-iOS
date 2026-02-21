@@ -44,14 +44,14 @@ struct ArchiveImageFooter: View {
             Button(action: onDownload) {
                 Image(isEnabled ? .iconDownloadFill : .iconDownload)
                     .renderingMode(.template)
-                    .foregroundStyle(isEnabled ? .gray900 : .gray300)
+                    .foregroundStyle(isEnabled ? .gray500 : .gray100)
             }
             .frame(width: 44, height: 44)
             .disabled(!isEnabled)
             
             if let isFavorite = isFavorite, let onFavorite = onFavorite {
                 Button(action: onFavorite) {
-                    Image(isFavorite ? .iconHeartFill28 : .iconHeart28)
+                    Image(isFavorite ? .iconHeart28Fill : .iconHeart28Gray)
                         .renderingMode(.template)
                         .foregroundStyle(isFavorite ? .red : .gray300)
                 }
@@ -64,7 +64,7 @@ struct ArchiveImageFooter: View {
             Button(action: onDelete) {
                 Image(isEnabled ? .iconTrashFill : .iconTrash)
                     .renderingMode(.template)
-                    .foregroundStyle(isEnabled ? .gray900 : .gray300)
+                    .foregroundStyle(isEnabled ? .gray600 : .gray100)
             }
             .frame(width: 44, height: 44)
             .disabled(!isEnabled)

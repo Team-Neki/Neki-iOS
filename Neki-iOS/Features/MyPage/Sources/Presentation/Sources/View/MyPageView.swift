@@ -21,11 +21,13 @@ struct MyPageView: View {
             
             divider(isLarge: true)
             
-            section(.authorizationSettings)
-            
-            divider(isLarge: false)
-            
-            section(.support)
+            VStack(spacing: 10) {
+                section(.authorizationSettings)
+                
+                divider(isLarge: false)
+                
+                section(.support)
+            }
             
             Spacer()
         }
@@ -36,6 +38,7 @@ struct MyPageView: View {
                 // NekiToolBar.icon(.iconBellFill)
             }
         )
+        .task { await store.send(.onAppear).finish() }
     }
 }
 
@@ -85,12 +88,13 @@ private extension MyPageView {
         VStack(alignment: .leading, spacing: 4) {
             // Header
             Text(item.title)
-                .nekiFont(.caption12Medium)
+                .nekiFont(.body14Medium)
                 .foregroundStyle(.gray400)
-                .padding(.top, 12)
+                .padding(.top, 16)
+                .padding(.bottom, 4)
             
             // Content
-            VStack(spacing: 12) {
+            VStack(spacing: .zero) {
                 ForEach(item.includedItems) { cellItem in
                     sectionCell(cellItem)
                 }
@@ -102,7 +106,7 @@ private extension MyPageView {
     func sectionCell(_ item: SectionCellItem) -> some View {
         HStack {
             Text(item.title)
-                .nekiFont(.body16Medium)
+                .nekiFont(.title18Medium)
                 .foregroundStyle(.gray900)
             
             Spacer()
@@ -110,7 +114,7 @@ private extension MyPageView {
             if item.hasLink {
                 Image(.iconChevronRight)
             } else {
-                Text("v.1.3.1") // TODO: 실제 버전정보 표시하도록 해야함
+                Text("v.\(store.appVersion.value)")
                     .nekiFont(.body14Medium)
                     .foregroundStyle(.gray500)
             }
@@ -119,8 +123,4 @@ private extension MyPageView {
         .contentShape(.rect)
         .onTapGesture { store.send(.cellTapped(item)) }
     }
-}
-
-#Preview {
-    MyPageView(store: .init(initialState: MyPageFeature.State(user: .init(id: 1, nickname: "Swain", email: "dsad", profileImageURL: nil, providerType: .apple)), reducer: { MyPageFeature() }))
 }

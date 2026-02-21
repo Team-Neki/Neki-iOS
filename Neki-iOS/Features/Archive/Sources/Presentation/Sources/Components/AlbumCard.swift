@@ -19,21 +19,20 @@ struct AlbumCard: View {
         ZStack(alignment: .bottom) {
             KFImage(album.coverImageURL)
                 .placeholder({
-                    Image(.temporaryBranding)
+                    Image(.temporaryBrandingImageLong)
                         .resizable()
+                        .frame(height: cardHeight)
+                        .frame(maxWidth: .infinity)
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: cardWidth, height: cardHeight)
                         .clipped()
                 })
-                .onFailureImage(.temporaryBranding)
                 .resizable()
                 .retry(maxCount: 3, interval: .seconds(5))
-                .onFailure { error in
-                    Logger.presentation.error("앨범이미지 로드 실패: \(error)")
-                    Logger.presentation.error("실패한 앨범이미지 id: \(album.id)")
-                }
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
+                .overlay(content: {
+                    Color.black.opacity(0.04)
+                })
                 .frame(width: cardWidth, height: cardHeight)
                 .clipped()
             
@@ -43,11 +42,11 @@ struct AlbumCard: View {
             HStack(alignment: .bottom, spacing: 0) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("\(album.count)장")
-                        .nekiFont(.caption12Medium)
+                        .nekiFont(.body14Medium)
                         .foregroundStyle(.white.opacity(0.7))
                     
                     Text(album.title)
-                        .nekiFont(.body14SemiBold)
+                        .nekiFont(.body16SemiBold)
                         .foregroundStyle(.white)
                         .lineLimit(1)
                 }
@@ -59,28 +58,26 @@ struct AlbumCard: View {
                     Image(systemName: "heart.fill")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(width: 8, height: 8)
-                        .padding(4)
-                        .background(.white.opacity(0.2))
+                        .frame(width: 9.75, height: 9.25)
+                        .padding(.vertical, 5.38)
+                        .padding(.horizontal, 5.12)
+                        .background(.gray25.opacity(0.3))
                         .clipShape(Circle())
                         .foregroundStyle(.white)
                         .padding(.trailing, 8)
-                        .padding(.bottom, 3)
+                        .padding(.bottom, 2)
                 } else {
                     Color.clear
-                        .frame(width: 16, height: 16)
+                        .frame(width: 20, height: 20)
                         .padding(.trailing, 8)
                 }
             }
-            .padding(.bottom, 10)
+            .padding(.bottom, 8)
         }
         .frame(width: cardWidth, height: cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
-
-
-// MARK: - 익성님이 공유해준 앨범 커버 만드는 로직
 
 private extension AlbumCard {
     struct UnionShape: Shape {

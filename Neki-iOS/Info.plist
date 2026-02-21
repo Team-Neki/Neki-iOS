@@ -20,6 +20,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>KAKAO_LOGIN_NATIVE_APP_KEY</key>
+	<string>$(KAKAO_LOGIN_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>nmap</string>
@@ -28,30 +30,43 @@
 		<string>kakaokompassauth</string>
 	</array>
 	<key>NMFNcpKeyId</key>
-	<string>${NAVER_MAPS_CLIENT_ID}</string>
+	<string>$(NAVER_MAPS_CLIENT_ID)</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>mx2.co.kr</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<key>photoqr3.kr</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>TEMPORARY_ACCESS_TOKEN</key>
 	<string>$(TEMPORARY_ACCESS_TOKEN)</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Pretendard-Bold.otf</string>
 		<string>Pretendard-Medium.otf</string>
-        <string>Pretendard-Regular.otf</string>
-        <string>Pretendard-SemiBold.otf</string>
-    </array>
-    <key>UIDesignRequiresCompatibility</key>
-    <true/>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSExceptionDomains</key>
-        <dict>
-            <key>mx2.co.kr</key>
-            <dict>
-                <key>NSExceptionAllowsInsecureHTTPLoads</key>
-                <true/>
-                <key>NSIncludesSubdomains</key>
-                <true/>
-            </dict>
-        </dict>
-    </dict>
+		<string>Pretendard-Regular.otf</string>
+		<string>Pretendard-SemiBold.otf</string>
+	</array>
+	<key>UIDesignRequiresCompatibility</key>
+	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>$(LOCATION_USAGE_DESCRIPTION)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>$(PHOTO_LIBRARY_USAGE_DESCRIPTION)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>$(CAMERA_USAGE_DESCRIPTION)</string>
 </dict>
 </plist>

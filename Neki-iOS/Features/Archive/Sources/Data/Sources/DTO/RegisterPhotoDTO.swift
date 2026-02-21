@@ -11,10 +11,11 @@ public enum RegisterPhotoDTO {
     public struct Request: Encodable {
         let folderID: Int?
         let uploads: [RegisterPhotoData]
+        let favorite: Bool?
 
         enum CodingKeys: String, CodingKey {
             case folderID = "folderId"
-            case uploads
+            case uploads, favorite
         }
     }
     

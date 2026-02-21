@@ -36,10 +36,6 @@ struct ArchiveCoordinatorView: View {
             case .favoriteAlbum(let store):
                 ArchiveFavoriteAlbumView(store: store)
                     .navigationBarBackButtonHidden()
-                
-            case .qrScanner(let store):
-                QRCodeScannerView(store: store)
-                    .navigationBarBackButtonHidden()
             }
         }
     }

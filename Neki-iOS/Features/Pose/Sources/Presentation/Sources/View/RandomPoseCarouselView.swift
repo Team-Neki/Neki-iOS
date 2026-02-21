@@ -14,7 +14,7 @@ struct RandomPoseCarouselView: View {
     
     var body: some View {
         ZStack {
-            Color.white.ignoresSafeArea()
+            Color.gray50.ignoresSafeArea()
             
             VStack {
                 Spacer()
@@ -28,7 +28,14 @@ struct RandomPoseCarouselView: View {
             }
             .ignoresSafeArea()
             
-            mainContentView
+            ZStack {
+                if let pose = store.currentPose {
+                    mainContentView(for: pose)
+                        .id(pose.id)
+                        .transition(activeTransition)
+                }
+            }
+            .animation(.spring(response: 0.35, dampingFraction: 0.7, blendDuration: 0), value: store.currentPose)
             
             HStack(spacing: .zero) {
                 Color.clear
@@ -39,19 +46,37 @@ struct RandomPoseCarouselView: View {
                     .contentShape(.rect)
                     .onTapGesture { store.send(.tapRight) }
             }
+            .gesture(
+                DragGesture()
+                    .onEnded { value in
+                        let horizontalAmount = value.translation.width
+                        
+                        if horizontalAmount < 0 {
+                            store.send(.tapRight)
+                        } else {
+                            store.send(.tapLeft)
+                        }
+                    }
+            )
             
             controlButtons
                 .frame(maxHeight: .infinity, alignment: .bottom)
-            // TODO: 하단부 안전영역 패딩 줘야할 수도 있음 / 디자인팀에 문의해보기
             
             if store.isTutorialPresented { tutorialOverlay }
         }
         .animation(.easeInOut, value: store.isTutorialPresented)
-        .animation(.easeInOut(duration: 0.4), value: store.currentPose)
         .task { await store.send(.onAppear).finish() }
-        .onDisappear {
-            guard store.isDismissing == false else { return }
-            store.send(.onDisappear)
+        .nekiToolbar(
+            isOverlay: true,
+            center: { NekiToolBar.textCenter("랜덤포즈") }
+        )
+    }
+    
+    private var activeTransition: AnyTransition {
+        switch store.slideDirection {
+        case .previous: return .asymmetric(insertion: .move(edge: .leading), removal: .move(edge: .trailing))
+        case .next: return .asymmetric(insertion: .move(edge: .trailing), removal: .move(edge: .leading))
+        case .none: return .opacity
         }
     }
 }
@@ -100,7 +125,7 @@ private extension RandomPoseCarouselView {
         }
         .padding(8)
         .background {
-            Capsule() // TODO: 이거 디자인 수치 확인해서 다시 그려야함
+            Capsule()
                 .fill(.white.opacity(0.3))
                 .strokeBorder(
                     LinearGradient(colors: [
@@ -114,7 +139,7 @@ private extension RandomPoseCarouselView {
     
     var tutorialOverlay: some View {
         ZStack {
-            Color.gray900
+            Color.gray900.opacity(0.8)
                 .ignoresSafeArea()
             
             VStack {
@@ -185,22 +210,20 @@ private extension RandomPoseCarouselView {
             .padding()
         }
         .transition(.opacity)
-        .zIndex(1)
+        .zIndex(10)
     }
     
-    var mainContentView: some View {
-        KFImage(store.currentPose?.imageURL)
+    func mainContentView(for pose: Pose) -> some View {
+        KFImage(pose.imageURL)
             .placeholder {
                 ProgressView()
                     .controlSize(.large)
             }
-            .cancelOnDisappear(true)
             .resizable()
             .scaledToFit()
             .clipShape(.rect(cornerRadius: 20))
             .padding()
-            .id(store.currentPose?.id)
-            .transition(.opacity)
+            .compositingGroup()
     }
 }
 

@@ -15,14 +15,12 @@ struct PoseCoordinator {
     struct State {
         var root = PoseFeature.State()
         var path = StackState<Path.State>()
-        @Presents var randomPose: RandomPoseCarouselFeature.State?
     }
     
     enum Action {
         // Child
         case root(PoseFeature.Action)
         case path(StackActionOf<Path>)
-        case randomPose(PresentationAction<RandomPoseCarouselFeature.Action>)
         
         // Navigation
         case routeToDetail(Pose)
@@ -30,6 +28,7 @@ struct PoseCoordinator {
         case delegate(Delegate)
         enum Delegate {
             case logout
+            case requestQRScan
         }
     }
     
@@ -47,18 +46,21 @@ struct PoseCoordinator {
                 return .none
                 
             case let .root(.delegate(.didTapStartRandomPose(option))):
-                state.randomPose = RandomPoseCarouselFeature.State(peopleCount: option)
+                state.path.append(.randomPose(RandomPoseCarouselFeature.State(peopleCount: option)))
                 return .none
+                
+            case .root(.delegate(.qrScanButtonTapped)):
+                return .send(.delegate(.requestQRScan))
                 
                 // MARK: - Data Synchronization (Coordinator's Main Job)
             case let .path(.element(_, action: .detail(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 
-            case let .randomPose(.presented(.delegate(.poseUpdated(pose)))):
+            case let .path(.element(_, action: .randomPose(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 
                 // MARK: - Navigation from Random Pose
-            case let .randomPose(.presented(.delegate(.routeToDetail(pose)))):
+            case let .path(.element(_, action: .randomPose(.delegate(.routeToDetail(pose))))):
                 return .send(.routeToDetail(pose))
                 
             case let .routeToDetail(pose):
@@ -73,7 +75,6 @@ struct PoseCoordinator {
             }
         }
         .forEach(\.path, action: \.path)
-        .ifLet(\.$randomPose, action: \.randomPose) { RandomPoseCarouselFeature() }
     }
 }
 
@@ -81,5 +82,6 @@ extension PoseCoordinator {
     @Reducer
     enum Path {
         case detail(PoseDetailFeature)
+        case randomPose(RandomPoseCarouselFeature)
     }
 }

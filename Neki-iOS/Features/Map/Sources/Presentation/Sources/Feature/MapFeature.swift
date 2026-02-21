@@ -12,6 +12,10 @@ import os
 
 @Reducer
 public struct MapFeature {
+    enum Constants {
+        static let defaultInitialPosition: CLLocation = .init(latitude: 37.498095, longitude: 127.027610)
+    }
+    
     enum SheetStage {
         case first, second, third, photoBoothSelected
         
@@ -32,6 +36,7 @@ public struct MapFeature {
         var detent: NekiSheetDetent = SheetStage.first.detent
         var isSearchHereButtonVisible: Bool = false
         var isFirstLoad: Bool = true
+        var isPermissionAlertPresented: Bool = false
         
         // Map State
         var cameraPosition: GeographicCoordinate?
@@ -40,6 +45,10 @@ public struct MapFeature {
         // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var userLocation: CLLocation?
+        var userGeographicCoordinate: GeographicCoordinate? {
+            guard let location = userLocation else { return nil }
+            return .init(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude)
+        }
         var isUserTrackingMode: Bool = false
         var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
@@ -68,6 +77,7 @@ public struct MapFeature {
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
         case didTapSearchHereButton
+        case dismissPermissionAlert
         
         // Internal Logic Actions
         case updateLocationAuthorization(CLAuthorizationStatus)
@@ -75,8 +85,10 @@ public struct MapFeature {
         case updateUserLocation(Result<CLLocation, Error>)
         case setUserTrackingMode(Bool)
         case didDetectMapInteraction
+        case presentPermissionAlert
         
         // Map Logic Actions
+        case mapLoaded(GeographicBoundingBox)
         case cameraMotionStarted
         case cameraMotionEnded(GeographicBoundingBox)
         case updateSearchButtonVisibility(isVisible: Bool)
@@ -87,6 +99,9 @@ public struct MapFeature {
         case photoBoothChunkLoaded([PhotoBooth])
         case photoBoothStreamFinished
         case photoBoothStreamFailure(Error)
+        case loadBrands
+        case brandsResponse(Result<[PhotoBoothBrand], Error>)
+        
         // Sheet
         case fetchNearbyPhotoBooths(GeographicCoordinate)
         case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
@@ -124,6 +139,7 @@ public struct MapFeature {
                 // MARK: - Life Cycle & Streams
             case .onAppear:
                 return .merge(
+                    .send(.loadBrands),
                     .run { send in
                         for await status in await mapClient.locationAuthorizationStatus() {
                             await send(.updateLocationAuthorization(status))
@@ -160,26 +176,48 @@ public struct MapFeature {
                 case .notDetermined:
                     return state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
                     
-                default:
+                case .denied, .restricted:
                     state.isUserTrackingMode = false
+                    
+                    guard state.isFirstLoad, let bounds = state.currentBounds else { return .none }
+                    state.isFirstLoad = false
+                    return .merge(
+                        .send(.fetchPhotoBooths(bounds: bounds)),
+                        .send(.fetchNearbyPhotoBooths(bounds.center))
+                    )
+                    
+                @unknown default:
                     return .none
                 }
                 
+            case .presentPermissionAlert:
+                state.isPermissionAlertPresented = true
+                return .none
+                
+            case .dismissPermissionAlert:
+                state.isPermissionAlertPresented = false
+                return .none
+                
             case .openAppSettings:
-                // TODO: 설정 앱 동작 전에 안내문구 따위를 보여주도록 해야하는데 디자인 가이드가 없습니다.
+                state.isPermissionAlertPresented = false
                 return .run { _ in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)
                 }
                 
                 // MARK: - User Location Interaction
+            case let .mapLoaded(bounds):
+                state.currentBounds = bounds
+                state.cameraPosition = bounds.center
+                return .none
+                
             case .didTapCurrentLocationButton:
                 resetToMapMode(&state, for: .first)
                 switch state.locationAuthorizationStatus {
                 case .notDetermined:
                     return .send(.requestPermission)
                 case .restricted, .denied:
-                    return .send(.openAppSettings)
+                    return .send(.presentPermissionAlert)
                 case .authorizedAlways, .authorizedWhenInUse, .authorized:
                     state.isUserTrackingMode = true
                     if let location = state.userLocation { updateCameraPosition(&state, to: location.coordinate) }
@@ -191,9 +229,11 @@ public struct MapFeature {
             case let .updateUserLocation(.success(location)):
                 state.userLocation = location
                 
-                guard state.isUserTrackingMode else { return .none }
-                updateCameraPosition(&state, to: location.coordinate)
-                state.isSearchHereButtonVisible = false
+                if state.isFirstLoad || state.isUserTrackingMode {
+                    updateCameraPosition(&state, to: location.coordinate)
+                    guard state.isFirstLoad else { return .none }
+                    state.isSearchHereButtonVisible = false
+                }
                 return .none
                 
             case .updateUserLocation(.failure):
@@ -207,28 +247,36 @@ public struct MapFeature {
                 // MARK: - Map Camera & Search Logic
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false
-                return .none
-                
-            case .cameraMotionStarted:
                 return .merge(
-                    .send(.updateSearchButtonVisibility(isVisible: true)),
                     .cancel(id: CancelID.mapFetch),
                     .cancel(id: CancelID.listFetch)
                 )
+                
+            case .cameraMotionStarted:
+                return .send(.updateSearchButtonVisibility(isVisible: true))
                 
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
                 
-                if state.isFirstLoad {
-                    state.isFirstLoad = false
-                    return .merge(
-                        .send(.fetchPhotoBooths(bounds: bounds)),
-                        .send(.fetchNearbyPhotoBooths(bounds.center))
-                    )
+                guard state.isFirstLoad else { return .none }
+                guard state.locationAuthorizationStatus != .notDetermined else { return .none }
+                let targetCoordinate: CLLocation
+                if state.isLocationAuthorized {
+                    guard let userLocation = state.userLocation else { return .none }
+                    targetCoordinate = userLocation
+                } else {
+                    targetCoordinate = Constants.defaultInitialPosition
                 }
                 
-                return .none
+                let currentCameraLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
+                guard currentCameraLocation.distance(from: targetCoordinate) <= 200 else { return .none }
+                state.isFirstLoad = false
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
+                return .merge(
+                    .send(.fetchPhotoBooths(bounds: bounds)),
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
+                )
                 
             case let .updateSearchButtonVisibility(isVisible):
                 state.isSearchHereButtonVisible = isVisible
@@ -236,12 +284,27 @@ public struct MapFeature {
                 
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
+                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
                 return .merge(
                     .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(bounds.center))
+                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
                 )
                 
                 // MARK: - Data Fetching
+            case .loadBrands:
+                return .run { send in
+                    await send(.brandsResponse(Result { try await photoBoothClient.loadBrands() }))
+                }
+                
+            case let .brandsResponse(.success(brands)):
+                state.photoBoothListState.brands = IdentifiedArray(uniqueElements: brands)
+                return .none
+                
+            case let .brandsResponse(.failure(error)):
+                // TODO: 토스트
+                Logger.presentation.error("브랜드 정보 로드 실패: \(error)")
+                return .none
+                
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
                 state.photoBooths.removeAll()
@@ -295,8 +358,11 @@ public struct MapFeature {
                 }.cancellable(id: CancelID.listFetch, cancelInFlight: true)
                 
             case let .nearbyPhotoBoothResponse(.success(booths)):
-                state.photoBoothListState.photoBooths = IdentifiedArray(uniqueElements: booths)
-                return .send(.startBackgroundCalculation)
+                let nearbyBooths = IdentifiedArray(uniqueElements: booths)
+                return .merge(
+                    .send(.photoBoothListAction(.setNearbyBooths(nearbyBooths))),
+                    .send(.startBackgroundCalculation)
+                )
                 
             case let .nearbyPhotoBoothResponse(.failure(error)):
                 Logger.presentation.error("Nearby PhotoBooths fetch error: \(error)")
@@ -317,8 +383,7 @@ public struct MapFeature {
                 
             case let .didFinishBackgroundCalculation(map, list):
                 state.visiblePhotoBooths = map
-                state.photoBoothListState.visibleBooths = list
-                return .none
+                return .send(.photoBoothListAction(.setVisibleBooths(list)))
                 
             case .didTapGoBackToMapButton:
                 resetToMapMode(&state, for: .first)

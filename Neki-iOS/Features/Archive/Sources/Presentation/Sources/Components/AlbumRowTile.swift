@@ -28,6 +28,9 @@ struct AlbumRowTile: View {
                 .cancelOnDisappear(true)
                 .aspectRatio(contentMode: .fill)
                 .frame(width: 72, height: 72)
+                .overlay(content: {
+                    Color.black.opacity(0.04)
+                })
                 .overlay(favoriteHeartOverlay)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .clipped()
@@ -44,10 +47,11 @@ struct AlbumRowTile: View {
             
             Spacer()
             
-            if isSelectMode || isDeleteMode {
+            if isSelectMode && !album.isFavorite || isDeleteMode && !album.isFavorite {
                 selectionIndicator
             }
         }
+        .contentShape(Rectangle())
     }
 }
 
@@ -68,7 +72,7 @@ private extension AlbumRowTile {
     @ViewBuilder
     var selectionIndicator: some View {
         let shouldShowCheckbox: Bool = {
-            if isSelectMode { return true }
+            if isSelectMode && !album.isFavorite { return true }
             if isDeleteMode && !album.isFavorite { return true }
             return false
         }()

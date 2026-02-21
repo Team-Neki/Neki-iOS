@@ -11,7 +11,7 @@ import os
 struct Life4CutStrategy: QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { .htmlCrawling }
     
-    func canHandle(host: String) -> Bool { PhotoBoothBrand.life4cut.hostKeywords.contains(where: { host.lowercased().contains($0.lowercased()) }) }
+    func canHandle(host: String) -> Bool { QRCodeBrand.life4cut.hostKeywords.contains(where: { host.lowercased().contains($0.lowercased()) }) }
     
     func parse(_ url: URL, networkProvider: any NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("인생네컷 파싱 시도: \(url.absoluteString)")
@@ -55,8 +55,8 @@ struct Life4CutStrategy: QRCodeParsingStrategy {
             }
             return ParsedQRResult(brand: .life4cut, originalImage: data)
         } catch {
-            Logger.domain.notice("이미지 다운로드 실패. 웹뷰 폴백 시도")
-            throw .fallbackToWebView(url)
+            Logger.network.warning("이미지 없음(404 등). 만료 확인.")
+            throw .imageDownloadFailed
         }
     }
 }

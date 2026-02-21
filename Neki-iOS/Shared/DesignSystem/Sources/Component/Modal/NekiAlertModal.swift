@@ -31,17 +31,18 @@ public struct NekiAlertModal<Content: View, Actions: View>: View {
     public var body: some View {
         VStack(alignment: .center, spacing: 0) {
             if hasIcon {
-                Image(.iconCircleAlertFill)
+                Image(.iconQuestionmarkAlert)
                     .padding(.top, 20)
                     .padding(.bottom, 12)
             }
             
             content
                 .padding(.horizontal, 12)
-            
-            actions
                 .padding(.top, 24)
                 .padding(.bottom, 12)
+            
+            actions
+                .padding(.vertical, 12)
                 .padding(.horizontal, 12)
         }
         .frame(maxWidth: .infinity)

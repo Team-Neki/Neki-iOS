@@ -15,7 +15,11 @@ public protocol NetworkProvider {
 }
 
 private enum NetworkProviderKey: DependencyKey {
-    static let liveValue: NetworkProvider = DefaultNetworkProvider()
+    static let liveValue: NetworkProvider = {
+        let tokenRefresher = AuthTokenRefresher()
+        let networkProvider = DefaultNetworkProvider(refresher: tokenRefresher)
+        return networkProvider
+    }()
 }
 
 public extension DependencyValues {

@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "icon_trash.svg",
+      "filename" : "trash_disabled.svg",
       "idiom" : "universal"
     }
   ],

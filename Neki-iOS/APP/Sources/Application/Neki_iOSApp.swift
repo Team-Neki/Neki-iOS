@@ -17,6 +17,16 @@ struct Neki_iOSApp: App {
     var body: some Scene {
         WindowGroup {
             AppCoordinatorView(store: store)
+                .onOpenURL { handleIncomingURL($0) }
+        }
+    }
+    
+    private func handleIncomingURL(_ url: URL) {
+        if url.scheme == "neki" { return }
+        
+        if url.scheme == "https" || url.scheme == "http" {
+            guard let host = url.host(), host == "neki.suitestudy.com" else { return }
+            return
         }
     }
 }

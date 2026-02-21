@@ -395,8 +395,8 @@ extension NaverMapRepresentable {
             marker.anchor = CGPoint(x: 0.5, y: 0.5)
             marker.zIndex = 50
             
-            marker.touchHandler = { [weak mapView] _ in
-                guard let mapView else { return false }
+            marker.touchHandler = { [weak mapView, weak marker] _ in
+                guard let mapView, let marker else { return false }
                 let currentZoom = mapView.zoomLevel
                 let targetZoom = min(currentZoom + 2.5, Constants.maxZoomLevel)
                 let cameraUpdate = NMFCameraUpdate(scrollTo: marker.position, zoomTo: targetZoom)

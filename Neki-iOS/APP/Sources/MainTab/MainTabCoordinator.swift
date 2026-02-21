@@ -179,6 +179,9 @@ struct MainTabCoordinator {
                 state.toast = item
                 return .none
                 
+            case .pose(.delegate(.requestQRScan)):
+                return .send(.onTapQRScan)
+                
             case .myPage(.delegate(.didLogout)):
                 return .run { send in
                     await send(.archive(.root(.clearData)))

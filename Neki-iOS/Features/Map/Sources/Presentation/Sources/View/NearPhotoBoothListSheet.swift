@@ -12,6 +12,8 @@ import Kingfisher
 struct NearPhotoBoothListSheet: View {
     @Bindable var store: StoreOf<PhotoBoothListFeature>
     
+    private let brandNameFormatter = PhotoBoothNameFormatter()
+    
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }
     
     var body: some View {
@@ -71,7 +73,7 @@ private extension NearPhotoBoothListSheet {
                         }
                     }
                 
-                Text(brand.name)
+                Text(brandNameFormatter.format(brand: brand))
                     .font(.neki(isSelected ? .body14SemiBold : .body14Medium))
                     .foregroundStyle(isSelected ? .primary400 : .gray900)
                     .lineLimit(2)
@@ -99,15 +101,18 @@ private extension NearPhotoBoothListSheet {
         } header: {
             HStack {
                 HStack(spacing: 2) {
-                    Text("가까운").foregroundStyle(.primary400) + Text("  포토 부스")
+                    Text("가까운").foregroundStyle(.primary400) +
+                    Text(" ") +
+                    Text("포토") +
+                    Text(" ") +
+                    Text("부스")
                     
                     Image(.iconPinClip)
                 }
                 
                 Spacer()
                 
-                Image(systemName: "exclamationmark.circle")
-                    .foregroundStyle(.gray400)
+                Image(.iconExclamationMarkGray)
                     .onTapGesture { store.send(.toggleTooltip) }
                     .nekiTooltip(isPresented: $store.isTooltipPresented, "가까운 네컷 사진 브랜드는\n1Km 기준으로 표시돼요.")
             }

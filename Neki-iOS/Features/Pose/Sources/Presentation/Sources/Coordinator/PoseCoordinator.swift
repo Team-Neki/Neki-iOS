@@ -49,7 +49,7 @@ struct PoseCoordinator {
                 state.path.append(.randomPose(RandomPoseCarouselFeature.State(peopleCount: option)))
                 return .none
                 
-            case let .root(.delegate(.qrScanButtonTapped)):
+            case .root(.delegate(.qrScanButtonTapped)):
                 return .send(.delegate(.requestQRScan))
                 
                 // MARK: - Data Synchronization (Coordinator's Main Job)

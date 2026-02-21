@@ -281,17 +281,6 @@ extension NaverMapRepresentable {
             lastSelectedBoothID = selectedBoothID
         }
         
-        func createMarker(for booth: PhotoBooth) -> NMFMarker {
-            let marker = NMFMarker()
-            marker.position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-            
-            marker.touchHandler = { [weak self] _ in
-                self?.parent.store.send(.didTapBooth(booth))
-                return true
-            }
-            return marker
-        }
-        
         func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, expectedID: Int) {
             guard let currentID = marker.userInfo["identifier"] as? Int, currentID == expectedID else { return }
             marker.iconImage = overlay

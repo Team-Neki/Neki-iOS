@@ -66,7 +66,7 @@ struct ArchiveImageCard: View {
                     Button {
                         onTapFavorite()
                     } label: {
-                        Image(item.isFavorite ? .iconHeart20White : .iconHeart20Gray)
+                        Image(item.isFavorite ? .iconHeart20WhiteFill : .iconHeart20White)
                             .renderingMode(.template)
                             .foregroundStyle(.white)
                     }

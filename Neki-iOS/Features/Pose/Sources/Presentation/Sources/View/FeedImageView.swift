@@ -46,9 +46,9 @@ struct FeedImageView: View {
             Button {
                 onTapBookmark?()
             } label: {
-                Image(item.isScrapped ? .iconBookmarkFill : .iconBookmark)
+                Image(item.isScrapped ? .iconBookmark20WhiteFill : .iconBookmark20White)
             }
-            .padding()
+            .padding(10)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()

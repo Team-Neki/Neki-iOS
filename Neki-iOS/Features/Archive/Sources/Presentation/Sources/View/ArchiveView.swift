@@ -78,30 +78,6 @@ struct ArchiveView: View {
                     }
             }
             
-//            if store.showDropDownMenu {
-//                dropDownMenu
-//                    .padding(.top, 46)
-//                    .padding(.trailing, 16)
-//            }
-            
-        }
-        .sheet(isPresented: $addAlbumSheetPresented) {
-            ArchiveAddAlbumSheet(
-                text: $store.newAlbumTitle,
-                errorMessage: store.albumTitleErrorMessage,
-                isConfirmEnabled: store.isConfirmButtonEnabled,
-                onCancel: {
-                    store.send(.onTapCancelAddAlbum)
-                    addAlbumSheetPresented = false
-                },
-                onConfirm: {
-                    store.send(.onTapConfirmAddAlbum)
-                    addAlbumSheetPresented = false
-                }
-            )
-            .presentationDetents([.height(266)])
-            .presentationDragIndicator(.visible)
-            .presentationCornerRadius(20)
         }
         .fullScreenCover(isPresented: $store.isLoading, content: {
             LoadingView(message: "사진을 업로드하고 있어요.")
@@ -113,13 +89,31 @@ struct ArchiveView: View {
         .transaction { transaction in
             transaction.disablesAnimations = true
         }
+        .sheet(isPresented: $addAlbumSheetPresented) {
+            ArchiveAlbumInputSheet(
+                style: .add,
+                text: $store.newAlbumTitle,
+                errorMessage: store.albumTitleErrorMessage,
+                isConfirmEnabled: store.isConfirmButtonEnabled,
+                onCancel: {
+                    store.send(.onTapCancelAddAlbum)
+                    withAnimation {
+                        addAlbumSheetPresented = false
+                    }
+                },
+                onConfirm: {
+                    store.send(.onTapConfirmAddAlbum)
+                    withAnimation {
+                        addAlbumSheetPresented = false
+                    }
+                }
+            )
+            .presentationDetents([.height(266)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
+        }
         .task {
             await store.send(.onAppear).finish()
-        }
-        .onTapGesture {
-            if store.showDropDownMenu {
-                store.showDropDownMenu = false
-            }
         }
     }
 }
@@ -134,88 +128,29 @@ private extension ArchiveView {
             
             Spacer()
             
-//            HStack(alignment: .center, spacing: 12) {
-//                Button {
-//                    store.send(.toggleDropDownMenu)
-//                } label: {
-//                    Image(.iconPlusRed)
-//                }
-//                .nekiTooltip(
-//                    isPresented: $store.showTooltip,
-//                    "버튼을 눌러 네컷을 추가할 수 있어요",
-//                    position: .bottom,
-//                    style: .dark,
-//                    showDismiss: false
-//                )
+            HStack(alignment: .center, spacing: 12) {
+                Button {
+                    store.send(.onTapQRScan)
+                } label: {
+                    Image(.iconQrCode)
+                }
+                .nekiTooltip(
+                    isPresented: $store.showTooltip,
+                    "QR스캔으로 빠르게 네컷을 추가해보세요!",
+                    position: .bottom,
+                    style: .dark,
+                    showDismiss: false
+                )
                 
-//                Button {
-//                    // TODO: - 알림 이벤트
-//                } label: {
-//                    Image(.iconBellFill)
-//                }
-//            }
+                //                Button {
+                //                    // TODO: - 알림 이벤트
+                //                } label: {
+                //                    Image(.iconBellFill)
+                //                }
+            }
         }
         .frame(height: 54)
         .padding(.horizontal, 20)
-    }
-    
-//    var dropDownMenu: some View {
-//        VStack(alignment: .leading, spacing: 0) {
-//            dropDownMenuButton(title: "QR 인식", icon: .iconQrcodeScan) {
-//                store.send(.onTapQRScan)
-//            }
-//            
-//            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-//                HStack(alignment: .center, spacing: 6) {
-//                    Image(uiImage: .iconRoundAddPhotoAlternate)
-//                    
-//                    Text("갤러리에서 추가")
-//                        .nekiFont(.body16Medium)
-//                        .foregroundStyle(.gray900)
-//                    
-//                    Spacer()
-//                }
-//                .padding(.leading, 12)
-//                .padding(.vertical, 5)
-//                .frame(height: 34)
-//                .contentShape(Rectangle())
-//            }
-//            
-//            Divider()
-//                .background(.gray50)
-//                .padding(.vertical, 4)
-//            
-//            dropDownMenuButton(title: "새 앨범 추가", icon: .iconSolarFolderBold) {
-//                addAlbumSheetPresented = true
-//                store.send(.onTapCancelAddAlbum)
-//            }
-//        }
-//        .padding(.vertical, 5)
-//        .frame(width: 158, height: 130)
-//        .background(.white)
-//        .clipShape(RoundedRectangle(cornerRadius: 12))
-//        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
-//    }
-    
-    func dropDownMenuButton(
-        title: String,
-        icon: UIImage,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            HStack(alignment: .center, spacing: 6) {
-                Image(uiImage: icon)
-                
-                Text(title)
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray900)
-                
-                Spacer()
-            }
-            .padding(.leading, 12)
-            .padding(.vertical, 5)
-            .frame(height: 34)
-        }
     }
     
     var albumSection: some View {
@@ -244,12 +179,35 @@ private extension ArchiveView {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(store.albums) { album in
+                    ForEach(store.previewAlbums) { album in
                         AlbumCard(album: album)
                             .onTapGesture {
                                 store.send(.albumTapped(album))
                             }
                     }
+                    
+                    Button {
+                        withAnimation {
+                            addAlbumSheetPresented = true
+                        }
+                    } label: {
+                        VStack(alignment: .center, spacing: 8) {
+                            Image(.iconPlusRed)
+                            
+                            Text("새 앨범 추가")
+                                .nekiFont(.body14Medium)
+                        }
+                        .frame(width: 124, height: 166)
+                        .contentShape(Rectangle())
+                    }
+                    .foregroundStyle(.primary400)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .background(content: {
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(.primary400 , style: StrokeStyle(lineWidth: 2, lineCap: .round,
+                                                                           dash: [5, 5], dashPhase: 0))
+                    })
+                    
                 }
                 .padding(.horizontal, 20)
             }
@@ -287,7 +245,7 @@ private extension ArchiveView {
                     items: Array(store.photos),
                     columns: 2
                 ) { item in
-                    ArchiveImageCard(item: item)
+                    ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
                         .onTapGesture {
                             store.send(.imageTapped(item))
                         }
@@ -321,21 +279,6 @@ private extension ArchiveView {
         }
     }
 }
-
-// MARK: - 텍스트필드 글자 수 제한 extension
-
-private extension TextField {
-    ///글자 수 제한
-    func maxLength(_ length: Int, text: Binding<String>) -> some View {
-        self
-            .onChange(of: text.wrappedValue) { _, newValue in
-                if newValue.count > length {
-                    text.wrappedValue = String(newValue.prefix(length))
-                }
-            }
-    }
-}
-
 
 #Preview {
     ArchiveCoordinatorView(store: .init(initialState: ArchiveCoordinator.State(), reducer: { ArchiveCoordinator() }))

@@ -15,8 +15,13 @@ struct ArchiveFavoriteAlbumFeature {
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         let album: AlbumItem
         
+        var showDropDownMenu: Bool = false
+        
         var selectedIDs: Set<Int> = []
         var isSelectionMode: Bool = false
+        
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
+        var isLoading: Bool = false
         
         var isFetchingPhotos: Bool = false
         
@@ -27,6 +32,13 @@ struct ArchiveFavoriteAlbumFeature {
         case binding(BindingAction<State>)
         
         case onAppear
+        
+        case toggleDropDownMenu
+        case closeDropDownMenu
+        
+        case onTapFavorite(item: ArchiveImageItem)
+        case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
+        
         case fetchFavoritePhotos
         case favoritePhotoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
@@ -37,6 +49,13 @@ struct ArchiveFavoriteAlbumFeature {
         
         // 기능 액션
         case onTapDownloadButton
+        case downloadImagesResponse(successCount: Int)
+        
+        case imagePicker(ImagePickerFeature.Action)
+        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
+        case processUploadImages(imageIDs: [Int])
+        case registerPhotos(imageIDs: [Int])
+        case registerPhotosResponse(Result<Void, Error>)
         
         case onTapDeleteButton
         case deletePhotos
@@ -53,9 +72,14 @@ struct ArchiveFavoriteAlbumFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
+        
+        Scope(state: \.imagePicker, action: \.imagePicker) {
+            ImagePickerFeature()
+        }
         
         Reduce { state, action in
             switch action {
@@ -64,6 +88,78 @@ struct ArchiveFavoriteAlbumFeature {
                 
             case .onAppear:
                 return .send(.fetchFavoritePhotos)
+                
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
+                
+            case let .onTapFavorite(item):
+                let newStatus = !item.isFavorite
+                
+                state.photos[id: item.id]?.isFavorite = newStatus
+                
+                return .run { [id = item.id, isFavorite = newStatus] send in
+                    do {
+                        try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
+                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
+                    } catch {
+                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
+                    }
+                }
+                
+            case .toggleFavoriteResponse(_, .success):
+                return .none
+                
+            case let .toggleFavoriteResponse(photoID, .failure):
+                state.photos[id: photoID]?.isFavorite.toggle()
+                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
+                
+                // MARK: - Image Upload
+                
+            case .imagePicker(.uploadStarted):
+                state.isLoading = true
+                return .send(.closeDropDownMenu)
+                
+            case let .imagePicker(.uploadCompleted(ids)):
+                return .send(.processUploadImages(imageIDs: ids))
+                
+            case .imagePicker(.uploadFailed):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
+                
+            case let .processUploadImages(imageIDs):
+                state.isLoading = false
+                guard !imageIDs.isEmpty else { return .none }
+                return .send(.registerPhotos(imageIDs: imageIDs))
+                
+            case let .registerPhotos(imageIDs):
+                return .run { [mediaIds = imageIDs] send in
+                    await send(.registerPhotosResponse(
+                        Result {
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
+                            try await archiveClient.registerPhotos(
+                                folderId: nil,
+                                uploads: uploads,
+                                favorite: true
+                            )
+                        }
+                    ))
+                }
+                
+            case .registerPhotosResponse(.success):
+                state.isLoading = false
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
+                    await send(.fetchFavoritePhotos)
+                }
+                
+            case .registerPhotosResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
             case .fetchFavoritePhotos:
                 guard !state.isFetchingPhotos else { return .none }
@@ -103,6 +199,7 @@ struct ArchiveFavoriteAlbumFeature {
                 return .send(.fetchFavoritePhotos)
                 
             case .onTapSelectButton:
+                state.showDropDownMenu = false
                 state.isSelectionMode = true
                 return .none
                 
@@ -122,9 +219,24 @@ struct ArchiveFavoriteAlbumFeature {
                 return .none
                 
             case .onTapDownloadButton:
+                guard !state.selectedIDs.isEmpty else { return .none }
+                
+                let urls = state.selectedIDs.compactMap { state.photos[id: $0]?.imageURL }
+                
+                return .run { send in
+                    let count = try await imageDownloadClient.downloadImages(urls: urls)
+                    await send(.downloadImagesResponse(successCount: count))
+                }
+                
+            case let .downloadImagesResponse(count):
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                
+                if count > 0 {
+                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
+                } else {
+                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
+                }
                 
             case .onTapDeleteButton:
                 guard !state.selectedIDs.isEmpty else { return .none }

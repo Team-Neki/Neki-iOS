@@ -13,16 +13,26 @@ struct ArchiveAlbumDetailView: View {
     
     @State private var isFilterBarVisible: Bool = true
     @State private var lastDragPoint: CGFloat = 0
-    @State var showDropDownMenu: Bool = false
     @State var deleteAlbumSheetPresented: Bool = false
+    @State var editAlbumNameSheetPresented: Bool = false
     
     var body: some View {
-        ZStack(alignment: .top) {
-            if store.filteredAlbumPhotos.isEmpty {
-                ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n새로운 사진을 등록하고 앨범에 추가해보세요!")
-                    .padding(.bottom, 54)
-            } else {
-                masonryView
+        ZStack(alignment: .topTrailing) {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                
+                if store.filteredAlbumPhotos.isEmpty {
+                    ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n새로운 사진을 등록하고 앨범에 추가해보세요!")
+                        .padding(.bottom, 54)
+                } else {
+                    masonryView
+                }
+            }
+            
+            if store.showDropDownMenu && !store.isSelectionMode {
+                dropDownButton
+                    .padding(.top, 47)
+                    .padding(.trailing, 20)
             }
             
             if store.isSelectionMode {
@@ -35,19 +45,12 @@ struct ArchiveAlbumDetailView: View {
                     )
                 }
             }
+            
+            if store.isLoading {
+                LoadingView(message: "사진을 업로드하고 있어요.")
+            }
         }
         .task { await store.send(.onAppear).finish() }
-        .nekiToolbar(
-            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
-            center: { NekiToolBar.textCenter(store.album.title) },
-            right: {
-                if store.filteredAlbumPhotos.count != 0 {
-                    store.isSelectionMode ?
-                    NekiToolBar.textRight("취소") { store.send(.onTapCancelSelectButton) } :
-                    NekiToolBar.textRight("선택") { store.send(.onTapSelectButton) }
-                }
-            }
-        )
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
                 initialOption: .fromAlbumOnly,
@@ -65,12 +68,116 @@ struct ArchiveAlbumDetailView: View {
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
         }
+        .sheet(isPresented: $editAlbumNameSheetPresented) {
+            ArchiveAlbumInputSheet(
+                style: .edit,
+                text: $store.newAlbumTitle,
+                errorMessage: store.albumTitleErrorMessage,
+                isConfirmEnabled: store.isConfirmButtonEnabled,
+                onCancel: {
+                    store.send(.onTapCancelEditAlbum)
+                    withAnimation {
+                        editAlbumNameSheetPresented = false
+                    }
+                },
+                onConfirm: {
+                    store.send(.onTapConfirmEditAlbum)
+                    withAnimation {
+                        editAlbumNameSheetPresented = false
+                    }
+                }
+            )
+            .presentationDetents([.height(266)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
+        }
         .background(.white)
         
     }
 }
 
 private extension ArchiveAlbumDetailView {
+    @ViewBuilder
+    var header: some View {
+        ZStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 0) {
+                Button {
+                    store.send(.onTapBackButton)
+                } label: {
+                    Image(.iconChevronLeft)
+                }
+                
+                Spacer()
+                
+                HStack(alignment: .center, spacing: 12) {
+                    if store.isSelectionMode {
+                        Button {
+                            store.send(.onTapCancelSelectButton)
+                        } label: {
+                            Text("취소")
+                                .nekiFont(.body16SemiBold)
+                                .foregroundStyle(.gray800)
+                        }
+                    } else {
+                        Button {
+                            store.send(.toggleDropDownMenu)
+                        } label: {
+                            Image(.iconEllipsis)
+                        }
+                    }
+                }
+            }
+            
+            // 수정되는 모습이 바로바로 보여서 이렇게 해뒀는데, QA 후 별로라는 의견 나오면 별도 title로 관리
+            Text(store.newAlbumTitle)
+                .nekiFont(.title18SemiBold)
+                .foregroundStyle(.gray900)
+        }
+        .frame(height: 54)
+        .padding(.horizontal, 20)
+    }
+    
+    var dropDownButton: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                store.send(.onTapSelectButton)
+            } label: {
+                Text("사진 선택")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 120, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+
+            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+                Text("사진 추가")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 120, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+
+            Button {
+                store.send(.closeDropDownMenu)
+                editAlbumNameSheetPresented = true
+            } label: {
+                Text("앨범 이름 변경")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 120, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+        }
+        .padding(.vertical, 8)
+        .frame(width: 120, alignment: .topLeading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
+    }
+    
     @ViewBuilder
     var masonryView: some View {
         ScrollView {
@@ -81,7 +188,8 @@ private extension ArchiveAlbumDetailView {
                 ArchiveImageCard(
                     item: item,
                     isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id)
+                    isSelected: store.selectedIDs.contains(item.id),
+                    onTapFavorite: { store.send(.onTapFavorite(item: item)) }
                 )
                 .onTapGesture {
                     store.send(.imageTapped(item))
@@ -105,10 +213,35 @@ private extension ArchiveAlbumDetailView {
                     withAnimation(.smooth) {
                         isFilterBarVisible = diff < 0 ? false : true
                     }
-                    if showDropDownMenu { showDropDownMenu = false }
+                    if store.showDropDownMenu { store.send(.closeDropDownMenu) }
                     lastDragPoint = currentPoint
                 }
                 .onEnded { _ in lastDragPoint = 0 }
         )
     }
+}
+
+#Preview {
+    ArchiveAlbumDetailView(
+        store: Store(
+            initialState: ArchiveAlbumDetailFeature.State(
+                photos: [
+                    ArchiveImageItem(id: 1, imageURLString: "https://picsum.photos/200/300", isFavorite: true, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 2, imageURLString: "https://picsum.photos/200/400", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 3, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 4, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 5, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 6, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 7, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 8, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 9, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
+                    ArchiveImageItem(id: 10, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1)
+                ],
+                album: AlbumItem(id: 1, title: "제주도 여행", count: 3, coverImageURL: nil, isFavorite: false)
+            ),
+            reducer: {
+                ArchiveAlbumDetailFeature()
+            }
+        )
+    )
 }

@@ -139,7 +139,8 @@ public struct NekiToolbarLayout<Left: View, Center: View, Right: View>: View {
                 Spacer()
                 right
             }
-            .padding(.horizontal, 8)
+            .padding(.leading, 8)
+            .padding(.trailing, 20)
             .frame(height: 54)
             
             center

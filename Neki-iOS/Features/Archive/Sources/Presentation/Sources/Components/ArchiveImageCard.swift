@@ -17,6 +17,8 @@ struct ArchiveImageCard: View {
     let isSelectionMode: Bool
     let isSelected: Bool
     
+    let onTapFavorite: (() -> Void)
+    
     let gradientColor: LinearGradient = LinearGradient(
         colors: [
             .black.opacity(0),
@@ -31,11 +33,13 @@ struct ArchiveImageCard: View {
     init(
         item: ArchiveImageItem,
         isSelectionMode: Bool = false,
-        isSelected: Bool = false
+        isSelected: Bool = false,
+        onTapFavorite: @escaping () -> Void
     ) {
         self.item = item
         self.isSelectionMode = isSelectionMode
         self.isSelected = isSelected
+        self.onTapFavorite = onTapFavorite
     }
     
     //MARK: - Main Body
@@ -59,10 +63,12 @@ struct ArchiveImageCard: View {
                     gradientColor.opacity(0.2)
                 })
                 .overlay(alignment: .topTrailing) {
-                    if item.isFavorite {
-                        Image(.iconHeart20White)
-                            .padding(10)
+                    Button {
+                        onTapFavorite()
+                    } label: {
+                        Image(item.isFavorite ? .iconHeart20WhiteFill : .iconHeart20White)
                     }
+                    .padding(10)
                 }
                 .overlay(alignment: .topLeading) {
                     if isSelectionMode {

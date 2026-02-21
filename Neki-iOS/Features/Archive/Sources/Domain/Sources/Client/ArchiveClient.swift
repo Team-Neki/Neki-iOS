@@ -14,13 +14,14 @@ struct ArchiveClient {
     public var fetchPhotoList: (_ folderId: Int?, _ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
     public var getAlbumList: () async throws -> [AlbumEntity]
     public var deletePhotoList: (_ photoIds: [Int]) async throws -> Void
-    public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?)]) async throws -> Void
+    public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?)], _ favorite: Bool?) async throws -> Void
     public var getFavoriteAlbumInfo: () async throws -> FavoriteAlbumEntity
     public var addFolder: (_ name: String) async throws -> Int
     public var deleteFolders: (_ folderIDs: [Int], _ deletePhotos: Bool) async throws -> Void
     public var fetchFavoritePhotoList: (_ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
     public var toggleFavorite: (_ photoID: Int, _ request: Bool) async throws -> Void
     public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
+    public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -37,8 +38,8 @@ extension ArchiveClient: DependencyKey {
             deletePhotoList: { photoIds in
                 try await archiveRepository.deletePhotoList(photoIDs: photoIds)
             },
-            registerPhotos: { folderId, uploads in
-                try await archiveRepository.registerPhoto(folderID: folderId, uploads: uploads)
+            registerPhotos: { folderId, uploads, favorite in
+                try await archiveRepository.registerPhoto(folderID: folderId, uploads: uploads, favorite: favorite)
             },
             getFavoriteAlbumInfo: {
                 try await archiveRepository.getFavoriteAlbumInfo()
@@ -57,6 +58,9 @@ extension ArchiveClient: DependencyKey {
             },
             excludePhotosInAlbum: { albumID, photoIDs in
                 try await archiveRepository.excludePhotosInAlbum(albumID: albumID, photoIDs: photoIDs)
+            },
+            editAlbumName: { albumID, name in
+                try await archiveRepository.editAlbumName(albumID: albumID, name: name)
             }
         )
     }

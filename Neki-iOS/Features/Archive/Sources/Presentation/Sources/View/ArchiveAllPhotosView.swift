@@ -84,7 +84,8 @@ private extension ArchiveAllPhotosView {
                     ArchiveImageCard(
                         item: item,
                         isSelectionMode: store.isSelectionMode,
-                        isSelected: store.selectedIDs.contains(item.id)
+                        isSelected: store.selectedIDs.contains(item.id),
+                        onTapFavorite: { store.send(.onTapFavorite(item: item)) }
                     )
                     .onTapGesture {
                         store.send(.imageTapped(item))

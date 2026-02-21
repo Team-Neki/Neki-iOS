@@ -14,7 +14,7 @@ import os
 fileprivate enum Constants {
     // Map Settings
     static let defaultInitialPosition = NMGLatLng(lat: 37.498095, lng: 127.027610)
-    static let animationDuration: TimeInterval = 0.3
+    static let animationDuration: TimeInterval = 0.4
     static let minZoomLevel: Double = 12.0
     static let maxZoomLevel: Double = 20.0
     static let initialZoomLevel: Double = 14.0
@@ -24,6 +24,15 @@ fileprivate enum Constants {
     static let selectedSize = CGSize(width: 72, height: 83)
     static let zIndexNormal: Int = 0
     static let zIndexSelected: Int = 100
+    
+    // Clustering Settings
+    static let clusterMaxZoom: Int = 15
+    static let clusterMinZoom: Int = 4
+    static let clusterScreenDistance: Double = 65.0
+    static let leafCaptionTextSize: CGFloat = 12.0
+    static let clusterCaptionTextSize: CGFloat = 14.0
+    static let captionColorHex: UInt = 0x202227
+    static let brandClusteringThreshold: Double = 11.0
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
@@ -135,6 +144,17 @@ extension NaverMapRepresentable {
         typealias BoothID = Int
         typealias BrandID = Int
         
+        var lastCameraPosition: GeographicCoordinate?
+        var isMapLoaded: Bool = false
+        
+        let parent: NaverMapRepresentable
+        
+        private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
+        private var overlayImageCache: NSCache<NSString, NMFOverlayImage> = {
+            let cache = NSCache<NSString, NMFOverlayImage>()
+            cache.countLimit = 30
+            return cache
+        }()
         private let defaultBrandImage: UIImage = UIImage(resource: .imgDefaultBrandOriginal)
         private lazy var defaultNormalOverlay: NMFOverlayImage = {
             let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: false)
@@ -144,125 +164,268 @@ extension NaverMapRepresentable {
             let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: true)
             return NMFOverlayImage(image: image)
         }()
+        private var currentKeyByID: [BoothID: BoothClusteringKey] = [:]
+        private var lastSelectedBoothID: BoothID?
         
-        var lastCameraPosition: GeographicCoordinate?
-        var isMapLoaded: Bool = false
-        
-        private var markers: [BoothID: NMFMarker] = [:]
-        private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
-        private var overlayImageCache: [String: NMFOverlayImage] = [:]
-        private var lastSelectedBoothID: Int?
-        
-        let parent: NaverMapRepresentable
+        private var clusterer: NMCClusterer<BoothClusteringKey>?
+        private let leafUpdater = BoothLeafMarkerUpdater()
         
         init(parent: NaverMapRepresentable) { self.parent = parent }
+        
+        private func setupClusterer(mapView: NMFMapView) {
+            let builder = NMCComplexBuilder<BoothClusteringKey>()
+            builder.markerManager = BoothMarkerManager()
+            builder.leafMarkerUpdater = leafUpdater
+            builder.clusterMarkerUpdater = BoothClusterMarkerUpdater(mapView: mapView)
+            builder.maxClusteringZoom = Constants.clusterMaxZoom
+            builder.minClusteringZoom = Constants.clusterMinZoom
+            builder.maxScreenDistance = Constants.clusterScreenDistance
+            builder.tagMergeStrategy = BoothTagMergeStrategy()
+            
+            let clusterer = builder.build()
+            clusterer.mapView = mapView
+            self.clusterer = clusterer
+            
+            leafUpdater.onLeafTapped = { [weak self] boothID in
+                guard let booth = self?.parent.store.visiblePhotoBooths[id: boothID] else { return }
+                self?.parent.store.send(.didTapBooth(booth))
+            }
+            
+            leafUpdater.requestImage = { [weak self] booth, marker, isSelected in
+                self?.loadMarkerImage(for: booth, marker: marker, isSelected: isSelected)
+            }
+        }
+        
+        private func loadMarkerImage(for booth: PhotoBooth, marker: NMFMarker, isSelected: Bool) {
+            let cacheKey = createCacheKey(brandID: booth.brand.id, isSelected: isSelected)
+            
+            if let cachedOverlay = overlayImageCache.object(forKey: cacheKey as NSString) {
+                return applyOverlay(to: marker, overlay: cachedOverlay, expectedID: booth.id)
+            }
+            
+            guard let url = booth.brand.imageURL else { return applyDefaultOverlay(to: marker, isSelected: isSelected, expectedID: booth.id) }
+            
+            markerImageTasks[booth.id]?.cancel()
+            markerImageTasks[booth.id] = Task { [weak self, weak marker] in
+                guard let self, let marker else { return }
+                let resource = KF.ImageResource(downloadURL: url, cacheKey: url.absoluteString)
+                
+                do {
+                    let result = try await KingfisherManager.shared.retrieveImage(with: resource)
+                    guard Task.isCancelled == false else { return }
+                    
+                    let renderedOverlay: NMFOverlayImage? = await Task.detached(priority: .userInitiated) {
+                        guard Task.isCancelled == false else { return nil }
+                        let finalImage = MarkerImageRenderer.render(brandImage: result.image, isSelected: isSelected)
+                        return NMFOverlayImage(image: finalImage)
+                    }.value
+                    
+                    guard let overlay = renderedOverlay, Task.isCancelled == false else { return }
+                    
+                    await MainActor.run {
+                        self.overlayImageCache.setObject(overlay, forKey: cacheKey as NSString)
+                        self.applyOverlay(to: marker, overlay: overlay, expectedID: booth.id)
+                    }
+                } catch {
+                    guard Task.isCancelled == false else { return }
+                    Logger.presentation.error("Brand Image Download Failed for Marker: \(booth.id) - \(error)")
+                    await MainActor.run {
+                        self.applyDefaultOverlay(to: marker, isSelected: isSelected, expectedID: booth.id)
+                    }
+                }
+            }
+        }
         
         func updateMarkers(
             mapView: NMFMapView,
             photoBooths: IdentifiedArrayOf<PhotoBooth>,
             selectedBoothID: BoothID?
         ) {
-            let newIDs = Set(photoBooths.ids)
-            let currentIDs = Set(markers.keys)
+            if clusterer == nil { setupClusterer(mapView: mapView) }
+            leafUpdater.updateState(photoBooths: photoBooths, selectedBoothID: selectedBoothID)
             
-            let idsToRemove = currentIDs.subtracting(newIDs)
-            for id in idsToRemove {
-                markers[id]?.mapView = nil
-                markers[id] = nil
-                markerImageTasks[id]?.cancel()
-                markerImageTasks[id] = nil
-            }
+            let oldSelected = lastSelectedBoothID
+            let selectionChanged = oldSelected != selectedBoothID
+            
+            var keysToAdd: [BoothClusteringKey: NSObject] = [:]
+            var keysToRemove: [BoothClusteringKey] = []
+            
+            let newIDs = Set(photoBooths.ids)
+            let toRemoveIDs = currentKeyByID.keys.filter { newIDs.contains($0) == false }
+            keysToRemove.append(contentsOf: toRemoveIDs.compactMap { currentKeyByID[$0] })
             
             for booth in photoBooths {
-                let isSelected = (booth.id == selectedBoothID)
+                let isNew = currentKeyByID.keys.contains(booth.id) == false
+                let isSelectedAffected = selectionChanged && (booth.id == selectedBoothID || booth.id == oldSelected)
                 
-                if let existingMarker = markers[booth.id] {
-                    updateMarkerStyleIfNeeded(existingMarker, booth: booth, isSelected: isSelected)
-                } else {
-                    let newMarker = createMarker(for: booth)
-                    newMarker.mapView = mapView
-                    markers[booth.id] = newMarker
-                    updateMarkerStyleIfNeeded(newMarker, booth: booth, isSelected: isSelected, isInitial: true)
+                if isNew || isSelectedAffected {
+                    let position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
+                    let key = BoothClusteringKey(identifier: booth.id, brandID: booth.brand.id, position: position)
+                    
+                    if isSelectedAffected, let oldKey = currentKeyByID[booth.id] {
+                        keysToRemove.append(oldKey)
+                    }
+                    
+                    keysToAdd[key] = NSNumber(value: booth.brand.id)
+                    currentKeyByID[booth.id] = key
                 }
             }
+            
+            if keysToRemove.isEmpty == false { clusterer?.removeAll(keysToRemove) }
+            if keysToAdd.isEmpty == false { clusterer?.addAll(keysToAdd) }
+            
+            for id in toRemoveIDs {
+                currentKeyByID.removeValue(forKey: id)
+            }
+            
+            lastSelectedBoothID = selectedBoothID
         }
-    }
-}
-
-
-// MARK: - NaverMapRepresentable.Coordinator + Factory Helpers
-
-private extension NaverMapRepresentable.Coordinator {
-    func createMarker(for booth: PhotoBooth) -> NMFMarker {
-        let marker = NMFMarker()
-        marker.position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-        marker.captionText = "\(booth.brand.name)\n\(booth.name)"
-        marker.captionColor = .init(hex: 0x202227)
-        marker.captionHaloColor = .white
-        marker.captionTextSize = 12
-        marker.anchor = CGPoint(x: 0.5, y: 1.0)
         
-        marker.touchHandler = { [weak self] _ in
-            self?.parent.store.send(.didTapBooth(booth))
-            return true
+        func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, expectedID: Int) {
+            guard let currentID = marker.userInfo["identifier"] as? Int, currentID == expectedID else { return }
+            marker.iconImage = overlay
         }
-        return marker
+        
+        func applyDefaultOverlay(to marker: NMFMarker, isSelected: Bool, expectedID: Int) {
+            let targetOverlay = isSelected ? defaultSelectedOverlay : defaultNormalOverlay
+            applyOverlay(to: marker, overlay: targetOverlay, expectedID: expectedID)
+        }
+        
+        func createCacheKey(brandID: BrandID, isSelected: Bool) -> String {
+            "brand_\(brandID)_selected_\(isSelected)"
+        }
     }
     
-    func updateMarkerStyleIfNeeded(_ marker: NMFMarker, booth: PhotoBooth, isSelected: Bool, isInitial: Bool = false) {
-        let currentSelectionState = marker.userInfo["isSelected"] as? Bool ?? false
-        if isInitial == false, currentSelectionState == isSelected { return }
-        marker.userInfo["isSelected"] = isSelected
-        marker.zIndex = isSelected ? Constants.zIndexSelected : Constants.zIndexNormal
-        let cacheKey = createCacheKey(brandID: booth.brand.id, isSelected: isSelected)
-        if let cachedOverlay = overlayImageCache[cacheKey] {
-            marker.iconImage = cachedOverlay
-            return
+    final class BoothClusteringKey: NSObject, NMCClusteringKey {
+        let identifier: Int
+        let brandID: Int
+        let position: NMGLatLng
+        
+        init(identifier: Int, brandID: Int, position: NMGLatLng) {
+            self.identifier = identifier
+            self.brandID = brandID
+            self.position = position
         }
         
-        guard let url = booth.brand.imageURL else {
-            applyDefaultOverlay(to: marker, isSelected: isSelected)
-            return
+        override func isEqual(_ object: Any?) -> Bool {
+            guard let other = object as? Self else { return false }
+            return self.identifier == other.identifier
         }
         
-        markerImageTasks[booth.id]?.cancel()
-        markerImageTasks[booth.id] = Task { [weak self] in
-            guard let self else { return }
-            let resource = KF.ImageResource(downloadURL: url, cacheKey: url.absoluteString)
+        override var hash: Int { identifier.hashValue }
+        
+        func copy(with zone: NSZone? = nil) -> Any {
+            BoothClusteringKey(identifier: identifier, brandID: brandID, position: position)
+        }
+    }
+    
+    final class BoothLeafMarkerUpdater: NMCLeafMarkerUpdater {
+        var onLeafTapped: ((Int) -> Void)?
+        var requestImage: ((_ booth: PhotoBooth, _ marker: NMFMarker, _ isSelected: Bool) -> Void)?
+        
+        private var boothDataMap: [Int: PhotoBooth] = [:]
+        private var selectedBoothID: Int?
+        
+        func updateState(photoBooths: IdentifiedArrayOf<PhotoBooth>, selectedBoothID: Int?) {
+            boothDataMap = photoBooths.reduce(into: [:]) { $0[$1.id] = $1 }
+            self.selectedBoothID = selectedBoothID
+        }
+        
+        func updateLeafMarker(_ info: NMCLeafMarkerInfo, _ marker: NMFMarker) {
+            guard let key = info.key as? BoothClusteringKey,
+                  let booth = boothDataMap[key.identifier]
+            else { return }
             
-            do {
-                let result = try await KingfisherManager.shared.retrieveImage(with: resource)
-                guard Task.isCancelled == false else { return }
-                let renderedOverlay: NMFOverlayImage? = await Task.detached(priority: .userInitiated) {
-                    guard Task.isCancelled == false else { return nil }
-                    let finalImage = MarkerImageRenderer.render(brandImage: result.image, isSelected: isSelected)
-                    return NMFOverlayImage(image: finalImage)
-                }.value
-                
-                guard let overlay = renderedOverlay, Task.isCancelled == false else { return }
-                applyOverlay(to: marker, overlay: overlay, isSelected: isSelected, cacheKey: cacheKey)
-            } catch {
-                guard Task.isCancelled == false else { return }
-                Logger.presentation.error("Brand Image Download Failed for Marker: \(booth.id) - \(error)")
-                applyDefaultOverlay(to: marker, isSelected: isSelected)
+            let isSelected = (booth.id == selectedBoothID)
+            marker.userInfo["identifier"] = booth.id
+            marker.captionText = "\(booth.brand.name)\n\(booth.name)"
+            marker.captionColor = .init(hex: Constants.captionColorHex)
+            marker.captionHaloColor = .white
+            marker.captionAligns = [NMFAlignType.bottom]
+            marker.captionTextSize = 12
+            marker.captionOffset = -8
+            marker.anchor = CGPoint(x: 0.5, y: 1.0)
+            marker.zIndex = isSelected ? Constants.zIndexSelected : Constants.zIndexNormal
+            marker.touchHandler = { [weak self] _ in
+                self?.onLeafTapped?(booth.id)
+                return true
+            }
+            
+            requestImage?(booth, marker, isSelected)
+        }
+    }
+    
+    final class BoothClusterMarkerUpdater: NMCDefaultClusterMarkerUpdater {
+        private weak var mapView: NMFMapView?
+        private var clusterImageCache: [String: NMFOverlayImage] = [:]
+        
+        init(mapView: NMFMapView) {
+            self.mapView = mapView
+            super.init()
+        }
+        
+        override func updateClusterMarker(_ info: NMCClusterMarkerInfo, _ marker: NMFMarker) {
+            guard let mapView else { return }
+            let text = info.size > 50 ? "50+" : "\(info.size)"
+            let currentZoom = mapView.zoomLevel
+            
+            var cacheKey = "default_\(text)"
+            
+            if currentZoom < Constants.brandClusteringThreshold {
+                cacheKey = "default_\(text)"
+            } else {
+                // TODO: 이곳에서 브랜드별로 클러스터링된 이미지를 보여줄 수도 있습니다. 물론 지금은 디자인없음.
+                // TODO: 태크 병합 전략 적용하여 어떤 브랜드끼리 클러스터링된 건지 표시할 수 있습니다.
+                cacheKey = "default_\(text)"
+            }
+            
+            let overlayImage: NMFOverlayImage
+            if let cached = clusterImageCache[cacheKey] {
+                overlayImage = cached
+            } else {
+                let rendered = ClusterMarkerRenderer.render(text)
+                let overlay = NMFOverlayImage(image: rendered)
+                clusterImageCache[cacheKey] = overlay
+                overlayImage = overlay
+            }
+            
+            marker.iconImage = overlayImage
+            marker.captionText = ""
+            marker.captionAligns = [NMFAlignType.center]
+            marker.anchor = CGPoint(x: 0.5, y: 0.5)
+            marker.zIndex = 50
+            
+            marker.touchHandler = { [weak mapView, weak marker] _ in
+                guard let mapView, let marker else { return false }
+                let currentZoom = mapView.zoomLevel
+                let targetZoom = min(currentZoom + 2.5, Constants.maxZoomLevel)
+                let cameraUpdate = NMFCameraUpdate(scrollTo: marker.position, zoomTo: targetZoom)
+                cameraUpdate.animation = .easeOut
+                cameraUpdate.animationDuration = Constants.animationDuration
+                mapView.moveCamera(cameraUpdate)
+                return true
             }
         }
     }
     
-    func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, isSelected: Bool, cacheKey: String) {
-        let currentMarkerStats = marker.userInfo["isSelected"] as? Bool ?? isSelected
-        guard currentMarkerStats == isSelected else { return }
-        overlayImageCache[cacheKey] = overlay
-        marker.iconImage = overlay
+    final class BoothMarkerManager: NMCDefaultMarkerManager {
+        override func createMarker() -> NMFMarker {
+            let marker = super.createMarker()
+            marker.isHideCollidedSymbols = true
+            marker.isHideCollidedMarkers = false
+            marker.isHideCollidedCaptions = false
+            return marker
+        }
     }
     
-    func applyDefaultOverlay(to marker: NMFMarker, isSelected: Bool) {
-        let targetOverlay = isSelected ? defaultSelectedOverlay : defaultNormalOverlay
-        marker.iconImage = targetOverlay
-    }
-    
-    func createCacheKey(brandID: BrandID, isSelected: Bool) -> String {
-        "brand_\(brandID)_selected_\(isSelected)"
+    final class BoothTagMergeStrategy: NSObject, NMCTagMergeStrategy {
+        func mergeTag(_ cluster: NMCCluster) -> NSObject? {
+            // TODO: [Feature] 브랜드별 클러스터링 도입 시 구현 필요
+            // 1. cluster.children 노드를 순회하며 각 마커가 가진 태그(예: 브랜드 식별자)를 수집
+            // 2. 모든 자식 노드의 태그가 동일하다면 해당 태그를 반환하면 부모 노드의 태그가 됨
+            // 3. 여러 브랜드가 섞여있다면 줌 레벨에 따라 브랜드별 클러스터링 마커가 아닌 대표 클러스터링 마커일 것이므로 분기처리 필요
+            return nil
+        }
     }
 }
 

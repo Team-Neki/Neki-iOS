@@ -67,8 +67,6 @@ struct ArchiveImageCard: View {
                         onTapFavorite()
                     } label: {
                         Image(item.isFavorite ? .iconHeart20WhiteFill : .iconHeart20White)
-                            .renderingMode(.template)
-                            .foregroundStyle(.white)
                     }
                     .padding(10)
                 }

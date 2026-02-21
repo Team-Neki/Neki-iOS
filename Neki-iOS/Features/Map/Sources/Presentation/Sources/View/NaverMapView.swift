@@ -180,7 +180,7 @@ extension NaverMapRepresentable {
             builder.maxClusteringZoom = Constants.clusterMaxZoom
             builder.minClusteringZoom = Constants.clusterMinZoom
             builder.maxScreenDistance = Constants.clusterScreenDistance
-            builder .tagMergeStrategy = BoothTagMergeStrategy()
+            builder.tagMergeStrategy = BoothTagMergeStrategy()
             
             let clusterer = builder.build()
             clusterer.mapView = mapView

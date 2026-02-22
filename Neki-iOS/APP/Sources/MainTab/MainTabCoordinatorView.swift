@@ -39,6 +39,10 @@ struct MainTabCoordinatorView: View {
             if !store.isTabbarHidden {
                 NekiTabBar(selectedTab: $store.selectedTab) { store.send(.onTapAddButton) }
             }
+            
+            if store.isLoading {
+                LoadingView(message: "사진을 업로드하고 있어요.")
+            }
         }
         .nekiToast(item: $store.toast)
         .nekiAlert(

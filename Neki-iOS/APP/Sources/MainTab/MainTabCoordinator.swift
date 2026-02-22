@@ -27,6 +27,8 @@ struct MainTabCoordinator {
         var imagePicker = ImagePickerFeature.State(mediaType: .photoBooth)
         var isPhotoPickerPresented: Bool = false
         var pendingPresentation: PendingPresentation?
+        var isLoading: Bool = false
+
         
         @Presents var destination: Destination.State?
         
@@ -197,14 +199,20 @@ struct MainTabCoordinator {
             case let .myPage(.delegate(.profileUpdated(user))):
                 return .send(.delegate(.profileUpdated(user)))
                 
+            case .imagePicker(.uploadStarted):
+                state.isLoading = true
+                return .none
+                
             case let .imagePicker(.uploadCompleted(imageIDs)):
                 state.isPhotoPickerPresented = false
+                state.isLoading = false
                 state.selectedTab = .archive
                 guard imageIDs.isEmpty == false else { return .none }
                 return .send(.archive(.root(.processUploadImages(imageIDs: imageIDs))))
                 
             case .imagePicker(.uploadFailed):
                 state.isPhotoPickerPresented = false
+                state.isLoading = false
                 state.toast = NekiToastItem("이미지 업로드에 실패했어요.", style: .error)
                 return .none
                 

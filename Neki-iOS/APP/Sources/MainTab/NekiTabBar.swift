@@ -37,19 +37,19 @@ struct NekiTabBar: View {
     let onAddTap: () -> Void
     
     var body: some View {
-        HStack {
+        HStack(spacing: .zero) {
             ForEach(NekiTab.allCases, id: \.self) { tab in
                 Button {
                     guard case .add = tab else { return selectedTab = tab }
                     onAddTap()
                 } label: {
-                    VStack(alignment: .center, spacing: 4) {
+                    VStack(alignment: .center, spacing: 2) {
                         ZStack {
                             if case .add = tab {
                                 Color.clear.frame(width: 26, height: 26)
                                     .overlay {
                                         Image(tab.icon(isSelected: true))
-                                            .offset(y: -8)
+                                            .offset(y: -10)
                                     }
                             } else {
                                 Image(tab.icon(isSelected: selectedTab == tab))
@@ -62,10 +62,12 @@ struct NekiTabBar: View {
                             .foregroundColor(selectedTab == tab ? .gray800 : .gray500)
                     }
                     .frame(maxWidth: .infinity)
+                    .padding(.vertical, 2)
                 }
             }
         }
+        .frame(height: 52, alignment: .center)
         .background(.white)
-        .shadow(color: .black.opacity(0.05), radius: 2, y: -2)
+        .shadow(color: .black.opacity(0.04), radius: 5, y: -2)
     }
 }

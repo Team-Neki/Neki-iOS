@@ -617,9 +617,12 @@ private extension NaverMapView {
             .background(
                 Capsule()
                     .fill(.white)
-                    .strokeBorder(.primary400)
-                    .shadow(radius: 2)
+                    .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
             )
+            .overlay {
+                Capsule()
+                    .strokeBorder(.primary400)
+            }
         }
         .safeAreaPadding(.top)
     }

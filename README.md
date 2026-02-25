@@ -6,8 +6,6 @@
 
 ###  네컷사진의 시작부터 보관까지, 당신의 기록을 완성하는 서비스 
 
-<br>
-
 #### <img width="30" height="30" src="https://github.com/user-attachments/assets/7ec36287-820f-4efb-9c46-dc9c85e92263" /> QR 스캔 한 번으로 앨범에 즉시 저장
 흩어져 있던 종이 사진과 디지털 파일을 NEKI 하나로 끝내세요. QR 스캔 한 번으로 앱에서 바로 저장하고, 날짜별/폴더별로 정리됩니다.
 #### <img width="30" height="30" src="https://github.com/user-attachments/assets/06ab2292-4ab9-4e0a-8332-85508f9ef564" /> QR이 없어도 걱정 NO

@@ -27,7 +27,7 @@ jobs:
       - name: Run Fastlane Release
         run: bundle exec fastlane release
         env:
-          APP_IDENTIFIER_RELEASE: ${{ secrets.APP_IDENTIFIER }}
+          APP_IDENTIFIER: ${{ secrets.APP_IDENTIFIER }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}

@@ -1,4 +1,4 @@
-git_url("https://github.com/YAPP-Github/Neki-fastlane-match-repo.git")
+git_url("git@github.com:YAPP-Github/Neki-fastlane-match-repo.git")
 git_branch('release')
 
 storage_mode("git")

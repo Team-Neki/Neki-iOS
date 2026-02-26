@@ -1,0 +1,36 @@
+name: Build Test
+
+# testflight 브랜치에 push 되면 실행
+on:
+  push:
+    branches: [ "testflight" ]
+
+# 최신 push에 관한 CI 작업만 수행
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+  
+jobs:
+  beta:
+    runs-on: macos-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ruby Gems
+        run: bundle install
+
+      - name: Run Fastlane Beta
+        env:
+          APP_IDENTIFIER_DEV: ${{ secrets.APP_IDENTIFIER_DEV }}
+          APP_IDENTIFIER_RELEASE: ${{ secrets.APP_IDENTIFIER_RELEASE }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          FASTLANE_ITC_TEAM_ID: ${{ secrets.FASTLANE_ITC_TEAM_ID }}
+
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+
+        run: bundle exec fastlane beta

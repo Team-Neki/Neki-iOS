@@ -1,6 +1,5 @@
 name: iOS Release CI
 
-# 세팅 완료될때까지 임시로 develop에서 진행
 on:
   push:
     branches:
@@ -22,32 +21,38 @@ jobs:
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '26.2' 
+          xcode-version: '26.2'
 
-      # 2. SPM 매크로 지문 검증 우회 (빌드 안정성 확보)
+      # 2. 깃허브 Secret에서 Release.xcconfig 파일 생성하기
+      - name: Create Release.xcconfig
+        run: |
+          mkdir -p APP/Sources/Resources
+          echo "${{ secrets.RELEASE_XCCONFIG }}" > APP/Sources/Resources/Release.xcconfig
+
+      # 3. SPM 매크로 지문 검증 우회
       - name: Disable Macro Validation
         run: |
           defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
           defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
-      # 3. SPM 의존성 사전 해결
+      # 4. SPM 의존성 사전 해결
       - name: Resolve SPM Dependencies
         run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme Neki-iOS
 
-      # 4. Match 인증서 저장소 접근을 위한 SSH 세팅
+      # 5. Match 인증서 저장소 접근을 위한 SSH 세팅
       - name: Install SSH key for Match
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.MATCH_SSH_KEY }}
 
-      # 5. Ruby 및 Fastlane 세팅 (Gemfile 활용)
+      # 6. Ruby 및 Fastlane 세팅 (Gemfile 활용)
       - name: Setup Ruby and Install Gems
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
           bundler-cache: true
 
-      # 6. Fastlane 배포 실행
+      # 7. Fastlane 배포 실행
       - name: Run Fastlane Release
         run: bundle exec fastlane release
         env:
@@ -59,3 +64,18 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+
+      # 8. Discord 결과 알림 (성공/실패 여부 전송)
+      - name: Send Discord notification
+        if: always() # 빌드 성공/실패 여부와 상관없이 무조건 실행
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            STATUS="✅ [Neki-iOS] release 브랜치 App Store Connect 배포 성공 🚀"
+          else
+            STATUS="❌ [Neki-iOS] release 브랜치 App Store Connect 배포 실패 😭"
+          fi
+          PAYLOAD=$(jq -n --arg content "$STATUS (${{ github.repository }})" '{content: $content}')
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "$PAYLOAD" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -1,9 +1,10 @@
 name: iOS Release CI
 
+# 세팅 완료될때까지 임시로 develop에서 진행
 on:
   push:
     branches:
-      - release
+      - develop
 
 # 최신 push에 관한 CI 작업만 수행
 concurrency:
@@ -27,7 +28,7 @@ jobs:
       - name: Run Fastlane Release
         run: bundle exec fastlane release
         env:
-          APP_IDENTIFIER_RELEASE: ${{ secrets.APP_IDENTIFIER }}
+          APP_IDENTIFIER: ${{ secrets.APP_IDENTIFIER }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}

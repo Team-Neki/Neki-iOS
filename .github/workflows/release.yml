@@ -1,5 +1,6 @@
 name: iOS Release CI
 
+# 세팅 완료될때까지 임시로 develop에서 진행
 on:
   push:
     branches:

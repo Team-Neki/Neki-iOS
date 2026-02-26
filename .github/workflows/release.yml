@@ -21,6 +21,11 @@ jobs:
       - name: Select Xcode
         run: sudo xcode-select -switch /Applications/Xcode.app
 
+      - name: Install SSH key for Match
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.MATCH_SSH_KEY }}
+
       - name: Install Ruby Gems
         run: bundle install
 

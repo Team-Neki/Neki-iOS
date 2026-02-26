@@ -21,7 +21,7 @@ platform :ios do
     )
 
     build_app(
-      scheme: "Neki-iOS.Release",
+      scheme: "Neki-iOS",
       configuration: "Release",
       export_method: "app-store"
     )

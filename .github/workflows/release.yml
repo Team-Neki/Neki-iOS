@@ -1,9 +1,9 @@
-name: Build Test
+name: iOS Release CI
 
-# testflight 브랜치에 push 되면 실행
 on:
   push:
-    branches: [ "testflight" ]
+    branches:
+      - release
 
 # 최신 push에 관한 CI 작업만 수행
 concurrency:
@@ -11,26 +11,26 @@ concurrency:
   cancel-in-progress: true
   
 jobs:
-  beta:
+  build:
     runs-on: macos-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -switch /Applications/Xcode.app
 
       - name: Install Ruby Gems
         run: bundle install
 
-      - name: Run Fastlane Beta
+      - name: Run Fastlane Release
+        run: bundle exec fastlane release
         env:
-          APP_IDENTIFIER_DEV: ${{ secrets.APP_IDENTIFIER_DEV }}
           APP_IDENTIFIER_RELEASE: ${{ secrets.APP_IDENTIFIER_RELEASE }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
-          FASTLANE_ITC_TEAM_ID: ${{ secrets.FASTLANE_ITC_TEAM_ID }}
-
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-
-        run: bundle exec fastlane beta
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}

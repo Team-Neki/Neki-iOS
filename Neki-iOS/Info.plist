@@ -36,6 +36,12 @@
 	</array>
 	<key>NMFNcpKeyId</key>
 	<string>$(NAVER_MAPS_CLIENT_ID)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>$(CAMERA_USAGE_DESCRIPTION)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>$(LOCATION_USAGE_DESCRIPTION)</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>$(PHOTO_LIBRARY_USAGE_DESCRIPTION)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

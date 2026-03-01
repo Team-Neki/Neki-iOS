@@ -35,6 +35,7 @@ jobs:
           xcodebuild clean build \
             -project Neki-iOS.xcodeproj \
             -scheme Neki-iOS \
+            -configuration Release \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

@@ -26,9 +26,9 @@ jobs:
       # 2. 깃허브 Secret에서 Release.xcconfig 파일 생성하기
       - name: Create Release.xcconfig
         run: |
-          mkdir -p APP/Sources/Resources
-          echo "${{ secrets.RELEASE_XCCONFIG }}" > APP/Sources/Resources/Release.xcconfig
-
+          mkdir -p Neki-iOS/APP/Sources/Resources
+          echo "${{ secrets.RELEASE_XCCONFIG }}" | base64 --decode > Neki-iOS/APP/Sources/Resources/Release.xcconfig    
+      
       # 3. SPM 매크로 지문 검증 우회
       - name: Disable Macro Validation
         run: |

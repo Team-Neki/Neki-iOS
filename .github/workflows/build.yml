@@ -10,15 +10,12 @@ concurrency:
 
 jobs:
   build:
-    name: Build Neki Dev Scheme
     runs-on: macos-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        uses: maxim-lobanov/setup-xcode@v1
+      - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '26.2'
 
@@ -27,11 +24,17 @@ jobs:
           defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
           defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
-      - name: Build on Simulator (Debug)
+      - name: Resolve Swift Packages
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -project Neki-iOS.xcodeproj \
+            -scheme Neki-iOS
+
+      - name: Build on Simulator
         run: |
           xcodebuild clean build \
             -project Neki-iOS.xcodeproj \
             -scheme Neki-iOS \
             -sdk iphonesimulator \
-            -destination 'platform=iOS Simulator,name=iPhone 17' \
+            -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO

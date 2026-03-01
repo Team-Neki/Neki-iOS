@@ -31,13 +31,13 @@ jobs:
         run: |
           xcodebuild -resolvePackageDependencies \
             -project Neki-iOS.xcodeproj \
-            -scheme Neki-iOS-Dev
+            -scheme Neki-Dev
 
       - name: Build on Simulator (Debug)
         run: |
           xcodebuild clean build-for-testing \
             -project Neki-iOS.xcodeproj \
-            -scheme Neki-iOS-Dev \
+            -scheme Neki-Dev \
             -configuration Debug \
             -sdk iphonesimulator \
             -destination 'platform=iOS Simulator,name=iPhone 15' \

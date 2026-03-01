@@ -11,19 +11,23 @@ import ComposableArchitecture
 struct QRCodeScannerView: View {
     @Bindable var store: StoreOf<QRCodeScanFeature>
     
+    @State private var currentZoomFactor: CGFloat = 1.0
+    @State private var lastZoomFactor: CGFloat = 1.0
+    
     private let scanFrameSize: CGSize = .init(width: 304, height: 304)
     private let frameCornerRadius: CGFloat = 20
     private let bracketLineWidth: CGFloat = 6
     
     var body: some View {
         ZStack(alignment: .top) {
-            CameraPreview(isTorchOn: store.isLightOn, isActive: store.isCameraActive) { urlString in
+            CameraPreview(isTorchOn: store.isLightOn, isActive: store.isCameraActive, zoomFactor: currentZoomFactor) { urlString in
                 store.send(.codeScanned(urlString))
             }
             .ignoresSafeArea()
             
             Color.gray900.opacity(0.6)
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
             
             VStack {
                 header
@@ -33,6 +37,7 @@ struct QRCodeScannerView: View {
                 
                 ScannerAreaView(frameSize: scanFrameSize, cornerRadius: frameCornerRadius)
                     .padding(.top, 32)
+                    .allowsHitTesting(false)
                 
                 footer
                     .padding(.top, 40)
@@ -42,6 +47,16 @@ struct QRCodeScannerView: View {
                 webViewLayer(url: url)
             }
         }
+        .gesture(
+            MagnificationGesture()
+                .onChanged { value in
+                    let newZoom = lastZoomFactor * value
+                    currentZoomFactor = min(max(newZoom, CameraZoomFactor.defaultMinZoomFactor), CameraZoomFactor.defaultMaxZoomFactor)
+                }
+                .onEnded { _ in
+                    lastZoomFactor = currentZoomFactor
+                }
+        )
         .nekiAlert(
             isPresented: $store.isManualDownloadNeededAlertPresented,
             style: .plain,

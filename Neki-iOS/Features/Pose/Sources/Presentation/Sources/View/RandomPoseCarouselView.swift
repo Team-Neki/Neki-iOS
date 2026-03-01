@@ -61,6 +61,7 @@ struct RandomPoseCarouselView: View {
             
             controlButtons
                 .frame(maxHeight: .infinity, alignment: .bottom)
+                .disabled(store.isLoading)
             
             if store.isTutorialPresented { tutorialOverlay }
         }

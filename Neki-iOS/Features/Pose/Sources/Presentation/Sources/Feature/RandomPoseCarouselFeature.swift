@@ -13,6 +13,8 @@ import os
 struct RandomPoseCarouselFeature {
     enum SlideDirection { case previous, next, none }
     
+    private enum CancelID { case poseRequest }
+    
     @ObservableState
     struct State {
         @Shared(.appStorage("RandomPoseTutorial")) var isTutorialPresented: Bool = true
@@ -80,15 +82,19 @@ struct RandomPoseCarouselFeature {
                 
             case .tapLeft:
                 state.slideDirection = .previous
+                state.isLoading = true
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }))
                 }
+                .cancellable(id: CancelID.poseRequest, cancelInFlight: true)
                 
             case .tapRight:
                 state.slideDirection = .next
+                state.isLoading = true
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
                 }
+                .cancellable(id: CancelID.poseRequest, cancelInFlight: true)
                 
                 // MARK: - Scrap Logic (Optimistic)
             case .onTapScrap:

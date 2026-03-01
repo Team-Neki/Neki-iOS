@@ -221,6 +221,13 @@ struct MainTabCoordinator {
                 state.selectedTab = .archive
                 return .send(.archive(.root(.addPhotoFromQRScanner(imageID: imageID))))
                 
+            case .destination(.presented(.qrScan(.addPhotoFromGalleryButtonTapped))):
+                state.destination = nil
+                return .run { send in
+                    await send(.onTapGallery)
+                    await send(.setPhotosPickerPresented(true))
+                }
+                
             default:
                 return .none
             }

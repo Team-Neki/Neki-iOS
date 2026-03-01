@@ -33,6 +33,7 @@ struct QRCodeScanFeature {
         // View Actions
         case closeButtonTapped
         case lightButtonTapped
+        case openGalleryButtonTapped
         case openSuggestBrandPage
         case openWebViewButtonTapped
         case closeWebViewButtonTapped
@@ -81,6 +82,10 @@ struct QRCodeScanFeature {
                 state.isWebViewPresented = false
                 state.webViewURL = nil
                 return .none
+                
+            case .openGalleryButtonTapped:
+                state.isUnsupportedBrandAlertPresented = false
+                return .send(.addPhotoFromGalleryButtonTapped)
                 
             case .openSuggestBrandPage:
                 Logger.presentation.debug("브랜드 제안 페이지 이동 요청")

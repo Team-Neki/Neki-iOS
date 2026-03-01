@@ -99,7 +99,7 @@ struct QRCodeScannerView: View {
         Button {
             store.send(.lightButtonTapped)
         } label: {
-            Image(store.isLightOn ? .iconLightOff : .iconLightOn)
+            Image(store.isLightOn ? .iconLightOn : .iconLightOff)
                 .padding(.horizontal, 13.5)
                 .padding(.vertical, 15)
                 .background(.ultraThinMaterial)

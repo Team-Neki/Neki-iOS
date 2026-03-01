@@ -27,8 +27,8 @@ jobs:
       - name: Create Release.xcconfig
         run: |
           mkdir -p APP/Sources/Resources
-          echo "${{ secrets.RELEASE_XCCONFIG }}" > APP/Sources/Resources/Release.xcconfig
-
+          printf "%s" "${{ secrets.RELEASE_XCCONFIG }}" > Configs/Release.xcconfig
+    
       # 3. SPM 매크로 지문 검증 우회
       - name: Disable Macro Validation
         run: |

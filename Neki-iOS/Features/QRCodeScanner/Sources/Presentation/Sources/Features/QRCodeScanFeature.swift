@@ -25,7 +25,11 @@ struct QRCodeScanFeature {
         var isWebViewPresented: Bool = false
         
         var isCameraActive: Bool {
-            isLoading == false && isWebViewPresented == false && isManualDownloadNeededAlertPresented == false && isUnsupportedBrandAlertPresented == false
+            isLoading == false &&
+            isWebViewPresented == false &&
+            isManualDownloadNeededAlertPresented == false &&
+            isUnsupportedBrandAlertPresented == false &&
+            isExpiredAlertPresented == false
         }
     }
     
@@ -100,7 +104,7 @@ struct QRCodeScanFeature {
                 
                 // MARK: - Scanning Flow
             case .codeScanned(let urlString):
-                guard state.isLoading == false else { return .none }
+                guard state.isLoading == false, state.isCameraActive else { return .none }
                 state.isLoading = true
                 Logger.presentation.debug("QR 스캔 감지: \(urlString)")
                 

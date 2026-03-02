@@ -64,6 +64,9 @@ final actor CameraManager {
             if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
             if device.isExposureModeSupported(.continuousAutoExposure) { device.exposureMode = .continuousAutoExposure }
             if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) { device.whiteBalanceMode = .continuousAutoWhiteBalance }
+            if device.isAutoFocusRangeRestrictionSupported { device.autoFocusRangeRestriction = .near }
+            if device.isFocusPointOfInterestSupported { device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5) }
+            if device.isExposurePointOfInterestSupported { device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5) }
             device.unlockForConfiguration()
         } catch {
             Logger.presentation.debug("Camera Configuration Lost: \(error)")
@@ -97,6 +100,19 @@ final actor CameraManager {
             device.unlockForConfiguration()
         } catch {
             Logger.presentation.error("Torch could not be used")
+        }
+    }
+    
+    func setZoom(_ factor: CGFloat) {
+        guard let device else { return }
+        
+        do {
+            try device.lockForConfiguration()
+            let maxZoomFactor = min(CameraZoomFactor.defaultMaxZoomFactor, device.activeFormat.videoMaxZoomFactor)
+            device.videoZoomFactor = max(CameraZoomFactor.defaultMinZoomFactor, min(factor, maxZoomFactor))
+            device.unlockForConfiguration()
+        } catch {
+            Logger.presentation.error("Zoom could not be used: \(error)")
         }
     }
 }
@@ -155,6 +171,7 @@ final class CameraView: UIView {
 struct CameraPreview: UIViewRepresentable {
     let isTorchOn: Bool
     let isActive: Bool
+    let zoomFactor: CGFloat
     let onScan: (String) -> Void
     
     func makeUIView(context: Context) -> CameraView {
@@ -179,6 +196,7 @@ struct CameraPreview: UIViewRepresentable {
             if isActive {
                 await manager.start()
                 await manager.setTorch(on: isTorchOn)
+                await manager.setZoom(zoomFactor)
             } else {
                 await manager.stop()
             }

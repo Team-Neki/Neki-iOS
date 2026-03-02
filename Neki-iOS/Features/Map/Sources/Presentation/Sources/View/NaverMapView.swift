@@ -26,13 +26,14 @@ fileprivate enum Constants {
     static let zIndexSelected: Int = 100
     
     // Clustering Settings
-    static let clusterMaxZoom: Int = 15
-    static let clusterMinZoom: Int = 4
-    static let clusterScreenDistance: Double = 65.0
+    static let clusterMaxZoom: Int = 20
+    static let clusterMinZoom: Int = 12
+    static let clusterThresholdZoomIn: Double = 60.0
+    static let clusterThresholdZoomOut: Double = 70.0
     static let leafCaptionTextSize: CGFloat = 12.0
     static let clusterCaptionTextSize: CGFloat = 14.0
     static let captionColorHex: UInt = 0x202227
-    static let brandClusteringThreshold: Double = 11.0
+    static let brandClusteringThreshold: Double = 15.0
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
@@ -179,7 +180,7 @@ extension NaverMapRepresentable {
             builder.clusterMarkerUpdater = BoothClusterMarkerUpdater(mapView: mapView)
             builder.maxClusteringZoom = Constants.clusterMaxZoom
             builder.minClusteringZoom = Constants.clusterMinZoom
-            builder.maxScreenDistance = Constants.clusterScreenDistance
+            builder.thresholdStrategy = ClusterStrategy()
             builder.tagMergeStrategy = BoothTagMergeStrategy()
             
             let clusterer = builder.build()
@@ -296,6 +297,26 @@ extension NaverMapRepresentable {
         }
     }
     
+    final class ClusterStrategy: NMCDefaultDistanceStrategy, NMCThresholdStrategy {
+        func getThreshold(_ zoom: Int) -> Double {
+            guard zoom < 15 else { return Constants.clusterThresholdZoomIn }
+            return Constants.clusterThresholdZoomOut
+        }
+        
+        override func getDistance(_ zoom: Int, node1: NMCNode, node2: NMCNode) -> Double {
+            let defaultDistance = super.getDistance(zoom, node1: node1, node2: node2)
+            
+            if Double(zoom) < Constants.brandClusteringThreshold { return defaultDistance }
+            
+            guard let tag1 = node1.tag as? NSNumber,
+                  let tag2 = node2.tag as? NSNumber,
+                  tag1 == tag2
+            else { return Double.infinity }
+            
+            return defaultDistance
+        }
+    }
+    
     final class BoothClusteringKey: NSObject, NMCClusteringKey {
         let identifier: Int
         let brandID: Int
@@ -395,8 +416,8 @@ extension NaverMapRepresentable {
             marker.anchor = CGPoint(x: 0.5, y: 0.5)
             marker.zIndex = 50
             
-            marker.touchHandler = { [weak mapView, weak marker] _ in
-                guard let mapView, let marker else { return false }
+            marker.touchHandler = { [weak mapView] overlay in
+                guard let mapView, let marker = overlay as? NMFMarker else { return false }
                 let currentZoom = mapView.zoomLevel
                 let targetZoom = min(currentZoom + 2.5, Constants.maxZoomLevel)
                 let cameraUpdate = NMFCameraUpdate(scrollTo: marker.position, zoomTo: targetZoom)
@@ -420,11 +441,20 @@ extension NaverMapRepresentable {
     
     final class BoothTagMergeStrategy: NSObject, NMCTagMergeStrategy {
         func mergeTag(_ cluster: NMCCluster) -> NSObject? {
-            // TODO: [Feature] 브랜드별 클러스터링 도입 시 구현 필요
-            // 1. cluster.children 노드를 순회하며 각 마커가 가진 태그(예: 브랜드 식별자)를 수집
-            // 2. 모든 자식 노드의 태그가 동일하다면 해당 태그를 반환하면 부모 노드의 태그가 됨
-            // 3. 여러 브랜드가 섞여있다면 줌 레벨에 따라 브랜드별 클러스터링 마커가 아닌 대표 클러스터링 마커일 것이므로 분기처리 필요
-            return nil
+            var mergedBrandID: Int?
+            
+            for node in cluster.children {
+                guard let tag = node.tag as? NSNumber else { return nil }
+                let currentBrandID = tag.intValue
+                
+                if mergedBrandID == nil {
+                    mergedBrandID = currentBrandID
+                } else if mergedBrandID != currentBrandID {
+                    return nil
+                }
+            }
+            
+            return mergedBrandID.map { NSNumber(value: $0) }
         }
     }
 }

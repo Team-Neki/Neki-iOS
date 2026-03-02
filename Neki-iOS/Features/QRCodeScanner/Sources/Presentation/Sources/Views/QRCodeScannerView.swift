@@ -50,10 +50,12 @@ struct QRCodeScannerView: View {
         .gesture(
             MagnifyGesture()
                 .onChanged { value in
+                    guard store.isCameraActive else { return }
                     let newZoom = lastZoomFactor * value.magnification
                     currentZoomFactor = min(max(newZoom, CameraZoomFactor.defaultMinZoomFactor), CameraZoomFactor.defaultMaxZoomFactor)
                 }
                 .onEnded { _ in
+                    guard store.isCameraActive else { return }
                     lastZoomFactor = currentZoomFactor
                 }
         )

@@ -109,6 +109,7 @@ struct QRCodeScanFeature {
                 
             case let .parseQRResult(.failure(error)):
                 state.isLoading = false
+                Logger.domain.info("QR 파싱 실패: \(error)")
                 return handleError(error, state: &state)
                 
                 // MARK: - WebView Download Flow

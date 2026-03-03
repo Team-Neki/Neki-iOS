@@ -1,4 +1,4 @@
-<img width="1920" alt="Frame 2087328876" src="https://github.com/user-attachments/assets/76eab410-423b-4442-ba36-3daead58e4a9" />
+<img width="1920" height="1080" alt="Frame (6)" src="https://github.com/user-attachments/assets/f45abc26-1ea1-470b-845c-ca255b766a83" />
 
 # <img width="200" alt="Frame 2087328927" src="https://github.com/user-attachments/assets/2c0d2cf9-742a-41ad-807a-f2feabcec053" />
 
@@ -17,7 +17,12 @@
 #### <img width="30" height="30" src="https://github.com/user-attachments/assets/ee60a2a4-b933-447f-9a43-df38676b5fe4" /> 추억을 테마별로 관리
 친구, 연인, 특별한 기념일 등 목적에 맞춰 폴더를 만들고 소중한 순간들을 테마별로 기록하세요.
 
-<!-- 기능 소개 PPT 추가 예정 -->
+<img width="1920" height="1080" alt="Frame (1)" src="https://github.com/user-attachments/assets/a38ef13a-bd82-43c4-ad26-f9da919990ad" />
+<img width="1920" height="1080" alt="Frame (2)" src="https://github.com/user-attachments/assets/4bc7e352-0bbe-4485-9ffc-68aee9b0df86" />
+<img width="1920" height="1080" alt="Frame (3)" src="https://github.com/user-attachments/assets/122255c8-bf48-4450-b8c0-0aadbb4b73ca" />
+<img width="1920" height="1080" alt="Frame (4)" src="https://github.com/user-attachments/assets/65a99f67-1273-470f-9bf6-04b987153e57" />
+<img width="1920" height="1080" alt="Frame (5)" src="https://github.com/user-attachments/assets/00832df3-f5e8-4a96-827b-50d1fbe58681" />
+
 
 <br>
 
@@ -45,6 +50,7 @@
 | **로그인** | **KakaoOpenSDK** | 카카오 소셜 로그인을 통한 간편한 사용자 인증 | 2.27.1 |
 | **버전 관리** | **Git, GitHub** | 분산 버전 관리 시스템을 통한 형상 관리 및 협업 | 2.46.0 |
 | **협업 도구** | **Figma, Notion** | UI/UX 디자인 리소스 공유 및 프로젝트 문서화, 태스크 관리 | 2.46.0 |
+| **CI/CD** | **Github Actions, Fastlane** | 번거로운 출시,배포 과정을 자동화 | - |
 
 <br>
 
@@ -135,4 +141,4 @@ APP(라우팅), Core(공통 로직/네트워크), Shared(디자인/UI), Features
 
 <br>
 
-<img width="3240" height="400" src="https://github.com/user-attachments/assets/fee4035c-4bac-4921-95ec-93318bd2bdf9" />
+![인스타 게시물 시안2](https://github.com/user-attachments/assets/c4eadc86-5b9c-4184-98ad-a45387e2d698)

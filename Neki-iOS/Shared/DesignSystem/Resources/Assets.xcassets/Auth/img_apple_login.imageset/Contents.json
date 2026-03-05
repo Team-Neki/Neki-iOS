@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "img_apple_login.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "Main button (1).png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "Main button (2).png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "apple_login.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

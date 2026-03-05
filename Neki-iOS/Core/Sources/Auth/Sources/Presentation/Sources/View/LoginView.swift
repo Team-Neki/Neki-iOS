@@ -45,7 +45,7 @@ public struct LoginView: View {
         VStack(spacing: 10) {
             Image(.imgAppleLogin)
                 .resizable()
-                .frame(maxHeight: 52)
+                .scaledToFit()
                 .overlay {
                     SignInWithAppleButton(.continue) { _ in
                         
@@ -60,7 +60,7 @@ public struct LoginView: View {
             } label: {
                 Image(.imgKakaoLogin)
                     .resizable()
-                    .frame(maxHeight: 52)
+                    .scaledToFit()
             }
             .onOpenURL { store.send(.handleKakaoOpenURL($0)) }
         }

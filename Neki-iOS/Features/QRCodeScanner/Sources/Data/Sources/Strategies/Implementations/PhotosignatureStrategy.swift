@@ -17,8 +17,14 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
         Logger.data.debug("포토시그니처 파싱 시도: \(url.absoluteString)")
         
         let urlString = url.absoluteString
-        let cleanString = urlString.hasSuffix("/") ? String(urlString.dropLast()) : urlString
-        let imageURLString = cleanString + "/a.jpg"
+        var imageURLString = String()
+        
+        if urlString.hasSuffix("index.html") {
+            imageURLString = urlString.replacingOccurrences(of: "index.html", with: "a.jpg")
+        } else {
+            let cleanString = urlString.hasSuffix("/") ? String(urlString.dropLast()) : urlString
+            imageURLString = cleanString + "/a.jpg"
+        }
         
         guard let imageURL = URL(string: imageURLString) else {
             Logger.domain.error("이미지 URL 생성 실패.")
@@ -35,6 +41,8 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
             
             return ParsedQRResult(brand: .photosignature, originalImage: data)
             
+        } catch let error as QRParseError {
+            throw error
         } catch {
             Logger.network.warning("이미지 없음(404 등). 만료 확인.")
             throw .imageDownloadFailed

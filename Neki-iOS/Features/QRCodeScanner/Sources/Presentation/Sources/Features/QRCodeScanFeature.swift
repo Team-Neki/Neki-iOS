@@ -25,7 +25,11 @@ struct QRCodeScanFeature {
         var isWebViewPresented: Bool = false
         
         var isCameraActive: Bool {
-            isLoading == false && isWebViewPresented == false && isManualDownloadNeededAlertPresented == false && isUnsupportedBrandAlertPresented == false
+            isLoading == false &&
+            isWebViewPresented == false &&
+            isManualDownloadNeededAlertPresented == false &&
+            isUnsupportedBrandAlertPresented == false &&
+            isExpiredAlertPresented == false
         }
     }
     
@@ -33,6 +37,7 @@ struct QRCodeScanFeature {
         // View Actions
         case closeButtonTapped
         case lightButtonTapped
+        case openGalleryButtonTapped
         case openSuggestBrandPage
         case openWebViewButtonTapped
         case closeWebViewButtonTapped
@@ -82,6 +87,10 @@ struct QRCodeScanFeature {
                 state.webViewURL = nil
                 return .none
                 
+            case .openGalleryButtonTapped:
+                state.isUnsupportedBrandAlertPresented = false
+                return .send(.addPhotoFromGalleryButtonTapped)
+                
             case .openSuggestBrandPage:
                 Logger.presentation.debug("브랜드 제안 페이지 이동 요청")
                 return .run { _ in
@@ -95,7 +104,7 @@ struct QRCodeScanFeature {
                 
                 // MARK: - Scanning Flow
             case .codeScanned(let urlString):
-                guard state.isLoading == false else { return .none }
+                guard state.isLoading == false, state.isCameraActive else { return .none }
                 state.isLoading = true
                 Logger.presentation.debug("QR 스캔 감지: \(urlString)")
                 
@@ -109,6 +118,7 @@ struct QRCodeScanFeature {
                 
             case let .parseQRResult(.failure(error)):
                 state.isLoading = false
+                Logger.domain.info("QR 파싱 실패: \(error)")
                 return handleError(error, state: &state)
                 
                 // MARK: - WebView Download Flow

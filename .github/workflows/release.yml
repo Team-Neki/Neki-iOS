@@ -75,7 +75,7 @@ jobs:
           echo "추출된 최신 버전: $APP_VERSION"
 
           # 추출된 버전을 JSON 바디에 담아서 서버로 POST 요청 (minVersion은 필요시 추후 수정)
-               curl -X POST "${{ secrets.VERSION_API }}" \
+               curl -X POST "${{ secrets.APP_VERSION_API_ADDRESS }}" \
                -H "Content-Type: application/json" \
                -d "{
                  \"minVersion\": \"1.0.0\",

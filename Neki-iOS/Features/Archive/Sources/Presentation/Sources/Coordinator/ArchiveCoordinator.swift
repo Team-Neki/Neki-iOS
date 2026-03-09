@@ -119,7 +119,7 @@ struct ArchiveCoordinator {
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
                         ArchivePhotoDetailFeature.State(
-                            photos: state.root.photos,
+                            photos: albumDetailState.photos,
                             currentItemID: item.id,
                             folderId: albumDetailState.album.id
                         )
@@ -133,7 +133,7 @@ struct ArchiveCoordinator {
                 if !albumDetailState.isSelectionMode {
                     state.path.append(.detail(
                         ArchivePhotoDetailFeature.State(
-                            photos: state.root.photos,
+                            photos: albumDetailState.photos,
                             currentItemID: item.id,
                             folderId: albumDetailState.album.id
                         )

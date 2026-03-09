@@ -83,10 +83,15 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
 
 private extension NekiSheet {
     var indicator: some View {
-        RoundedRectangle(cornerRadius: configuration.indicatorSize.height / 2)
-            .fill(configuration.indicatorColor)
-            .frame(width: configuration.indicatorSize.width, height: configuration.indicatorSize.height)
-            .padding(.vertical, 10)
+        VStack {
+            RoundedRectangle(cornerRadius: configuration.indicatorSize.height / 2)
+                .fill(configuration.indicatorColor)
+                .frame(width: configuration.indicatorSize.width, height: configuration.indicatorSize.height)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 24)
+        .contentShape(.rect)
+        .onTapGesture { withAnimation(configuration.animation) { selection = .large } }
     }
 }
 

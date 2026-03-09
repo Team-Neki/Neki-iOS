@@ -102,8 +102,22 @@ public struct DefaultAuthRepository: AuthRepository {
         }
     }
     
-    public func agreeWithTerms(agreements: [TermAgreement]) async throws(AuthRepositoryError) {
-        let agreements = agreements.map { AgreementsDTO(termID: $0.id, agreed: $0.agreed) }
+    public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {
+        let endpoint = AuthEndpoint.fetchTerms
+        
+        do {
+            let responseDTO: BaseResponseDTO<FetchTermsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let data = responseDTO.data else { throw AuthRepositoryError.networkError(.responseDecodingError) }
+            return data.terms.map { $0.toEntity() }
+        } catch let error as NetworkError {
+            throw .networkError(error)
+        } catch {
+            throw .unknown
+        }
+    }
+    
+    public func agreeWithTerms(agreements: [UserAgreement]) async throws(AuthRepositoryError) {
+        let agreements = agreements.map { AgreementsDTO(termID: $0.id, agreed: $0.isAgreed) }
         let dto = AgreeTermsDTO.Request(agreements: agreements)
         let endpoint = AuthEndpoint.agreeWithTerms(dto: dto)
         

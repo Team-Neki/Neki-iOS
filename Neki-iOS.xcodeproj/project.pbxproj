@@ -317,6 +317,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = "Neki-Dev";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
@@ -368,6 +369,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Neki;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";

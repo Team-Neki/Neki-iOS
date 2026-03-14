@@ -21,7 +21,7 @@ struct DefaultImageTransformRepositoryTests {
         let inputData = try createValidPNGData()
         
         // when
-        let outputData = try await repository.transform(data: inputData, model: .whiteboxCartoonization)
+        let outputData = try await repository.transform(data: inputData)
         let imageSource = CGImageSourceCreateWithData(outputData as CFData, nil)
 
         // then
@@ -37,7 +37,7 @@ struct DefaultImageTransformRepositoryTests {
         
         // when & then
         await #expect(throws: Error.self) {
-            _ = try await repository.transform(data: garbageData, model: .anime2Sketch)
+            _ = try await repository.transform(data: garbageData)
         }
     }
 }

@@ -7,5 +7,4 @@
 
 public enum ImageTransformModel: Equatable, Sendable {
     case whiteboxCartoonization
-    case anime2Sketch
 }

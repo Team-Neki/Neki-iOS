@@ -31,29 +31,21 @@ public enum ImageTransformDataError: LocalizedError {
 
 public final class DefaultImageTransformRepository: ImageTransformRepository {
     
-    private var modelTasks: [ImageTransformModel: Task<VNCoreMLModel, Error>] = [:]
+    private let modelTask: Task<VNCoreMLModel, Error>
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
     
     public init() {
-            // init에서는 무거운 작업을 하지 않고, 백그라운드에서 모델을 로드하도록 Task만 걸어둡니다. (메인 스레드 멈춤 방지)
-            let config = MLModelConfiguration()
-            config.computeUnits = .all
-            
-            modelTasks[.whiteboxCartoonization] = Task {
-                let coreML = try whiteboxcartoonization(configuration: config).model
-                return try VNCoreMLModel(for: coreML)
-            }
-            
-            modelTasks[.anime2Sketch] = Task {
-                let coreML = try anime2sketch(configuration: config).model
-                return try VNCoreMLModel(for: coreML)
-            }
+        let config = MLModelConfiguration()
+        config.computeUnits = .all
+        
+        self.modelTask = Task {
+            let coreML = try whiteboxcartoonization(configuration: config).model
+            return try VNCoreMLModel(for: coreML)
         }
+    }
     
-    public func transform(data inputData: Data, model type: ImageTransformModel) async throws -> Data {
-        guard let task = modelTasks[type], let visionModel = try? await task.value else {
-            throw ImageTransformDataError.modelLoadFailed
-        }
+    public func transform(data inputData: Data) async throws -> Data {
+        let visionModel = try await modelTask.value
         
         return try await Task(priority: .userInitiated) {
             let request = VNCoreMLRequest(model: visionModel)

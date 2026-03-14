@@ -16,16 +16,13 @@ public struct ImageTransformFeature {
         public var outputImage: UIImage?
         public var isProcessing: Bool = false
         public var errorMessage: String?
-        public var aiModel: ImageTransformModel = .whiteboxCartoonization
-        
+                
         public init(inputImage: UIImage? = nil) {
             self.inputImage = inputImage
         }
     }
     
-    public enum Action: BindableAction {
-        case binding(BindingAction<State>)
-        
+    public enum Action {
         case transformButtonTapped
         case transformCompleted(UIImage)
         case transformFailed(String)
@@ -37,18 +34,8 @@ public struct ImageTransformFeature {
     @Dependency(\.dismiss) var dismiss
     
     public var body: some ReducerOf<Self> {
-        BindingReducer()
-        
         Reduce { state, action in
             switch action {
-                
-            case .binding(\.aiModel):
-                state.outputImage = nil
-                state.errorMessage = nil
-                return .none
-                
-            case .binding:
-                return .none
                 
             case .revertButtonTapped:
                 state.outputImage = nil
@@ -57,31 +44,27 @@ public struct ImageTransformFeature {
                 
             case .transformButtonTapped:
                 guard !state.isProcessing else { return .none }
-
                 guard let inputImage = state.inputImage else { return .none }
                 
                 state.isProcessing = true
                 state.errorMessage = nil
                 state.outputImage = nil
                 
-                return .run { [aiModel = state.aiModel] send in
+                return .run { send in
                     do {
-                        // 원본 비율 기억
                         let originalRatio = inputImage.size.width / inputImage.size.height
                         
-                        // 512 비율 맞춰 전처리
                         guard let squaredImage = inputImage.prepareSquareForCoreML(targetSize: 512),
                               let inputData = squaredImage.pngData() else {
                             throw ImageTransformError.processingFailed
                         }
                         
-                        let resultData = try await imageTransformClient.transformImage(inputData, aiModel)
+                        let resultData = try await imageTransformClient.transformImage(inputData)
                         
                         guard let resultSquareImage = UIImage(data: resultData) else {
                             throw ImageTransformError.resultDataReadFailed
                         }
                         
-                        // 원본 비율 복구
                         if let finalCroppedImage = resultSquareImage.cropToOriginalRatio(originalRatio: originalRatio) {
                             await send(.transformCompleted(finalCroppedImage))
                         } else {

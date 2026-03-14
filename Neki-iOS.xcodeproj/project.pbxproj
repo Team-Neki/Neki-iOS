@@ -54,7 +54,6 @@
 		6C45F2B92F65ECE900A6ABBB /* Exceptions for "Neki-iOS" folder in "Neki-iOSTests" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Core/Sources/ImageTransform/Data/MLModel/anime2sketch.mlmodel,
 				Core/Sources/ImageTransform/Data/MLModel/whiteboxcartoonization.mlmodel,
 			);
 			target = 6C3B4B7B2F65C44C008449C1 /* Neki-iOSTests */;

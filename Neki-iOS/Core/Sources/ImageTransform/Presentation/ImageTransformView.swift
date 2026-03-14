@@ -9,7 +9,7 @@ import SwiftUI
 import ComposableArchitecture
 
 public struct ImageTransformView: View {
-    @Bindable var store: StoreOf<ImageTransformFeature>
+    let store: StoreOf<ImageTransformFeature>
     
     public init(store: StoreOf<ImageTransformFeature>) {
         self.store = store
@@ -20,14 +20,7 @@ public struct ImageTransformView: View {
             Text("AI 스케치 변환 🎨")
                 .font(.title2)
                 .fontWeight(.bold)
-            
-            Picker("변환에 사용할 모델 선택", selection: $store.aiModel) {
-                Text("웹툰 스타일").tag(ImageTransformModel.whiteboxCartoonization)
-                Text("크로키 스타일").tag(ImageTransformModel.anime2Sketch)
-            }
-            .pickerStyle(.segmented)
-            .padding(.horizontal, 20)
-            .disabled(store.isProcessing)
+                .padding(.top, 20)
             
             ZStack {
                 if let outputImage = store.outputImage {
@@ -84,33 +77,18 @@ public struct ImageTransformView: View {
             Spacer()
             
             if store.outputImage != nil {
-                HStack(spacing: 12) {
-                    Button(action: {
-                        store.send(.revertButtonTapped)
-                    }) {
-                        Text("원본 되돌리기")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(16)
-                    }
-                    .disabled(store.isProcessing)
-                    
-                    Button(action: {
-                        store.send(.transformButtonTapped)
-                    }) {
-                        Text("이 스타일로 다시 변환")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 56)
-                            .background(store.isProcessing ? Color.gray.opacity(0.5) : Color.blue)
-                            .cornerRadius(16)
-                    }
-                    .disabled(store.isProcessing)
+                Button(action: {
+                    store.send(.revertButtonTapped)
+                }) {
+                    Text("원본 되돌리기")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 56)
+                        .background(Color.gray.opacity(0.2))
+                        .cornerRadius(16)
                 }
+                .disabled(store.isProcessing)
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
                 

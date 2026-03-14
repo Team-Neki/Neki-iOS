@@ -58,24 +58,8 @@ struct ImageTransformFeatureTests {
             $0.errorMessage = nil
         }
     }
-    
-    @Test("시나리오 4: AI 모델 변경 시, 결과물 및 에러가 초기화된다.")
-    func changeAiModel_clearsOutput() async {
-        // given
-        var state = ImageTransformFeature.State(inputImage: mockImage)
-        state.outputImage = mockImage
-        state.aiModel = .whiteboxCartoonization
-        let store = makeStore(initialState: state)
         
-        // when
-        await store.send(.binding(.set(\.aiModel, .anime2Sketch))) {
-            // then
-            $0.aiModel = .anime2Sketch
-            $0.outputImage = nil
-        }
-    }
-    
-    @Test("시나리오 5: 변환 로딩 중일 때, 추가 변환 요청은 무시된다.")
+    @Test("시나리오 4: 변환 로딩 중일 때, 추가 변환 요청은 무시된다.")
     func transformButtonTapped_whileProcessing_isIgnored() async {
         // given
         var state = ImageTransformFeature.State(inputImage: mockImage)
@@ -89,11 +73,11 @@ struct ImageTransformFeatureTests {
         // 상태 변화 클로저가 없으므로 무시됨을 검증
     }
     
-    @Test("시나리오 6: 변환 실패 시, 에러 메시지를 할당하고 로딩을 종료한다.")
+    @Test("시나리오 5: 변환 실패 시, 에러 메시지를 할당하고 로딩을 종료한다.")
     func transformFailed_setsErrorMessage() async {
         // given
         let expectedError = "변환 실패"
-        let store = makeStore(initialState: ImageTransformFeature.State(inputImage: mockImage)) { _, _ in
+        let store = makeStore(initialState: ImageTransformFeature.State(inputImage: mockImage)) { _ in
             throw ImageTransformError.custom(expectedError)
         }
         await store.send(.transformButtonTapped) // 실행 트리거
@@ -106,10 +90,10 @@ struct ImageTransformFeatureTests {
         }
     }
     
-    @Test("시나리오 7: 변환 성공 시, 결과 이미지를 할당하고 로딩을 종료한다.")
+    @Test("시나리오 6: 변환 성공 시, 결과 이미지를 할당하고 로딩을 종료한다.")
     func transformCompleted_setsOutputImage() async {
         // given
-        let store = makeStore(initialState: ImageTransformFeature.State(inputImage: mockImage)) { _, _ in
+        let store = makeStore(initialState: ImageTransformFeature.State(inputImage: mockImage)) { _ in
             return self.mockData
         }
         await store.send(.transformButtonTapped) // 실행 트리거
@@ -131,7 +115,7 @@ struct ImageTransformFeatureTests {
 private extension ImageTransformFeatureTests {
     func makeStore(
         initialState: ImageTransformFeature.State = .init(),
-        transformResult: @Sendable @escaping (Data, ImageTransformModel) async throws -> Data = { data, _ in data }
+        transformResult: @Sendable @escaping (Data) async throws -> Data = { data in data }
     ) -> TestStore<ImageTransformFeature.State, ImageTransformFeature.Action> {
         let store = TestStore(initialState: initialState) {
             ImageTransformFeature()

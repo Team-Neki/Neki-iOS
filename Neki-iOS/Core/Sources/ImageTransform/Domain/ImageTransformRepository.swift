@@ -8,5 +8,5 @@
 import Foundation
 
 public protocol ImageTransformRepository: Sendable {
-    func transform(data: Data, model: ImageTransformModel) async throws -> Data
+    func transform(data: Data) async throws -> Data
 }

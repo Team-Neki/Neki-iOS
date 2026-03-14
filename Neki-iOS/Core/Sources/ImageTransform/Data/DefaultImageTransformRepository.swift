@@ -52,44 +52,18 @@ public final class DefaultImageTransformRepository: ImageTransformRepository {
     
     public func transform(data inputData: Data, model type: ImageTransformModel) async throws -> Data {
         guard let task = modelTasks[type], let visionModel = try? await task.value else {
-                    throw ImageTransformDataError.modelLoadFailed
-                }
+            throw ImageTransformDataError.modelLoadFailed
+        }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            
-            /// VNCoreMLRequest: - CoreML 모델을 기반으로 한 이미지 분석 요청 객체
-            let request = VNCoreMLRequest(model: visionModel) { [weak self] request, error in
-                guard let self = self else {
-                                    continuation.resume(throwing: CancellationError())
-                                    return
-                                }
-                
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                do {
-                    let finalPNGData = try self.extractData(from: request.results)
-                    continuation.resume(returning: finalPNGData)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-            
-            /// imageCropAndScaleOption: - 원본 이미지가 모델의 요구 사이즈(512x512)와 다를 경우 어떻게 리사이징할지
+        return try await Task(priority: .userInitiated) {
+            let request = VNCoreMLRequest(model: visionModel)
             request.imageCropAndScaleOption = .scaleFit
             
-            DispatchQueue.global(qos: .userInitiated).async {
-                do {
-                    /// VNImageRequestHandler: - VNRequest를 실행하는 객체
-                    let handler = VNImageRequestHandler(data: inputData)
-                    try handler.perform([request])
-                } catch {
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+            let handler = VNImageRequestHandler(data: inputData)
+            try handler.perform([request])
+            
+            return try self.extractData(from: request.results)
+        }.value
     }
 }
 

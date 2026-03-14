@@ -56,6 +56,8 @@ public struct ImageTransformFeature {
                 return .none
                 
             case .transformButtonTapped:
+                guard !state.isProcessing else { return .none }
+
                 guard let inputImage = state.inputImage else { return .none }
                 
                 state.isProcessing = true

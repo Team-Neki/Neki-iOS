@@ -31,9 +31,11 @@ extension DependencyValues {
     }
 }
 
-//extension ImageTransformClient: TestDependencyKey {
-//    public static let testValue = ImageTransformClient(
-//        transformImage: { image in image }
-//    )
-//}
+extension ImageTransformClient: TestDependencyKey {
+    public static let testValue = ImageTransformClient(
+        transformImage: { inputData, aiModel in
+            return inputData
+        }
+    )
+}
 

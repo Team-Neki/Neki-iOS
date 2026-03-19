@@ -13,22 +13,6 @@ import ComposableArchitecture
 import CoreImage
 import os
 
-public enum ImageTransformDataError: LocalizedError {
-    case modelLoadFailed
-    case destinationCreationFailed
-    case dataCompressionFailed
-    case renderingFailed
-    
-    public var errorDescription: String? {
-        switch self {
-        case .modelLoadFailed: return "AI 모델을 불러오는데 실패했습니다."
-        case .destinationCreationFailed: return "데이터 저장소를 생성할 수 없습니다."
-        case .dataCompressionFailed: return "이미지 압축에 실패했습니다."
-        case .renderingFailed: return "이미지 렌더링에 실패했습니다."
-        }
-    }
-}
-
 public final class DefaultImageTransformRepository: ImageTransformRepository {
     
     private let modelTask: Task<VNCoreMLModel, Error>
@@ -69,13 +53,13 @@ private extension DefaultImageTransformRepository {
         // Vision 결과물(CVPixelBuffer)
         guard let observations = results as? [VNPixelBufferObservation],
               let pixelBuffer = observations.first?.pixelBuffer else {
-            throw ImageTransformDataError.renderingFailed
+            throw ImageTransformRepositoryError.renderingFailed
         }
         
         // 픽셀 데이터를 이미지(CIImage -> CGImage)로 렌더링
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let outputCGImage = self.ciContext.createCGImage(ciImage, from: ciImage.extent) else {
-            throw ImageTransformDataError.renderingFailed
+            throw ImageTransformRepositoryError.renderingFailed
         }
         
         // 렌더링된 이미지를 PNG 형식의 Data로 압축
@@ -86,7 +70,7 @@ private extension DefaultImageTransformRepository {
     /// UIImage(cgImage:).pngData() 이거 쓰면 딸깍이긴 하지만 Data 레이어에 UIKit 의존성이 생겨버림..
     func compressToPNG(cgImage: CGImage) throws -> Data {
         guard let cfMutableData = CFDataCreateMutable(kCFAllocatorDefault, 0) else {
-            throw ImageTransformDataError.destinationCreationFailed
+            throw ImageTransformRepositoryError.destinationCreationFailed
         }
         
         guard let destination = CGImageDestinationCreateWithData(
@@ -95,7 +79,7 @@ private extension DefaultImageTransformRepository {
             1,
             nil
         ) else {
-            throw ImageTransformDataError.destinationCreationFailed
+            throw ImageTransformRepositoryError.destinationCreationFailed
         }
         
         CGImageDestinationAddImage(destination, cgImage, nil)
@@ -103,7 +87,7 @@ private extension DefaultImageTransformRepository {
         if CGImageDestinationFinalize(destination) {
             return cfMutableData as Data
         } else {
-            throw ImageTransformDataError.dataCompressionFailed
+            throw ImageTransformRepositoryError.dataCompressionFailed
         }
     }
 }

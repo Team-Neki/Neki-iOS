@@ -6,12 +6,9 @@
 //
 
 import Foundation
-import CoreML
 import Vision
-import UniformTypeIdentifiers
 import ComposableArchitecture
 import CoreImage
-import os
 
 public final class DefaultImageTransformRepository: ImageTransformRepository {
     
@@ -28,17 +25,17 @@ public final class DefaultImageTransformRepository: ImageTransformRepository {
         }
     }
     
-    public func transform(data inputData: Data) async throws -> Data {
+    public func transform(image inputImage: CGImage) async throws -> CGImage {
         let visionModel = try await modelTask.value
         
         return try await Task(priority: .userInitiated) {
             let request = VNCoreMLRequest(model: visionModel)
             request.imageCropAndScaleOption = .scaleFit
             
-            let handler = VNImageRequestHandler(data: inputData)
+            let handler = VNImageRequestHandler(cgImage: inputImage)
             try handler.perform([request])
             
-            return try self.extractData(from: request.results)
+            return try self.extractCGImage(from: request.results)
         }.value
     }
 }
@@ -47,48 +44,18 @@ public final class DefaultImageTransformRepository: ImageTransformRepository {
 // MARK: - DefaultImageTransformRepository Private Helpers
 
 private extension DefaultImageTransformRepository {
-    
-    /// Vision 결과물을 추출하여 최종 PNG Data로 변환하는 로직
-    func extractData(from results: [VNObservation]?) throws -> Data {
-        // Vision 결과물(CVPixelBuffer)
+    func extractCGImage(from results: [VNObservation]?) throws -> CGImage {
         guard let observations = results as? [VNPixelBufferObservation],
               let pixelBuffer = observations.first?.pixelBuffer else {
             throw ImageTransformRepositoryError.renderingFailed
         }
         
-        // 픽셀 데이터를 이미지(CIImage -> CGImage)로 렌더링
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
         guard let outputCGImage = self.ciContext.createCGImage(ciImage, from: ciImage.extent) else {
             throw ImageTransformRepositoryError.renderingFailed
         }
         
-        // 렌더링된 이미지를 PNG 형식의 Data로 압축
-        return try compressToPNG(cgImage: outputCGImage)
-    }
-    
-    /// CGImage를 PNG Data로 압축하는 메서드 (너무 어렵다...)
-    /// UIImage(cgImage:).pngData() 이거 쓰면 딸깍이긴 하지만 Data 레이어에 UIKit 의존성이 생겨버림..
-    func compressToPNG(cgImage: CGImage) throws -> Data {
-        guard let cfMutableData = CFDataCreateMutable(kCFAllocatorDefault, 0) else {
-            throw ImageTransformRepositoryError.destinationCreationFailed
-        }
-        
-        guard let destination = CGImageDestinationCreateWithData(
-            cfMutableData,
-            UTType.png.identifier as CFString,
-            1,
-            nil
-        ) else {
-            throw ImageTransformRepositoryError.destinationCreationFailed
-        }
-        
-        CGImageDestinationAddImage(destination, cgImage, nil)
-        
-        if CGImageDestinationFinalize(destination) {
-            return cfMutableData as Data
-        } else {
-            throw ImageTransformRepositoryError.dataCompressionFailed
-        }
+        return outputCGImage
     }
 }
 

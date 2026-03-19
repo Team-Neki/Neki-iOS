@@ -55,15 +55,12 @@ public struct ImageTransformFeature {
                         let originalRatio = inputImage.size.width / inputImage.size.height
                         
                         guard let squaredImage = self.prepareSquareForCoreML(image: inputImage, targetSize: 512),
-                              let inputData = squaredImage.pngData() else {
+                              let inputCGImage = squaredImage.cgImage else {
                             throw ImageTransformError.processingFailed
                         }
                         
-                        let resultData = try await imageTransformClient.transformImage(inputData)
-                        
-                        guard let resultSquareImage = UIImage(data: resultData) else {
-                            throw ImageTransformError.resultDataReadFailed
-                        }
+                        let resultCGImage = try await imageTransformClient.transformImage(inputCGImage)
+                        let resultSquareImage = UIImage(cgImage: resultCGImage)
                         
                         if let finalCroppedImage = self.cropToOriginalRatio(image: resultSquareImage, originalRatio: originalRatio) {
                             await send(.transformCompleted(finalCroppedImage))

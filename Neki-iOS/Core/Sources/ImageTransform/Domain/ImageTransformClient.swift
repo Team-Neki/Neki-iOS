@@ -7,9 +7,10 @@
 
 import Foundation
 import ComposableArchitecture
+import CoreGraphics
 
 public struct ImageTransformClient {
-    public var transformImage: @Sendable (_ image: Data) async throws -> Data
+    public var transformImage: @Sendable (_ image: CGImage) async throws -> CGImage
 }
 
 extension ImageTransformClient: DependencyKey {
@@ -17,8 +18,8 @@ extension ImageTransformClient: DependencyKey {
         @Dependency(\.imageTransformRepository) var repository
         
         return ImageTransformClient(
-            transformImage: { inputData in
-                return try await repository.transform(data: inputData)
+            transformImage: { inputImage in
+                return try await repository.transform(image: inputImage)
             }
         )
     }()
@@ -33,8 +34,8 @@ extension DependencyValues {
 
 extension ImageTransformClient: TestDependencyKey {
     public static let testValue = ImageTransformClient(
-        transformImage: { inputData in
-            return inputData
+        transformImage: { inputImage in
+            return inputImage
         }
     )
 }

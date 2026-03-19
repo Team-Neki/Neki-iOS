@@ -16,7 +16,6 @@
 		597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335F2F2482E1000B8194 /* KakaoSDKUser */; };
 		59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 59D1D21A2F168EE800F50EB5 /* Kingfisher */; };
 		6C3B4B8A2F65CA4B008449C1 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6C3B4B882F65C9B0008449C1 /* WebKit.framework */; };
-		6C3B4B8B2F65CA4B008449C1 /* WebKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 6C3B4B882F65C9B0008449C1 /* WebKit.framework */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 /* End PBXBuildFile section */
 
@@ -29,20 +28,6 @@
 			remoteInfo = "Neki-iOS";
 		};
 /* End PBXContainerItemProxy section */
-
-/* Begin PBXCopyFilesBuildPhase section */
-		6C3B4B8C2F65CA4B008449C1 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				6C3B4B8B2F65CA4B008449C1 /* WebKit.framework in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		6C3B4B7C2F65C44C008449C1 /* Neki-iOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Neki-iOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -149,7 +134,6 @@
 				6C3B4B782F65C44C008449C1 /* Sources */,
 				6C3B4B792F65C44C008449C1 /* Frameworks */,
 				6C3B4B7A2F65C44C008449C1 /* Resources */,
-				6C3B4B8C2F65CA4B008449C1 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

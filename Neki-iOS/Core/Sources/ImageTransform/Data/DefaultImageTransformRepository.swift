@@ -10,33 +10,32 @@ import Vision
 import ComposableArchitecture
 import CoreImage
 
-public final class DefaultImageTransformRepository: ImageTransformRepository {
+public actor DefaultImageTransformRepository: ImageTransformRepository {
     
-    private let modelTask: Task<VNCoreMLModel, Error>
+    private var cachedModel: VNCoreMLModel?
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
     
-    public init() {
-        let config = MLModelConfiguration()
-        config.computeUnits = .all
-        
-        self.modelTask = Task {
-            let coreML = try whiteboxcartoonization(configuration: config).model
-            return try VNCoreMLModel(for: coreML)
-        }
-    }
-    
     public func transform(image inputImage: CGImage) async throws -> CGImage {
-        let visionModel = try await modelTask.value
         
-        return try await Task(priority: .userInitiated) {
-            let request = VNCoreMLRequest(model: visionModel)
-            request.imageCropAndScaleOption = .scaleFit
+        if self.cachedModel == nil {
+            let config = MLModelConfiguration()
+            config.computeUnits = .all
             
-            let handler = VNImageRequestHandler(cgImage: inputImage)
-            try handler.perform([request])
-            
-            return try self.extractCGImage(from: request.results)
-        }.value
+            let coreML = try whiteboxcartoonization(configuration: config).model
+            self.cachedModel = try VNCoreMLModel(for: coreML)
+        }
+        
+        guard let visionModel = self.cachedModel else {
+            throw ImageTransformRepositoryError.renderingFailed
+        }
+        
+        let request = VNCoreMLRequest(model: visionModel)
+        request.imageCropAndScaleOption = .scaleFit
+        
+        let handler = VNImageRequestHandler(cgImage: inputImage)
+        try handler.perform([request])
+        
+        return try self.extractCGImage(from: request.results)
     }
 }
 

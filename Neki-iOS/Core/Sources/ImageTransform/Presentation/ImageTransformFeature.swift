@@ -50,7 +50,7 @@ public struct ImageTransformFeature {
                 state.errorMessage = nil
                 state.outputImage = nil
                 
-                return .run { send in
+                return .run(priority: .userInitiated) { send in
                     do {
                         let originalRatio = inputImage.size.width / inputImage.size.height
                         

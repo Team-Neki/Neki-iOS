@@ -16,8 +16,11 @@ struct ShareExtensionConfiguration {
     let deepLinkURL: URL?
     
     init(bundle: Bundle = .main) {
-        let bundleIdentifier = bundle.bundleIdentifier ?? "com.OneTen.Neki-iOS.Share-Extension"
-        self.appGroupID = "group.\(bundleIdentifier)"
+        #if DEBUG
+        self.appGroupID = "group.com.Neki-dev.Share-Extension"
+        #else
+        self.appGroupID = "group.com.OneTen.Neki-iOS.Share-Extension"
+        #endif
         
         var components = URLComponents(string: "neki://shareExtension")
         components?.queryItems = [URLQueryItem(name: "appGroupID", value: appGroupID)]

@@ -15,11 +15,13 @@ enum ImageShareProcessorError: Error {
     case unknown
 }
 
-protocol Sharable {
-    func share(extensionItems: [NSExtensionItem]) async throws
+protocol ImageShareUseCase {
+    func extractImageProviders(from extensionItems: [NSExtensionItem]) -> [NSItemProvider]
+    func fetchPreviewData(from provider: NSItemProvider) async throws -> Data
+    func share(providers: [NSItemProvider]) async throws
 }
 
-struct ImageShareProcessor: Sharable {
+struct ImageShareProcessor {
     private let repository: ExtensionImageRepository
     
     init(repository: ExtensionImageRepository) { self.repository = repository }
@@ -43,13 +45,27 @@ struct ImageShareProcessor: Sharable {
             }
         }
     }
+}
+
+
+// MARK: - ImageShareProcessor + ImageShareUseCase
+
+extension ImageShareProcessor: ImageShareUseCase {
+    func extractImageProviders(from extensionItems: [NSExtensionItem]) -> [NSItemProvider] {
+        extensionItems.compactMap { $0.attachments }.flatMap { $0 }.filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
+    }
     
-    func share(extensionItems: [NSExtensionItem]) async throws {
-        let providers = extensionItems
-            .compactMap { $0.attachments }
-            .flatMap { $0 }
-            .filter { $0.hasItemConformingToTypeIdentifier(UTType.image.identifier) }
-        
+    func fetchPreviewData(from provider: NSItemProvider) async throws -> Data {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, error in
+                if let error = error { return continuation.resume(throwing: ImageShareProcessorError.loadFailed(error)) }
+                guard let data = data else { return continuation.resume(throwing: ImageShareProcessorError.unknown) }
+                continuation.resume(returning: data)
+            }
+        }
+    }
+    
+    func share(providers: [NSItemProvider]) async throws {
         guard providers.isEmpty == false else { throw ImageShareProcessorError.noImageFound }
         
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -57,7 +73,7 @@ struct ImageShareProcessor: Sharable {
                 group.addTask { try await processAndSaveImage(from: provider) }
             }
             
-            for try await _ in group { }
+            for try await _ in group {}
         }
     }
 }

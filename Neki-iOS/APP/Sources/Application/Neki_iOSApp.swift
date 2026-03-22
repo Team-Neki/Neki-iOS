@@ -22,7 +22,10 @@ struct Neki_iOSApp: App {
     }
     
     private func handleIncomingURL(_ url: URL) {
-        if url.scheme == "neki" { return }
+        if url.scheme == "neki" {
+            store.send(.onOpenURL(url))
+            return
+        }
         
         if url.scheme == "https" || url.scheme == "http" {
             guard let host = url.host(), host == "neki.suitestudy.com" else { return }

@@ -15,6 +15,9 @@
 		5970335E2F2482E1000B8194 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335D2F2482E1000B8194 /* KakaoSDKCommon */; };
 		597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335F2F2482E1000B8194 /* KakaoSDKUser */; };
 		59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 59D1D21A2F168EE800F50EB5 /* Kingfisher */; };
+		6C0C1ACB2F6FD2E30037F650 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */; };
+		6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */; };
+		6C0C1ACF2F6FD2E30037F650 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */; };
 		6C3B4B8A2F65CA4B008449C1 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6C3B4B882F65C9B0008449C1 /* WebKit.framework */; };
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 /* End PBXBuildFile section */
@@ -46,6 +49,8 @@
 		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				"APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist",
+				"APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist",
 				Info.plist,
 			);
 			target = 6C4998DC2EF7EF62006BE1DB /* Neki-iOS */;
@@ -85,11 +90,14 @@
 				59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */,
 				5970335E2F2482E1000B8194 /* KakaoSDKCommon in Frameworks */,
 				6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */,
+				6C0C1ACF2F6FD2E30037F650 /* FirebaseInstallations in Frameworks */,
 				592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */,
 				5970335C2F2482E1000B8194 /* KakaoSDKCertCore in Frameworks */,
+				6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */,
 				597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */,
 				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 				597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */,
+				6C0C1ACB2F6FD2E30037F650 /* FirebaseAnalytics in Frameworks */,
 				5970335A2F2482E1000B8194 /* KakaoSDKCert in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -157,6 +165,7 @@
 				6C4998D92EF7EF62006BE1DB /* Sources */,
 				6C4998DA2EF7EF62006BE1DB /* Frameworks */,
 				6C4998DB2EF7EF62006BE1DB /* Resources */,
+				6C0C1AD92F6FD64B0037F650 /* Copy Firebase Plist */,
 			);
 			buildRules = (
 			);
@@ -176,6 +185,9 @@
 				5970335D2F2482E1000B8194 /* KakaoSDKCommon */,
 				5970335F2F2482E1000B8194 /* KakaoSDKUser */,
 				6C4D99E42F365E1700E93BF0 /* Lottie */,
+				6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */,
+				6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */,
+				6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -215,6 +227,7 @@
 				59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 				597033562F2482E1000B8194 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 				6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */,
+				6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6C4998DE2EF7EF62006BE1DB /* Products */;
@@ -243,6 +256,27 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		6C0C1AD92F6FD64B0037F650 /* Copy Firebase Plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Copy Firebase Plist";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# 1. 환경(Debug/Release) 변수 가져오기\nENVIRONMENT=\"${CONFIGURATION}\"\n\n# 2. 올려주신 폴더 구조에 맞춘 정확한 원본 파일 경로\n# (에러 로그를 기반으로 Neki-iOS 하위의 APP 폴더를 가리키도록 설정했습니다)\nSRC_PLIST_PATH=\"${SRCROOT}/Neki-iOS/APP/Sources/Resources/FirebaseConfig/${ENVIRONMENT}/GoogleService-Info.plist\"\n\n# 3. 앱이 빌드되어 완성될 목적지 경로\nDEST_PLIST_PATH=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/GoogleService-Info.plist\"\n\n# 4. 파일 복사 실행\necho \"Copying ${ENVIRONMENT} Firebase plist...\"\ncp -r \"${SRC_PLIST_PATH}\" \"${DEST_PLIST_PATH}\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		6C3B4B782F65C44C008449C1 /* Sources */ = {
@@ -370,7 +404,7 @@
 				DEVELOPMENT_TEAM = 586LZSS32L;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -436,7 +470,7 @@
 				DEVELOPMENT_TEAM = 586LZSS32L;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -624,6 +658,14 @@
 				minimumVersion = 8.6.2;
 			};
 		};
+		6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.11.0;
+			};
+		};
 		6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/airbnb/lottie-ios";
@@ -674,6 +716,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
+		};
+		6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
+		};
+		6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseInstallations;
 		};
 		6C4D99E42F365E1700E93BF0 /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;

@@ -10,6 +10,8 @@ import ComposableArchitecture
 
 @main
 struct Neki_iOSApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
+    
     let store = Store(initialState: AppCoordinator.State()) {
         AppCoordinator()
     }

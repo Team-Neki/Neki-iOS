@@ -33,6 +33,18 @@ final class ShareViewController: UIViewController {
         return ImageShareProcessor(repository: repository)
     }()
     
+    override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
+        super.init(nibName: nibNameOrNil, bundle: nibBundleOrNil)
+        self.modalTransitionStyle = .coverVertical
+        self.modalPresentationStyle = .popover
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        self.modalTransitionStyle = .coverVertical
+        self.modalPresentationStyle = .popover
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -47,10 +59,12 @@ final class ShareViewController: UIViewController {
 
 private extension ShareViewController {
     func setupUI() {
+        view.backgroundColor = .clear
         view.isOpaque = false
         
         containerView.backgroundColor = .systemBackground
         containerView.layer.cornerRadius = 12
+        containerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         containerView.clipsToBounds = true
         containerView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(containerView)
@@ -69,7 +83,7 @@ private extension ShareViewController {
         navigationBar.setItems([navigationItem], animated: false)
         containerView.addSubview(navigationBar)
         
-        imageView.contentMode = .scaleAspectFill
+        imageView.contentMode = .scaleAspectFit
         imageView.backgroundColor = .secondarySystemBackground
         imageView.layer.cornerRadius = 8
         imageView.clipsToBounds = true
@@ -92,14 +106,14 @@ private extension ShareViewController {
     
     func setupLayout() {
         NSLayoutConstraint.activate([
+            containerView.topAnchor.constraint(equalTo: view.topAnchor),
             containerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            containerView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.5),
             
-            navigationBar.topAnchor.constraint(equalTo: containerView.topAnchor),
-            navigationBar.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            navigationBar.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            navigationBar.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 16),
+            navigationBar.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            navigationBar.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
             
             imageView.topAnchor.constraint(equalTo: navigationBar.bottomAnchor, constant: 16),
             imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),

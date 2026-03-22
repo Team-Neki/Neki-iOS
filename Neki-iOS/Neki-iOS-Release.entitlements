@@ -10,5 +10,9 @@
 	<array>
 		<string>applinks:neki.suitestudy.com</string>
 	</array>
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.com.OneTen.Neki-iOS.Share-Extension</string>
+	</array>
 </dict>
 </plist>

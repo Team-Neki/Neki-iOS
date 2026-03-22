@@ -69,6 +69,7 @@ struct ArchiveFeature {
         case albumsResponse(Result<[AlbumItem], Error>)
         case favoriteAlbumResponse(Result<AlbumItem, Error>)
         case photoListResponse(Result<[PhotoEntity], Error>)
+        case uploadSharedImagesResponse(Result<[Int], Error>)
         
         // Image Upload Action
         case imagePicker(ImagePickerFeature.Action)
@@ -85,6 +86,8 @@ struct ArchiveFeature {
         // Internal Action
         case addPhotoFromQRScanner(imageID: Int)
         case processUploadImages(imageIDs: [Int])
+        case addPhotoFromShareExtension(appGroupID: String)
+        case cleanSharedImages(appGroupID: String)
         
         // Delegate Action
         case delegate(DelegateAction)
@@ -95,6 +98,8 @@ struct ArchiveFeature {
     }
     
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageUploadClient) var imageUploadClient
+    @Dependency(\.sharedImageClient) var sharedImageClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -282,6 +287,31 @@ struct ArchiveFeature {
                 state.selectUploadAlbum = SelectUploadAlbumFeature.State(uploadedImageIds: imageIDs, albums: state.albums)
                 return .none
                 
+            case let .addPhotoFromShareExtension(appGroupID):
+                state.isLoading = true
+                return .run { send in
+                    do {
+                        let fileURLs = try await sharedImageClient.fetchSharedImageURLs(appGroupID: appGroupID)
+                        
+                        guard fileURLs.isEmpty == false else {
+                            await send(.delegate(.showToast(NekiToastItem("가져올 수 있는 이미지가 없어요.", style: .error))))
+                            await send(.uploadSharedImagesResponse(.failure(UploadError.uploadFailed)))
+                            return
+                        }
+                        
+                        let uploadedMediaIDs = try await imageUploadClient.uploadConcurrentlyFromURLs(fileURLs, .photoBooth)
+                        
+                        await send(.cleanSharedImages(appGroupID: appGroupID))
+                        await send(.uploadSharedImagesResponse(.success(uploadedMediaIDs)))
+                        
+                    } catch {
+                        Logger.presentation.error("공유 확장 이미지 업로드 에러: \(error)")
+                        
+                        await send(.cleanSharedImages(appGroupID: appGroupID))
+                        await send(.uploadSharedImagesResponse(.failure(error)))
+                    }
+                }
+                
             case let .selectUploadAlbum(.presented(.delegate(delegateAction))):
                 switch delegateAction {
                 case let .uploadDidSuccess(albumId):
@@ -321,6 +351,22 @@ struct ArchiveFeature {
                     Logger.presentation.error("사진 등록 실패: \(error)")
                     await send(.delegate(.showToast(NekiToastItem("사진 등록에 실패했어요", style: .error))))
                 }
+                
+            case let .cleanSharedImages(appGroupID):
+                return .run { send in
+                    do {
+                        try await sharedImageClient.clearSharedImages(appGroupID: appGroupID)
+                    } catch {
+                        Logger.presentation.error("임시 파일 정리 실패: \(error)")
+                    }
+                }
+                
+            case let .uploadSharedImagesResponse(.success(imageIDs)):
+                return .send(.processUploadImages(imageIDs: imageIDs))
+                
+            case .uploadSharedImagesResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
                 // MARK: - Binding
                 

@@ -7,11 +7,16 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Firebase
 
 @main
 struct Neki_iOSApp: App {
     let store = Store(initialState: AppCoordinator.State()) {
         AppCoordinator()
+    }
+    
+    init() {
+        FirebaseApp.configure()
     }
     
     var body: some Scene {
@@ -20,8 +25,10 @@ struct Neki_iOSApp: App {
                 .onOpenURL { handleIncomingURL($0) }
         }
     }
-    
-    private func handleIncomingURL(_ url: URL) {
+}
+
+private extension Neki_iOSApp {
+    func handleIncomingURL(_ url: URL) {
         if url.scheme == "neki" { return }
         
         if url.scheme == "https" || url.scheme == "http" {

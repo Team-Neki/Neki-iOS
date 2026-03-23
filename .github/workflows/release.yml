@@ -29,30 +29,36 @@ jobs:
           mkdir -p Neki-iOS/APP/Sources/Resources
           echo "${{ secrets.RELEASE_XCCONFIG }}" | base64 --decode > Neki-iOS/APP/Sources/Resources/Release.xcconfig    
       
-      # 3. SPM 매크로 지문 검증 우회
+      # 3. 깃허브 Secret에서 Firebase Plist 파일 생성하기
+      - name: Create Firebase Plist
+        run: |
+          mkdir -p Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release
+          echo "${{ secrets.FIREBASE_PLIST_RELEASE }}" | base64 --decode > Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist
+
+      # 4. SPM 매크로 지문 검증 우회
       - name: Disable Macro Validation
         run: |
           defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
           defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
-      # 4. SPM 의존성 사전 해결
+      # 5. SPM 의존성 사전 해결
       - name: Resolve SPM Dependencies
         run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme Neki-iOS
 
-      # 5. Match 인증서 저장소 접근을 위한 SSH 세팅
+      # 6. Match 인증서 저장소 접근을 위한 SSH 세팅
       - name: Install SSH key for Match
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.MATCH_SSH_KEY }}
 
-      # 6. Ruby 및 Fastlane 세팅 (Gemfile 활용)
+      # 7. Ruby 및 Fastlane 세팅 (Gemfile 활용)
       - name: Setup Ruby and Install Gems
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
           bundler-cache: true
 
-      # 7. Fastlane 배포 실행
+      # 8. Fastlane 배포 실행
       - name: Run Fastlane Release
         run: bundle exec fastlane release
         env:
@@ -65,7 +71,7 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
 
-      # 8. 배포 완료 후 서버로 최신 버전 정보 POST 요청
+      # 9. 배포 완료 후 서버로 최신 버전 정보 POST 요청
       - name: Send Version Update to Server
         if: success() # 배포가 성공적으로 끝났을 때만 실행
         run: |
@@ -75,15 +81,14 @@ jobs:
           echo "추출된 최신 버전: $APP_VERSION"
 
           # 추출된 버전을 JSON 바디에 담아서 서버로 POST 요청 (minVersion은 필요시 추후 수정)
-               curl -X PATCH "${{ secrets.APP_VERSION_API_ADDRESS }}" \
-               -H "Content-Type: application/json" \
-               -H "Authorization: Bearer empty_token_just_for_header" \
-               -d "{
-                 \"minVersion\": \"1.0.0\",
-                 \"currentVersion\": \"$APP_VERSION\"
-               }"
+          curl -X PATCH "${{ secrets.APP_VERSION_API_ADDRESS }}" \
+          -H "Content-Type: application/json" \
+          -d "{
+            \"minVersion\": \"1.0.0\",
+            \"currentVersion\": \"$APP_VERSION\"
+          }"
 
-      # 9. Discord 결과 알림 (성공/실패 여부 전송)
+      # 10. Discord 결과 알림 (성공/실패 여부 전송)
       - name: Send Discord notification
         if: always() # 빌드 성공/실패 여부와 상관없이 무조건 실행
         run: |
@@ -94,6 +99,6 @@ jobs:
           fi
           PAYLOAD=$(jq -n --arg content "$STATUS (${{ github.repository }})" '{content: $content}')
           curl -H "Content-Type: application/json" \
-               -X POST \
-               -d "$PAYLOAD" \
-               ${{ secrets.DISCORD_WEBHOOK_URL }}
+              -X POST \
+              -d "$PAYLOAD" \
+              ${{ secrets.DISCORD_WEBHOOK_URL }}

@@ -7,11 +7,16 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Firebase
 
 @main
 struct Neki_iOSApp: App {
     let store = Store(initialState: AppCoordinator.State()) {
         AppCoordinator()
+    }
+    
+    init() {
+        FirebaseApp.configure()
     }
     
     var body: some Scene {

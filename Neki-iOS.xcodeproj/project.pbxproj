@@ -49,7 +49,9 @@
 		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				APP/Sources/Resources/FirebaseConfig/Debug/.gitkeep,
 				"APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist",
+				APP/Sources/Resources/FirebaseConfig/Release/.gitkeep,
 				"APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist",
 				Info.plist,
 			);

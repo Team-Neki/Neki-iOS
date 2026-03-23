@@ -10,8 +10,6 @@
 		59235C592F64245A00198051 /* NekiShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 59235C4F2F64245A00198051 /* NekiShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 592F2C5D2F0508FE00802BB7 /* ComposableArchitecture */; };
 		592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */ = {isa = PBXBuildFile; productRef = 592F345B2F0E1F1700802BB7 /* NMapsMap */; };
-		596F679E2F710D430071F0B7 /* DefaultImageTransformRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 596F67982F710D430071F0B7 /* DefaultImageTransformRepositoryTests.swift */; };
-		596F679F2F710D430071F0B7 /* ImageTransformFeatureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 596F679A2F710D430071F0B7 /* ImageTransformFeatureTests.swift */; };
 		597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 597033572F2482E1000B8194 /* KakaoSDKAuth */; };
 		5970335A2F2482E1000B8194 /* KakaoSDKCert in Frameworks */ = {isa = PBXBuildFile; productRef = 597033592F2482E1000B8194 /* KakaoSDKCert */; };
 		5970335C2F2482E1000B8194 /* KakaoSDKCertCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335B2F2482E1000B8194 /* KakaoSDKCertCore */; };
@@ -54,8 +52,6 @@
 
 /* Begin PBXFileReference section */
 		59235C4F2F64245A00198051 /* NekiShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NekiShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		596F67982F710D430071F0B7 /* DefaultImageTransformRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultImageTransformRepositoryTests.swift; sourceTree = "<group>"; };
-		596F679A2F710D430071F0B7 /* ImageTransformFeatureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageTransformFeatureTests.swift; sourceTree = "<group>"; };
 		6C3B4B7C2F65C44C008449C1 /* Neki-iOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Neki-iOSTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Neki-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -91,6 +87,11 @@
 				59235C5E2F64245A00198051 /* Exceptions for "NekiShareExtension" folder in "NekiShareExtension" target */,
 			);
 			path = NekiShareExtension;
+			sourceTree = "<group>";
+		};
+		596F67AD2F714EAB0071F0B7 /* Neki-iOSTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Neki-iOSTests";
 			sourceTree = "<group>";
 		};
 		6C4998DF2EF7EF62006BE1DB /* Neki-iOS */ = {
@@ -138,46 +139,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		596F67992F710D430071F0B7 /* Data */ = {
-			isa = PBXGroup;
-			children = (
-				596F67982F710D430071F0B7 /* DefaultImageTransformRepositoryTests.swift */,
-			);
-			path = Data;
-			sourceTree = "<group>";
-		};
-		596F679B2F710D430071F0B7 /* Presentation */ = {
-			isa = PBXGroup;
-			children = (
-				596F679A2F710D430071F0B7 /* ImageTransformFeatureTests.swift */,
-			);
-			path = Presentation;
-			sourceTree = "<group>";
-		};
-		596F679C2F710D430071F0B7 /* ImageTransform */ = {
-			isa = PBXGroup;
-			children = (
-				596F67992F710D430071F0B7 /* Data */,
-				596F679B2F710D430071F0B7 /* Presentation */,
-			);
-			path = ImageTransform;
-			sourceTree = "<group>";
-		};
-		596F679D2F710D430071F0B7 /* Neki-iOSTests */ = {
-			isa = PBXGroup;
-			children = (
-				596F679C2F710D430071F0B7 /* ImageTransform */,
-			);
-			path = "Neki-iOSTests";
-			sourceTree = "<group>";
-		};
 		6C4998D42EF7EF62006BE1DB = {
 			isa = PBXGroup;
 			children = (
 				6C4998DF2EF7EF62006BE1DB /* Neki-iOS */,
-				596F679D2F710D430071F0B7 /* Neki-iOSTests */,
 				59235C502F64245A00198051 /* NekiShareExtension */,
 				6C4998DE2EF7EF62006BE1DB /* Products */,
+				596F67AD2F714EAB0071F0B7 /* Neki-iOSTests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -228,6 +196,9 @@
 			);
 			dependencies = (
 				6C3B4B812F65C44C008449C1 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				596F67AD2F714EAB0071F0B7 /* Neki-iOSTests */,
 			);
 			name = "Neki-iOSTests";
 			packageProductDependencies = (
@@ -362,8 +333,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				596F679E2F710D430071F0B7 /* DefaultImageTransformRepositoryTests.swift in Sources */,
-				596F679F2F710D430071F0B7 /* ImageTransformFeatureTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -7,11 +7,14 @@
 
 import SwiftUI
 import ComposableArchitecture
+import Kingfisher
 
 @Reducer
 struct ArchivePhotoDetailFeature {
     @ObservableState
     struct State {
+        @Presents var imageTransform: ImageTransformFeature.State?
+        
         var photos: IdentifiedArrayOf<ArchiveImageItem>
         
         var currentItemID: Int
@@ -33,6 +36,10 @@ struct ArchivePhotoDetailFeature {
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        
+        case onTapTransform
+        case imageFetchResponse(Result<UIImage, Error>)
+        case imageTransform(PresentationAction<ImageTransformFeature.Action>)
         
         case onTapBackButton
         case onTapDownload
@@ -59,6 +66,34 @@ struct ArchivePhotoDetailFeature {
         
         Reduce { state, action in
             switch action {
+                
+            case .onTapTransform:
+                guard let url = state.currentItem?.imageURL else { return .none }
+                
+                return .run { send in
+                    do {
+                        let image = try await withCheckedThrowingContinuation { continuation in
+                            KingfisherManager.shared.retrieveImage(with: url, options: [
+                                .cacheOriginalImage
+                            ]) { result in
+                                switch result {
+                                case .success(let value): continuation.resume(returning: value.image)
+                                case .failure(let error): continuation.resume(throwing: error)
+                                }
+                            }
+                        }
+                        await send(.imageFetchResponse(.success(image)))
+                    } catch {
+                        await send(.imageFetchResponse(.failure(error)))
+                    }
+                }
+                
+            case let .imageFetchResponse(.success(image)):
+                state.imageTransform = ImageTransformFeature.State(inputImage: image)
+                return .none
+                
+            case .imageFetchResponse(.failure):
+                return .send(.delegate(.showToast(NekiToastItem("이미지를 불러오지 못했어요", style: .error))))
                 
             case .onTapBackButton:
                 return .run { _ in await dismiss() }
@@ -146,6 +181,10 @@ struct ArchivePhotoDetailFeature {
                 return .none
             }
         }
+        .ifLet(\.$imageTransform, action: \.imageTransform) {
+            ImageTransformFeature()
+        }
+        
     }
     
 }

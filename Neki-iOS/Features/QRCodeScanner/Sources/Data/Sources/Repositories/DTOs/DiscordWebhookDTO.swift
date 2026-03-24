@@ -31,9 +31,10 @@ public enum DiscordWebhookDTO {
                 description: "새로운 포토부스 브랜드이거나 파싱에 실패한 URL입니다.",
                 color: 16711680, // 빨강색 (Hex: FF0000)
                 fields: [
+                    Field(name: "🍎 Platform", value: "iOS", inline: true),
                     Field(name: "👤 User", value: "\(user.nickname) (ID: \(user.id))", inline: true),
                     Field(name: "🌐 Host", value: host, inline: true),
-                    Field(name: "🔗 Full URL", value: unsupportedURL.absoluteString, inline: false)
+                    Field(name: "🔗 Full URL", value: unsupportedURL.absoluteString, inline: false),
                 ]
             )
             

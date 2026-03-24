@@ -29,20 +29,6 @@ public struct FileManagerSharedImageRepository {
 // MARK: - FileManagerSharedImageRepository + SharedImageRepository
 
 extension FileManagerSharedImageRepository: SharedImageRepository {
-    public func fetchSharedImages(appGroupID: String) async throws -> [ImageUploadEntity] {
-        let fileURLs = try sharedImageURLs(for: appGroupID)
-        
-        return fileURLs.compactMap { url in
-            do {
-                let data = try Data(contentsOf: url)
-                return ImageUploadEntity(data: data, format: data.detectedImageFormat)
-            } catch {
-                Logger.data.error("공유된 이미지 읽기 실패: \(error.localizedDescription)")
-                return nil
-            }
-        }
-    }
-    
     public func fetchSharedImageURLs(appGroupID: String) async throws -> [URL] {
         return try sharedImageURLs(for: appGroupID)
     }

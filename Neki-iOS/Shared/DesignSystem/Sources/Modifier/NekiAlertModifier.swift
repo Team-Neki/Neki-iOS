@@ -37,10 +37,7 @@ struct NekiAlertModifier: ViewModifier {
                     .ignoresSafeArea()
                     .zIndex(1)
                     .transition(.opacity)
-                    .onTapGesture {
-                        // 필요 시 배경 탭으로 닫기 로직 추가 가능
-                        // isPresented.toggle()
-                    }
+                    .onTapGesture { isPresented.toggle() }
                 
                 NekiAlertModal(hasIcon: hasIcon) {
                     VStack(spacing: 4) {

@@ -25,33 +25,21 @@ extension ImageUploadClient: DependencyKey {
             },
             
             uploadConcurrentlyFromURLs: { fileURLs, mediaType in
-                return try await withThrowingTaskGroup(of: [Int].self) { group in
-                    var uploadedMediaIDs: [Int] = []
-                    let maxConcurrentTasks = 3
-                    var urlIterator = fileURLs.makeIterator()
-                    
-                    for _ in 0..<maxConcurrentTasks {
-                        guard let url = urlIterator.next() else { break }
-                        group.addTask {
-                            let data = try Data(contentsOf: url)
-                            let entity = ImageUploadEntity(data: data, format: data.detectedImageFormat)
-                            return try await repository.upload(items: [entity], mediaType: mediaType)
-                        }
+                var uploadedMediaIDs: [Int] = []
+                let chunkSize: Int = 3
+                let chunks = stride(from: 0, to: fileURLs.count, by: chunkSize).map { Array(fileURLs[$0..<min($0 + chunkSize, fileURLs.count)]) }
+                
+                for chunk in chunks {
+                    var entities: [ImageUploadEntity] = []
+                    for url in chunk {
+                        let data = try Data(contentsOf: url)
+                        entities.append(ImageUploadEntity(data: data, format: data.detectedImageFormat))
                     }
                     
-                    for try await resultIDs in group {
-                        uploadedMediaIDs.append(contentsOf: resultIDs)
-                        
-                        guard let nextURL = urlIterator.next() else { continue }
-                        group.addTask {
-                            let data = try Data(contentsOf: nextURL)
-                            let entity = ImageUploadEntity(data: data, format: data.detectedImageFormat)
-                            return try await repository.upload(items: [entity], mediaType: mediaType)
-                        }
-                    }
-                    
-                    return uploadedMediaIDs
+                    let resultIDs = try await repository.upload(items: entities, mediaType: mediaType)
+                    uploadedMediaIDs.append(contentsOf: resultIDs)
                 }
+                return uploadedMediaIDs
             },
             
             convert: { items in

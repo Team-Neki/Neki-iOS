@@ -102,7 +102,7 @@ struct QRCodeScanFeature {
                 
             case .closeExpiredAlertButtonTapped:
                 state.isExpiredAlertPresented = false
-                return .none
+                return .send(.addPhotoFromGalleryButtonTapped)
                 
                 // MARK: - Scanning Flow
             case .codeScanned(let urlString):

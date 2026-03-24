@@ -81,9 +81,9 @@ struct QRCodeScannerView: View {
         .nekiAlert(
             isPresented: $store.isExpiredAlertPresented,
             style: .plain,
-            title: "만료된 QR 코드예요.",
-            subtitle: "만료되지 않은 네컷사진만 저장할 수 있어요.",
-            confirmText: "확인",
+            title: "QR이 만료되었어요.",
+            subtitle: "일정 시간이 지나면 QR로는 더 이상 불러올 수 없어요. 이미 저장된 사진이 있다면 갤러리에서 추가해보세요.",
+            confirmText: "갤러리에서 추가하기",
             onConfirm: { store.send(.closeExpiredAlertButtonTapped) }
         )
         .fullScreenCover(isPresented: $store.isLoading) { LoadingView() }

@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		59235C592F64245A00198051 /* NekiShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 59235C4F2F64245A00198051 /* NekiShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */ = {isa = PBXBuildFile; productRef = 592F2C5D2F0508FE00802BB7 /* ComposableArchitecture */; };
 		592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */ = {isa = PBXBuildFile; productRef = 592F345B2F0E1F1700802BB7 /* NMapsMap */; };
 		597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 597033572F2482E1000B8194 /* KakaoSDKAuth */; };
@@ -15,16 +14,23 @@
 		5970335C2F2482E1000B8194 /* KakaoSDKCertCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335B2F2482E1000B8194 /* KakaoSDKCertCore */; };
 		5970335E2F2482E1000B8194 /* KakaoSDKCommon in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335D2F2482E1000B8194 /* KakaoSDKCommon */; };
 		597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335F2F2482E1000B8194 /* KakaoSDKUser */; };
+		598D191E2F72BABF002662DF /* NekiShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 59235C4F2F64245A00198051 /* NekiShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 59D1D21A2F168EE800F50EB5 /* Kingfisher */; };
 		6C0C1ACB2F6FD2E30037F650 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */; };
 		6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */; };
 		6C0C1ACF2F6FD2E30037F650 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */; };
-		6C3B4B8A2F65CA4B008449C1 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6C3B4B882F65C9B0008449C1 /* WebKit.framework */; };
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		59235C572F64245A00198051 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 6C4998D52EF7EF62006BE1DB /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 59235C4E2F64245A00198051;
+			remoteInfo = NekiShareExtension;
+		};
+		598D191F2F72BABF002662DF /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 6C4998D52EF7EF62006BE1DB /* Project object */;
 			proxyType = 1;
@@ -41,13 +47,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		59235C5A2F64245A00198051 /* Embed Foundation Extensions */ = {
+		598D19212F72BABF002662DF /* Embed Foundation Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				59235C592F64245A00198051 /* NekiShareExtension.appex in Embed Foundation Extensions */,
+				598D191E2F72BABF002662DF /* NekiShareExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -150,6 +156,13 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		598D191D2F72BABF002662DF /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		6C4998D42EF7EF62006BE1DB = {
 			isa = PBXGroup;
 			children = (
@@ -157,6 +170,7 @@
 				59235C502F64245A00198051 /* NekiShareExtension */,
 				6C4998DE2EF7EF62006BE1DB /* Products */,
 				596F67AD2F714EAB0071F0B7 /* Neki-iOSTests */,
+				598D191D2F72BABF002662DF /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -226,11 +240,13 @@
 				6C4998DA2EF7EF62006BE1DB /* Frameworks */,
 				6C4998DB2EF7EF62006BE1DB /* Resources */,
 				6C0C1AD92F6FD64B0037F650 /* Copy Firebase Plist */,
+				598D19212F72BABF002662DF /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				59235C582F64245A00198051 /* PBXTargetDependency */,
+				598D19202F72BABF002662DF /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				6C4998DF2EF7EF62006BE1DB /* Neki-iOS */,
@@ -379,6 +395,11 @@
 			isa = PBXTargetDependency;
 			target = 59235C4E2F64245A00198051 /* NekiShareExtension */;
 			targetProxy = 59235C572F64245A00198051 /* PBXContainerItemProxy */;
+		};
+		598D19202F72BABF002662DF /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 59235C4E2F64245A00198051 /* NekiShareExtension */;
+			targetProxy = 598D191F2F72BABF002662DF /* PBXContainerItemProxy */;
 		};
 		6C3B4B812F65C44C008449C1 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;

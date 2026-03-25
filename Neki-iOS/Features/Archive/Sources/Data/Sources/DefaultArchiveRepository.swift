@@ -42,7 +42,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
 
 extension DefaultArchiveRepository {
     func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool? = false) async throws {
-        let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo) }
+        let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: "QR") }
         let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
         let endpoint = ArchiveEndpoint.registerPhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)

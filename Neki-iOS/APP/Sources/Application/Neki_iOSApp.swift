@@ -25,11 +25,12 @@ struct Neki_iOSApp: App {
                 .onOpenURL { handleIncomingURL($0) }
         }
     }
-}
-
-private extension Neki_iOSApp {
-    func handleIncomingURL(_ url: URL) {
-        if url.scheme == "neki" { return }
+    
+    private func handleIncomingURL(_ url: URL) {
+        if url.scheme == "neki" {
+            store.send(.onOpenURL(url))
+            return
+        }
         
         if url.scheme == "https" || url.scheme == "http" {
             guard let host = url.host(), host == "neki.suitestudy.com" else { return }

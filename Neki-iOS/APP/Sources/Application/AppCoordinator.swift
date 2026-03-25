@@ -33,6 +33,7 @@ struct AppCoordinator {
             }
         }
         var pendingSessionStatus: UserSessionStatus?
+        var pendingShareAppGroupID: String?
         var lastVersionCheckedTime: Date?
         
         init() {
@@ -50,12 +51,14 @@ struct AppCoordinator {
         case onAppLaunched
         case didTapUpdateAlert
         case didTapLaterAlert
+        case onOpenURL(URL)
         
         // Internal Actions
         case splashSequenceCompleted(UserSessionStatus, AppVersionClient.VersionResult)
         case userSessionStatusChanged(UserSessionStatus)
         case scenePhaseChanged(ScenePhase)
         case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
+        case executePendingShareExtensionIfNeeded
         
         // Binding Actions
         case binding(BindingAction<State>)
@@ -108,6 +111,16 @@ struct AppCoordinator {
                     await send(.splashSequenceCompleted(finalStatus, finalVersionResult))
                 }
                 
+            case let .onOpenURL(url):
+                guard url.scheme == "neki" && url.host == "shareExtension" else { return .none }
+                guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                      let appGroupID = components.queryItems?.first(where: { $0.name == "appGroupID" })?.value
+                else { return .none }
+                state.pendingShareAppGroupID = appGroupID
+                
+                guard case .mainTab = state.route else { return .none }
+                return .send(.executePendingShareExtensionIfNeeded)
+                
             case let .scenePhaseChanged(phase):
                 guard phase == .active else { return .none }
                 if state.versionAlert == .updateNeeded { return .none }
@@ -154,6 +167,12 @@ struct AppCoordinator {
                 }
                 
                 return navigateToNextScreen(state: &state, sessionStatus: finalStatus)
+                
+            case .executePendingShareExtensionIfNeeded:
+                guard let appGroupID = state.pendingShareAppGroupID else { return .none }
+                guard case .mainTab = state.route else { return .none }
+                state.pendingShareAppGroupID = nil
+                return .send(.route(.mainTab(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))))
                 
             case .didTapUpdateAlert:
                 // TODO: 앱스토어 URL 필요
@@ -204,7 +223,7 @@ struct AppCoordinator {
             case let .route(.auth(.delegate(.moveToMainTab(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 state.route = .mainTab(.init(user: user))
-                return .none
+                return .send(.executePendingShareExtensionIfNeeded)
                 
             case .route(.mainTab(.delegate(.signedOut))):
                 state.$userSessionStatus.withLock { $0 = .signedOut }
@@ -237,7 +256,7 @@ struct AppCoordinator {
         switch sessionStatus {
         case .signedIn(let user):
             state.route = .mainTab(.init(user: user))
-            return .none
+            return .send(.executePendingShareExtensionIfNeeded)
             
         case .signedOut, .expired:
             if state.hasSeenOnboarding {

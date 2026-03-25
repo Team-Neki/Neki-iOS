@@ -23,9 +23,9 @@ struct NekiAlertModifier: ViewModifier {
     let hasIcon: Bool
     
     // 액션 클로저
-    let onConfirm: () -> Void
-    let onCancel: () -> Void
-    let onSecondary: () -> Void
+    let onConfirm: (() -> Void)?
+    let onCancel: (() -> Void)?
+    let onSecondary: (() -> Void)?
     
     func body(content: Content) -> some View {
         ZStack {
@@ -38,8 +38,11 @@ struct NekiAlertModifier: ViewModifier {
                     .zIndex(1)
                     .transition(.opacity)
                     .onTapGesture {
-                        // 필요 시 배경 탭으로 닫기 로직 추가 가능
-                        // isPresented.toggle()
+                        if let onCancel = onCancel {
+                            onCancel()
+                        } else {
+                            isPresented.toggle()
+                        }
                     }
                 
                 NekiAlertModal(hasIcon: hasIcon) {
@@ -89,7 +92,7 @@ struct NekiAlertModifier: ViewModifier {
     // 개별 버튼 컴포넌트
     private var confirmButton: some View {
         Button {
-            onConfirm()
+            onConfirm?()
         } label: {
             Text(confirmText)
                 .frame(maxWidth: .infinity)
@@ -100,7 +103,7 @@ struct NekiAlertModifier: ViewModifier {
     
     private var cancelButton: some View {
         Button {
-            onCancel()
+            onCancel?()
         } label: {
             Text(cancelText ?? "취소")
                 .frame(maxWidth: .infinity)
@@ -111,7 +114,7 @@ struct NekiAlertModifier: ViewModifier {
     
     private var secondaryButton: some View {
         Button {
-            onSecondary()
+            onSecondary?()
         } label: {
             Text(secondaryText ?? "선택")
                 .padding(.horizontal, 32)
@@ -136,9 +139,9 @@ public extension View {
         secondaryText: String? = nil,
         isProcessing: Bool = false,
         hasIcon: Bool = true,
-        onConfirm: @escaping () -> Void = {},
-        onCancel: @escaping () -> Void = {},
-        onSecondary: @escaping () -> Void = {}
+        onConfirm: (() -> Void)? = nil,
+        onCancel: (() -> Void)? = nil,
+        onSecondary: (() -> Void)? = nil
     ) -> some View {
         self.modifier(NekiAlertModifier(
             isPresented: isPresented,

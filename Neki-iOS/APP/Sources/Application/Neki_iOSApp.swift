@@ -27,7 +27,7 @@ struct Neki_iOSApp: App {
     }
     
     private func handleIncomingURL(_ url: URL) {
-        if url.scheme == "neki" {
+        if url.scheme == "neki" || url.scheme == "neki-dev" {
             store.send(.onOpenURL(url))
             return
         }

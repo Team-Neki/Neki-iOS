@@ -112,7 +112,7 @@ struct AppCoordinator {
                 }
                 
             case let .onOpenURL(url):
-                guard url.scheme == "neki" && url.host == "shareExtension" else { return .none }
+                guard (url.scheme == "neki" || url.scheme == "neki-dev") && url.host == "shareExtension" else { return .none }
                 guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
                       let appGroupID = components.queryItems?.first(where: { $0.name == "appGroupID" })?.value
                 else { return .none }

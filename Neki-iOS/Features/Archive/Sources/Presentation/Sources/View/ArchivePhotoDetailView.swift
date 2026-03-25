@@ -64,8 +64,10 @@ struct ArchivePhotoDetailView: View {
             left: { NekiToolBar.back { store.send(.onTapBackButton) } },
             center: { NekiToolBar.textCenter(store.formattedDate) },
             right: {
+                #if DEBUG
                 NekiToolBar.icon(UIImage(systemName: "wand.and.stars")!,
                                  action: { store.send(.onTapTransform) })
+                #endif
             }
         )
         .nekiAlert(

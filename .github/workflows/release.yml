@@ -63,6 +63,7 @@ jobs:
         run: bundle exec fastlane release
         env:
           APP_IDENTIFIER: ${{ secrets.APP_IDENTIFIER }}
+          SHARE_EXTENSION_APP_IDENTIFIER: ${{ secrets.SHARE_EXTENSION_APP_IDENTIFIER }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           FASTLANE_ITC_TEAM_ID: ${{ secrets.FASTLANE_ITC_TEAM_ID }}

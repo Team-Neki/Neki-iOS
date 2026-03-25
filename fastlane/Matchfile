@@ -4,7 +4,7 @@ git_branch('release')
 storage_mode("git")
 type("appstore")
 
-app_identifier(ENV["APP_IDENTIFIER"])
+app_identifier([ENV["APP_IDENTIFIER"], ENV["SHARE_EXTENSION_APP_IDENTIFIER"]])
 username(ENV['APPLE_ID'])
 team_id(ENV['TEAM_ID'])
 

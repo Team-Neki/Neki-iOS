@@ -142,3 +142,6 @@ iOSInjectionProject/
 *.p12
 *.mobileprovision
 *.certSigningRequest
+
+# Firebase
+GoogleService-Info.plist

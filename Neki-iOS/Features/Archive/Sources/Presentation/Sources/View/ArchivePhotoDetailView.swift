@@ -43,9 +43,32 @@ struct ArchivePhotoDetailView: View {
                 )
             }
         }
+        .fullScreenCover(
+            item: $store.scope(state: \.imageTransform, action: \.imageTransform)
+        ) { transformStore in
+            NavigationStack {
+                ImageTransformView(store: transformStore)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button(action: {
+                                transformStore.send(.closeButtonTapped)
+                            }) {
+                                Image(systemName: "xmark")
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                    }
+            }
+        }
         .nekiToolbar(
             left: { NekiToolBar.back { store.send(.onTapBackButton) } },
-            center: { NekiToolBar.textCenter(store.formattedDate) }
+            center: { NekiToolBar.textCenter(store.formattedDate) },
+            right: {
+                #if DEBUG
+                NekiToolBar.icon(UIImage(systemName: "wand.and.stars")!,
+                                 action: { store.send(.onTapTransform) })
+                #endif
+            }
         )
         .nekiAlert(
             isPresented: $showDeleteAlert,

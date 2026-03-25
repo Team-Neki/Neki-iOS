@@ -14,31 +14,38 @@ public struct TermsAgreementView: View {
     @Bindable var store: StoreOf<TermsAgreementFeature>
     
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Image(.iconGpicAgreement)
+        ZStack {
+            VStack(alignment: .leading, spacing: 12) {
+                Image(.iconGpicAgreement)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                
+                terms
+                    .padding(.horizontal, 20)
+                
+                Spacer()
+                
+                Button {
+                    store.send(.confirmButtonTapped)
+                } label: {
+                    Text("다음으로")
+                }
+                .buttonStyle(.nekiCTA())
+                .disabled(store.isConfirmButtonEnabled == false)
                 .padding(.horizontal, 20)
-                .padding(.top, 12)
-            
-            terms
-                .padding(.horizontal, 20)
-            
-            Spacer()
-            
-            Button {
-                store.send(.confirmButtonTapped)
-            } label: {
-                Text("다음으로")
+                
             }
-            .buttonStyle(.nekiCTA())
-            .disabled(store.isConfirmButtonEnabled == false)
-            .padding(.horizontal, 20)
             
+            if store.isLoading {
+                LoadingView()
+            }
         }
         .nekiToolbar {
             NekiToolBar.back { dismiss() }
         } center: {
             NekiToolBar.textCenter("이용약관")
         }
+        .task { await store.send(.onAppear).finish() }
     }
     
     private var terms: some View {
@@ -78,28 +85,26 @@ public struct TermsAgreementView: View {
             }
             
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(TermsType.allCases) { type in
-                    HStack(alignment: .center, spacing: 0) {
+                ForEach(store.agreements) { agreement in
+                    HStack(alignment: .center, spacing: .zero) {
                         Button {
-                            store.send(.toggleAgreement(type))
+                            store.send(.toggleAgreement(agreement))
                         } label: {
-                            HStack(alignment: .center, spacing: 0) {
-                                if let agreement = store.agreements[id: type.id] {
-                                    Image(agreement.isAgreed ? .iconCheckmark : .iconCheckmarkGray)
-                                        .frame(width: 44, height: 44)
-                                        .scaledToFit()
+                            HStack(alignment: .center, spacing: .zero) {
+                                Image(agreement.isAgreed ? .iconCheckmark : .iconCheckmarkGray)
+                                    .frame(width: 44, height: 44)
+                                    .scaledToFit()
+                                
+                                HStack(alignment: .center, spacing: 2) {
+                                    Text(agreement.term.isRequired ? "(필수)" : "(선택)")
+                                        .nekiFont(.body14Medium)
+                                        .foregroundStyle(.gray500)
                                     
-                                    HStack(alignment: .center, spacing: 2) {
-                                        Text(agreement.isRequired ? "(필수)" : "(선택)")
-                                            .nekiFont(.body14Medium)
-                                            .foregroundStyle(.gray500)
-                                        
-                                        Text(type.displayName)
-                                            .nekiFont(.body16Medium)
-                                            .foregroundStyle(.gray900)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .padding(.vertical)
-                                    }
+                                    Text(agreement.term.title)
+                                        .nekiFont(.body16Medium)
+                                        .foregroundStyle(.gray900)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.vertical)
                                 }
                             }
                         }
@@ -107,7 +112,7 @@ public struct TermsAgreementView: View {
                         Spacer()
                         
                         Button {
-                            store.send(.termPageLinkTapped(type))
+                            store.send(.termPageLinkTapped(agreement))
                         } label: {
                             Image(.iconChevronRight)
                                 .resizable()
@@ -116,7 +121,6 @@ public struct TermsAgreementView: View {
                     }
                 }
             }
-            
         }
     }
 }

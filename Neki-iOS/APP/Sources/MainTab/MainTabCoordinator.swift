@@ -153,7 +153,7 @@ struct MainTabCoordinator {
                 }
                 
             case .qrScannerPresented:
-                state.destination = .qrScan(QRCodeScanFeature.State())
+                state.destination = .qrScan(QRCodeScanFeature.State(user: state.user))
                 return .none
                 
             case .presentPermissionAlert:

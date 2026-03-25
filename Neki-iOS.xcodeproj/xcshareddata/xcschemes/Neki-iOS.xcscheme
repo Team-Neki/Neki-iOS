@@ -35,7 +35,7 @@
             parallelizable = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "6C4998E92EF7EF64006BE1DB"
+               BlueprintIdentifier = "6C3B4B7B2F65C44C008449C1"
                BuildableName = "Neki-iOSTests.xctest"
                BlueprintName = "Neki-iOSTests"
                ReferencedContainer = "container:Neki-iOS.xcodeproj">

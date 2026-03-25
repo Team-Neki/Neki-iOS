@@ -11,6 +11,7 @@ import PhotosUI
 
 public struct ImageUploadClient {
     public var upload: @Sendable (_ data: [ImageUploadEntity], _ mediaType: ImageMediaType) async throws -> [Int]
+    public var uploadConcurrentlyFromURLs: @Sendable (_ fileURLs: [URL], _ mediaType: ImageMediaType) async throws -> [Int]
     public var convert: @Sendable (_ items: [PhotosPickerItem]) async -> [ImageUploadEntity]
 }
 
@@ -22,13 +23,31 @@ extension ImageUploadClient: DependencyKey {
             upload: { items, mediaType in
                 return try await repository.upload(items: items, mediaType: mediaType)
             },
+            
+            uploadConcurrentlyFromURLs: { fileURLs, mediaType in
+                var uploadedMediaIDs: [Int] = []
+                let chunkSize: Int = 3
+                let chunks = stride(from: 0, to: fileURLs.count, by: chunkSize).map { Array(fileURLs[$0..<min($0 + chunkSize, fileURLs.count)]) }
+                
+                for chunk in chunks {
+                    var entities: [ImageUploadEntity] = []
+                    for url in chunk {
+                        let data = try Data(contentsOf: url)
+                        entities.append(ImageUploadEntity(data: data, format: data.detectedImageFormat))
+                    }
+                    
+                    let resultIDs = try await repository.upload(items: entities, mediaType: mediaType)
+                    uploadedMediaIDs.append(contentsOf: resultIDs)
+                }
+                return uploadedMediaIDs
+            },
+            
             convert: { items in
                 await withTaskGroup(of: ImageUploadEntity?.self) { group in
                     for item in items {
                         group.addTask {
                             guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
-                            let format = data.detectedImageFormat
-                            return ImageUploadEntity(data: data, format: format)
+                            return ImageUploadEntity(data: data, format: data.detectedImageFormat)
                         }
                     }
                     
@@ -37,7 +56,6 @@ extension ImageUploadClient: DependencyKey {
                         guard let result else { continue }
                         results.append(result)
                     }
-                    
                     return results
                 }
             }

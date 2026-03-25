@@ -22,10 +22,12 @@ public enum RegisterPhotoDTO {
     public struct RegisterPhotoData: Encodable {
         let mediaID: Int
         let memo: String?
+        let uploadMethod: String
 
         enum CodingKeys: String, CodingKey {
             case mediaID = "mediaId"
             case memo
+            case uploadMethod
         }
     }
 

@@ -39,6 +39,7 @@ private extension NearPhotoBoothListSheet {
             }
             .scrollIndicators(.never)
             .contentMargins(.horizontal, 20, for: .scrollContent)
+            .scrollDisabled(false)
         } header: {
             Text("네컷 사진 브랜드")
                 .frame(maxWidth: .infinity, alignment: .leading)

@@ -14,6 +14,8 @@ import os
 struct QRCodeScanFeature {
     @ObservableState
     struct State {
+        let user: User
+        
         var isLightOn: Bool = false
         var isLoading: Bool = false
         
@@ -100,16 +102,17 @@ struct QRCodeScanFeature {
                 
             case .closeExpiredAlertButtonTapped:
                 state.isExpiredAlertPresented = false
-                return .none
+                return .send(.addPhotoFromGalleryButtonTapped)
                 
                 // MARK: - Scanning Flow
             case .codeScanned(let urlString):
                 guard state.isLoading == false, state.isCameraActive else { return .none }
+                let user = state.user
                 state.isLoading = true
                 Logger.presentation.debug("QR 스캔 감지: \(urlString)")
                 
                 return .run { send in
-                    await send(.parseQRResult(Result { try await qrScannerClient.parse(urlString) }))
+                    await send(.parseQRResult(Result { try await qrScannerClient.parse(urlString, user) }))
                 }
                 
             case let .parseQRResult(.success(parsed)):

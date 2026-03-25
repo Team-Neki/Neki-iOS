@@ -12,7 +12,7 @@ import ComposableArchitecture
 struct QRScannerClient {
     var checkAuthorizationStatus: @Sendable () -> AVAuthorizationStatus
     var requestAccess: @Sendable () async -> Bool
-    var parse: @Sendable (_ urlString: String) async throws -> ParsedQRResult
+    var parse: @Sendable (_ urlString: String, User) async throws -> ParsedQRResult
     var processImage: @Sendable (_ data: Data) async throws -> [Int]
 }
 
@@ -25,9 +25,9 @@ extension QRScannerClient: DependencyKey {
             AVCaptureDevice.authorizationStatus(for: .video)
         } requestAccess: {
             await AVCaptureDevice.requestAccess(for: .video)
-        } parse: { urlString in
+        } parse: { urlString, user in
             guard let url = URL(string: urlString) else { throw QRParseError.invalidURL }
-            return try await qrCodeScanRepository.parse(url)
+            return try await qrCodeScanRepository.parse(url, user: user)
         } processImage: { data in
             let processed = await ImageDownsamplingProcessor.process(data: data)
             guard let imageData = processed?.data else { throw QRParseError.parsingFailed }

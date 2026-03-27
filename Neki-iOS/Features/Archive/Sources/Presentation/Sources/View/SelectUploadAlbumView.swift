@@ -37,6 +37,10 @@ struct SelectUploadAlbumView: View {
                     .transition(.move(edge: .trailing))
                 }
             }
+            
+            if store.isLoading {
+                LoadingView(message: "사진을 업로드하고 있어요.")
+            }
         }
         .animation(.easeInOut, value: store.viewMode)
     }

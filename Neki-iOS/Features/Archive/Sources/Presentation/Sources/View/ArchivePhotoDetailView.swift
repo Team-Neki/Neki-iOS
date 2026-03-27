@@ -100,21 +100,15 @@ extension ArchivePhotoDetailView {
         )
     }
     
-    // 사진 영역
     private var photoTabView: some View {
         TabView(selection: $store.currentItemID) {
             ForEach(store.photos) { item in
-                KFImage(item.imageURL)
-                    .resizable()
-                    .placeholder {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .retry(maxCount: 3, interval: .seconds(5))
-                    .cancelOnDisappear(true)
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .tag(item.id)
+                ZoomableImageView(
+                    imageURL: item.imageURL,
+                    isCurrent: store.currentItemID == item.id
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .tag(item.id)
             }
         }
         .tabViewStyle(.page(indexDisplayMode: .never))

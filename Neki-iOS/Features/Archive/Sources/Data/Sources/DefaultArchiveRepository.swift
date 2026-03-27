@@ -41,8 +41,10 @@ final actor DefaultArchiveRepository: ArchiveRepository {
 // MARK: - Create Logic
 
 extension DefaultArchiveRepository {
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool? = false) async throws {
-        let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: "QR") }
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], favorite: Bool? = false) async throws {
+        let uploadData = uploads.map {
+            RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: $0.uploadMethod.rawValue)
+        }
         let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
         let endpoint = ArchiveEndpoint.registerPhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)

@@ -10,7 +10,7 @@ import Foundation
 protocol ArchiveRepository: Sendable {
     // Create
     func addFolder(name: String) async throws -> Int
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool?) async throws
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], favorite: Bool?) async throws
     
     // Read
     func fetchPhotoList(folderID: Int?, size: Int?, sortOrder: String?) async throws -> [PhotoEntity]
@@ -26,4 +26,10 @@ protocol ArchiveRepository: Sendable {
     // Delete
     func deletePhotoList(photoIDs: [Int]) async throws
     func deleteFolders(folderIDs: [Int], deletePhotos: Bool) async throws
+}
+
+public enum PhotoUploadMethod: String, Sendable {
+    case qr = "QR"
+    case gallery = "GALLERY"
+    case share = "SHARE"
 }

@@ -14,7 +14,7 @@ struct ArchiveClient {
     public var fetchPhotoList: (_ folderId: Int?, _ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
     public var getAlbumList: () async throws -> [AlbumEntity]
     public var deletePhotoList: (_ photoIds: [Int]) async throws -> Void
-    public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?)], _ favorite: Bool?) async throws -> Void
+    public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], _ favorite: Bool?) async throws -> Void
     public var getFavoriteAlbumInfo: () async throws -> FavoriteAlbumEntity
     public var addFolder: (_ name: String) async throws -> Int
     public var deleteFolders: (_ folderIDs: [Int], _ deletePhotos: Bool) async throws -> Void

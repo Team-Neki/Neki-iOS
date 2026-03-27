@@ -151,8 +151,8 @@ struct ArchiveAlbumDetailFeature {
                     await send(.registerPhotosResponse(
                         Result {
                             let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
-                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
-                            try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads, favorite: false)
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.qr) }
+                            try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads ,favorite: false)
                         }
                     ))
                 }

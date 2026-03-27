@@ -256,7 +256,7 @@ struct ArchiveFeature {
                 
             case let .addPhotoFromQRScanner(imageID):
                 return .run { send in
-                    try await archiveClient.registerPhotos(nil, [(imageID, nil)], false)
+                    try await archiveClient.registerPhotos(nil, [(imageID, nil, PhotoUploadMethod.qr)], false)
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
                 } catch: { error, send in

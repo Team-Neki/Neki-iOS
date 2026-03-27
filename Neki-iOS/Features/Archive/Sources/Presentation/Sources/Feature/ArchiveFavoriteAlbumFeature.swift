@@ -174,7 +174,8 @@ struct ArchiveFavoriteAlbumFeature {
                         imageURLString: entity.imageURL,
                         isFavorite: true,
                         date: entity.createdAt.toISO8601Date(),
-                        folderId: currentAlbumId
+                        folderId: currentAlbumId,
+                        memo: entity.memo ?? ""
                     )
                 }
                 

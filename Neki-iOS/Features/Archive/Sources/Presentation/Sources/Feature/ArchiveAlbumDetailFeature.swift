@@ -221,7 +221,8 @@ struct ArchiveAlbumDetailFeature {
                         imageURLString: entity.imageURL,
                         isFavorite: entity.isfavorite,
                         date: entity.createdAt.toISO8601Date(),
-                        folderId: currentAlbumId
+                        folderId: currentAlbumId,
+                        memo: entity.memo ?? ""
                     )
                 }
                 

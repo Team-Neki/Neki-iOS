@@ -222,7 +222,8 @@ extension DefaultArchiveRepository {
                         folderID: oldItem.folderID,
                         isfavorite: request,
                         contentType: oldItem.contentType,
-                        createdAt: oldItem.createdAt
+                        createdAt: oldItem.createdAt,
+                        memo: oldItem.memo
                     )
                     list[index] = newItem
                     photoCache[key] = list
@@ -251,6 +252,53 @@ extension DefaultArchiveRepository {
         let _ = try await networkProvider.request(endpoint: endpoint)
         
         self.isAlbumCacheDirty = true
+    }
+    
+    func updatePhotoMemo(photoID: Int, memo: String) async throws {
+        var capturedAt = ""
+        if let cachedItem = photoCache.values.flatMap({ $0 }).first(where: { $0.photoID == photoID }) {
+            capturedAt = cachedItem.createdAt
+        } else if let cachedItem = favoritePhotoCache.first(where: { $0.photoID == photoID }) {
+            capturedAt = cachedItem.createdAt
+        } else {
+            capturedAt = Date().ISO8601Format()
+        }
+        
+        let requestDTO = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
+        let endpoint = ArchiveEndpoint.updateMemo(photoID: photoID, request: requestDTO)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        for (key, var list) in photoCache {
+            if let index = list.firstIndex(where: { $0.photoID == photoID }) {
+                let oldItem = list[index]
+                let newItem = PhotoEntity(
+                    photoID: oldItem.photoID,
+                    imageURL: oldItem.imageURL,
+                    folderID: oldItem.folderID,
+                    isfavorite: oldItem.isfavorite,
+                    contentType: oldItem.contentType,
+                    createdAt: oldItem.createdAt,
+                    memo: memo
+                )
+                list[index] = newItem
+                photoCache[key] = list
+            }
+        }
+        
+        if let index = favoritePhotoCache.firstIndex(where: { $0.photoID == photoID }) {
+            let oldItem = favoritePhotoCache[index]
+            let newItem = PhotoEntity(
+                photoID: oldItem.photoID,
+                imageURL: oldItem.imageURL,
+                folderID: oldItem.folderID,
+                isfavorite: oldItem.isfavorite,
+                contentType: oldItem.contentType,
+                createdAt: oldItem.createdAt,
+                memo: memo
+            )
+            favoritePhotoCache[index] = newItem
+        }
+        
     }
 }
 

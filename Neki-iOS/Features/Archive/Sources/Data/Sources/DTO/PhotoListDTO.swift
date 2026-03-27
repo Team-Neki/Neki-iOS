@@ -29,7 +29,8 @@ public enum PhotoListDTO {
                     folderID: $0.folderID,
                     isfavorite: $0.favorite,
                     contentType: $0.contentType,
-                    createdAt: $0.createdAt
+                    createdAt: $0.createdAt,
+                    memo: ""    // TODO: 서버 반영되면 수정
                 )
             }
         }

@@ -84,7 +84,7 @@ struct ArchivePhotoDetailFeature {
         Reduce { state, action in
             switch action {
                 
-            // MARK: - 메모 조회 모드 로직
+                // MARK: - 메모 조회 모드 로직
             case .toggleMemoVisibility:
                 state.isMemoVisible.toggle()
                 if !state.isMemoVisible {
@@ -96,7 +96,7 @@ struct ArchivePhotoDetailFeature {
                 state.isMemoExpanded = isExpanded
                 return .none
                 
-            // MARK: - 메모 편집 모드 로직
+                // MARK: - 메모 편집 모드 로직
             case .startMemoEditing:
                 state.isMemoEditing = true
                 state.isMemoVisible = true
@@ -106,15 +106,25 @@ struct ArchivePhotoDetailFeature {
                 
             case .cancelMemoEditing:
                 state.isMemoEditing = false
-                 state.isMemoExpanded = false
+                state.isMemoExpanded = false
                 return .none
                 
             case .doneMemoEditing:
+                // 100자 자르기
                 let limitedText = String(state.editingMemoText.prefix(100))
-                state.photos[id: state.currentItemID]?.memo = limitedText
+                let photoID = state.currentItemID
+                
+                state.photos[id: photoID]?.memo = limitedText
                 state.isMemoEditing = false
                 state.isMemoExpanded = false
-                return .none
+                
+                return .run { send in
+                    do {
+                        try await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
+                    } catch {
+                        await send(.delegate(.showToast(NekiToastItem("메모 저장에 실패했어요", style: .error))))
+                    }
+                }
                 
             case .clearAllMemoEditing:
                 state.editingMemoText = ""

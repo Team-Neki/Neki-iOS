@@ -19,6 +19,7 @@ public enum ArchiveEndpoint {
     case toggleFavorite(photoID: Int, request: ToggleFavoriteDTO)
     case excludePhotosInAlbum(albumID: Int, request: DeletePhotoRequestDTO)
     case editFolderName(albumID: Int, request: FolderDTO.Request)
+    case updateMemo(photoID: Int, request: UpdateMemoRequestDTO)
 }
 
 extension ArchiveEndpoint: Endpoint {
@@ -58,6 +59,8 @@ extension ArchiveEndpoint: Endpoint {
             return "folders/\(albumID)/photos"
         case .editFolderName(let albumID, _):
             return "folders/\(albumID)"
+        case .updateMemo(let id, _):
+            return "photos/\(id)"
         }
     }
     
@@ -117,6 +120,8 @@ extension ArchiveEndpoint: Endpoint {
             return .delete
         case .editFolderName:
             return .patch
+        case .updateMemo:
+            return .put
         }
     }
     
@@ -143,6 +148,8 @@ extension ArchiveEndpoint: Endpoint {
         case .excludePhotosInAlbum(_, let request):
             return request
         case .editFolderName(_, let request):
+            return request
+        case .updateMemo(_, let request):
             return request
         }
     }

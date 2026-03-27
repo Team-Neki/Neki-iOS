@@ -32,10 +32,27 @@ struct ArchivePhotoDetailFeature {
         }
         
         var isLoading: Bool = false
+        
+        // MARK: - Memo States
+        
+        var isMemoVisible: Bool = false  // 단순 조회 모드 가시성
+        var isMemoExpanded: Bool = false // 단순 조회 모드 더 보기(확장) 여부
+        var isMemoEditing: Bool = false // 편집 모드 여부
+        var editingMemoText: String = "" // 편집 중인 임시 텍스트
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        
+        // 메모 조회 모드 액션
+        case toggleMemoVisibility
+        case toggleMemoExpanded(Bool)
+        
+        // 메모 편집 모드 액션
+        case startMemoEditing
+        case cancelMemoEditing
+        case doneMemoEditing
+        case clearAllMemoEditing
         
         case onTapTransform
         case imageFetchResponse(Result<UIImage, Error>)
@@ -66,6 +83,42 @@ struct ArchivePhotoDetailFeature {
         
         Reduce { state, action in
             switch action {
+                
+            // MARK: - 메모 조회 모드 로직
+            case .toggleMemoVisibility:
+                state.isMemoVisible.toggle()
+                if !state.isMemoVisible {
+                    state.isMemoExpanded = false
+                }
+                return .none
+                
+            case let .toggleMemoExpanded(isExpanded):
+                state.isMemoExpanded = isExpanded
+                return .none
+                
+            // MARK: - 메모 편집 모드 로직
+            case .startMemoEditing:
+                state.isMemoEditing = true
+                state.isMemoVisible = true
+                state.isMemoExpanded = true
+                state.editingMemoText = state.currentItem?.memo ?? ""
+                return .none
+                
+            case .cancelMemoEditing:
+                state.isMemoEditing = false
+                 state.isMemoExpanded = false
+                return .none
+                
+            case .doneMemoEditing:
+                let limitedText = String(state.editingMemoText.prefix(100))
+                state.photos[id: state.currentItemID]?.memo = limitedText
+                state.isMemoEditing = false
+                state.isMemoExpanded = false
+                return .none
+                
+            case .clearAllMemoEditing:
+                state.editingMemoText = ""
+                return .none
                 
             case .onTapTransform:
                 guard let url = state.currentItem?.imageURL else { return .none }

@@ -42,4 +42,22 @@ extension Data {
         else { return nil }
         return UTType(typeIdentifier as String)
     }
+    
+    var imageDimensions: (width: Int, height: Int)? {
+        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        
+        guard let source = CGImageSourceCreateWithData(self as CFData, options as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options as CFDictionary) as? [CFString: Any] else {
+            return nil
+        }
+        
+        var width = properties[kCGImagePropertyPixelWidth] as? Int
+        var height = properties[kCGImagePropertyPixelHeight] as? Int
+        
+        if let w = width, let h = height {
+            return (w, h)
+        }
+        
+        return nil
+    }
 }

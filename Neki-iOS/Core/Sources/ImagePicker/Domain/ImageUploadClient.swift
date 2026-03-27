@@ -33,7 +33,17 @@ extension ImageUploadClient: DependencyKey {
                     var entities: [ImageUploadEntity] = []
                     for url in chunk {
                         let data = try Data(contentsOf: url)
-                        entities.append(ImageUploadEntity(data: data, format: data.detectedImageFormat))
+                        let dimensions = data.imageDimensions
+                        
+                        entities.append(
+                            ImageUploadEntity(
+                                data: data,
+                                format: data.detectedImageFormat,
+                                width: dimensions?.width,
+                                height: dimensions?.height,
+                                size: data.count
+                            )
+                        )
                     }
                     
                     let resultIDs = try await repository.upload(items: entities, mediaType: mediaType)
@@ -47,7 +57,15 @@ extension ImageUploadClient: DependencyKey {
                     for item in items {
                         group.addTask {
                             guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
-                            return ImageUploadEntity(data: data, format: data.detectedImageFormat)
+                            let dimensions = data.imageDimensions
+                            
+                            return ImageUploadEntity(
+                                data: data,
+                                format: data.detectedImageFormat,
+                                width: dimensions?.width,
+                                height: dimensions?.height,
+                                size: data.count
+                            )
                         }
                     }
                     

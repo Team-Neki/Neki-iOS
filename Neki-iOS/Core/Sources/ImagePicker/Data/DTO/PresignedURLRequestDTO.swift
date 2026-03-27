@@ -15,4 +15,5 @@ public struct PresignedURLRequestData: Encodable {
     public let filename: String
     public let contentType: String
     public let mediaType: String
+    public let width, height, size: Int?
 }

@@ -8,6 +8,7 @@
 import ComposableArchitecture
 import SwiftUI
 import PhotosUI
+import ImageIO
 
 @Reducer
 public struct ImagePickerFeature {
@@ -60,7 +61,7 @@ public struct ImagePickerFeature {
                 state.isLoading = true
                 
                 return .run { send in
-                    let entities = await imageUploadClient.convert(items)
+                    let entities = await Self.convert(items: items)
                     await send(.imageConverted(entities))
                 }
                 
@@ -101,7 +102,80 @@ public struct ImagePickerFeature {
                 
             default:
                 return .none
+                
             }
         }
+    }
+}
+
+
+// MARK: - ImagePickerFeature Private Func
+
+private extension ImagePickerFeature {
+    static func convert(items: [PhotosPickerItem]) async -> [ImageUploadEntity] {
+        await withTaskGroup(of: ImageUploadEntity?.self) { group in
+            for item in items {
+                group.addTask {
+                    guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
+                    let dimensions = extractDimensions(from: data)
+                    let format = detectFormat(from: data)
+                    
+                    return ImageUploadEntity(
+                        data: data,
+                        format: format,
+                        width: dimensions?.width,
+                        height: dimensions?.height,
+                        size: data.count
+                    )
+                }
+            }
+            
+            var results: [ImageUploadEntity] = []
+            for await result in group {
+                guard let result else { continue }
+                results.append(result)
+            }
+            return results
+        }
+    }
+    
+    static func detectFormat(from data: Data) -> ImageFileFormat {
+        // 데이터가 너무 짧으면 기본값(JPEG) 반환
+        guard data.count > 12 else { return .jpeg }
+        
+        let header = data.prefix(12)
+        let firstByte = header[0]
+        
+        // PNG 확인 (0x89로 시작)
+        if firstByte == 0x89 {
+            return .png
+        }
+        
+        // WebP 확인
+        // WebP 파일 구조:
+        // Offset 0-3: "RIFF" (0x52, 0x49, 0x46, 0x46)
+        // Offset 8-11: "WEBP" (0x57, 0x45, 0x42, 0x50)
+        if header[0] == 0x52 && header[1] == 0x49 && header[2] == 0x46 && header[3] == 0x46 && // "RIFF"
+            header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50 { // "WEBP"
+            return .webp
+        }
+        
+        // 나머지는 JPEG로
+        return .jpeg
+    }
+    
+    static func extractDimensions(from data: Data) -> (width: Int, height: Int)? {
+        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        
+        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options as CFDictionary) as? [CFString: Any] else {
+            return nil
+        }
+        
+        var width = properties[kCGImagePropertyPixelWidth] as? Int
+        var height = properties[kCGImagePropertyPixelHeight] as? Int
+        
+        if let w = width, let h = height { return (w, h) }
+        return nil
     }
 }

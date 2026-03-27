@@ -176,7 +176,7 @@ struct AppCoordinator {
                 
             case .didTapUpdateAlert:
                 return .run { _ in
-                    let appStoreURL = URL(string: "https://neki.suitestudy.com")!
+                    let appStoreURL = URL(string: "https://apps.apple.com/kr/app/neki/id6757490609")!
                     await openURL(appStoreURL)
                 }
                 

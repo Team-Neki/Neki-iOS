@@ -10,6 +10,7 @@ import SwiftUI
 
 @Reducer
 struct ArchiveFavoriteAlbumFeature {
+    
     @ObservableState
     struct State {
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
@@ -20,7 +21,7 @@ struct ArchiveFavoriteAlbumFeature {
         var selectedIDs: Set<Int> = []
         var isSelectionMode: Bool = false
         
-        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
         
         var isFetchingPhotos: Bool = false
@@ -32,7 +33,6 @@ struct ArchiveFavoriteAlbumFeature {
         case binding(BindingAction<State>)
         
         case onAppear
-        
         case toggleDropDownMenu
         case closeDropDownMenu
         
@@ -47,21 +47,19 @@ struct ArchiveFavoriteAlbumFeature {
         case onTapSelectButton
         case onTapCancelSelectButton
         
-        // 기능 액션
         case onTapDownloadButton
         case downloadImagesResponse(successCount: Int)
         
         case imagePicker(ImagePickerFeature.Action)
-        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
-        case processUploadImages(imageIDs: [Int])
-        case registerPhotos(imageIDs: [Int])
+        
+        case processUploadImages(entities: [ImageUploadEntity])
+        case registerPhotos(entities: [ImageUploadEntity])
         case registerPhotosResponse(Result<Void, Error>)
         
         case onTapDeleteButton
         case deletePhotos
         case deletePhotosResponse(Result<Void, Error>)
         
-        // 네비게이션
         case imageTapped(ArchiveImageItem)
         
         case delegate(Delegate)
@@ -72,6 +70,7 @@ struct ArchiveFavoriteAlbumFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
@@ -118,34 +117,25 @@ struct ArchiveFavoriteAlbumFeature {
                 state.photos[id: photoID]?.isFavorite.toggle()
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
-                // MARK: - Image Upload
+            // MARK: - Image Upload
                 
-            case .imagePicker(.uploadStarted):
+            case let .imagePicker(.delegate(.imagesConverted(entities))):
+                state.showDropDownMenu = false
+                return .send(.processUploadImages(entities: entities))
+                
+            case let .processUploadImages(entities):
+                state.isLoading = false
+                guard !entities.isEmpty else { return .none }
                 state.isLoading = true
-                return .send(.closeDropDownMenu)
+                return .send(.registerPhotos(entities: entities))
                 
-            case let .imagePicker(.uploadCompleted(ids)):
-                return .send(.processUploadImages(imageIDs: ids))
-                
-            case .imagePicker(.uploadFailed):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
-                
-            case let .processUploadImages(imageIDs):
-                state.isLoading = false
-                guard !imageIDs.isEmpty else { return .none }
-                return .send(.registerPhotos(imageIDs: imageIDs))
-                
-            case let .registerPhotos(imageIDs):
-                return .run { [mediaIds = imageIDs] send in
+            case let .registerPhotos(entities):
+                return .run { send in
                     await send(.registerPhotosResponse(
                         Result {
+                            let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
                             let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
-                            try await archiveClient.registerPhotos(
-                                folderId: nil,
-                                uploads: uploads,
-                                favorite: true
-                            )
+                            try await archiveClient.registerPhotos(folderId: nil, uploads: uploads, favorite: true)
                         }
                     ))
                 }

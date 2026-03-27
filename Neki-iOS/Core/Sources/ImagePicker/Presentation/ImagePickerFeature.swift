@@ -19,32 +19,36 @@ public struct ImagePickerFeature {
         public var maxCount: Int
         public let mediaType: ImageMediaType
         
+        public var autoUpload: Bool
+        
         public var selectedImages: IdentifiedArrayOf<ImageUploadEntity> = []
         public var pickerItems: [PhotosPickerItem] = []
         public var isLoading: Bool = false
         
         public var remainingCount: Int { max(.zero, maxCount - selectedImages.count) }
         
-        public init(maxCount: Int = 10, mediaType: ImageMediaType) {
+        public init(maxCount: Int = 10, mediaType: ImageMediaType, autoUpload: Bool = true) {
             self.maxCount = maxCount
             self.mediaType = mediaType
+            self.autoUpload = autoUpload
         }
     }
     
     public enum Action: BindableAction {
         case binding(BindingAction<State>)
         
-        // User Action
         case pickerItemsChanged([PhotosPickerItem])
-        
-        // Internal Action (Data Load Complete)
         case imageConverted([ImageUploadEntity])
         
-        // Upload Action
         case requestUpload
         case uploadStarted
         case uploadCompleted([Int])
         case uploadFailed
+        
+        case delegate(Delegate)
+        public enum Delegate {
+            case imagesConverted([ImageUploadEntity])
+        }
     }
     
     @Dependency(\.imageUploadClient) var imageUploadClient
@@ -70,7 +74,15 @@ public struct ImagePickerFeature {
                 if remaining > 0 { state.selectedImages.append(contentsOf: newEntities.prefix(remaining)) }
                 
                 state.pickerItems.removeAll()
-                return .send(.requestUpload)
+                
+                if state.autoUpload {
+                    return .send(.requestUpload)
+                } else {
+                    state.isLoading = false
+                    let validEntities = Array(state.selectedImages)
+                    state.selectedImages.removeAll()
+                    return .send(.delegate(.imagesConverted(validEntities)))
+                }
                 
             case .requestUpload:
                 guard !state.selectedImages.isEmpty else {
@@ -102,17 +114,14 @@ public struct ImagePickerFeature {
                 
             default:
                 return .none
-                
             }
         }
     }
-}
-
-
-// MARK: - ImagePickerFeature Private Func
-
-private extension ImagePickerFeature {
-    static func convert(items: [PhotosPickerItem]) async -> [ImageUploadEntity] {
+    
+    
+    // MARK: - Private Methods
+    
+    private static func convert(items: [PhotosPickerItem]) async -> [ImageUploadEntity] {
         await withTaskGroup(of: ImageUploadEntity?.self) { group in
             for item in items {
                 group.addTask {
@@ -129,7 +138,6 @@ private extension ImagePickerFeature {
                     )
                 }
             }
-            
             var results: [ImageUploadEntity] = []
             for await result in group {
                 guard let result else { continue }
@@ -139,10 +147,8 @@ private extension ImagePickerFeature {
         }
     }
     
-    static func detectFormat(from data: Data) -> ImageFileFormat {
-        // 데이터가 너무 짧으면 기본값(JPEG) 반환
+    private static func detectFormat(from data: Data) -> ImageFileFormat {
         guard data.count > 12 else { return .jpeg }
-        
         let header = data.prefix(12)
         let firstByte = header[0]
         
@@ -159,22 +165,20 @@ private extension ImagePickerFeature {
             header[8] == 0x57 && header[9] == 0x45 && header[10] == 0x42 && header[11] == 0x50 { // "WEBP"
             return .webp
         }
-        
-        // 나머지는 JPEG로
         return .jpeg
     }
     
-    static func extractDimensions(from data: Data) -> (width: Int, height: Int)? {
+    private static func extractDimensions(from data: Data) -> (width: Int, height: Int)? {
         let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
-        
         guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary),
               let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, options as CFDictionary) as? [CFString: Any] else {
             return nil
         }
-        
         var width = properties[kCGImagePropertyPixelWidth] as? Int
         var height = properties[kCGImagePropertyPixelHeight] as? Int
-        
+        if let orientation = properties[kCGImagePropertyOrientation] as? Int, (5...8).contains(orientation) {
+            swap(&width, &height)
+        }
         if let w = width, let h = height { return (w, h) }
         return nil
     }

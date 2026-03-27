@@ -175,9 +175,8 @@ struct AppCoordinator {
                 return .send(.route(.mainTab(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))))
                 
             case .didTapUpdateAlert:
-                // TODO: 앱스토어 URL 필요
                 return .run { _ in
-                    let appStoreURL = URL(string: "https://itunes.apple.com/kr/app/neki")!
+                    let appStoreURL = URL(string: "https://neki.suitestudy.com")!
                     await openURL(appStoreURL)
                 }
                 

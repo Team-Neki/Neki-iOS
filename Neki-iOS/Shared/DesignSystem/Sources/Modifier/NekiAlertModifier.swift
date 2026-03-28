@@ -122,6 +122,7 @@ struct NekiAlertModifier: ViewModifier {
                 .padding(.vertical, 4)
                 .underline()
                 .tint(.primary500)
+                .nekiFont(.body14Regular)
         }
         .disabled(isProcessing)
     }

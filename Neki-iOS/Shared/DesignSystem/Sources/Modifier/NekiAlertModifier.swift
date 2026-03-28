@@ -117,6 +117,7 @@ struct NekiAlertModifier: ViewModifier {
             onSecondary?()
         } label: {
             Text(secondaryText ?? "선택")
+                .frame(maxWidth: .infinity)
                 .padding(.horizontal, 32)
                 .padding(.vertical, 4)
                 .underline()

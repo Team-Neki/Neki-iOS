@@ -77,7 +77,7 @@ struct SelectUploadAlbumFeature {
                     await send(.uploadResponse(
                         Result {
                             let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
-                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.qr) }
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.direct) }
                             try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads, favorite: false)
                             return albumId
                         }

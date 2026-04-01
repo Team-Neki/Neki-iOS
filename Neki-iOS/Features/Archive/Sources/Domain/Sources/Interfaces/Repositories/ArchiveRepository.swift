@@ -32,6 +32,5 @@ protocol ArchiveRepository: Sendable {
 
 public enum PhotoUploadMethod: String, Sendable {
     case qr = "QR"
-    case gallery = "GALLERY"
-    case share = "SHARE"
+    case direct = "DIRECT_UPLOAD"
 }

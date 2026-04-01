@@ -347,6 +347,27 @@ extension DefaultArchiveRepository {
             self.isFavoriteAlbumInfoDirty = true
         }
     }
+    
+    func clearCache() async {
+            // 캐시 데이터 초기화
+            self.photoCache.removeAll()
+            self.currentSortOrder.removeAll()
+            self.albumCache.removeAll()
+            self.favoritePhotoCache.removeAll()
+            self.favoriteAlbumInfoCache = nil
+            
+            // Dirty Flag 초기화
+            self.isPhotoCacheDirty.removeAll()
+            self.isAlbumCacheDirty = true
+            self.isFavoriteCacheDirty = true
+            self.isFavoriteAlbumInfoDirty = true
+            
+            // 페이징 상태 초기화
+            self.currentPhotoPage.removeAll()
+            self.hasNextPhoto.removeAll()
+            self.currentFavoritePage = 0
+            self.hasNextFavorite = true
+        }
 }
 
 

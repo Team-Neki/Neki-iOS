@@ -23,6 +23,7 @@ struct ArchiveClient {
     public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
     public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
     public var updatePhotoMemo: (_ photoID: Int, _ memo: String) async throws -> Void
+    public var clearCache: () async -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -65,6 +66,9 @@ extension ArchiveClient: DependencyKey {
             },
             updatePhotoMemo: { photoID, memo in
                 try await archiveRepository.updatePhotoMemo(photoID: photoID, memo: memo)
+            },
+            clearCache: {
+                await archiveRepository.clearCache()
             }
         )
     }

@@ -93,7 +93,9 @@ struct ArchiveFeature {
             case .clearData:
                 state.photos.removeAll()
                 state.albums.removeAll()
-                return .none
+                return .run { _ in
+                    await archiveClient.clearCache()
+                }
                 
             case .onAppear:
                 return .merge(.send(.fetchAlbums), .send(.fetchPhotos))

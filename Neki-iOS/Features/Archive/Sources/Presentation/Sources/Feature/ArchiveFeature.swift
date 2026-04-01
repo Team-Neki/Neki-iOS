@@ -149,7 +149,7 @@ struct ArchiveFeature {
                     .run { send in
                         do {
                             let entity = try await archiveClient.getFavoriteAlbumInfo()
-                            let favoriteAlbum = AlbumItem(id: 0, title: "즐겨찾기", count: entity.totalCount, coverImageURL: URL(string: entity.latestImageURL), isFavorite: true)
+                            let favoriteAlbum = AlbumItem(id: -1, title: "즐겨찾기", count: entity.totalCount, coverImageURL: URL(string: entity.latestImageURL), isFavorite: true)
                             await send(.favoriteAlbumResponse(.success(favoriteAlbum)))
                         } catch {
                             await send(.favoriteAlbumResponse(.failure(error)))

@@ -64,22 +64,24 @@ struct ArchiveCoordinator {
                 return .none
                 
             case let .root(.albumTapped(album)):
-                let isFirstAlbum = state.root.albums.first?.id == album.id
-                
-                if isFirstAlbum {
-                    state.path.append(.favoriteAlbum(ArchiveFavoriteAlbumFeature.State(album: album)))
+                if album.isFavorite {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(album: album)
+                    ))
                 } else {
-                    state.path.append(.albumDetail(ArchiveAlbumDetailFeature.State(album: album)))
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
             case let .root(.afterUploadNavigateToAlbumDetail(album)):
-                let isFirstAlbum = state.root.albums.first?.id == album.id
-                
-                if isFirstAlbum {
-                    state.path.append(.favoriteAlbum(ArchiveFavoriteAlbumFeature.State(album: album)))
+                if album.isFavorite {
+                    state.path.append(.favoriteAlbum(
+                        ArchiveFavoriteAlbumFeature.State(album: album)
+                    ))
                 } else {
-                    state.path.append(.albumDetail(ArchiveAlbumDetailFeature.State(album: album)))
+                    state.path.append(.albumDetail(
+                        ArchiveAlbumDetailFeature.State(album: album)))
                 }
                 return .none
                 
@@ -101,9 +103,7 @@ struct ArchiveCoordinator {
                 return .none
                 
             case let .path(.element(id: _, action: .allAlbums(.onTapAlbum(album)))):
-                let isFirstAlbum = state.root.albums.first?.id == album.id
-                
-                if isFirstAlbum {
+                if album.isFavorite {
                     state.path.append(.favoriteAlbum(
                         ArchiveFavoriteAlbumFeature.State(album: album)
                     ))

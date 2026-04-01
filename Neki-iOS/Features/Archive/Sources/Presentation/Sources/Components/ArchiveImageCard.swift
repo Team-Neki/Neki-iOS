@@ -29,14 +29,14 @@ struct ArchiveImageCard: View {
     )
     
     var imageAspectRatio: CGFloat? {
-            if let width = item.width, let height = item.height, height > 0 {
-                return CGFloat(width) / CGFloat(height)
-            }
-            return nil
+        if let width = item.width, let height = item.height, height > 0 {
+            return CGFloat(width) / CGFloat(height)
         }
+        return nil
+    }
     
     //MARK: - Init
-
+    
     init(
         item: ArchiveImageItem,
         isSelectionMode: Bool = false,

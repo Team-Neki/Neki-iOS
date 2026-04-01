@@ -291,36 +291,3 @@ fileprivate extension TextField {
         }
     }
 }
-
-#Preview {
-    ArchivePhotoDetailView(
-        store: Store(
-            initialState: ArchivePhotoDetailFeature.State(
-                photos: [
-                    ArchiveImageItem(
-                        id: 1,
-                        imageURLString: "https://picsum.photos/400/200",
-                        isFavorite: false,
-                        date: Date()
-                    ),
-                    ArchiveImageItem(
-                        id: 2,
-                        imageURLString: "https://picsum.photos/400/2000",
-                        isFavorite: true,
-                        date: Date()
-                    ),
-                    ArchiveImageItem(
-                        id: 3,
-                        imageURLString: "https://picsum.photos/400/400",
-                        isFavorite: true,
-                        date: Date()
-                    )
-                ],
-                currentItemID: 1,
-                folderId: nil
-            )
-        ) {
-            ArchivePhotoDetailFeature()
-        }
-    )
-}

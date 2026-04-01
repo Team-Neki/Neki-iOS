@@ -223,7 +223,9 @@ extension DefaultArchiveRepository {
                         isfavorite: request,
                         contentType: oldItem.contentType,
                         createdAt: oldItem.createdAt,
-                        memo: oldItem.memo
+                        memo: oldItem.memo,
+                        width: oldItem.width,
+                        height: oldItem.height
                     )
                     list[index] = newItem
                     photoCache[key] = list
@@ -278,7 +280,9 @@ extension DefaultArchiveRepository {
                     isfavorite: oldItem.isfavorite,
                     contentType: oldItem.contentType,
                     createdAt: oldItem.createdAt,
-                    memo: memo
+                    memo: memo,
+                    width: oldItem.width,
+                    height: oldItem.height
                 )
                 list[index] = newItem
                 photoCache[key] = list
@@ -294,7 +298,9 @@ extension DefaultArchiveRepository {
                 isfavorite: oldItem.isfavorite,
                 contentType: oldItem.contentType,
                 createdAt: oldItem.createdAt,
-                memo: memo
+                memo: memo,
+                width: oldItem.width,
+                height: oldItem.height
             )
             favoritePhotoCache[index] = newItem
         }

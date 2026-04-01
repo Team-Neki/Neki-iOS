@@ -220,28 +220,3 @@ private extension ArchiveAlbumDetailView {
         )
     }
 }
-
-#Preview {
-    ArchiveAlbumDetailView(
-        store: Store(
-            initialState: ArchiveAlbumDetailFeature.State(
-                photos: [
-                    ArchiveImageItem(id: 1, imageURLString: "https://picsum.photos/200/300", isFavorite: true, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 2, imageURLString: "https://picsum.photos/200/400", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 3, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 4, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 5, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 6, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 7, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 8, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 9, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 10, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1)
-                ],
-                album: AlbumItem(id: 1, title: "제주도 여행", count: 3, coverImageURL: nil, isFavorite: false)
-            ),
-            reducer: {
-                ArchiveAlbumDetailFeature()
-            }
-        )
-    )
-}

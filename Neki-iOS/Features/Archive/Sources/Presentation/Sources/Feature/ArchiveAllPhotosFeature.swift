@@ -206,7 +206,9 @@ struct ArchiveAllPhotosFeature {
                         isFavorite: entity.isfavorite,
                         date: entity.createdAt.toISO8601Date(),
                         folderId: entity.folderID,
-                        memo: entity.memo ?? ""
+                        memo: entity.memo ?? "",
+                        width: entity.width,
+                        height: entity.height
                     )
                 }
                 

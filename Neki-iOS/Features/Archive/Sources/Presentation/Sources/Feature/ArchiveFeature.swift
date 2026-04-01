@@ -189,7 +189,18 @@ struct ArchiveFeature {
                 
             case let .photoListResponse(.success(entities)):
                 state.isFetchingPhotos = false
-                let items = entities.map { ArchiveImageItem(id: $0.photoID, imageURLString: $0.imageURL, isFavorite: $0.isfavorite, date: $0.createdAt.toISO8601Date()) }
+                let items = entities.map { entity in
+                    ArchiveImageItem(
+                        id: entity.photoID,
+                        imageURLString: entity.imageURL,
+                        isFavorite: entity.isfavorite,
+                        date: entity.createdAt.toISO8601Date(),
+                        folderId: entity.folderID,
+                        memo: entity.memo ?? "",
+                        width: entity.width,
+                        height: entity.height
+                    )
+                }
                 state.photos = IdentifiedArray(uniqueElements: items)
                 return .none
                 

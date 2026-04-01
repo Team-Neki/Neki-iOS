@@ -15,4 +15,6 @@ struct PhotoEntity {
     let contentType: String
     let createdAt: String
     let memo: String?
+    let width: Int?
+    let height: Int?
 }

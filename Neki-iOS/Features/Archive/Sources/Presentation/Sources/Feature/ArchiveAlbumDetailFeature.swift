@@ -222,7 +222,9 @@ struct ArchiveAlbumDetailFeature {
                         isFavorite: entity.isfavorite,
                         date: entity.createdAt.toISO8601Date(),
                         folderId: currentAlbumId,
-                        memo: entity.memo ?? ""
+                        memo: entity.memo ?? "",
+                        width: entity.width,
+                        height: entity.height
                     )
                 }
                 

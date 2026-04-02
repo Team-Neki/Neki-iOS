@@ -34,9 +34,16 @@ struct ArchiveAllPhotosView: View {
                 VStack {
                     Spacer()
                     ArchiveImageFooter(
+                        style: .selection,
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
-                        onDelete: { showDeleteAlert = true }
+                        onDelete: { showDeleteAlert = true },
+                        onDuplicate: {
+                            // TODO: 사진 복제 액션
+                        },
+                        onMove: {
+                            // TODO: 사진 이동 액션
+                        }
                     )
                 }
             }

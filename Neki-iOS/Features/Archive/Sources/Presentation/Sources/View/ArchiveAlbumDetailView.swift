@@ -189,6 +189,17 @@ private extension ArchiveAlbumDetailView {
             .contentShape(Rectangle())
             
             Button {
+               // 사진 가져오기 액션 연결
+            } label: {
+                Text("사진 가져오기")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 120, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+            
+            Button {
                 store.send(.closeDropDownMenu)
                 editAlbumNameSheetPresented = true
             } label: {

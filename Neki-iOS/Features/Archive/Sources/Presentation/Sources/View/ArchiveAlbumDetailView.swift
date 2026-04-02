@@ -60,10 +60,12 @@ struct ArchiveAlbumDetailView: View {
                 AlbumSelectionView(store: selectionStore)
             }
         }
+        // 사진 가져오기 시트
         .sheet(item: $store.scope(state: \.photoImport, action: \.photoImport)) { importStore in
             PhotoImportView(store: importStore)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .presentationCornerRadius(20)
         }
         // 사진 삭제 시트
         .sheet(isPresented: $deleteAlbumSheetPresented) {

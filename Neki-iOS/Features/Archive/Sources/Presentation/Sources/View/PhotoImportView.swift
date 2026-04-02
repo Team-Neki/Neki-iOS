@@ -19,7 +19,7 @@ struct PhotoImportView: View {
             
             VStack(spacing: 0) {
                 header
-                    .padding(.top, 16)
+                    .padding(.top, 40)
                 
                 if store.isFetchingPhotos && store.photos.isEmpty {
                     Spacer()
@@ -84,7 +84,7 @@ struct PhotoImportView: View {
             
             if store.isDropdownOpen {
                 dropDownMenu
-                    .padding(.top, 48)
+                    .padding(.top, 91)
                     .padding(.leading, 20)
             }
             
@@ -99,34 +99,32 @@ struct PhotoImportView: View {
 
 extension PhotoImportView {
     private var header: some View {
-        ZStack(alignment: .center) {
-            HStack(alignment: .center) {
-                Button {
-                    store.send(.toggleDropdown)
-                } label: {
-                    HStack(spacing: 4) {
-                        Text(store.selectedAlbum?.title ?? "전체 사진")
-                            .nekiFont(.title20SemiBold)
-                            .foregroundStyle(.gray900)
-                        
-                        Image(.iconChevronDown)
-                            .renderingMode(.template)
-                            .foregroundStyle(.gray500)
-                            .rotationEffect(.degrees(store.isDropdownOpen ? 180 : 0))
-                    }
-                }
-                
-                Spacer()
-                
-                Button {
-                    store.send(.tapClose)
-                } label: {
-                    Image(.iconXmarkBlack)
+        HStack(alignment: .center) {
+            Button {
+                store.send(.toggleDropdown)
+            } label: {
+                HStack(spacing: 4) {
+                    Text(store.selectedAlbum?.title ?? "전체 사진")
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray900)
+                    
+                    Image(.iconChevronDown)
+                        .renderingMode(.template)
+                        .foregroundStyle(.gray500)
+                        .rotationEffect(.degrees(store.isDropdownOpen ? 180 : 0))
                 }
             }
-            .padding(.horizontal, 20)
+            
+            Spacer()
+            
+            Button {
+                store.send(.tapClose)
+            } label: {
+                Image(.iconXmarkBlack)
+            }
         }
         .frame(height: 54)
+        .padding(.horizontal, 20)
     }
     
     private var dropDownMenu: some View {

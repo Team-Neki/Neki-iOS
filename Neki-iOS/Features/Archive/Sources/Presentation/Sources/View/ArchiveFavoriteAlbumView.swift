@@ -40,22 +40,23 @@ struct ArchiveFavoriteAlbumView: View {
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
                         onDelete: { showDeleteAlert = true },
-                        onDuplicate: {
-                            // TODO: 사진 복제 액션
-                        },
-                        onMove: {
-                            // TODO: 사진 이동 액션
-                        }
+                        onDuplicate: { store.send(.onTapDuplicateButton) },
+                        onMove: { store.send(.onTapMoveButton) }
                     )
                 }
             }
             
             if store.isLoading {
-                LoadingView(message: "사진을 업로드하고 있어요.")
+                LoadingView(message: "작업을 수행하고 있어요.")
             }
             
         }
         .task { await store.send(.onAppear).finish() }
+        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+            NavigationStack {
+                AlbumSelectionView(store: selectionStore)
+            }
+        }
         .nekiAlert(
             isPresented: $showDeleteAlert,
             style: .cancelable,
@@ -128,7 +129,7 @@ private extension ArchiveFavoriteAlbumView {
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
-
+            
             NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
                 Text("사진 추가")
                     .nekiFont(.body16Medium)

@@ -7,6 +7,11 @@
 
 import SwiftUI
 
+public enum PhotoSelectionPurpose {
+    case duplicate
+    case move
+}
+
 public enum ArchiveFooterStyle {
     case detail    // 사진 상세 화면 (즐겨찾기, 메모 아이콘)
     case selection // 사진 선택 화면 (다운로드, 복제, 이동, 삭제 + 텍스트)

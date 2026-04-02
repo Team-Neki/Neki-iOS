@@ -43,21 +43,22 @@ struct ArchiveAlbumDetailView: View {
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
                         onDelete: { deleteAlbumSheetPresented = true },
-                        onDuplicate: {
-                            // TODO: 사진 복제 액션
-                        },
-                        onMove: {
-                            // TODO: 사진 이동 액션
-                        }
+                        onDuplicate: { store.send(.onTapDuplicateButton) },
+                        onMove: { store.send(.onTapMoveButton) }
                     )
                 }
             }
             
             if store.isLoading {
-                LoadingView(message: "사진을 업로드하고 있어요.")
+                LoadingView(message: "작업을 수행하고 있어요.")
             }
         }
         .task { await store.send(.onAppear).finish() }
+        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+            NavigationStack {
+                AlbumSelectionView(store: selectionStore)
+            }
+        }
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
                 initialOption: .fromAlbumOnly,
@@ -156,7 +157,7 @@ private extension ArchiveAlbumDetailView {
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
-
+            
             NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
                 Text("사진 추가")
                     .nekiFont(.body16Medium)
@@ -165,7 +166,7 @@ private extension ArchiveAlbumDetailView {
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
-
+            
             Button {
                 store.send(.closeDropDownMenu)
                 editAlbumNameSheetPresented = true

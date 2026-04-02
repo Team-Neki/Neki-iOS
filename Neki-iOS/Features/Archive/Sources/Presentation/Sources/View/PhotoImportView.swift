@@ -16,12 +16,15 @@ struct PhotoImportView: View {
     
     var body: some View {
         ZStack(alignment: .top) {
+            
             VStack(spacing: 0) {
                 header
                     .padding(.top, 16)
                 
                 if store.isFetchingPhotos && store.photos.isEmpty {
-                    LoadingView(message: "사진을 불러오는 중이에요")
+                    Spacer()
+                    ProgressView()
+                    Spacer()
                 } else if store.photos.isEmpty {
                     Spacer()
                     ArchiveEmptyView(description: "아직 등록된 사진이 없어요")
@@ -45,24 +48,38 @@ struct PhotoImportView: View {
                             if store.isFetchingPhotos && !store.photos.isEmpty {
                                 ProgressView()
                                     .padding(.vertical, 20)
-                                    .padding(.bottom, 100)
+                                    .padding(.bottom, 120)
                             } else {
-                                Spacer().frame(height: 100)
+                                Spacer().frame(height: 120)
                             }
                         }
                     }
                 }
-                
+            }
+            
+            VStack(spacing: 0) {
                 Spacer()
                 
-                Button {
-                    store.send(.tapUpload)
-                } label: {
-                    Text("\(store.uploadCount)장 업로드")
+                LinearGradient(
+                    gradient: Gradient(colors: [.clear, .white.opacity(0.5)]),
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(height: 48)
+                
+                VStack(spacing: 0) {
+                    Button {
+                        store.send(.tapUpload)
+                    } label: {
+                        Text("\(store.uploadCount)장 업로드")
+                    }
+                    .buttonStyle(.nekiCTA(.primary))
+                    .disabled(!store.isUploadEnabled)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 28)
+                    .padding(.top, 4)   // MARK: - 임의로 넣었음. 너무 딱 붙으니까 이상해서
                 }
-                .buttonStyle(.nekiCTA(.primary))
-                .disabled(!store.isUploadEnabled)
-                .padding(.horizontal, 20)
+                .background(.white)
             }
             
             if store.isDropdownOpen {

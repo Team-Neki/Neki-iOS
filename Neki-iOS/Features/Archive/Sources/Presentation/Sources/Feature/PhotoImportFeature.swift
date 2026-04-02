@@ -141,6 +141,7 @@ struct PhotoImportFeature {
                 return .none
                 
             case let .selectAlbum(album):
+                state.selectedIDs.removeAll()   // TODO: - 현재는 앨범 변경 시 선택된 사진 해제. 피그마에 문의 남김. 추후 수정될 여지 있음
                 state.selectedAlbum = album
                 state.isDropdownOpen = false
                 state.photos.removeAll()

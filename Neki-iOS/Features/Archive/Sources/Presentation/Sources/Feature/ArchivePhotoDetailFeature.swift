@@ -63,6 +63,9 @@ struct ArchivePhotoDetailFeature {
         case toggleDropDownMenu
         case closeDropDownMenu
         
+        case onTapShareToInstagramStory
+        case instagramImageFetchResponse(Result<UIImage, Error>)
+        
         case delegate(Delegate)
         enum Delegate {
             case showToast(NekiToastItem)
@@ -175,24 +178,24 @@ struct ArchivePhotoDetailFeature {
                 switch delegateAction {
                     
                 case let .didSelectAlbum(albumId):
-//                    let photoId = state.currentItemID
-//                    state.albumSelection = nil
-//                    state.isLoading = true
-//                    
+                    //                    let photoId = state.currentItemID
+                    //                    state.albumSelection = nil
+                    //                    state.isLoading = true
+                    //
                     // TODO: - 어떤 식으로 업로드 할 건지 서버측과 논의 필요함
                     // 그냥 킹피셔로 데이터 추출해서 새로운 파일로 업로드하는 것도 가능하긴 한데, 흠
-//                    return .run { send in
-//                        await send(.addToAlbumResponse(Result {
-//                            let isFavorite = albumId == -1
-//                            let targetFolderId = isFavorite ? nil : albumId
-//                            
-//                            try await archiveClient.registerPhotos(
-//                                folderId: targetFolderId,
-//                                uploads: [(mediaID: photoId, memo: String?.none, uploadMethod: PhotoUploadMethod.direct)],
-//                                favorite: isFavorite
-//                            )
-//                        }))
-//                    }
+                    //                    return .run { send in
+                    //                        await send(.addToAlbumResponse(Result {
+                    //                            let isFavorite = albumId == -1
+                    //                            let targetFolderId = isFavorite ? nil : albumId
+                    //
+                    //                            try await archiveClient.registerPhotos(
+                    //                                folderId: targetFolderId,
+                    //                                uploads: [(mediaID: photoId, memo: String?.none, uploadMethod: PhotoUploadMethod.direct)],
+                    //                                favorite: isFavorite
+                    //                            )
+                    //                        }))
+                    //                    }
                     return .none
                     
                 case .didTapCancel:
@@ -276,6 +279,69 @@ struct ArchivePhotoDetailFeature {
                 
             case .deletePhotoResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
+                
+            case .onTapShareToInstagramStory:
+                state.showDropDownMenu = false
+                guard let url = state.currentItem?.imageURL else { return .none }
+                
+                state.isLoading = true
+                
+                return .run { send in
+                    do {
+                        let image = try await withCheckedThrowingContinuation { continuation in
+                            KingfisherManager.shared.retrieveImage(
+                                with: url,
+                                options: [.cacheOriginalImage]
+                            ) { result in
+                                switch result {
+                                case .success(let value):
+                                    continuation.resume(returning: value.image)
+                                case .failure(let error):
+                                    continuation.resume(throwing: error)
+                                }
+                            }
+                        }
+                        await send(.instagramImageFetchResponse(.success(image)))
+                    } catch {
+                        await send(.instagramImageFetchResponse(.failure(error)))
+                    }
+                }
+                
+            case let .instagramImageFetchResponse(.success(image)):
+                state.isLoading = false
+                return .run { send in
+                    // 이미지를 클립보드에 담고 인스타그램 앱 열기 (MainActor에서 실행)
+                    let isShared = await MainActor.run { () -> Bool in
+                        guard let urlScheme = URL(string: "instagram-stories://share?source_application=Neki") else { return false }
+                        
+                        // 인스타그램 앱이 설치되어 있는지 확인
+                        if UIApplication.shared.canOpenURL(urlScheme) {
+                            if let imageData = image.pngData() {
+                                // 인스타 스토리 배경으로 이미지 전달
+                                let pasteboardItems: [[String: Any]] = [
+                                    ["com.instagram.sharedSticker.backgroundImage": imageData]
+                                ]
+                                let pasteboardOptions = [
+                                    UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(60 * 5)
+                                ]
+                                
+                                UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
+                                UIApplication.shared.open(urlScheme, options: [:], completionHandler: nil)
+                                return true
+                            }
+                        }
+                        return false
+                    }
+                    
+                    // 설치되어 있지 않거나 실패한 경우 토스트
+                    if !isShared {
+                        await send(.delegate(.showToast(NekiToastItem("인스타그램 앱이 설치되어 있지 않아요", style: .error))))
+                    }
+                }
+                
+            case .instagramImageFetchResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("이미지를 불러오지 못했어요", style: .error))))
                 
             default:
                 return .none

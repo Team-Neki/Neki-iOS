@@ -51,7 +51,7 @@ struct ArchiveAlbumDetailView: View {
             }
             
             if store.isLoading {
-                LoadingView(message: "작업을 수행하고 있어요.")
+                LoadingView(message: "요청을 처리하고 있어요.")
             }
         }
         .animation(.easeInOut(duration: 0.3), value: store.photos)

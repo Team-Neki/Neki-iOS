@@ -159,6 +159,17 @@ extension ArchivePhotoDetailView {
             .frame(width: 158, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
+            
+            Button {
+                store.send(.onTapShareToInstagramStory)
+            } label: {
+                Text("인스타 스토리 공유")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 158, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
             #endif
             
         }

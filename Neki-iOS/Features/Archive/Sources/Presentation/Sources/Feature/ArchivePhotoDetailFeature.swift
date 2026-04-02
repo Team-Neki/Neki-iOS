@@ -14,41 +14,31 @@ struct ArchivePhotoDetailFeature {
     @ObservableState
     struct State {
         @Presents var imageTransform: ImageTransformFeature.State?
+        @Presents var albumSelection: AlbumSelectionFeature.State?
         
         var photos: IdentifiedArrayOf<ArchiveImageItem>
-        
         var currentItemID: Int
         let folderId: Int?
         
-        var currentItem: ArchiveImageItem? {
-            photos[id: currentItemID]
-        }
-        
+        var currentItem: ArchiveImageItem? { photos[id: currentItemID] }
         var formattedDate: String {
-            guard let date = currentItem?.date else { return "" }
-            let formatter = DateFormatter()
-            formatter.dateFormat = "yyyy.MM.dd"
-            return formatter.string(from: date)
+            return currentItem?.date.toDotFormatString() ?? ""
         }
         
         var isLoading: Bool = false
+        var isMemoVisible: Bool = false
+        var isMemoExpanded: Bool = false
+        var isMemoEditing: Bool = false
+        var editingMemoText: String = ""
         
-        // MARK: - Memo States
-        
-        var isMemoVisible: Bool = false  // 단순 조회 모드 가시성
-        var isMemoExpanded: Bool = false // 단순 조회 모드 더 보기(확장) 여부
-        var isMemoEditing: Bool = false // 편집 모드 여부
-        var editingMemoText: String = "" // 편집 중인 임시 텍스트
+        var showDropDownMenu: Bool = false
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         
-        // 메모 조회 모드 액션
         case toggleMemoVisibility
         case toggleMemoExpanded(Bool)
-        
-        // 메모 편집 모드 액션
         case startMemoEditing
         case cancelMemoEditing
         case doneMemoEditing
@@ -58,15 +48,20 @@ struct ArchivePhotoDetailFeature {
         case imageFetchResponse(Result<UIImage, Error>)
         case imageTransform(PresentationAction<ImageTransformFeature.Action>)
         
+        case onTapAddToAlbum
+        case albumSelection(PresentationAction<AlbumSelectionFeature.Action>)
+        case addToAlbumResponse(Result<Void, Error>)
+        
         case onTapBackButton
         case onTapDownload
         case downloadImageResponse(successCount: Int)
-        
         case onTapFavorite
         case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
-        
         case onTapDelete
         case deletePhotoResponse(Result<Void, Error>)
+        
+        case toggleDropDownMenu
+        case closeDropDownMenu
         
         case delegate(Delegate)
         enum Delegate {
@@ -84,7 +79,19 @@ struct ArchivePhotoDetailFeature {
         Reduce { state, action in
             switch action {
                 
-                // MARK: - 메모 조회 모드 로직
+            case .onTapBackButton:
+                return .run { _ in await dismiss() }
+                
+                // MARK: - DropDown Menu
+            case .toggleDropDownMenu:
+                state.showDropDownMenu.toggle()
+                return .none
+                
+            case .closeDropDownMenu:
+                state.showDropDownMenu = false
+                return .none
+                
+                // MARK: - Memo
             case .toggleMemoVisibility:
                 state.isMemoVisible.toggle()
                 if !state.isMemoVisible {
@@ -96,7 +103,6 @@ struct ArchivePhotoDetailFeature {
                 state.isMemoExpanded = isExpanded
                 return .none
                 
-                // MARK: - 메모 편집 모드 로직
             case .startMemoEditing:
                 state.isMemoEditing = true
                 state.isMemoVisible = true
@@ -110,38 +116,38 @@ struct ArchivePhotoDetailFeature {
                 return .none
                 
             case .doneMemoEditing:
-                // 100자 자르기
                 let limitedText = String(state.editingMemoText.prefix(100))
                 let photoID = state.currentItemID
-                
                 state.photos[id: photoID]?.memo = limitedText
                 state.isMemoEditing = false
                 state.isMemoExpanded = false
                 
                 return .run { send in
-                    do {
-                        try await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
-                    } catch {
-                        await send(.delegate(.showToast(NekiToastItem("메모 저장에 실패했어요", style: .error))))
-                    }
+                    try? await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
                 }
                 
             case .clearAllMemoEditing:
                 state.editingMemoText = ""
                 return .none
                 
+                // MARK: - Image Transform
             case .onTapTransform:
+                state.showDropDownMenu = false
+                
                 guard let url = state.currentItem?.imageURL else { return .none }
                 
                 return .run { send in
                     do {
                         let image = try await withCheckedThrowingContinuation { continuation in
-                            KingfisherManager.shared.retrieveImage(with: url, options: [
-                                .cacheOriginalImage
-                            ]) { result in
+                            KingfisherManager.shared.retrieveImage(
+                                with: url,
+                                options: [.cacheOriginalImage]
+                            ) { result in
                                 switch result {
-                                case .success(let value): continuation.resume(returning: value.image)
-                                case .failure(let error): continuation.resume(throwing: error)
+                                case .success(let value):
+                                    continuation.resume(returning: value.image)
+                                case .failure(let error):
+                                    continuation.resume(throwing: error)
                                 }
                             }
                         }
@@ -158,36 +164,71 @@ struct ArchivePhotoDetailFeature {
             case .imageFetchResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("이미지를 불러오지 못했어요", style: .error))))
                 
-            case .onTapBackButton:
-                return .run { _ in await dismiss() }
                 
+                // MARK: - Add To Album
+            case .onTapAddToAlbum:
+                state.showDropDownMenu = false
+                state.albumSelection = AlbumSelectionFeature.State(uploadCount: 1)
+                return .none
+                
+            case let .albumSelection(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                    
+                case let .didSelectAlbum(albumId):
+//                    let photoId = state.currentItemID
+//                    state.albumSelection = nil
+//                    state.isLoading = true
+//                    
+                    // TODO: - 어떤 식으로 업로드 할 건지 서버측과 논의 필요함
+                    // 그냥 킹피셔로 데이터 추출해서 새로운 파일로 업로드하는 것도 가능하긴 한데, 흠
+//                    return .run { send in
+//                        await send(.addToAlbumResponse(Result {
+//                            let isFavorite = albumId == -1
+//                            let targetFolderId = isFavorite ? nil : albumId
+//                            
+//                            try await archiveClient.registerPhotos(
+//                                folderId: targetFolderId,
+//                                uploads: [(mediaID: photoId, memo: String?.none, uploadMethod: PhotoUploadMethod.direct)],
+//                                favorite: isFavorite
+//                            )
+//                        }))
+//                    }
+                    return .none
+                    
+                case .didTapCancel:
+                    state.albumSelection = nil
+                    return .none
+                    
+                case let .showToast(toastItem):
+                    return .send(.delegate(.showToast(toastItem)))
+                }
+                
+            case .addToAlbumResponse(.success):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("사진을 앨범에 추가했어요", style: .success))))
+                
+            case .addToAlbumResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("앨범 추가에 실패했어요", style: .error))))
+                
+                
+                // MARK: - 즐겨찾기
             case .onTapFavorite:
                 guard let item = state.currentItem else { return .none }
                 let newStatus = !item.isFavorite
-                
                 state.photos[id: item.id]?.isFavorite = newStatus
                 
                 return .run { [id = item.id, isFavorite = newStatus] send in
-                    do {
-                        try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
-                        await send(.toggleFavoriteResponse(photoID: id, result: .success(())))
-                    } catch {
-                        await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
-                    }
+                    try? await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
                 }
                 
-            case .toggleFavoriteResponse(_, .success):
+            case .toggleFavoriteResponse:
                 return .none
                 
-            case let .toggleFavoriteResponse(photoID, .failure):
-                state.photos[id: photoID]?.isFavorite.toggle()
-                return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
+                // MARK: - 다운로드
             case .onTapDownload:
-                guard let url = state.currentItem?.imageURL else {
-                    return .none
-                }
-                
+                guard let url = state.currentItem?.imageURL else { return .none }
                 state.isLoading = true
                 
                 return .run { send in
@@ -204,22 +245,19 @@ struct ArchivePhotoDetailFeature {
                     return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
                 }
                 
+                
+                // MARK: - 삭제
             case .onTapDelete:
                 guard let id = state.currentItem?.id else { return .none }
                 return .run { send in
-                    do {
-                        try await archiveClient.deletePhotoList(photoIds: [id])
-                        await send(.deletePhotoResponse(.success(())))
-                    } catch {
-                        await send(.deletePhotoResponse(.failure(error)))
-                    }
+                    try? await archiveClient.deletePhotoList(photoIds: [id])
+                    await send(.deletePhotoResponse(.success(())))
                 }
                 
             case .deletePhotoResponse(.success):
                 guard let deletedID = state.currentItem?.id else { return .none }
                 
                 let deletedIndex = state.photos.index(id: deletedID)
-                
                 state.photos.remove(id: deletedID)
                 
                 if state.photos.isEmpty {
@@ -234,7 +272,6 @@ struct ArchivePhotoDetailFeature {
                 } else if let last = state.photos.last {
                     state.currentItemID = last.id
                 }
-                
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
             case .deletePhotoResponse(.failure):
@@ -244,10 +281,7 @@ struct ArchivePhotoDetailFeature {
                 return .none
             }
         }
-        .ifLet(\.$imageTransform, action: \.imageTransform) {
-            ImageTransformFeature()
-        }
-        
+        .ifLet(\.$imageTransform, action: \.imageTransform) { ImageTransformFeature() }
+        .ifLet(\.$albumSelection, action: \.albumSelection) { AlbumSelectionFeature() }
     }
-    
 }

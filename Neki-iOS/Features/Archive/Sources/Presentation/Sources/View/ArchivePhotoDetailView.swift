@@ -34,8 +34,35 @@ struct ArchivePhotoDetailView: View {
             
             // 하단 메모 및 푸터 UI
             bottomContainer
+            
+            if store.isLoading {
+                LoadingView(message: "요청을 처리하고 있어요.")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            
+            if store.showDropDownMenu {
+                // 메뉴 외부 빈 공간 터치 시 드롭다운 닫기
+                Color.clear
+                    .contentShape(Rectangle())
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        store.send(.closeDropDownMenu)
+                    }
+                
+                VStack(spacing: 0) {
+                    HStack {
+                        Spacer()
+                        dropDownMenu
+                            .padding(.top, 45)
+                            .padding(.trailing, 20)
+                    }
+                    Spacer()
+                }
+                .zIndex(10)
+            }
         }
         .onChange(of: store.currentItemID) { _, _ in
+            store.send(.closeDropDownMenu)
             store.send(.binding(.set(\.isMemoVisible, false)))
             store.send(.toggleMemoExpanded(false))
             store.send(.binding(.set(\.isMemoEditing, false)))
@@ -59,6 +86,11 @@ struct ArchivePhotoDetailView: View {
                             }
                         }
                     }
+            }
+        }
+        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+            NavigationStack {
+                AlbumSelectionView(store: selectionStore)
             }
         }
         .nekiAlert(
@@ -90,14 +122,46 @@ extension ArchivePhotoDetailView {
             left: { NekiToolBar.back { store.send(.onTapBackButton) } },
             center: { NekiToolBar.textCenter(store.formattedDate) },
             right: {
-                #if DEBUG
-                NekiToolBar.icon(UIImage(systemName: "wand.and.stars")!,
-                                 action: { store.send(.onTapTransform) })
-                #else
-                NekiToolBar.icon(.iconEllipsis ,action: { store.send(.onTapTransform) })
-                #endif
+                Button {
+                    store.send(.toggleDropDownMenu)
+                } label: {
+                    Image(.iconEllipsis)
+                        .frame(width: 24, height: 24)
+                        .padding(8)
+                }
             }
         )
+    }
+    
+    private var dropDownMenu: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Button {
+                store.send(.onTapAddToAlbum)
+            } label: {
+                Text("앨범에 추가")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 158, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+            
+            Button {
+                store.send(.onTapTransform)
+            } label: {
+                Text("이미지 변환")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.gray900)
+            }
+            .frame(width: 158, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+        }
+        .padding(.vertical, 8)
+        .frame(width: 158, alignment: .topLeading)
+        .background(.white)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
     }
     
     private var photoTabView: some View {
@@ -192,7 +256,7 @@ extension ArchivePhotoDetailView {
                             .nekiFont(.body16SemiBold)
                             .foregroundStyle(.gray800)
                     }
-
+                    
                     Button {
                         store.send(.doneMemoEditing)
                         isMemoEditingFocused = false

@@ -28,13 +28,28 @@ struct PhotoImportView: View {
                     Spacer()
                 } else {
                     ScrollView {
-                        LazyVGrid(columns: columns, spacing: 2) {
-                            ForEach(store.photos) { item in
-                                imageCell(for: item)
+                        VStack(spacing: 0) {
+                            LazyVGrid(columns: columns, spacing: 2) {
+                                ForEach(store.photos) { item in
+                                    imageCell(for: item)
+                                        .onAppear {
+                                            if item == store.photos.last {
+                                                store.send(.loadMorePhotos)
+                                            }
+                                        }
+                                }
+                            }
+                            .padding(.vertical, 12)
+                            .padding(.horizontal, 20)
+                            
+                            if store.isFetchingPhotos && !store.photos.isEmpty {
+                                ProgressView()
+                                    .padding(.vertical, 20)
+                                    .padding(.bottom, 100)
+                            } else {
+                                Spacer().frame(height: 100)
                             }
                         }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 20)
                     }
                 }
                 
@@ -152,7 +167,7 @@ extension PhotoImportView {
             KFImage(item.imageURL)
                 .resizable()
                 .placeholder { Color.gray.opacity(0.1) }
-                .aspectRatio(1, contentMode: .fit)
+                .aspectRatio(1, contentMode: .fill)
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 145, maxHeight: .infinity)
                 .clipped()
                 .overlay(

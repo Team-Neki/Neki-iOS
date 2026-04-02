@@ -32,7 +32,9 @@ struct PhotoImportFeature {
         case onAppear
         case fetchAlbumsResponse(Result<[AlbumItem], Error>)
         case fetchFavoriteAlbumResponse(Result<AlbumItem, Error>)
+        
         case fetchPhotos
+        case loadMorePhotos
         case fetchPhotosResponse(Result<[PhotoEntity], Error>)
         
         case toggleDropdown
@@ -101,17 +103,21 @@ struct PhotoImportFeature {
                 return .none
                 
             case .fetchPhotos:
+                guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
                 let targetFolderId = state.selectedAlbum?.id == -1 ? nil : state.selectedAlbum?.id
                 let sortOrder = "DESC"
                 
                 return .run { [id = state.selectedAlbum?.id] send in
                     if id == -1 {
-                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchFavoritePhotoList(100, sortOrder) }))
+                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchFavoritePhotoList(20, sortOrder) }))
                     } else {
-                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchPhotoList(folderId: targetFolderId, size: 100, sortOrder: sortOrder) }))
+                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchPhotoList(folderId: targetFolderId, size: 20, sortOrder: sortOrder) }))
                     }
                 }
+                
+            case .loadMorePhotos:
+                return .send(.fetchPhotos)
                 
             case let .fetchPhotosResponse(.success(entities)):
                 state.isFetchingPhotos = false

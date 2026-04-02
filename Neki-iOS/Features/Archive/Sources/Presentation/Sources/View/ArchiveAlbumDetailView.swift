@@ -60,6 +60,11 @@ struct ArchiveAlbumDetailView: View {
                 AlbumSelectionView(store: selectionStore)
             }
         }
+        .sheet(item: $store.scope(state: \.photoImport, action: \.photoImport)) { importStore in
+            PhotoImportView(store: importStore)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         // 사진 삭제 시트
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
@@ -189,7 +194,7 @@ private extension ArchiveAlbumDetailView {
             .contentShape(Rectangle())
             
             Button {
-               // 사진 가져오기 액션 연결
+                store.send(.onTapImportPhotos)
             } label: {
                 Text("사진 가져오기")
                     .nekiFont(.body16Medium)

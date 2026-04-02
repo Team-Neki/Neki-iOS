@@ -13,6 +13,7 @@ struct ArchiveAlbumDetailFeature {
     @ObservableState
     struct State {
         @Presents var albumSelection: AlbumSelectionFeature.State?
+        @Presents var photoImport: PhotoImportFeature.State?
         var selectionPurpose: PhotoSelectionPurpose?
         
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
@@ -76,6 +77,11 @@ struct ArchiveAlbumDetailFeature {
         // 앨범 삭제 액션
         case onTapExecuteDeleteAlbum(option: ArchiveAlbumDeleteOption)
         case deleteAlbumResponse(Result<Void, Error>)
+        
+        // 사진 가져오기 액션
+        case onTapImportPhotos
+        case photoImport(PresentationAction<PhotoImportFeature.Action>)
+        case importPhotosResponse(Result<Void, Error>)
         
         case fetchPhotos
         case photoListResponse(Result<[PhotoEntity], Error>)
@@ -338,9 +344,43 @@ struct ArchiveAlbumDetailFeature {
             case .deleteAlbumResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 삭제하지 못했어요", style: .error))))
                 
+            case .onTapImportPhotos:
+                state.showDropDownMenu = false
+                state.photoImport = PhotoImportFeature.State()
+                return .none
+                
+            case let .photoImport(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case let .didImportPhotos(photoIDs):
+                    state.photoImport = nil
+                    state.isLoading = true
+                    
+                    return .run { send in
+                        // TODO: 선택한 사진들을 현재 앨범으로 복제하는 API 호출
+                        try? await Task.sleep(for: .seconds(1)) // 임시 딜레이
+                        await send(.importPhotosResponse(.success(())))
+                    }
+                    
+                case .didTapCancel:
+                    state.photoImport = nil
+                    return .none
+                }
+                
+            case .importPhotosResponse(.success):
+                state.isLoading = false
+                return .merge(
+                    .send(.delegate(.showToast(NekiToastItem("사진을 앨범에 가져왔어요", style: .success)))),
+                    .send(.fetchPhotos)
+                )
+                
+            case .importPhotosResponse(.failure):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem("사진을 가져오지 못했어요", style: .error))))
+                
             default: return .none
             }
         }
         .ifLet(\.$albumSelection, action: \.albumSelection) { AlbumSelectionFeature() }
+        .ifLet(\.$photoImport, action: \.photoImport) { PhotoImportFeature() }
     }
 }

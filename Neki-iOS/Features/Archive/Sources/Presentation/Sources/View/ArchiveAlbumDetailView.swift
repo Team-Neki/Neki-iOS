@@ -15,6 +15,7 @@ struct ArchiveAlbumDetailView: View {
     @State private var lastDragPoint: CGFloat = 0
     @State var deleteAlbumSheetPresented: Bool = false
     @State var editAlbumNameSheetPresented: Bool = false
+    @State var deleteEntireAlbumSheetPresented: Bool = false
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -59,6 +60,7 @@ struct ArchiveAlbumDetailView: View {
                 AlbumSelectionView(store: selectionStore)
             }
         }
+        // 사진 삭제 시트
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
                 initialOption: .fromAlbumOnly,
@@ -76,6 +78,25 @@ struct ArchiveAlbumDetailView: View {
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
         }
+        // 앨범 삭제 시트
+        .sheet(isPresented: $deleteEntireAlbumSheetPresented) {
+            ArchiveDeleteSheet<ArchiveAlbumDeleteOption>(
+                initialOption: .withPhotos,
+                title: "앨범을 삭제하시겠어요?",
+                firstOption: (.withPhotos, "사진까지 함께 삭제"),
+                secondOption: (.albumOnly, "사진은 유지하고 앨범만 삭제"),
+                onCancel: {
+                    deleteEntireAlbumSheetPresented = false
+                },
+                onConfirm: { selectedOption in
+                    store.send(.onTapExecuteDeleteAlbum(option: selectedOption))
+                    deleteEntireAlbumSheetPresented = false
+                }
+            )
+            .presentationDetents([.height(280)])
+            .presentationCornerRadius(20)
+        }
+        // 앨범 이름 수정 시트
         .sheet(isPresented: $editAlbumNameSheetPresented) {
             ArchiveAlbumInputSheet(
                 style: .edit,
@@ -174,6 +195,18 @@ private extension ArchiveAlbumDetailView {
                 Text("앨범 이름 변경")
                     .nekiFont(.body16Medium)
                     .foregroundStyle(.gray900)
+            }
+            .frame(width: 120, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+            
+            Button {
+                store.send(.closeDropDownMenu)
+                deleteEntireAlbumSheetPresented = true
+            } label: {
+                Text("앨범 삭제")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.primary500) // TODO: - 위험한 액션이니 빨간색 어떠냐고 피그마 문의 남김. 답변에 따라 수정가능성 있음
             }
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)

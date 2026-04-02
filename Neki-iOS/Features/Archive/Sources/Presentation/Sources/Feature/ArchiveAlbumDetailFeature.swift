@@ -68,8 +68,15 @@ struct ArchiveAlbumDetailFeature {
         
         case onTapDownloadButton
         case downloadImagesResponse(successCount: Int)
+        
+        // 사진 삭제 액션
         case onTapDeleteButton(option: ArchivePhotoDeleteOption)
         case deletePhotosResponse(Result<Void, Error>)
+        
+        // 앨범 삭제 액션
+        case onTapExecuteDeleteAlbum(option: ArchiveAlbumDeleteOption)
+        case deleteAlbumResponse(Result<Void, Error>)
+        
         case fetchPhotos
         case photoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
@@ -312,6 +319,24 @@ struct ArchiveAlbumDetailFeature {
                 
             case .deletePhotosResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
+                
+            case let .onTapExecuteDeleteAlbum(option):
+                let shouldDeletePhotos = (option == .withPhotos)
+                let albumId = state.album.id
+                return .run { send in
+                    await send(.deleteAlbumResponse(Result {
+                        try await archiveClient.deleteFolders([albumId], shouldDeletePhotos)
+                    }))
+                }
+                
+            case .deleteAlbumResponse(.success):
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("앨범을 삭제했어요", style: .success))))
+                    await dismiss()
+                }
+                
+            case .deleteAlbumResponse(.failure):
+                return .send(.delegate(.showToast(NekiToastItem("앨범을 삭제하지 못했어요", style: .error))))
                 
             default: return .none
             }

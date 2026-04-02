@@ -21,40 +21,48 @@ struct PhotoImportView: View {
                 header
                     .padding(.top, 40)
                 
-                if store.isFetchingPhotos && store.photos.isEmpty {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
-                } else if store.photos.isEmpty {
-                    Spacer()
-                    ArchiveEmptyView(description: "아직 등록된 사진이 없어요")
-                    Spacer()
-                } else {
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            LazyVGrid(columns: columns, spacing: 2) {
-                                ForEach(store.photos) { item in
-                                    imageCell(for: item)
-                                        .onAppear {
-                                            if item == store.photos.last {
-                                                store.send(.loadMorePhotos)
+                ZStack {
+                    if store.isFetchingPhotos && store.photos.isEmpty {
+                        VStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    } else if store.photos.isEmpty {
+                        VStack {
+                            Spacer()
+                            ArchiveEmptyView(description: "아직 등록된 사진이 없어요")
+                            Spacer()
+                        }
+                    } else {
+                        ScrollView {
+                            VStack(spacing: 0) {
+                                LazyVGrid(columns: columns, spacing: 2) {
+                                    ForEach(store.photos) { item in
+                                        imageCell(for: item)
+                                            .onAppear {
+                                                if item == store.photos.last {
+                                                    store.send(.loadMorePhotos)
+                                                }
                                             }
-                                        }
+                                    }
                                 }
-                            }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 20)
-                            
-                            if store.isFetchingPhotos && !store.photos.isEmpty {
-                                ProgressView()
-                                    .padding(.vertical, 20)
-                                    .padding(.bottom, 120)
-                            } else {
-                                Spacer().frame(height: 120)
+                                .padding(.vertical, 12)
+                                .padding(.horizontal, 20)
+                                
+                                if store.isFetchingPhotos && !store.photos.isEmpty {
+                                    ProgressView()
+                                        .padding(.vertical, 20)
+                                        .padding(.bottom, 120)
+                                } else {
+                                    Spacer().frame(height: 120)
+                                }
                             }
                         }
                     }
                 }
+                .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
+                .animation(.easeInOut(duration: 0.3), value: store.photos)
             }
             
             VStack(spacing: 0) {

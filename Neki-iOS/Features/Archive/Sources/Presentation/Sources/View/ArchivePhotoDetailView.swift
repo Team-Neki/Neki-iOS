@@ -146,6 +146,9 @@ extension ArchivePhotoDetailView {
             .padding(.leading, 12)
             .contentShape(Rectangle())
             
+            
+            // MARK: - 내부 테스트 전용 기능
+            #if DEBUG
             Button {
                 store.send(.onTapTransform)
             } label: {
@@ -156,6 +159,8 @@ extension ArchivePhotoDetailView {
             .frame(width: 158, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
+            #endif
+            
         }
         .padding(.vertical, 8)
         .frame(width: 158, alignment: .topLeading)

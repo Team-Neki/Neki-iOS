@@ -54,6 +54,7 @@ struct ArchiveAlbumDetailView: View {
                 LoadingView(message: "작업을 수행하고 있어요.")
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: store.photos)
         .task { await store.send(.onAppear).finish() }
         .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
             NavigationStack {

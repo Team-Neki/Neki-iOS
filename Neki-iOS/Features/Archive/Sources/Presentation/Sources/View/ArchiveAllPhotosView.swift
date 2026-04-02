@@ -49,6 +49,7 @@ struct ArchiveAllPhotosView: View {
             }
             
         }
+        .animation(.easeInOut(duration: 0.3), value: store.photos)
         .nekiToolbar(
             left: { NekiToolBar.back(action: { store.send(.onTapBackButton) }) },
             center: { NekiToolBar.textCenter("모든 사진") },

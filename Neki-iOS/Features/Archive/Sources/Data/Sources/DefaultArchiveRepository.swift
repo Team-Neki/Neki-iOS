@@ -41,8 +41,10 @@ final actor DefaultArchiveRepository: ArchiveRepository {
 // MARK: - Create Logic
 
 extension DefaultArchiveRepository {
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool? = false) async throws {
-        let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: "QR") }
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], favorite: Bool? = false) async throws {
+        let uploadData = uploads.map {
+            RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: $0.uploadMethod.rawValue)
+        }
         let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
         let endpoint = ArchiveEndpoint.registerPhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
@@ -220,7 +222,10 @@ extension DefaultArchiveRepository {
                         folderID: oldItem.folderID,
                         isfavorite: request,
                         contentType: oldItem.contentType,
-                        createdAt: oldItem.createdAt
+                        createdAt: oldItem.createdAt,
+                        memo: oldItem.memo,
+                        width: oldItem.width,
+                        height: oldItem.height
                     )
                     list[index] = newItem
                     photoCache[key] = list
@@ -249,6 +254,57 @@ extension DefaultArchiveRepository {
         let _ = try await networkProvider.request(endpoint: endpoint)
         
         self.isAlbumCacheDirty = true
+    }
+    
+    func updatePhotoMemo(photoID: Int, memo: String) async throws {
+        var capturedAt = ""
+        if let cachedItem = photoCache.values.flatMap({ $0 }).first(where: { $0.photoID == photoID }) {
+            capturedAt = cachedItem.createdAt
+        } else if let cachedItem = favoritePhotoCache.first(where: { $0.photoID == photoID }) {
+            capturedAt = cachedItem.createdAt
+        } else {
+            capturedAt = Date().ISO8601Format()
+        }
+        
+        let requestDTO = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
+        let endpoint = ArchiveEndpoint.updateMemo(photoID: photoID, request: requestDTO)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        for (key, var list) in photoCache {
+            if let index = list.firstIndex(where: { $0.photoID == photoID }) {
+                let oldItem = list[index]
+                let newItem = PhotoEntity(
+                    photoID: oldItem.photoID,
+                    imageURL: oldItem.imageURL,
+                    folderID: oldItem.folderID,
+                    isfavorite: oldItem.isfavorite,
+                    contentType: oldItem.contentType,
+                    createdAt: oldItem.createdAt,
+                    memo: memo,
+                    width: oldItem.width,
+                    height: oldItem.height
+                )
+                list[index] = newItem
+                photoCache[key] = list
+            }
+        }
+        
+        if let index = favoritePhotoCache.firstIndex(where: { $0.photoID == photoID }) {
+            let oldItem = favoritePhotoCache[index]
+            let newItem = PhotoEntity(
+                photoID: oldItem.photoID,
+                imageURL: oldItem.imageURL,
+                folderID: oldItem.folderID,
+                isfavorite: oldItem.isfavorite,
+                contentType: oldItem.contentType,
+                createdAt: oldItem.createdAt,
+                memo: memo,
+                width: oldItem.width,
+                height: oldItem.height
+            )
+            favoritePhotoCache[index] = newItem
+        }
+        
     }
 }
 
@@ -291,6 +347,27 @@ extension DefaultArchiveRepository {
             self.isFavoriteAlbumInfoDirty = true
         }
     }
+    
+    func clearCache() async {
+            // 캐시 데이터 초기화
+            self.photoCache.removeAll()
+            self.currentSortOrder.removeAll()
+            self.albumCache.removeAll()
+            self.favoritePhotoCache.removeAll()
+            self.favoriteAlbumInfoCache = nil
+            
+            // Dirty Flag 초기화
+            self.isPhotoCacheDirty.removeAll()
+            self.isAlbumCacheDirty = true
+            self.isFavoriteCacheDirty = true
+            self.isFavoriteAlbumInfoDirty = true
+            
+            // 페이징 상태 초기화
+            self.currentPhotoPage.removeAll()
+            self.hasNextPhoto.removeAll()
+            self.currentFavoritePage = 0
+            self.hasNextFavorite = true
+        }
 }
 
 

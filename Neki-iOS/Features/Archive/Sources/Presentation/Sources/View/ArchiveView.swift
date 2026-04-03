@@ -179,11 +179,12 @@ private extension ArchiveView {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(store.previewAlbums) { album in
-                        AlbumCard(album: album)
-                            .onTapGesture {
-                                store.send(.albumTapped(album))
-                            }
+                    ForEach(store.previewAlbums, id: \.id) { album in
+                        Button {
+                            store.send(.albumTapped(album))
+                        } label: {
+                            AlbumCard(album: album)
+                        }
                     }
                     
                     Button {

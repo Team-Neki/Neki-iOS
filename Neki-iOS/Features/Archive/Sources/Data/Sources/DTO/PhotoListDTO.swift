@@ -29,7 +29,10 @@ public enum PhotoListDTO {
                     folderID: $0.folderID,
                     isfavorite: $0.favorite,
                     contentType: $0.contentType,
-                    createdAt: $0.createdAt
+                    createdAt: $0.createdAt,
+                    memo: $0.memo,
+                    width: $0.width,
+                    height: $0.height
                 )
             }
         }
@@ -41,13 +44,15 @@ public enum PhotoListDTO {
         let folderID: Int?
         let favorite: Bool
         let contentType, createdAt: String
+        let memo: String?
+        let width, height: Int?
         
         enum CodingKeys: String, CodingKey {
             case photoID = "photoId"
             case imageURL = "imageUrl"
             case folderID = "folderId"
             case favorite = "favorite"
-            case contentType, createdAt
+            case contentType, createdAt, memo, width, height
         }
     }
     

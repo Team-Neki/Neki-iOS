@@ -20,6 +20,7 @@ struct ArchiveImageFooter: View {
     let onDownload: () -> Void
     let onDelete: () -> Void
     let onFavorite: (() -> Void)?
+    let onTapMemo: (() -> Void)?
     
     // MARK: - Init
     
@@ -28,13 +29,15 @@ struct ArchiveImageFooter: View {
         isFavorite: Bool? = nil,
         onDownload: @escaping () -> Void,
         onDelete: @escaping () -> Void,
-        onFavorite: (() -> Void)? = nil
+        onFavorite: (() -> Void)? = nil,
+        onTapMemo: (() -> Void)? = nil
     ) {
         self.isEnabled = isEnabled
         self.isFavorite = isFavorite
         self.onDownload = onDownload
         self.onDelete = onDelete
         self.onFavorite = onFavorite
+        self.onTapMemo = onTapMemo
     }
     
     // MARK: - Body
@@ -44,19 +47,25 @@ struct ArchiveImageFooter: View {
             Button(action: onDownload) {
                 Image(isEnabled ? .iconDownloadFill : .iconDownload)
                     .renderingMode(.template)
-                    .foregroundStyle(isEnabled ? .gray500 : .gray100)
+                    .foregroundStyle(isEnabled ? .gray700 : .gray100)
             }
-            .frame(width: 44, height: 44)
             .disabled(!isEnabled)
             
             if let isFavorite = isFavorite, let onFavorite = onFavorite {
                 Button(action: onFavorite) {
                     Image(isFavorite ? .iconHeart28Fill : .iconHeart28Gray)
                         .renderingMode(.template)
-                        .foregroundStyle(isFavorite ? .red : .gray300)
+                        .foregroundStyle(isFavorite ? .red : .gray700)
                 }
-                .padding(.leading, 12)
-                .frame(width: 44, height: 44)
+                .padding(.leading, 16)
+            }
+            
+            if let onTapMemo = onTapMemo {
+                Button(action: onTapMemo) {
+                    Image(.iconNote)
+                        .foregroundStyle(.gray700)
+                }
+                .padding(.leading, 16)
             }
             
             Spacer()
@@ -64,13 +73,12 @@ struct ArchiveImageFooter: View {
             Button(action: onDelete) {
                 Image(isEnabled ? .iconTrashFill : .iconTrash)
                     .renderingMode(.template)
-                    .foregroundStyle(isEnabled ? .gray600 : .gray100)
+                    .foregroundStyle(isEnabled ? .gray700 : .gray100)
             }
-            .frame(width: 44, height: 44)
             .disabled(!isEnabled)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, 20)
         .background(Color.white)
         .overlay(
             Rectangle()

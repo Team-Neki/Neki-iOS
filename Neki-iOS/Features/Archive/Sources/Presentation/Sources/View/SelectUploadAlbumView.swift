@@ -37,6 +37,10 @@ struct SelectUploadAlbumView: View {
                     .transition(.move(edge: .trailing))
                 }
             }
+            
+            if store.isLoading {
+                LoadingView(message: "사진을 업로드하고 있어요.")
+            }
         }
         .animation(.easeInOut, value: store.viewMode)
     }
@@ -90,7 +94,8 @@ private extension SelectUploadAlbumView {
                     Button {
                         store.send(.tapConfirmUpload)
                     } label: {
-                        Text("\(store.uploadedImageIds.count)장 업로드")
+                        // 💡 에러 수정: pendingUploadImages 프로퍼티를 참조하도록 변경했습니다.
+                        Text("\(store.pendingUploadImages.count)장 업로드")
                             .nekiFont(.body16SemiBold)
                             .foregroundStyle(store.selectedAlbumId == nil ? .gray200 : .primary500)
                     }
@@ -127,8 +132,6 @@ private extension SelectUploadAlbumView {
                 }
             }
             .padding(.top, 8)
-            
         }
-        
     }
 }

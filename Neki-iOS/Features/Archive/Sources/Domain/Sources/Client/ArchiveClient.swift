@@ -14,7 +14,7 @@ struct ArchiveClient {
     public var fetchPhotoList: (_ folderId: Int?, _ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
     public var getAlbumList: () async throws -> [AlbumEntity]
     public var deletePhotoList: (_ photoIds: [Int]) async throws -> Void
-    public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?)], _ favorite: Bool?) async throws -> Void
+    public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], _ favorite: Bool?) async throws -> Void
     public var getFavoriteAlbumInfo: () async throws -> FavoriteAlbumEntity
     public var addFolder: (_ name: String) async throws -> Int
     public var deleteFolders: (_ folderIDs: [Int], _ deletePhotos: Bool) async throws -> Void
@@ -22,6 +22,8 @@ struct ArchiveClient {
     public var toggleFavorite: (_ photoID: Int, _ request: Bool) async throws -> Void
     public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
     public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
+    public var updatePhotoMemo: (_ photoID: Int, _ memo: String) async throws -> Void
+    public var clearCache: () async -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -61,6 +63,12 @@ extension ArchiveClient: DependencyKey {
             },
             editAlbumName: { albumID, name in
                 try await archiveRepository.editAlbumName(albumID: albumID, name: name)
+            },
+            updatePhotoMemo: { photoID, memo in
+                try await archiveRepository.updatePhotoMemo(photoID: photoID, memo: memo)
+            },
+            clearCache: {
+                await archiveRepository.clearCache()
             }
         )
     }

@@ -31,65 +31,46 @@ struct ArchiveFeature {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
         
-        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
-        
         var isFetchingPhotos: Bool = false
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
-        
         case clearData
-        
-        // View Life Cycle Action
         case onAppear
-        
-        // User Action
         case onTapAllPhotos
         case onTapAllAlbums
         case openAppSettings
-        
         case onTapFavorite(item: ArchiveImageItem)
         case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
-        
-        // Add Folder Action
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
         case addFolderResponse(Result<Int, Error>)
-        
-        // QR Scanner Action
         case onTapQRScan
-        
-        // Fetch Actions
         case fetchAlbums
         case fetchPhotos
-        
-        // Responses
         case albumsResponse(Result<[AlbumItem], Error>)
         case favoriteAlbumResponse(Result<AlbumItem, Error>)
         case photoListResponse(Result<[PhotoEntity], Error>)
-        case uploadSharedImagesResponse(Result<[Int], Error>)
         
-        // Image Upload Action
         case imagePicker(ImagePickerFeature.Action)
         case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
         
-        // Pagination
         case loadMorePhotos
-        
-        // Navigation Action
         case imageTapped(ArchiveImageItem)
         case albumTapped(AlbumItem)
         case afterUploadNavigateToAlbumDetail(AlbumItem)
         
-        // Internal Action
         case addPhotoFromQRScanner(imageID: Int)
-        case processUploadImages(imageIDs: [Int])
+        
+        case processUploadImages(entities: [ImageUploadEntity])
+        case uploadSharedImagesResponse(Result<[ImageUploadEntity], Error>)
+        
         case addPhotoFromShareExtension(appGroupID: String)
         case cleanSharedImages(appGroupID: String)
         
-        // Delegate Action
         case delegate(DelegateAction)
         enum DelegateAction {
             case showToast(NekiToastItem)
@@ -104,9 +85,7 @@ struct ArchiveFeature {
     var body: some ReducerOf<Self> {
         BindingReducer()
         
-        Scope(state: \.imagePicker, action: \.imagePicker) {
-            ImagePickerFeature()
-        }
+        Scope(state: \.imagePicker, action: \.imagePicker) { ImagePickerFeature() }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
@@ -114,21 +93,16 @@ struct ArchiveFeature {
             case .clearData:
                 state.photos.removeAll()
                 state.albums.removeAll()
-                return .none
-                
-                // MARK: - View Life Cycle Action
+                return .run { _ in
+                    await archiveClient.clearCache()
+                }
                 
             case .onAppear:
-                return .merge(
-                    .send(.fetchAlbums),
-                    .send(.fetchPhotos)
-                )
+                return .merge(.send(.fetchAlbums), .send(.fetchPhotos))
                 
             case let .onTapFavorite(item):
                 let newStatus = !item.isFavorite
-                
                 state.photos[id: item.id]?.isFavorite = newStatus
-                
                 return .run { [id = item.id, isFavorite = newStatus] send in
                     do {
                         try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
@@ -139,16 +113,11 @@ struct ArchiveFeature {
                 }
                 
             case .toggleFavoriteResponse(_, .success):
-                return .merge(
-                    .send(.fetchAlbums),
-                    .send(.fetchPhotos)
-                )
+                return .merge(.send(.fetchAlbums), .send(.fetchPhotos))
                 
             case let .toggleFavoriteResponse(photoID, .failure):
                 state.photos[id: photoID]?.isFavorite.toggle()
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
-                
-                // MARK: - Add Folder Action
                 
             case .onTapCancelAddAlbum:
                 state.newAlbumTitle = ""
@@ -160,11 +129,8 @@ struct ArchiveFeature {
                 let title = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
-                
                 return .run { send in
-                    await send(.addFolderResponse(Result {
-                        try await archiveClient.addFolder(title)
-                    }))
+                    await send(.addFolderResponse(Result { try await archiveClient.addFolder(title) }))
                 }
                 
             case .addFolderResponse(.success):
@@ -176,25 +142,14 @@ struct ArchiveFeature {
             case .addFolderResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 만들지 못했어요", style: .error))))
                 
-                // MARK: - QR Scanner Action
-                
-            case .onTapQRScan:
-                return .send(.delegate(.requestQRScan))
-                
-                // MARK: - Fetch Logic
+            case .onTapQRScan: return .send(.delegate(.requestQRScan))
                 
             case .fetchAlbums:
                 return .merge(
                     .run { send in
                         do {
                             let entity = try await archiveClient.getFavoriteAlbumInfo()
-                            let favoriteAlbum = AlbumItem(
-                                id: 0,
-                                title: "즐겨찾기",
-                                count: entity.totalCount,
-                                coverImageURL: URL(string: entity.latestImageURL),
-                                isFavorite: true
-                            )
+                            let favoriteAlbum = AlbumItem(id: -1, title: "즐겨찾기", count: entity.totalCount, coverImageURL: URL(string: entity.latestImageURL), isFavorite: true)
                             await send(.favoriteAlbumResponse(.success(favoriteAlbum)))
                         } catch {
                             await send(.favoriteAlbumResponse(.failure(error)))
@@ -203,15 +158,7 @@ struct ArchiveFeature {
                     .run { send in
                         await send(.albumsResponse(Result {
                             let entities = try await archiveClient.getAlbumList()
-                            return entities.map {
-                                AlbumItem(
-                                    id: $0.id,
-                                    title: $0.name,
-                                    count: $0.photoCount,
-                                    coverImageURL: URL(string: $0.coverImageURLString),
-                                    isFavorite: false
-                                )
-                            }
+                            return entities.map { AlbumItem(id: $0.id, title: $0.name, count: $0.photoCount, coverImageURL: URL(string: $0.coverImageURLString), isFavorite: false) }
                         }))
                     }
                 )
@@ -229,39 +176,33 @@ struct ArchiveFeature {
                 var newAlbums: [AlbumItem] = []
                 if let fav = favorite { newAlbums.append(fav) }
                 newAlbums.append(contentsOf: fetchedAlbums)
-                
                 state.albums = IdentifiedArray(uniqueElements: newAlbums)
                 return .none
                 
             case .albumsResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 불러오지 못했어요", style: .error))))
                 
-                
-                // MARK: - Fetch Photos
-                
             case .fetchPhotos:
                 guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
-                
                 return .run { send in
-                    await send(.photoListResponse(Result {
-                        let photos = try await archiveClient.fetchPhotoList(nil, nil, nil)
-                        return photos
-                    }))
+                    await send(.photoListResponse(Result { try await archiveClient.fetchPhotoList(nil, nil, nil) }))
                 }
                 
             case let .photoListResponse(.success(entities)):
                 state.isFetchingPhotos = false
-                
                 let items = entities.map { entity in
                     ArchiveImageItem(
                         id: entity.photoID,
                         imageURLString: entity.imageURL,
                         isFavorite: entity.isfavorite,
-                        date: entity.createdAt.toISO8601Date()
+                        date: entity.createdAt.toISO8601Date(),
+                        folderId: entity.folderID,
+                        memo: entity.memo ?? "",
+                        width: entity.width,
+                        height: entity.height
                     )
                 }
-                
                 state.photos = IdentifiedArray(uniqueElements: items)
                 return .none
                 
@@ -269,22 +210,15 @@ struct ArchiveFeature {
                 state.isFetchingPhotos = false
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
-            case .loadMorePhotos:
-                return .send(.fetchPhotos)
+            case .loadMorePhotos: return .send(.fetchPhotos)
                 
-                // MARK: - Image Upload
+            case let .imagePicker(.delegate(.imagesConverted(entities))):
+                return .send(.processUploadImages(entities: entities))
                 
-            case .imagePicker(.uploadStarted):
-                state.isLoading = true
-                return .none
-                
-            case let .imagePicker(.uploadCompleted(ids)):
-                return .send(.processUploadImages(imageIDs: ids))
-                
-            case let .processUploadImages(imageIDs):
+            case let .processUploadImages(entities):
                 state.isLoading = false
-                guard !imageIDs.isEmpty else { return .none }
-                state.selectUploadAlbum = SelectUploadAlbumFeature.State(uploadedImageIds: imageIDs, albums: state.albums)
+                guard !entities.isEmpty else { return .none }
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities, albums: state.albums)
                 return .none
                 
             case let .addPhotoFromShareExtension(appGroupID):
@@ -292,91 +226,71 @@ struct ArchiveFeature {
                 return .run { send in
                     do {
                         let fileURLs = try await sharedImageClient.fetchSharedImageURLs(appGroupID: appGroupID)
-                        
-                        guard fileURLs.isEmpty == false else {
+                        guard !fileURLs.isEmpty else {
                             await send(.delegate(.showToast(NekiToastItem("가져올 수 있는 이미지가 없어요.", style: .error))))
                             await send(.uploadSharedImagesResponse(.failure(UploadError.uploadFailed)))
                             return
                         }
                         
-                        let uploadedMediaIDs = try await imageUploadClient.uploadConcurrentlyFromURLs(fileURLs, .photoBooth)
-                        
+                        var entities: [ImageUploadEntity] = []
+                        for url in fileURLs {
+                            if let data = try? Data(contentsOf: url) {
+                                entities.append(ImageUploadEntity(data: data, format: .jpeg, size: data.count))
+                            }
+                        }
                         await send(.cleanSharedImages(appGroupID: appGroupID))
-                        await send(.uploadSharedImagesResponse(.success(uploadedMediaIDs)))
-                        
+                        await send(.uploadSharedImagesResponse(.success(entities)))
                     } catch {
-                        Logger.presentation.error("공유 확장 이미지 업로드 에러: \(error)")
-                        
                         await send(.cleanSharedImages(appGroupID: appGroupID))
                         await send(.uploadSharedImagesResponse(.failure(error)))
                     }
                 }
                 
-            case let .selectUploadAlbum(.presented(.delegate(delegateAction))):
-                switch delegateAction {
-                case let .uploadDidSuccess(albumId):
-                    state.selectUploadAlbum = nil
-                    
-                    if let albumId = albumId, let album = state.albums.first(where: { $0.id == albumId }) {
-                        return .run { send in
-                            await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
-                            await send(.fetchPhotos)
-                            await send(.fetchAlbums)
-                            try? await Task.sleep(for: .milliseconds(400))
-                            await send(.afterUploadNavigateToAlbumDetail(album))
-                        }
-                    }
-                    
+            case let .selectUploadAlbum(.presented(.delegate(.uploadDidSuccess(albumId)))):
+                state.selectUploadAlbum = nil
+                if let albumId = albumId, let album = state.albums.first(where: { $0.id == albumId }) {
                     return .run { send in
                         await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                         await send(.fetchPhotos)
                         await send(.fetchAlbums)
+                        try? await Task.sleep(for: .milliseconds(400))
+                        await send(.afterUploadNavigateToAlbumDetail(album))
                     }
-                    
-                case .uploadDidFail:
-                    state.selectUploadAlbum = nil
-                    return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
+                }
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
+                    await send(.fetchPhotos)
+                    await send(.fetchAlbums)
                 }
                 
-            case .imagePicker(.uploadFailed):
-                state.isLoading = false
+            case .selectUploadAlbum(.presented(.delegate(.uploadDidFail))):
+                state.selectUploadAlbum = nil
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
             case let .addPhotoFromQRScanner(imageID):
                 return .run { send in
-                    try await archiveClient.registerPhotos(nil, [(imageID, nil)], false)
+                    try await archiveClient.registerPhotos(nil, [(imageID, nil, PhotoUploadMethod.qr)], false)
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
                 } catch: { error, send in
-                    Logger.presentation.error("사진 등록 실패: \(error)")
                     await send(.delegate(.showToast(NekiToastItem("사진 등록에 실패했어요", style: .error))))
                 }
                 
             case let .cleanSharedImages(appGroupID):
                 return .run { send in
-                    do {
-                        try await sharedImageClient.clearSharedImages(appGroupID: appGroupID)
-                    } catch {
-                        Logger.presentation.error("임시 파일 정리 실패: \(error)")
-                    }
+                    try? await sharedImageClient.clearSharedImages(appGroupID: appGroupID)
                 }
                 
-            case let .uploadSharedImagesResponse(.success(imageIDs)):
-                return .send(.processUploadImages(imageIDs: imageIDs))
+            case let .uploadSharedImagesResponse(.success(entities)):
+                return .send(.processUploadImages(entities: entities))
                 
             case .uploadSharedImagesResponse(.failure):
                 state.isLoading = false
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
-                // MARK: - Binding
-                
             case .binding(\.newAlbumTitle):
                 let inputTitle = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                if state.albums.contains(where: { $0.title == inputTitle }) {
-                    state.albumTitleErrorMessage = "이미 사용 중인 앨범명이에요."
-                } else {
-                    state.albumTitleErrorMessage = nil
-                }
+                state.albumTitleErrorMessage = state.albums.contains(where: { $0.title == inputTitle }) ? "이미 사용 중인 앨범명이에요." : nil
                 return .none
                 
             default:

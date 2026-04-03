@@ -36,7 +36,7 @@ struct ArchiveAlbumDetailFeature {
         
         var isFetchingPhotos: Bool = false
         
-        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
         
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
@@ -50,41 +50,31 @@ struct ArchiveAlbumDetailFeature {
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
-        
         case onAppear
-        
         case toggleDropDownMenu
         case closeDropDownMenu
-        
         case onTapBackButton
         case onTapSelectButton
         case onTapCancelSelectButton
-        
         case onTapFavorite(item: ArchiveImageItem)
         case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
-        
         case onTapCancelEditAlbum
         case onTapConfirmEditAlbum
         case editAlbumResponse(Result<Void, Error>)
         
         case imagePicker(ImagePickerFeature.Action)
-        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
-        case processUploadImages(imageIDs: [Int])
-        case registerPhotos(imageIDs: [Int])
+        
+        case processUploadImages(entities: [ImageUploadEntity])
+        case registerPhotos(entities: [ImageUploadEntity])
         case registerPhotosResponse(Result<Void, Error>)
         
-        // 기능 액션
         case onTapDownloadButton
         case downloadImagesResponse(successCount: Int)
-        
         case onTapDeleteButton(option: ArchivePhotoDeleteOption)
         case deletePhotosResponse(Result<Void, Error>)
-        
         case fetchPhotos
         case photoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
-        
-        // 네비게이션
         case imageTapped(ArchiveImageItem)
         
         case delegate(Delegate)
@@ -95,6 +85,7 @@ struct ArchiveAlbumDetailFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
     
     var body: some ReducerOf<Self> {
@@ -141,36 +132,27 @@ struct ArchiveAlbumDetailFeature {
                 state.photos[id: photoID]?.isFavorite.toggle()
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
-                // MARK: - Image Upload
+            // MARK: - Image Upload
                 
-            case .imagePicker(.uploadStarted):
+            case let .imagePicker(.delegate(.imagesConverted(entities))):
+                state.showDropDownMenu = false
+                return .send(.processUploadImages(entities: entities))
+                
+            case let .processUploadImages(entities):
+                state.isLoading = false
+                guard !entities.isEmpty else { return .none }
                 state.isLoading = true
-                return .send(.closeDropDownMenu)
+                return .send(.registerPhotos(entities: entities))
                 
-            case let .imagePicker(.uploadCompleted(ids)):
-                return .send(.processUploadImages(imageIDs: ids))
-                
-            case .imagePicker(.uploadFailed):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
-                
-            case let .processUploadImages(imageIDs):
-                state.isLoading = false
-                guard !imageIDs.isEmpty else { return .none }
-                return .send(.registerPhotos(imageIDs: imageIDs))
-                
-            case let .registerPhotos(imageIDs):
+            case let .registerPhotos(entities):
                 let albumId = state.album.id
                 
-                return .run { [mediaIds = imageIDs, albumId] send in
+                return .run { send in
                     await send(.registerPhotosResponse(
                         Result {
-                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
-                            try await archiveClient.registerPhotos(
-                                folderId: albumId,
-                                uploads: uploads,
-                                favorite: false
-                            )
+                            let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.direct) }
+                            try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads ,favorite: false)
                         }
                     ))
                 }
@@ -186,7 +168,7 @@ struct ArchiveAlbumDetailFeature {
                 state.isLoading = false
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
-                // MARK: - Edit Album Action
+            // MARK: - Edit Album Action
                 
             case .onTapCancelEditAlbum:
                 state.newAlbumTitle = state.album.title
@@ -239,7 +221,10 @@ struct ArchiveAlbumDetailFeature {
                         imageURLString: entity.imageURL,
                         isFavorite: entity.isfavorite,
                         date: entity.createdAt.toISO8601Date(),
-                        folderId: currentAlbumId
+                        folderId: currentAlbumId,
+                        memo: entity.memo ?? "",
+                        width: entity.width,
+                        height: entity.height
                     )
                 }
                 

@@ -107,7 +107,7 @@ extension NekiToolBar {
                 } label: {
                     Image(uiImage: image)
                 }
-                .frame(width: 52, height: 52)
+                .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
             }
         }

@@ -12,17 +12,27 @@ public struct ImageUploadEntity: Identifiable, Sendable {
     public let data: Data
     public let format: ImageFileFormat
     
+    public let width: Int?
+    public let height: Int?
+    public let size: Int?
+    
     public var contentType: String { format.contentType }
     public var fileExtension: String { format.fileExtension }
     
     public init(
         id: UUID = UUID(),
         data: Data,
-        format: ImageFileFormat
+        format: ImageFileFormat,
+        width: Int? = nil,
+        height: Int? = nil,
+        size: Int? = nil
     ) {
         self.id = id
         self.data = data
         self.format = format
+        self.width = width
+        self.height = height
+        self.size = size
     }
 }
 

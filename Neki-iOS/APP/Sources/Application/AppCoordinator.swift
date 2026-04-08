@@ -195,7 +195,8 @@ struct AppCoordinator {
                 case let .signedIn(user):
                     if case var .mainTab(mainTabState) = state.route {
                         mainTabState.user = user
-                        state.route = .mainTab(.init(user: user))
+                        mainTabState.myPage.root.user = user
+                        state.route = .mainTab(mainTabState)
                         return .none
                     }
                     state.route = .mainTab(.init(user: user))

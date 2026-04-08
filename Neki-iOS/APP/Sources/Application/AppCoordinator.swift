@@ -193,13 +193,8 @@ struct AppCoordinator {
                 
                 switch newStatus {
                 case let .signedIn(user):
-                    if case var .mainTab(mainTabState) = state.route {
-                        mainTabState.user = user
-                        mainTabState.myPage.root.user = user
-                        state.route = .mainTab(mainTabState)
-                        return .none
-                    }
-                    state.route = .mainTab(.init(user: user))
+                    if case .mainTab = state.route { return .none }
+                    state.route = .mainTab(.init())
                     return .none
                     
                 case .signedOut:
@@ -222,22 +217,15 @@ struct AppCoordinator {
                 
             case let .route(.auth(.delegate(.moveToMainTab(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
-                state.route = .mainTab(.init(user: user))
+                state.route = .mainTab(.init())
                 return .send(.executePendingShareExtensionIfNeeded)
                 
-            case .route(.mainTab(.delegate(.signedOut))):
+            case .route(.mainTab(.delegate(.signedOut))), .route(.mainTab(.delegate(.withdraw))):
                 state.$userSessionStatus.withLock { $0 = .signedOut }
+                if case .route(.mainTab(.delegate(.withdraw))) = action {
+                    state.initializeUserDefaults()
+                }
                 state.route = .auth(.init())
-                return .none
-                
-            case .route(.mainTab(.delegate(.withdraw))):
-                state.$userSessionStatus.withLock { $0 = .signedOut }
-                state.initializeUserDefaults()
-                state.route = .auth(.init())
-                return .none
-                
-            case let .route(.mainTab(.delegate(.profileUpdated(user)))):
-                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 return .none
                 
             case .binding(\.isAlertPresented):
@@ -254,8 +242,8 @@ struct AppCoordinator {
     
     private func navigateToNextScreen(state: inout State, sessionStatus: UserSessionStatus) -> Effect<Action> {
         switch sessionStatus {
-        case .signedIn(let user):
-            state.route = .mainTab(.init(user: user))
+        case .signedIn:
+            state.route = .mainTab(.init())
             return .send(.executePendingShareExtensionIfNeeded)
             
         case .signedOut, .expired:

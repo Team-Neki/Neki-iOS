@@ -69,12 +69,20 @@ private extension AccountPreferenceView {
     
     var profileArea: some View {
         VStack(spacing: 16) {
-            KFImage(store.user.profileImageURL)
-                .resizable()
-                .onFailureImage(.iconDefaultProfile)
-                .scaledToFill()
-                .frame(width: 142, height: 142)
-                .clipShape(.circle)
+            ZStack(alignment: .bottomTrailing) {
+                KFImage(store.user.profileImageURL)
+                    .resizable()
+                    .onFailureImage(.iconDefaultProfile)
+                    .scaledToFill()
+                    .frame(width: 142, height: 142)
+                    .clipShape(.circle)
+                
+                Button {
+                    store.send(.editProfileButtonTapped)
+                } label: {
+                    Image(.iconProfileCamera)
+                }
+            }
             
             HStack(spacing: 9) {
                 Text(store.user.nickname)

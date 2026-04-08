@@ -14,7 +14,7 @@ import os
 struct ProfileEditFeature {
     @ObservableState
     struct State {
-        @ObservationStateIgnored let user: User
+        @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
         var nickname: String
         var currentProfileImageURL: URL?
         var selectedProfileImage: UIImage?
@@ -29,8 +29,18 @@ struct ProfileEditFeature {
         
         var isProfileSelectionAlertPresented: Bool = false
         
+        var user: User {
+            get {
+                guard case let .signedIn(user) = userSessionStatus else { return .dummy }
+                return user
+            }
+            
+            set {
+                $userSessionStatus.withLock { $0 = .signedIn(newValue) }
+            }
+        }
+        
         init(user: User) {
-            self.user = user
             nickname = user.nickname
             currentProfileImageURL = user.profileImageURL
         }
@@ -50,9 +60,6 @@ struct ProfileEditFeature {
         
         // Binding Actions
         case binding(BindingAction<State>)
-        
-        // Delegate Actions
-        case profileUpdated(User)
     }
     
     private enum CancelID { case imageLoad }
@@ -134,8 +141,8 @@ struct ProfileEditFeature {
                 
             case let .updateProfileResponse(.success(user)):
                 state.isLoading = false
-                return .run { send in
-                    await send(.profileUpdated(user))
+                state.user = user
+                return .run { _ in
                     await dismiss()
                 }
                 

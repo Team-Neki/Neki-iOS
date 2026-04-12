@@ -225,7 +225,7 @@ private extension ArchiveAlbumDetailView {
             } label: {
                 Text("앨범 삭제")
                     .nekiFont(.body16Medium)
-                    .foregroundStyle(.primary500) // TODO: - 위험한 액션이니 빨간색 어떠냐고 피그마 문의 남김. 답변에 따라 수정가능성 있음
+                    .foregroundStyle(.primary500)
             }
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)

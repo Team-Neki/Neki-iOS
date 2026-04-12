@@ -20,6 +20,8 @@ public enum ArchiveEndpoint {
     case excludePhotosInAlbum(albumID: Int, request: DeletePhotoRequestDTO)
     case editFolderName(albumID: Int, request: FolderDTO.Request)
     case updateMemo(photoID: Int, request: UpdateMemoRequestDTO)
+    case duplicatePhoto(request: UpdateMappingPhotoRequestDTO)
+    case movePhoto(request: UpdateMappingPhotoRequestDTO)
 }
 
 extension ArchiveEndpoint: Endpoint {
@@ -61,6 +63,10 @@ extension ArchiveEndpoint: Endpoint {
             return "folders/\(albumID)"
         case .updateMemo(let id, _):
             return "photos/\(id)"
+        case .duplicatePhoto:
+            return "folders/photos/copy"
+        case .movePhoto:
+            return "folders/photos/move"
         }
     }
     
@@ -122,6 +128,10 @@ extension ArchiveEndpoint: Endpoint {
             return .patch
         case .updateMemo:
             return .put
+        case .duplicatePhoto:
+            return .post
+        case .movePhoto:
+            return .patch
         }
     }
     
@@ -150,6 +160,10 @@ extension ArchiveEndpoint: Endpoint {
         case .editFolderName(_, let request):
             return request
         case .updateMemo(_, let request):
+            return request
+        case .duplicatePhoto(let request):
+            return request
+        case .movePhoto(let request):
             return request
         }
     }

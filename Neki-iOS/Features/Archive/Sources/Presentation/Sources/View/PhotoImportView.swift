@@ -85,7 +85,7 @@ struct PhotoImportView: View {
                     .disabled(!store.isUploadEnabled)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 28)
-                    .padding(.top, 4)   // MARK: - 임의로 넣었음. 너무 딱 붙으니까 이상해서
+                    .padding(.top, 4)
                 }
                 .background(.white)
             }
@@ -94,6 +94,11 @@ struct PhotoImportView: View {
                 dropDownMenu
                     .padding(.top, 91)
                     .padding(.leading, 20)
+            }
+            
+            if store.isLoading {
+                LoadingView(message: "요청을 처리하고 있어요.")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             
         }

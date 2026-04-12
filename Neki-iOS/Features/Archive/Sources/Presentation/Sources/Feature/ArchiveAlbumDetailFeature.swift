@@ -292,8 +292,9 @@ struct ArchiveAlbumDetailFeature {
             case .onTapDownloadButton:
                 guard !state.selectedIDs.isEmpty else { return .none }
                 state.isLoading = true
-                let urls = state.selectedIDs.compactMap { state.photos[id: $0]?.imageURL }
-                return .run { send in
+                return .run { [photos = state.photos, selectedIDs = state.selectedIDs] send in
+                    let urls = selectedIDs.compactMap { photos[id: $0]?.imageURL }
+                    
                     let count = try await imageDownloadClient.downloadImages(urls: urls)
                     await send(.downloadImagesResponse(successCount: count))
                 }

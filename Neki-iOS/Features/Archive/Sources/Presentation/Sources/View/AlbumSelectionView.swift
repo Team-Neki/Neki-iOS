@@ -20,7 +20,7 @@ struct AlbumSelectionView: View {
                 header
                 
                 if store.isFetching && store.albums.isEmpty {
-                    LoadingView(message: "앨범에 추가하고 있어요.")
+                    LoadingView(message: "앨범을 불러오고 있어요.")
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {

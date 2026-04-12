@@ -89,9 +89,7 @@ struct ArchivePhotoDetailView: View {
             }
         }
         .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
-            NavigationStack {
-                AlbumSelectionView(store: selectionStore)
-            }
+            AlbumSelectionView(store: selectionStore)
         }
         .nekiAlert(
             isPresented: $showDeleteAlert,

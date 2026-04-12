@@ -78,9 +78,7 @@ struct ArchiveAllPhotosView: View {
             await store.send(.onAppear).finish()
         }
         .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
-            NavigationStack {
-                AlbumSelectionView(store: selectionStore)
-            }
+            AlbumSelectionView(store: selectionStore)
         }
     }
 }

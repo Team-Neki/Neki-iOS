@@ -39,7 +39,7 @@ struct ArchiveAllPhotosView: View {
                         onDownload: { store.send(.onTapDownloadButton) },
                         onDelete: { showDeleteAlert = true },
                         onDuplicate: { store.send(.onTapDuplicateButton) },
-                        onMove: { store.send(.onTapMoveButton) }
+                        onMove: nil
                     )
                 }
             }

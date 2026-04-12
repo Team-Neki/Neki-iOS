@@ -13,12 +13,3 @@ extension Date {
         return DateFormatters.dotFormat.string(from: self)
     }
 }
-
-private struct DateFormatters {
-    static let dotFormat: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy.MM.dd"
-        formatter.locale = Locale(identifier: "ko_KR")
-        return formatter
-    }()
-}

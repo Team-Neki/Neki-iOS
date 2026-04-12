@@ -21,9 +21,16 @@ struct PhotoImportFeature {
         var isDropdownOpen: Bool = false
         var isFetchingPhotos: Bool = false
         var isFetchingAlbums: Bool = false
+        var isLoading: Bool = false
+        
+        var targetAlbumId: Int 
         
         var uploadCount: Int { selectedIDs.count }
         var isUploadEnabled: Bool { uploadCount > 0 }
+        
+        init(targetAlbumId: Int) {
+            self.targetAlbumId = targetAlbumId
+        }
     }
     
     enum Action: BindableAction {
@@ -45,10 +52,14 @@ struct PhotoImportFeature {
         case tapClose
         case tapUpload
         
+        case taskCompleted(message: String)
+        case taskFailed(message: String)
+        
         case delegate(DelegateAction)
         enum DelegateAction {
-            case didImportPhotos(photoIDs: [Int])
+            case didCompleteTask(message: String)
             case didTapCancel
+            case showToast(NekiToastItem)
         }
     }
     
@@ -159,8 +170,24 @@ struct PhotoImportFeature {
                 
             case .tapUpload:
                 guard state.isUploadEnabled else { return .none }
+                state.isLoading = true
                 let ids = Array(state.selectedIDs)
-                return .send(.delegate(.didImportPhotos(photoIDs: ids)))
+                let targetId = state.targetAlbumId
+                
+                return .run { send in
+                    // TODO: 실제 API 연동 (archiveClient.duplicatePhoto(sourceFolderId: nil, photoIDs: ids, targetFolderIDs: [targetId]))
+                    try? await Task.sleep(for: .seconds(1)) // 임시 딜레이
+                    
+                    await send(.taskCompleted(message: "사진을 앨범에 가져왔어요"))
+                }
+                
+            case let .taskCompleted(message):
+                state.isLoading = false
+                return .send(.delegate(.didCompleteTask(message: message)))
+                
+            case let .taskFailed(message):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem(message, style: .error))))
                 
             case .binding, .delegate:
                 return .none

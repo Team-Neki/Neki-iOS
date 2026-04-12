@@ -74,6 +74,11 @@ struct AlbumSelectionView: View {
             }
             .navigationBarHidden(true)
             .background(Color.white.ignoresSafeArea())
+            
+            if store.isLoading {
+                LoadingView(message: "요청을 처리하고 있어요.")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .task {
             await store.send(.onAppear).finish()

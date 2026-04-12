@@ -13,7 +13,6 @@ struct ArchiveAllPhotosFeature {
     @ObservableState
     struct State {
         @Presents var albumSelection: AlbumSelectionFeature.State?
-        var selectionPurpose: PhotoSelectionPurpose?
         
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         var selectedIDs: Set<Int> = []
@@ -53,8 +52,6 @@ struct ArchiveAllPhotosFeature {
         case onTapDuplicateButton
         case onTapMoveButton
         case albumSelection(PresentationAction<AlbumSelectionFeature.Action>)
-        case duplicatePhotosResponse(Result<Void, Error>)
-        case movePhotosResponse(Result<Void, Error>)
         
         case delegate(Delegate)
         enum Delegate {
@@ -72,7 +69,6 @@ struct ArchiveAllPhotosFeature {
         Reduce { state, action in
             switch action {
             case .onAppear: return .send(.fetchPhotos)
-                
             case .onTapBackButton: return .run { _ in await dismiss() }
                 
             case .onTapSelectButton:
@@ -97,7 +93,6 @@ struct ArchiveAllPhotosFeature {
                 }
                 
             case .toggleFavoriteResponse(_, .success): return .none
-                
             case let .toggleFavoriteResponse(photoID, .failure):
                 state.photos[id: photoID]?.isFavorite.toggle()
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
@@ -107,7 +102,6 @@ struct ArchiveAllPhotosFeature {
                 state.isLoading = true
                 return .run { [photos = state.photos, selectedIDs = state.selectedIDs] send in
                     let urls = selectedIDs.compactMap { photos[id: $0]?.imageURL }
-                    
                     let count = try await imageDownloadClient.downloadImages(urls: urls)
                     await send(.downloadImagesResponse(successCount: count))
                 }
@@ -177,66 +171,32 @@ struct ArchiveAllPhotosFeature {
                 return .none
                 
             case .onTapDuplicateButton:
-                state.selectionPurpose = .duplicate
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count, selectionPurpose: .duplicate, currentAlbumId: nil)
+                state.albumSelection = AlbumSelectionFeature.State(photoIDs: Array(state.selectedIDs), selectionPurpose: .duplicate, currentAlbumId: nil)
                 return .none
                 
             case .onTapMoveButton:
-                state.selectionPurpose = .move
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count, selectionPurpose: .move, currentAlbumId: nil)
+                state.albumSelection = AlbumSelectionFeature.State(photoIDs: Array(state.selectedIDs), selectionPurpose: .move, currentAlbumId: nil)
                 return .none
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case .didSelectAlbums:
-                    let purpose = state.selectionPurpose
-                    
-                    state.isLoading = true
+                case let .didCompleteTask(message):
                     state.albumSelection = nil
-                    state.selectionPurpose = nil
+                    state.isSelectionMode = false
+                    state.selectedIDs.removeAll()
                     
-                    // TODO: - 실제 API 연결하기
-                    return .run { send in
-                        if purpose == .duplicate {
-                            try? await Task.sleep(for: .seconds(1))
-                            await send(.duplicatePhotosResponse(.success(())))
-                        } else {
-                            try? await Task.sleep(for: .seconds(1))
-                            await send(.movePhotosResponse(.success(())))
-                        }
-                    }
+                    return .merge(
+                        .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
+                        .send(.fetchPhotos)
+                    )
                     
                 case .didTapCancel:
                     state.albumSelection = nil
-                    state.selectionPurpose = nil
                     return .none
                     
                 case let .showToast(toastItem):
                     return .send(.delegate(.showToast(toastItem)))
                 }
-                
-            case .duplicatePhotosResponse(.success):
-                state.isLoading = false
-                state.isSelectionMode = false
-                state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(NekiToastItem("사진을 앨범에 추가했어요", style: .success))))
-                
-            case .duplicatePhotosResponse(.failure):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("사진 추가에 실패했어요", style: .error))))
-                
-            case .movePhotosResponse(.success):
-                state.isLoading = false
-                state.isSelectionMode = false
-                state.selectedIDs.removeAll()
-                return .merge(
-                    .send(.delegate(.showToast(NekiToastItem("사진을 앨범으로 이동했어요", style: .success)))),
-                    .send(.fetchPhotos)
-                )
-                
-            case .movePhotosResponse(.failure):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("사진 이동에 실패했어요", style: .error))))
                 
             default: return .none
             }

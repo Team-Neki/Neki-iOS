@@ -50,7 +50,6 @@ struct ArchivePhotoDetailFeature {
         
         case onTapAddToAlbum
         case albumSelection(PresentationAction<AlbumSelectionFeature.Action>)
-        case addToAlbumResponse(Result<Void, Error>)
         
         case onTapBackButton
         case onTapDownload
@@ -85,7 +84,6 @@ struct ArchivePhotoDetailFeature {
             case .onTapBackButton:
                 return .run { _ in await dismiss() }
                 
-                // MARK: - DropDown Menu
             case .toggleDropDownMenu:
                 state.showDropDownMenu.toggle()
                 return .none
@@ -94,12 +92,9 @@ struct ArchivePhotoDetailFeature {
                 state.showDropDownMenu = false
                 return .none
                 
-                // MARK: - Memo
             case .toggleMemoVisibility:
                 state.isMemoVisible.toggle()
-                if !state.isMemoVisible {
-                    state.isMemoExpanded = false
-                }
+                if !state.isMemoVisible { state.isMemoExpanded = false }
                 return .none
                 
             case let .toggleMemoExpanded(isExpanded):
@@ -133,24 +128,16 @@ struct ArchivePhotoDetailFeature {
                 state.editingMemoText = ""
                 return .none
                 
-                // MARK: - Image Transform
             case .onTapTransform:
                 state.showDropDownMenu = false
-                
                 guard let url = state.currentItem?.imageURL else { return .none }
-                
                 return .run { send in
                     do {
                         let image = try await withCheckedThrowingContinuation { continuation in
-                            KingfisherManager.shared.retrieveImage(
-                                with: url,
-                                options: [.cacheOriginalImage]
-                            ) { result in
+                            KingfisherManager.shared.retrieveImage(with: url, options: [.cacheOriginalImage]) { result in
                                 switch result {
-                                case .success(let value):
-                                    continuation.resume(returning: value.image)
-                                case .failure(let error):
-                                    continuation.resume(throwing: error)
+                                case .success(let value): continuation.resume(returning: value.image)
+                                case .failure(let error): continuation.resume(throwing: error)
                                 }
                             }
                         }
@@ -167,25 +154,16 @@ struct ArchivePhotoDetailFeature {
             case .imageFetchResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("이미지를 불러오지 못했어요", style: .error))))
                 
-                
-                // MARK: - Add To Album
             case .onTapAddToAlbum:
                 state.showDropDownMenu = false
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: 1, selectionPurpose: .duplicate, currentAlbumId: state.folderId)
+                state.albumSelection = AlbumSelectionFeature.State(photoIDs: [state.currentItemID], selectionPurpose: .duplicate, currentAlbumId: state.folderId)
                 return .none
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                    
-                case .didSelectAlbums:
+                case let .didCompleteTask(message):
                     state.albumSelection = nil
-                    state.isLoading = true
-                    
-                    // TODO: - 실제 API 연결하기
-                    return .run { send in
-                        try? await Task.sleep(for: .seconds(1))
-                        await send(.addToAlbumResponse(.success(())))
-                    }
+                    return .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
                     
                 case .didTapCancel:
                     state.albumSelection = nil
@@ -195,21 +173,10 @@ struct ArchivePhotoDetailFeature {
                     return .send(.delegate(.showToast(toastItem)))
                 }
                 
-            case .addToAlbumResponse(.success):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("사진을 앨범에 추가했어요", style: .success))))
-                
-            case .addToAlbumResponse(.failure):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("앨범 추가에 실패했어요", style: .error))))
-                
-                
-                // MARK: - 즐겨찾기
             case .onTapFavorite:
                 guard let item = state.currentItem else { return .none }
                 let newStatus = !item.isFavorite
                 state.photos[id: item.id]?.isFavorite = newStatus
-                
                 return .run { [id = item.id, isFavorite = newStatus] send in
                     try? await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
                 }
@@ -217,12 +184,9 @@ struct ArchivePhotoDetailFeature {
             case .toggleFavoriteResponse:
                 return .none
                 
-                
-                // MARK: - 다운로드
             case .onTapDownload:
                 guard let url = state.currentItem?.imageURL else { return .none }
                 state.isLoading = true
-                
                 return .run { [url = url] send in
                     let count = try await imageDownloadClient.downloadImages(urls: [url])
                     await send(.downloadImageResponse(successCount: count))
@@ -230,15 +194,9 @@ struct ArchivePhotoDetailFeature {
                 
             case let .downloadImageResponse(count):
                 state.isLoading = false
+                if count > 0 { return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success)))) }
+                else { return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error)))) }
                 
-                if count > 0 {
-                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
-                } else {
-                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
-                }
-                
-                
-                // MARK: - 삭제
             case .onTapDelete:
                 guard let id = state.currentItem?.id else { return .none }
                 return .run { send in
@@ -272,21 +230,15 @@ struct ArchivePhotoDetailFeature {
             case .onTapShareToInstagramStory:
                 state.showDropDownMenu = false
                 guard let url = state.currentItem?.imageURL else { return .none }
-                
                 state.isLoading = true
                 
                 return .run { send in
                     do {
                         let image = try await withCheckedThrowingContinuation { continuation in
-                            KingfisherManager.shared.retrieveImage(
-                                with: url,
-                                options: [.cacheOriginalImage]
-                            ) { result in
+                            KingfisherManager.shared.retrieveImage(with: url, options: [.cacheOriginalImage]) { result in
                                 switch result {
-                                case .success(let value):
-                                    continuation.resume(returning: value.image)
-                                case .failure(let error):
-                                    continuation.resume(throwing: error)
+                                case .success(let value): continuation.resume(returning: value.image)
+                                case .failure(let error): continuation.resume(throwing: error)
                                 }
                             }
                         }
@@ -299,33 +251,19 @@ struct ArchivePhotoDetailFeature {
             case let .instagramImageFetchResponse(.success(image)):
                 state.isLoading = false
                 return .run { send in
-                    // 이미지를 클립보드에 담고 인스타그램 앱 열기 (MainActor에서 실행)
                     let isShared = await MainActor.run { () -> Bool in
                         guard let urlScheme = URL(string: "instagram-stories://share?source_application=Neki") else { return false }
-                        
-                        // 인스타그램 앱이 설치되어 있는지 확인
                         if UIApplication.shared.canOpenURL(urlScheme) {
                             if let imageData = image.pngData() {
-                                // 인스타 스토리 배경으로 이미지 전달
-                                let pasteboardItems: [[String: Any]] = [
-                                    ["com.instagram.sharedSticker.backgroundImage": imageData]
-                                ]
-                                let pasteboardOptions = [
-                                    UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(60 * 5)
-                                ]
-                                
-                                UIPasteboard.general.setItems(pasteboardItems, options: pasteboardOptions)
+                                let pasteboardItems: [[String: Any]] = [["com.instagram.sharedSticker.backgroundImage": imageData]]
+                                UIPasteboard.general.setItems(pasteboardItems, options: [UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(60 * 5)])
                                 UIApplication.shared.open(urlScheme, options: [:], completionHandler: nil)
                                 return true
                             }
                         }
                         return false
                     }
-                    
-                    // 설치되어 있지 않거나 실패한 경우 토스트
-                    if !isShared {
-                        await send(.delegate(.showToast(NekiToastItem("인스타그램 앱이 설치되어 있지 않아요", style: .error))))
-                    }
+                    if !isShared { await send(.delegate(.showToast(NekiToastItem("인스타그램 앱이 설치되어 있지 않아요", style: .error)))) }
                 }
                 
             case .instagramImageFetchResponse(.failure):

@@ -16,7 +16,9 @@ struct AlbumSelectionFeature {
         var selectedAlbumIDs: Set<Int> = []
         var uploadCount: Int
         var isFetching: Bool = false
+        var isLoading: Bool = false
         
+        var photoIDs: [Int]
         var selectionPurpose: PhotoSelectionPurpose
         var currentAlbumId: Int?
         
@@ -28,8 +30,9 @@ struct AlbumSelectionFeature {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
         
-        init(uploadCount: Int = 1, selectionPurpose: PhotoSelectionPurpose, currentAlbumId: Int? = nil) {
-            self.uploadCount = uploadCount
+        init(photoIDs: [Int], selectionPurpose: PhotoSelectionPurpose, currentAlbumId: Int? = nil) {
+            self.photoIDs = photoIDs
+            self.uploadCount = photoIDs.count
             self.selectionPurpose = selectionPurpose
             self.currentAlbumId = currentAlbumId
         }
@@ -48,6 +51,10 @@ struct AlbumSelectionFeature {
         case tapAlbum(Int)
         case tapConfirm
         
+        // 내부 통신 결과 처리
+        case taskCompleted(message: String)
+        case taskFailed(message: String)
+        
         // 앨범 생성 액션
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
@@ -55,7 +62,7 @@ struct AlbumSelectionFeature {
         
         case delegate(DelegateAction)
         enum DelegateAction {
-            case didSelectAlbums(albumIds: [Int])
+            case didCompleteTask(message: String)
             case didTapCancel
             case showToast(NekiToastItem)
         }
@@ -136,9 +143,25 @@ struct AlbumSelectionFeature {
                 
             case .tapConfirm:
                 guard !state.selectedAlbumIDs.isEmpty else { return .none }
-                return .send(.delegate(.didSelectAlbums(albumIds: Array(state.selectedAlbumIDs))))
+                state.isLoading = true
+                let purpose = state.selectionPurpose
                 
-                // MARK: - 앨범 생성 관련 처리
+                return .run { send in
+                    // TODO: 실제 API 연동 (archiveClient.duplicatePhoto / movePhoto)
+                    try? await Task.sleep(for: .seconds(1))
+                    
+                    let msg = purpose == .duplicate ? "사진을 앨범에 추가했어요" : "사진을 앨범으로 이동했어요"
+                    await send(.taskCompleted(message: msg))
+                }
+                
+            case let .taskCompleted(message):
+                state.isLoading = false
+                return .send(.delegate(.didCompleteTask(message: message)))
+                
+            case let .taskFailed(message):
+                state.isLoading = false
+                return .send(.delegate(.showToast(NekiToastItem(message, style: .error))))
+                
             case .onTapCancelAddAlbum:
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
@@ -159,7 +182,7 @@ struct AlbumSelectionFeature {
             case .addFolderResponse(.success):
                 return .merge(
                     .send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success)))),
-                    .send(.onAppear) // 앨범 목록 갱신
+                    .send(.onAppear)
                 )
                 
             case .addFolderResponse(.failure):

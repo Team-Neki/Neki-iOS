@@ -178,31 +178,30 @@ struct ArchiveAllPhotosFeature {
                 
             case .onTapDuplicateButton:
                 state.selectionPurpose = .duplicate
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count)
+                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count, selectionPurpose: .duplicate, currentAlbumId: nil)
                 return .none
                 
             case .onTapMoveButton:
                 state.selectionPurpose = .move
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count)
+                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count, selectionPurpose: .move, currentAlbumId: nil)
                 return .none
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didSelectAlbum(albumId):
+                case .didSelectAlbums:
                     let purpose = state.selectionPurpose
                     
                     state.isLoading = true
                     state.albumSelection = nil
                     state.selectionPurpose = nil
                     
+                    // TODO: - 실제 API 연결하기
                     return .run { send in
                         if purpose == .duplicate {
-                            // TODO: API 붙이기
-                            try? await Task.sleep(for: .seconds(1)) // 테스트용 임시 딜레이
+                            try? await Task.sleep(for: .seconds(1))
                             await send(.duplicatePhotosResponse(.success(())))
                         } else {
-                            // TODO: API 붙이기
-                            try? await Task.sleep(for: .seconds(1)) // 테스트용 임시 딜레이
+                            try? await Task.sleep(for: .seconds(1))
                             await send(.movePhotosResponse(.success(())))
                         }
                     }
@@ -230,7 +229,10 @@ struct ArchiveAllPhotosFeature {
                 state.isLoading = false
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                return .send(.delegate(.showToast(NekiToastItem("사진을 앨범으로 이동했어요", style: .success))))
+                return .merge(
+                    .send(.delegate(.showToast(NekiToastItem("사진을 앨범으로 이동했어요", style: .success)))),
+                    .send(.fetchPhotos)
+                )
                 
             case .movePhotosResponse(.failure):
                 state.isLoading = false

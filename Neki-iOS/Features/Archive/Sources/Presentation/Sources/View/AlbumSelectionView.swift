@@ -53,13 +53,14 @@ struct AlbumSelectionView: View {
                                     album: album,
                                     isSelectMode: true,
                                     isDeleteMode: false,
-                                    isSelected: store.selectedAlbumId == album.id
+                                    isSelected: store.selectedAlbumIDs.contains(album.id)
                                 )
                                 .padding(.horizontal, 20)
                                 .contentShape(Rectangle())
+                                .opacity(album.id == store.currentAlbumId ? 0.4 : 1.0)
                                 .onTapGesture {
-                                    // 즐겨찾기 앨범은 선택하지 못하도록 예외 처리
-                                    if !album.isFavorite {
+                                    // 즐겨찾기 앨범이랑 현재 앨범은 선택하지 못하도록 예외 처리
+                                    if !album.isFavorite || !(album.id == store.currentAlbumId) {
                                         store.send(.tapAlbum(album.id))
                                     }
                                 }
@@ -68,6 +69,7 @@ struct AlbumSelectionView: View {
                         .padding(.top, 8)
                         .padding(.bottom, 40)
                     }
+                    .scrollIndicators(.hidden)
                 }
             }
             .navigationBarHidden(true)
@@ -115,9 +117,9 @@ extension AlbumSelectionView {
                 } label: {
                     Text("\(store.uploadCount)장 업로드")
                         .nekiFont(.body16SemiBold)
-                        .foregroundStyle(store.selectedAlbumId == nil ? .gray200 : .primary500)
+                        .foregroundStyle(store.selectedAlbumIDs.isEmpty ? .gray200 : .primary500)
                 }
-                .disabled(store.selectedAlbumId == nil)
+                .disabled(store.selectedAlbumIDs.isEmpty)
             }
             .frame(height: 54)
             .padding(.horizontal, 20)

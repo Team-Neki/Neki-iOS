@@ -13,9 +13,12 @@ struct AlbumSelectionFeature {
     @ObservableState
     struct State {
         var albums: IdentifiedArrayOf<AlbumItem> = []
-        var selectedAlbumId: Int? = nil
+        var selectedAlbumIDs: Set<Int> = []
         var uploadCount: Int
         var isFetching: Bool = false
+        
+        var selectionPurpose: PhotoSelectionPurpose
+        var currentAlbumId: Int?
         
         // 앨범 생성관련
         var newAlbumTitle: String = ""
@@ -25,8 +28,10 @@ struct AlbumSelectionFeature {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
         
-        init(uploadCount: Int = 1) {
+        init(uploadCount: Int = 1, selectionPurpose: PhotoSelectionPurpose, currentAlbumId: Int? = nil) {
             self.uploadCount = uploadCount
+            self.selectionPurpose = selectionPurpose
+            self.currentAlbumId = currentAlbumId
         }
     }
     
@@ -50,7 +55,7 @@ struct AlbumSelectionFeature {
         
         case delegate(DelegateAction)
         enum DelegateAction {
-            case didSelectAlbum(albumId: Int)
+            case didSelectAlbums(albumIds: [Int])
             case didTapCancel
             case showToast(NekiToastItem)
         }
@@ -108,19 +113,30 @@ struct AlbumSelectionFeature {
                 return .send(.delegate(.didTapCancel))
                 
             case let .tapAlbum(id):
-                // 즐겨찾기 앨범은 선택 불가하게
+                // 즐겨찾기 앨범이거나, 현재 진입한 앨범이면 선택 무시
                 guard id != -1 else { return .none }
+                guard id != state.currentAlbumId else { return .none }
                 
-                if state.selectedAlbumId == id {
-                    state.selectedAlbumId = nil
+                if state.selectionPurpose == .move {
+                    // [사진 이동] 단일 선택 처리
+                    if state.selectedAlbumIDs.contains(id) {
+                        state.selectedAlbumIDs.removeAll()
+                    } else {
+                        state.selectedAlbumIDs = [id]
+                    }
                 } else {
-                    state.selectedAlbumId = id
+                    // [사진 복제] 다중 선택 처리
+                    if state.selectedAlbumIDs.contains(id) {
+                        state.selectedAlbumIDs.remove(id)
+                    } else {
+                        state.selectedAlbumIDs.insert(id)
+                    }
                 }
                 return .none
                 
             case .tapConfirm:
-                guard let id = state.selectedAlbumId else { return .none }
-                return .send(.delegate(.didSelectAlbum(albumId: id)))
+                guard !state.selectedAlbumIDs.isEmpty else { return .none }
+                return .send(.delegate(.didSelectAlbums(albumIds: Array(state.selectedAlbumIDs))))
                 
                 // MARK: - 앨범 생성 관련 처리
             case .onTapCancelAddAlbum:

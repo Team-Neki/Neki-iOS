@@ -226,19 +226,18 @@ struct ArchiveAlbumDetailFeature {
                 
             case .onTapDuplicateButton:
                 state.selectionPurpose = .duplicate
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count)
+                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count, selectionPurpose: .duplicate, currentAlbumId: state.album.id)
                 return .none
                 
             case .onTapMoveButton:
                 state.selectionPurpose = .move
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count)
+                state.albumSelection = AlbumSelectionFeature.State(uploadCount: state.selectedIDs.count, selectionPurpose: .move, currentAlbumId: state.album.id)
                 return .none
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didSelectAlbum(albumId):
+                case let .didSelectAlbums(albumIds):
                     let purpose = state.selectionPurpose
-                    let selectedIDs = Array(state.selectedIDs)
                     
                     state.albumSelection = nil
                     state.selectionPurpose = nil
@@ -287,7 +286,6 @@ struct ArchiveAlbumDetailFeature {
             case .movePhotosResponse(.failure):
                 state.isLoading = false
                 return .send(.delegate(.showToast(NekiToastItem("사진 이동에 실패했어요", style: .error))))
-                
                 
             case .onTapDownloadButton:
                 guard !state.selectedIDs.isEmpty else { return .none }
@@ -352,7 +350,7 @@ struct ArchiveAlbumDetailFeature {
                 
             case let .photoImport(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didImportPhotos(photoIDs):
+                case .didImportPhotos:
                     state.photoImport = nil
                     state.isLoading = true
                     

@@ -171,32 +171,21 @@ struct ArchivePhotoDetailFeature {
                 // MARK: - Add To Album
             case .onTapAddToAlbum:
                 state.showDropDownMenu = false
-                state.albumSelection = AlbumSelectionFeature.State(uploadCount: 1)
+                state.albumSelection = AlbumSelectionFeature.State(uploadCount: 1, selectionPurpose: .duplicate, currentAlbumId: state.folderId)
                 return .none
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
                     
-                case let .didSelectAlbum(albumId):
-                    //                    let photoId = state.currentItemID
-                    //                    state.albumSelection = nil
-                    //                    state.isLoading = true
-                    //
-                    // TODO: - 어떤 식으로 업로드 할 건지 서버측과 논의 필요함
-                    // 그냥 킹피셔로 데이터 추출해서 새로운 파일로 업로드하는 것도 가능하긴 한데, 흠
-                    //                    return .run { send in
-                    //                        await send(.addToAlbumResponse(Result {
-                    //                            let isFavorite = albumId == -1
-                    //                            let targetFolderId = isFavorite ? nil : albumId
-                    //
-                    //                            try await archiveClient.registerPhotos(
-                    //                                folderId: targetFolderId,
-                    //                                uploads: [(mediaID: photoId, memo: String?.none, uploadMethod: PhotoUploadMethod.direct)],
-                    //                                favorite: isFavorite
-                    //                            )
-                    //                        }))
-                    //                    }
-                    return .none
+                case .didSelectAlbums:
+                    state.albumSelection = nil
+                    state.isLoading = true
+                    
+                    // TODO: - 실제 API 연결하기
+                    return .run { send in
+                        try? await Task.sleep(for: .seconds(1))
+                        await send(.addToAlbumResponse(.success(())))
+                    }
                     
                 case .didTapCancel:
                     state.albumSelection = nil
@@ -234,7 +223,7 @@ struct ArchivePhotoDetailFeature {
                 guard let url = state.currentItem?.imageURL else { return .none }
                 state.isLoading = true
                 
-                return .run { send in
+                return .run { [url = url] send in
                     let count = try await imageDownloadClient.downloadImages(urls: [url])
                     await send(.downloadImageResponse(successCount: count))
                 }

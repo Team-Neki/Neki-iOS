@@ -80,17 +80,21 @@ extension ArchiveImageFooter {
                 action: onDownload
             )
             
-            selectionButton(
-                title: "사진 복제",
-                icon: Image(isEnabled ? .iconDuplicateFill : .iconDuplicate),
-                action: onDuplicate ?? {}
-            )
+            if let onDuplicate = onDuplicate {
+                selectionButton(
+                    title: "사진 복제",
+                    icon: Image(isEnabled ? .iconDuplicateFill : .iconDuplicate),
+                    action: onDuplicate
+                )
+            }
             
-            selectionButton(
-                title: "사진 이동",
-                icon: Image(isEnabled ? .iconMoveFill : .iconMove),
-                action: onMove ?? {}
-            )
+            if let onMove = onMove {
+                selectionButton(
+                    title: "사진 이동",
+                    icon: Image(isEnabled ? .iconMoveFill : .iconMove),
+                    action: onMove
+                )
+            }
             
             selectionButton(
                 title: "삭제",

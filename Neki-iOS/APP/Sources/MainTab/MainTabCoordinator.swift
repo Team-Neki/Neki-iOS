@@ -16,14 +16,14 @@ struct MainTabCoordinator {
     
     @ObservableState
     struct State {
-        var user: User
+        @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
         var selectedTab: NekiTab = .archive
         
         // 하위 코디네이터들의 State를 보유
         var pose = PoseCoordinator.State()
         var archive = ArchiveCoordinator.State()
         var map = MapCoordinator.State()
-        var myPage: MyPageCoordinator.State
+        var myPage = MyPageCoordinator.State()
         
         var imagePicker = ImagePickerFeature.State(mediaType: .photoBooth, autoUpload: false)
         
@@ -37,9 +37,15 @@ struct MainTabCoordinator {
         var toast: NekiToastItem? = nil
         var isPermissionAlertPresented: Bool = false
         
-        init(user: User) {
-            self.user = user
-            myPage = MyPageCoordinator.State(user: user)
+        var user: User {
+            get {
+                guard case let .signedIn(user) = userSessionStatus else { return .dummy }
+                return user
+            }
+            
+            set {
+                $userSessionStatus.withLock { $0 = .signedIn(newValue) }
+            }
         }
     }
     
@@ -72,7 +78,6 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
-            case profileUpdated(User)
         }
     }
     
@@ -169,9 +174,6 @@ struct MainTabCoordinator {
                     await send(.archive(.root(.clearData)))
                     await send(.delegate(.withdraw))
                 }
-                
-            case let .myPage(.delegate(.profileUpdated(user))):
-                return .send(.delegate(.profileUpdated(user)))
                 
             case let .imagePicker(.delegate(.imagesConverted(entities))):
                 state.isPhotoPickerPresented = false

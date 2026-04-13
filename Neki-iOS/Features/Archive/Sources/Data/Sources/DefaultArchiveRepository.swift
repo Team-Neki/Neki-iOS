@@ -307,9 +307,8 @@ extension DefaultArchiveRepository {
         
     }
     
-    func duplicatePhoto(sourceFolderId: Int?, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
-        let request = UpdateMappingPhotoRequestDTO(
-            sourceFolderID: sourceFolderId,
+    func duplicatePhoto(photoIDs: [Int], targetFolderIDs: [Int]) async throws {
+        let request = UpdateMappingPhotoDTO.DuplicatePhotos(
             photoIDS: photoIDs,
             targetFolderIDS: targetFolderIDs
         )
@@ -325,8 +324,8 @@ extension DefaultArchiveRepository {
         }
     }
     
-    func movePhoto(sourceFolderId: Int?, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
-        let request = UpdateMappingPhotoRequestDTO(
+    func movePhoto(sourceFolderId: Int, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
+        let request = UpdateMappingPhotoDTO.MovePhotos(
             sourceFolderID: sourceFolderId,
             photoIDS: photoIDs,
             targetFolderIDS: targetFolderIDs
@@ -337,23 +336,11 @@ extension DefaultArchiveRepository {
         // 앨범 정보 캐시 갱신
         self.isAlbumCacheDirty = true
         
-        // Source 폴더(혹은 전체 사진) 캐시 갱신
-        if let sourceID = sourceFolderId {
-            if var list = photoCache[sourceID] {
-                list.removeAll { photoIDs.contains($0.photoID) }
-                photoCache[sourceID] = list
-            }
-        } else {
-            self.isPhotoCacheDirty[nil] = true
-        }
+        self.isPhotoCacheDirty[sourceFolderId] = true
         
         // Target 폴더(혹은 전체 사진) 캐시 갱신
-        if targetFolderIDs.isEmpty {
-            self.isPhotoCacheDirty[nil] = true
-        } else {
-            for targetID in targetFolderIDs {
-                self.isPhotoCacheDirty[targetID] = true
-            }
+        for targetID in targetFolderIDs {
+            self.isPhotoCacheDirty[targetID] = true
         }
     }
     

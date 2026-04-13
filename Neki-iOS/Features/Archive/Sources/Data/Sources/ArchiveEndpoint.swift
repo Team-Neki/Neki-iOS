@@ -20,8 +20,8 @@ public enum ArchiveEndpoint {
     case excludePhotosInAlbum(albumID: Int, request: DeletePhotoRequestDTO)
     case editFolderName(albumID: Int, request: FolderDTO.Request)
     case updateMemo(photoID: Int, request: UpdateMemoRequestDTO)
-    case duplicatePhoto(request: UpdateMappingPhotoRequestDTO)
-    case movePhoto(request: UpdateMappingPhotoRequestDTO)
+    case duplicatePhoto(request: UpdateMappingPhotoDTO.DuplicatePhotos)
+    case movePhoto(request: UpdateMappingPhotoDTO.MovePhotos)
 }
 
 extension ArchiveEndpoint: Endpoint {

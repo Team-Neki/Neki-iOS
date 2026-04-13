@@ -152,6 +152,7 @@ struct PhotoImportFeature {
                 return .none
                 
             case let .selectAlbum(album):
+                state.selectedIDs.removeAll()
                 state.selectedAlbum = album
                 state.isDropdownOpen = false
                 state.photos.removeAll()

@@ -23,7 +23,7 @@ struct PhotoImportFeature {
         var isFetchingAlbums: Bool = false
         var isLoading: Bool = false
         
-        var targetAlbumId: Int 
+        var targetAlbumId: Int
         
         var uploadCount: Int { selectedIDs.count }
         var isUploadEnabled: Bool { uploadCount > 0 }
@@ -121,7 +121,7 @@ struct PhotoImportFeature {
                 
                 return .run { [id = state.selectedAlbum?.id] send in
                     if id == -1 {
-                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchFavoritePhotoList(20, sortOrder) }))
+                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchFavoritePhotoList(size: 20, sortOrder: sortOrder) }))
                     } else {
                         await send(.fetchPhotosResponse(Result { try await archiveClient.fetchPhotoList(folderId: targetFolderId, size: 20, sortOrder: sortOrder) }))
                     }
@@ -171,14 +171,17 @@ struct PhotoImportFeature {
             case .tapUpload:
                 guard state.isUploadEnabled else { return .none }
                 state.isLoading = true
-                let ids = Array(state.selectedIDs)
-                let targetId = state.targetAlbumId
+                
+                let photoIDs = Array(state.selectedIDs)
+                let targetFolderIDs = [state.targetAlbumId]
                 
                 return .run { send in
-                    // TODO: 실제 API 연동 (archiveClient.duplicatePhoto(sourceFolderId: nil, photoIDs: ids, targetFolderIDs: [targetId]))
-                    try? await Task.sleep(for: .seconds(1)) // 임시 딜레이
-                    
-                    await send(.taskCompleted(message: "사진을 앨범에 가져왔어요"))
+                    do {
+                        try await archiveClient.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+                        await send(.taskCompleted(message: "사진을 앨범에 가져왔어요"))
+                    } catch {
+                        await send(.taskFailed(message: "사진을 가져오지 못했어요"))
+                    }
                 }
                 
             case let .taskCompleted(message):

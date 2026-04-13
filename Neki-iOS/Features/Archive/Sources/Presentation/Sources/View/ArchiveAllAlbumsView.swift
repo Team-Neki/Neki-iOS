@@ -59,6 +59,7 @@ struct ArchiveAllAlbumsView: View {
             }
             
         }
+        .animation(.easeInOut(duration: 0.3), value: store.albums)
         .task { await store.send(.onAppear).finish() }
         .sheet(isPresented: $addAlbumSheetPresented) {
             ArchiveAlbumInputSheet(

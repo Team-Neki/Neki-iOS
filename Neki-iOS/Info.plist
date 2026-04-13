@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIdentifier</key>
+	<string></string>
 	<key>QR_WEBHOOK_URL</key>
 	<string>$(QR_WEBHOOK_URL)</string>
 	<key>BASE_URL</key>
@@ -31,6 +33,7 @@
 	<string>$(KAKAO_LOGIN_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
+		<string>instagram-stories</string>
 		<string>nmap</string>
 		<string>kakaomap</string>
 		<string>comgooglemaps</string>

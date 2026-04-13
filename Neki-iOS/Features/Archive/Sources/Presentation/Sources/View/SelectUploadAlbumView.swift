@@ -94,7 +94,6 @@ private extension SelectUploadAlbumView {
                     Button {
                         store.send(.tapConfirmUpload)
                     } label: {
-                        // 💡 에러 수정: pendingUploadImages 프로퍼티를 참조하도록 변경했습니다.
                         Text("\(store.pendingUploadImages.count)장 업로드")
                             .nekiFont(.body16SemiBold)
                             .foregroundStyle(store.selectedAlbumId == nil ? .gray200 : .primary500)

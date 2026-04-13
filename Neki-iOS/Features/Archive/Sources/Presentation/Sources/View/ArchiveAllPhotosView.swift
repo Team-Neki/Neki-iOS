@@ -34,14 +34,22 @@ struct ArchiveAllPhotosView: View {
                 VStack {
                     Spacer()
                     ArchiveImageFooter(
+                        style: .selection,
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
-                        onDelete: { showDeleteAlert = true }
+                        onDelete: { showDeleteAlert = true },
+                        onDuplicate: { store.send(.onTapDuplicateButton) },
+                        onMove: nil
                     )
                 }
             }
             
+            if store.isLoading {
+                LoadingView(message: "요청을 처리하고 있어요.")
+            }
+            
         }
+        .animation(.easeInOut(duration: 0.3), value: store.photos)
         .nekiToolbar(
             left: { NekiToolBar.back(action: { store.send(.onTapBackButton) }) },
             center: { NekiToolBar.textCenter("모든 사진") },
@@ -68,6 +76,9 @@ struct ArchiveAllPhotosView: View {
         .background(.white)
         .task {
             await store.send(.onAppear).finish()
+        }
+        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+            AlbumSelectionView(store: selectionStore)
         }
     }
 }

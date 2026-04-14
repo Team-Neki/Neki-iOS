@@ -1,5 +1,5 @@
 //
-//  AnalyticsParamterKey.swift
+//  AnalyticsParameterKey.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 4/14/26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum AnalyticsParamterKey: String {
+public enum AnalyticsParameterKey: String {
     // 공통
     case userId = "user_id"
     case platform = "platform"

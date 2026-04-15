@@ -309,8 +309,8 @@ extension DefaultArchiveRepository {
     
     func duplicatePhoto(photoIDs: [Int], targetFolderIDs: [Int]) async throws {
         let request = UpdateMappingPhotoDTO.DuplicatePhotos(
-            photoIDS: photoIDs,
-            targetFolderIDS: targetFolderIDs
+            photoIDs: photoIDs,
+            targetFolderIDs: targetFolderIDs
         )
         let endpoint = ArchiveEndpoint.duplicatePhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
@@ -327,8 +327,8 @@ extension DefaultArchiveRepository {
     func movePhoto(sourceFolderId: Int, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
         let request = UpdateMappingPhotoDTO.MovePhotos(
             sourceFolderID: sourceFolderId,
-            photoIDS: photoIDs,
-            targetFolderIDS: targetFolderIDs
+            photoIDs: photoIDs,
+            targetFolderIDs: targetFolderIDs
         )
         let endpoint = ArchiveEndpoint.movePhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)

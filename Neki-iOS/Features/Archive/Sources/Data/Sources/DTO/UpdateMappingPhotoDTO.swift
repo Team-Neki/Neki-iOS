@@ -10,21 +10,21 @@ import Foundation
 public enum UpdateMappingPhotoDTO {
     public struct MovePhotos: Encodable {
         let sourceFolderID: Int
-        let photoIDS, targetFolderIDS: [Int]
+        let photoIDs, targetFolderIDs: [Int]
         
         enum CodingKeys: String, CodingKey {
             case sourceFolderID = "sourceFolderId"
-            case photoIDS = "photoIds"
-            case targetFolderIDS = "targetFolderIds"
+            case photoIDs = "photoIds"
+            case targetFolderIDs = "targetFolderIds"
         }
     }
     
     public struct DuplicatePhotos: Encodable {
-        let photoIDS, targetFolderIDS: [Int]
+        let photoIDs, targetFolderIDs: [Int]
 
         enum CodingKeys: String, CodingKey {
-            case photoIDS = "photoIds"
-            case targetFolderIDS = "targetFolderIds"
+            case photoIDs = "photoIds"
+            case targetFolderIDs = "targetFolderIds"
         }
     }
 }

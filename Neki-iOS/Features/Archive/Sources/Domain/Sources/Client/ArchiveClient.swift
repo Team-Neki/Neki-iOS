@@ -24,6 +24,8 @@ struct ArchiveClient {
     public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
     public var updatePhotoMemo: (_ photoID: Int, _ memo: String) async throws -> Void
     public var clearCache: () async -> Void
+    public var duplicatePhoto: (_ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
+    public var movePhoto: (_ sourceFolderId: Int, _ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
 }
 
 extension ArchiveClient: DependencyKey {
@@ -69,6 +71,12 @@ extension ArchiveClient: DependencyKey {
             },
             clearCache: {
                 await archiveRepository.clearCache()
+            },
+            duplicatePhoto: { photoIDs, targetFolderIDs in
+                try await archiveRepository.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+            },
+            movePhoto: { sourceFolderId, photoIDs, targetFolderIDs in
+                try await archiveRepository.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
             }
         )
     }

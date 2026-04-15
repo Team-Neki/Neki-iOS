@@ -152,12 +152,13 @@ struct AlbumSelectionFeature {
                 
                 return .run { send in
                     do {
-                        if purpose == .duplicate {
+                        switch purpose {
+                        case .duplicate:
                             // 복제 - sourceFolderId 없음
                             try await archiveClient.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
                             await send(.taskCompleted(message: "사진을 앨범에 추가했어요"))
                             
-                        } else if purpose == .move {
+                        case .move:
                             // 이동 - sourceFolderId 필수
                             if let sourceFolderId = currentAlbumId {
                                 try await archiveClient.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)

@@ -306,6 +306,44 @@ extension DefaultArchiveRepository {
         }
         
     }
+    
+    func duplicatePhoto(photoIDs: [Int], targetFolderIDs: [Int]) async throws {
+        let request = UpdateMappingPhotoDTO.DuplicatePhotos(
+            photoIDs: photoIDs,
+            targetFolderIDs: targetFolderIDs
+        )
+        let endpoint = ArchiveEndpoint.duplicatePhoto(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        // 앨범 정보 캐시 갱신
+        self.isAlbumCacheDirty = true
+        
+        // Target 폴더들의 캐시를 다음 진입 시 새로 받아오도록 유도
+        for targetID in targetFolderIDs {
+            self.isPhotoCacheDirty[targetID] = true
+        }
+    }
+    
+    func movePhoto(sourceFolderId: Int, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
+        let request = UpdateMappingPhotoDTO.MovePhotos(
+            sourceFolderID: sourceFolderId,
+            photoIDs: photoIDs,
+            targetFolderIDs: targetFolderIDs
+        )
+        let endpoint = ArchiveEndpoint.movePhoto(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        // 앨범 정보 캐시 갱신
+        self.isAlbumCacheDirty = true
+        
+        self.isPhotoCacheDirty[sourceFolderId] = true
+        
+        // Target 폴더(혹은 전체 사진) 캐시 갱신
+        for targetID in targetFolderIDs {
+            self.isPhotoCacheDirty[targetID] = true
+        }
+    }
+    
 }
 
 

@@ -144,14 +144,33 @@ struct AlbumSelectionFeature {
             case .tapConfirm:
                 guard !state.selectedAlbumIDs.isEmpty else { return .none }
                 state.isLoading = true
+                
                 let purpose = state.selectionPurpose
+                let photoIDs = state.photoIDs
+                let targetFolderIDs = Array(state.selectedAlbumIDs)
+                let currentAlbumId = state.currentAlbumId
                 
                 return .run { send in
-                    // TODO: 실제 API 연동 (archiveClient.duplicatePhoto / movePhoto)
-                    try? await Task.sleep(for: .seconds(1))
-                    
-                    let msg = purpose == .duplicate ? "사진을 앨범에 추가했어요" : "사진을 앨범으로 이동했어요"
-                    await send(.taskCompleted(message: msg))
+                    do {
+                        switch purpose {
+                        case .duplicate:
+                            // 복제 - sourceFolderId 없음
+                            try await archiveClient.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+                            await send(.taskCompleted(message: "사진을 앨범에 추가했어요"))
+                            
+                        case .move:
+                            // 이동 - sourceFolderId 필수
+                            if let sourceFolderId = currentAlbumId {
+                                try await archiveClient.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+                                await send(.taskCompleted(message: "사진을 앨범으로 이동했어요"))
+                            } else {
+                                await send(.taskFailed(message: "사진 이동에 실패했어요"))
+                            }
+                        }
+                    } catch {
+                        let failMsg = purpose == .duplicate ? "사진 추가에 실패했어요" : "사진 이동에 실패했어요"
+                        await send(.taskFailed(message: failMsg))
+                    }
                 }
                 
             case let .taskCompleted(message):

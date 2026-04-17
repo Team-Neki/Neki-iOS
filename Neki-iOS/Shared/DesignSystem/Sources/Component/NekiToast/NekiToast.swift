@@ -38,7 +38,7 @@ public struct NekiToastItem: Identifiable, Equatable {
     public init(
         _ message: String,
         style: NekiToastStyle = .info,
-        duration: Double = 3.0,
+        duration: Double = 1.8,
         buttonTitle: String? = nil,
         action: Interaction? = nil
     ) {

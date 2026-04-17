@@ -30,7 +30,7 @@ extension DefaultAnalyticsRepository: AnalyticsRepository {
         if let parameters = event.parameters {
             parsedParameters = [:]
             for (key, value) in parameters {
-                parsedParameters?[key.value] = value
+                parsedParameters?[key.name] = value
             }
         }
         await service.sendEvent(name: eventName, parameters: parsedParameters)

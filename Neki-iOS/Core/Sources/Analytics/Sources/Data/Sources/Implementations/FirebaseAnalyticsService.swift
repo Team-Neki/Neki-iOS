@@ -14,17 +14,9 @@ public final actor FirebaseAnalyticsService: AnalyticsService {
     
     public func sendEvent(name: String, parameters: [String : Any]?) {
         Analytics.logEvent(name, parameters: parameters)
-        
-        #if DEBUG
-        Logger.data.log("[Firebase Service] Event: \(name) | Parameters: \(parameters ?? [:])")
-        #endif
     }
     
     public func setUserID(_ userID: String?) {
         Analytics.setUserID(userID)
-        
-        #if DEBUG
-        Logger.data.log("[Firebase Service] UserID set: \(userID ?? "nil")")
-        #endif
     }
 }

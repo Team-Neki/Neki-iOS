@@ -22,7 +22,7 @@ struct ArchiveAlbumDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 
-                if store.filteredAlbumPhotos.isEmpty {
+                if store.filteredAlbumPhotos.isEmpty && store.album.count == 0 {
                     ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n새로운 사진을 등록하고 앨범에 추가해보세요!")
                         .padding(.bottom, 54)
                 } else {

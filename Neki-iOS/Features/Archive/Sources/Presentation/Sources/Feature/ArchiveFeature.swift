@@ -34,6 +34,10 @@ struct ArchiveFeature {
         var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
         var isFetchingPhotos: Bool = false
+        
+        var isInitialFetchingPhotos: Bool {
+            return isFetchingPhotos && photos.isEmpty
+        }
     }
     
     enum Action: BindableAction {

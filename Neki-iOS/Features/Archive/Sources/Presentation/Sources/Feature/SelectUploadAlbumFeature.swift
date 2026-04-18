@@ -32,6 +32,7 @@ struct SelectUploadAlbumFeature {
         case tapBackToPrompt
         case tapAlbum(AlbumItem)
         case tapConfirmUpload
+        case tapDimmedBackground
         
         case executeUpload(albumId: Int?)
         case uploadResponse(Result<Int?, Error>)
@@ -45,12 +46,15 @@ struct SelectUploadAlbumFeature {
     
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageUploadClient) var imageUploadClient
+    @Dependency(\.dismiss) var dismiss
     
     var body: some ReducerOf<Self> {
         BindingReducer()
         
         Reduce { state, action in
             switch action {
+            case .tapDimmedBackground: return .run { _ in await self.dismiss() }
+                
             case .tapUploadWithoutAlbum:
                 state.isLoading = true
                 return .send(.executeUpload(albumId: nil))

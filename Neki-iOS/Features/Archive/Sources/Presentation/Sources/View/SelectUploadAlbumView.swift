@@ -18,6 +18,9 @@ struct SelectUploadAlbumView: View {
                 Color.gray900.opacity(0.5)
                     .ignoresSafeArea()
                     .transition(.opacity)
+                    .onTapGesture {
+                        store.send(.tapDimmedBackground)
+                    }
             } else {
                 Color.white
                     .ignoresSafeArea()

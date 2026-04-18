@@ -165,7 +165,7 @@ private extension ArchiveAlbumDetailView {
             
             // 수정되는 모습이 바로바로 보여서 이렇게 해뒀는데, QA 후 별로라는 의견 나오면 별도 title로 관리
             Text(store.newAlbumTitle)
-                .nekiFont(.title18SemiBold)
+                .nekiFont(.title20SemiBold)
                 .foregroundStyle(.gray900)
         }
         .frame(height: 54)

@@ -30,9 +30,9 @@ struct AlbumSelectionFeature {
             return !newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && albumTitleErrorMessage == nil
         }
         
-        init(photoIDs: [Int], selectionPurpose: PhotoSelectionPurpose, currentAlbumId: Int? = nil) {
+        init(photoIDs: [Int] = [], uploadCount: Int? = nil, selectionPurpose: PhotoSelectionPurpose, currentAlbumId: Int? = nil) {
             self.photoIDs = photoIDs
-            self.uploadCount = photoIDs.count
+            self.uploadCount = uploadCount ?? photoIDs.count
             self.selectionPurpose = selectionPurpose
             self.currentAlbumId = currentAlbumId
         }
@@ -65,6 +65,7 @@ struct AlbumSelectionFeature {
             case didCompleteTask(message: String)
             case didTapCancel
             case showToast(NekiToastItem)
+            case didSelectForUpload(albumId: Int)
         }
     }
     
@@ -124,7 +125,7 @@ struct AlbumSelectionFeature {
                 guard id != -1 else { return .none }
                 guard id != state.currentAlbumId else { return .none }
                 
-                if state.selectionPurpose == .move {
+                if state.selectionPurpose == .move || state.selectionPurpose == .upload {
                     // [사진 이동] 단일 선택 처리
                     if state.selectedAlbumIDs.contains(id) {
                         state.selectedAlbumIDs.removeAll()
@@ -143,11 +144,16 @@ struct AlbumSelectionFeature {
                 
             case .tapConfirm:
                 guard !state.selectedAlbumIDs.isEmpty else { return .none }
-                state.isLoading = true
                 
                 let purpose = state.selectionPurpose
-                let photoIDs = state.photoIDs
                 let targetFolderIDs = Array(state.selectedAlbumIDs)
+                
+                if purpose == .upload {
+                    return .send(.delegate(.didSelectForUpload(albumId: targetFolderIDs.first!)))
+                }
+                
+                state.isLoading = true
+                let photoIDs = state.photoIDs
                 let currentAlbumId = state.currentAlbumId
                 
                 return .run { send in
@@ -166,6 +172,8 @@ struct AlbumSelectionFeature {
                             } else {
                                 await send(.taskFailed(message: "사진 이동에 실패했어요"))
                             }
+                            
+                        case .upload: break
                         }
                     } catch {
                         let failMsg = purpose == .duplicate ? "사진 추가에 실패했어요" : "사진 이동에 실패했어요"

@@ -2,8 +2,6 @@
 //  SelectUploadAlbumFeature.swift
 //  Neki-iOS
 //
-//  Created by OneTen on 1/22/26.
-//
 
 import ComposableArchitecture
 import SwiftUI
@@ -19,23 +17,22 @@ struct SelectUploadAlbumFeature {
     @ObservableState
     struct State {
         let pendingUploadImages: [ImageUploadEntity]
-        var albums: IdentifiedArrayOf<AlbumItem>
-        var selectedAlbumId: Int? = nil
         var viewMode: ViewMode = .prompt
         var isLoading: Bool = false
+        
+        var albumSelection: AlbumSelectionFeature.State?
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         case tapUploadWithoutAlbum
         case tapSelectAlbumAndUpload
-        case tapBackToPrompt
-        case tapAlbum(AlbumItem)
-        case tapConfirmUpload
         case tapDimmedBackground
         
         case executeUpload(albumId: Int?)
         case uploadResponse(Result<Int?, Error>)
+        
+        case albumSelection(AlbumSelectionFeature.Action)
         
         case delegate(DelegateAction)
         enum DelegateAction {
@@ -61,20 +58,22 @@ struct SelectUploadAlbumFeature {
                 
             case .tapSelectAlbumAndUpload:
                 state.viewMode = .albumList
+                state.albumSelection = AlbumSelectionFeature.State(
+                    photoIDs: [],
+                    uploadCount: state.pendingUploadImages.count,
+                    selectionPurpose: .upload,
+                    currentAlbumId: nil
+                )
                 return .none
                 
-            case .tapBackToPrompt:
-                state.viewMode = .prompt
-                return .none
-                
-            case let .tapAlbum(album):
-                state.selectedAlbumId = (state.selectedAlbumId == album.id) ? nil : album.id
-                return .none
-                
-            case .tapConfirmUpload:
-                guard let albumId = state.selectedAlbumId else { return .none }
+            case let .albumSelection(.delegate(.didSelectForUpload(albumId))):
                 state.isLoading = true
                 return .send(.executeUpload(albumId: albumId))
+                
+            case .albumSelection(.delegate(.didTapCancel)):
+                state.viewMode = .prompt
+                state.albumSelection = nil
+                return .none
                 
             case let .executeUpload(albumId):
                 return .run { [entities = state.pendingUploadImages] send in
@@ -96,12 +95,14 @@ struct SelectUploadAlbumFeature {
                 state.isLoading = false
                 return .send(.delegate(.uploadDidFail(error)))
                 
-            case .binding:
+            case .binding, .albumSelection:
                 return .none
                 
-            default:
-                return .none
+            default: return .none
             }
+        }
+        .ifLet(\.albumSelection, action: \.albumSelection) {
+            AlbumSelectionFeature()
         }
     }
 }

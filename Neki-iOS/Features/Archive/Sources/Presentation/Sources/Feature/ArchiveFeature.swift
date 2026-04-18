@@ -222,7 +222,7 @@ struct ArchiveFeature {
             case let .processUploadImages(entities):
                 state.isLoading = false
                 guard !entities.isEmpty else { return .none }
-                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities, albums: state.albums)
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities)
                 return .none
                 
             case let .addPhotoFromShareExtension(appGroupID):

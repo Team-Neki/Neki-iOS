@@ -255,12 +255,17 @@ extension NaverMapRepresentable {
             let toRemoveIDs = currentKeyByID.keys.filter { newIDs.contains($0) == false }
             keysToRemove.append(contentsOf: toRemoveIDs.compactMap { currentKeyByID[$0] })
             
+            var coordinateFrequency = [String: Int]()
+            
             for booth in photoBooths {
+                let coordinateKey = "\(booth.coordinate.latitude), \(booth.coordinate.longitude)"
+                let overlapIndex = coordinateFrequency[coordinateKey, default: .zero]
+                coordinateFrequency[coordinateKey] = overlapIndex + 1
                 let isNew = currentKeyByID.keys.contains(booth.id) == false
                 let isSelectedAffected = selectionChanged && (booth.id == selectedBoothID || booth.id == oldSelected)
                 
                 if isNew || isSelectedAffected {
-                    let position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
+                    let position = calculateJitteredPosition(latitude: booth.coordinate.latitude, longitude: booth.coordinate.longitude, overlapIndex: overlapIndex)
                     let key = BoothClusteringKey(identifier: booth.id, brandID: booth.brand.id, position: position)
                     
                     if isSelectedAffected, let oldKey = currentKeyByID[booth.id] {
@@ -280,6 +285,16 @@ extension NaverMapRepresentable {
             }
             
             lastSelectedBoothID = selectedBoothID
+        }
+        
+        func calculateJitteredPosition(latitude: Double, longitude: Double, overlapIndex: Int) -> NMGLatLng {
+            guard overlapIndex > .zero else { return NMGLatLng(lat: latitude, lng: longitude) }
+            
+            let offsetRadius = 0.00005
+            let angle = Double(overlapIndex) * (Double.pi / 3)
+            let latitudeOffset = offsetRadius * cos(angle)
+            let longitudeOffset = offsetRadius * sin(angle)
+            return NMGLatLng(lat: latitude + latitudeOffset, lng: longitude + longitudeOffset)
         }
         
         func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, expectedID: Int) {

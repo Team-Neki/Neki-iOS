@@ -185,14 +185,15 @@ private extension ArchiveAlbumDetailView {
             .padding(.leading, 12)
             .contentShape(Rectangle())
             
-            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-                Text("사진 추가")
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray900)
-            }
-            .frame(width: 120, height: 34, alignment: .leading)
-            .padding(.leading, 12)
-            .contentShape(Rectangle())
+            // TODO: - 사진 추가 기능 추가되면 주석 해제
+//            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+//                Text("사진 추가")
+//                    .nekiFont(.body16Medium)
+//                    .foregroundStyle(.gray900)
+//            }
+//            .frame(width: 120, height: 34, alignment: .leading)
+//            .padding(.leading, 12)
+//            .contentShape(Rectangle())
             
             Button {
                 store.send(.onTapImportPhotos)

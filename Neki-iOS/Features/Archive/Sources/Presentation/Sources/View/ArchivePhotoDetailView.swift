@@ -321,6 +321,7 @@ extension ArchivePhotoDetailView {
                         .nekiFont(.body16Medium)
                         .foregroundColor(currentMemo.isEmpty ? .gray300 : .gray700)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
                         .onTapGesture {
                             store.send(.startMemoEditing)
                         }

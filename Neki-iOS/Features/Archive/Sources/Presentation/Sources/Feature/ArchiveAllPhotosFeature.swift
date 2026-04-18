@@ -128,14 +128,18 @@ struct ArchiveAllPhotosFeature {
             case .onTapFilterNewest:
                 if state.selectedSortedTime == "최신순" { return .none }
                 state.selectedSortedTime = "최신순"
-                state.photos.removeAll()
-                return .send(.fetchPhotos)
+                return .run { send in
+                    await archiveClient.clearCache()
+                    await send(.fetchPhotos)
+                }
                 
             case .onTapFilterOldest:
                 if state.selectedSortedTime == "오래된순" { return .none }
                 state.selectedSortedTime = "오래된순"
-                state.photos.removeAll()
-                return .send(.fetchPhotos)
+                return .run { send in
+                    await archiveClient.clearCache()
+                    await send(.fetchPhotos)
+                }
                 
             case .onTapFavoriteButton:
                 state.isSelectedFavorite.toggle()

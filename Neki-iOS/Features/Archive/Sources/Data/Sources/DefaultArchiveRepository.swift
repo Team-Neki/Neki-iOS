@@ -13,7 +13,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
     @Dependency(\.networkProvider) var networkProvider
     
     // MARK: - Cache
-    
+        
     private var photoCache: [Int?: [PhotoEntity]] = [:] // 사진들 캐시(앨범별), 앨범을 nil로 줄 경우 전체 사진
     private var currentSortOrder: [Int?: String] = [:]  // 앨범별 정렬 (최신순, 오래된 순)
 
@@ -21,6 +21,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
     private var favoritePhotoCache: [PhotoEntity] = []  // 즐겨찾기 사진들 캐시
     private var favoriteAlbumInfoCache: FavoriteAlbumEntity?    // 즐겨찾기 앨범 정보 캐시
     
+    private var photoTotalCountCache: [Int?: Int] = [:] // 전체사진 + 앨범별 사진 개수 캐시
     
     // Dirty Flags (데이터 유효성 검사)
     private var isPhotoCacheDirty: [Int?: Bool] = [:]   // 사진 변경사항 플래그
@@ -111,6 +112,8 @@ extension DefaultArchiveRepository {
         
         guard let data = response.data else { throw NetworkError.responseDecodingError }
         
+        self.photoTotalCountCache[folderID] = data.totalCount
+        
         let newEntities = data.toEntity()
         
         /// 캐시 업데이트 (해당 폴더 Key에 추가)
@@ -198,6 +201,10 @@ extension DefaultArchiveRepository {
         if data.hasNext { self.currentFavoritePage += 1 }
         
         return self.favoritePhotoCache
+    }
+    
+    func getPhotoTotalCount(folderID: Int?) async throws -> Int {
+        return photoTotalCountCache[folderID] ?? 0
     }
 }
 
@@ -388,6 +395,7 @@ extension DefaultArchiveRepository {
     
     func clearCache() async {
             // 캐시 데이터 초기화
+            self.photoTotalCountCache.removeAll()
             self.photoCache.removeAll()
             self.currentSortOrder.removeAll()
             self.albumCache.removeAll()

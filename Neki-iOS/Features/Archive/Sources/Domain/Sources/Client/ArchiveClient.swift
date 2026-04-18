@@ -26,6 +26,7 @@ struct ArchiveClient {
     public var clearCache: () async -> Void
     public var duplicatePhoto: (_ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
     public var movePhoto: (_ sourceFolderId: Int, _ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
+    public var getPhotoTotalCount: (_ folderId: Int?) async throws -> Int
 }
 
 extension ArchiveClient: DependencyKey {
@@ -77,6 +78,9 @@ extension ArchiveClient: DependencyKey {
             },
             movePhoto: { sourceFolderId, photoIDs, targetFolderIDs in
                 try await archiveRepository.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+            },
+            getPhotoTotalCount: { folderId in
+                try await archiveRepository.getPhotoTotalCount(folderID: folderId)
             }
         )
     }

@@ -151,6 +151,11 @@ extension PhotoImportView {
                         Text("전체 사진")
                             .nekiFont(.body16Medium)
                             .foregroundStyle(.gray900)
+                        
+                        Text("\(store.allPhotosCount)")
+                            .nekiFont(.caption12Medium)
+                            .foregroundStyle(.gray300)
+                        
                         Spacer()
                     }
                 }

@@ -180,7 +180,7 @@ struct MainTabCoordinator {
                 state.isLoading = false
                 state.selectedTab = .archive
                 guard !entities.isEmpty else { return .none }
-                return .send(.archive(.root(.processUploadImages(entities: entities))))
+                return .send(.archive(.root(.processUploadImages(entities: entities, appGroupID: nil))))
                 
             case let .destination(.presented(.qrScan(.addPhotoFromQRScanner(imageID)))):
                 state.destination = nil

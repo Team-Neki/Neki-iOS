@@ -92,6 +92,7 @@ struct ArchiveView: View {
         }
         .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
+                .presentationBackground(.clear)
         }
         .transaction { transaction in
             transaction.disablesAnimations = true

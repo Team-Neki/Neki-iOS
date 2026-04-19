@@ -39,6 +39,7 @@ private extension SelectUploadAlbumView {
     @ViewBuilder
     var promptPopupView: some View {
         Color.gray900.opacity(0.5)
+            .ignoresSafeArea()
             .onTapGesture {
                 store.send(.tapDimmedBackground)
             }

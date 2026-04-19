@@ -26,3 +26,10 @@ extension AnalyticsClient: DependencyKey {
         }
     }()
 }
+
+extension DependencyValues {
+    var analyticsClient: AnalyticsClient {
+        get { self[AnalyticsClient.self] }
+        set { self[AnalyticsClient.self] = newValue }
+    }
+}

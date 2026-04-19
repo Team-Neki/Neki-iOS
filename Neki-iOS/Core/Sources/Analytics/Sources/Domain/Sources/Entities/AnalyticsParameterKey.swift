@@ -30,6 +30,7 @@ public enum AnalyticsParameterKey: String {
     
     // 포즈
     case totalSwipeCount = "total_swipe_count"
+    case peopleCount = "people_count"
     
     var name: String { self.rawValue }
 }

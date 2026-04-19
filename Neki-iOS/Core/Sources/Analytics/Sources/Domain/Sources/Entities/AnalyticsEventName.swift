@@ -12,10 +12,12 @@ public enum AnalyticsEventName: String {
     case appOpen = "app_open"
     
     // 아카이빙
+    case archivingView = "archiving_view"
     case photoUpload = "photo_upload"
     case albumCreate = "album_create"
     case albumAddFromDetail = "album_add_from_detail"
     case albumAddFromMulti = "album_add_from_multi"
+    case photoAddToAlbum = "photo_add_to_album"
     case photoMove = "photo_move"
     case photoCopy = "photo_copy"
     case photoDetailView = "photo_detail_view"
@@ -23,7 +25,7 @@ public enum AnalyticsEventName: String {
     
     // 지도
     case mapView = "map_view"
-    case mapResearch = "map_research"
+    case mapReSearch = "map_re_search"
     case mapBrandFilterToggle = "map_brand_filter_toggle"
     case boothSelect = "booth_select"
     case mapRouteClick = "map_route_click"
@@ -31,8 +33,10 @@ public enum AnalyticsEventName: String {
     // 포즈
     case poseView = "pose_view"
     case poseRandomStart = "pose_random_start"
-    case poseRandomSwipeBatch = "pose_random_swipe_batch"
     case poseRandomSessionEnd = "pose_random_session_end"
+    case poseFilterToggle = "pose_filter_toggle"
+    case poseBookmarkFilter = "pose_bookmark_filter"
+    case poseBookmark = "pose_bookmark"
     
     var value: String { self.rawValue }
 }

@@ -20,6 +20,7 @@ public enum PhotoListDTO {
     public struct PhotoListData: Decodable {
         let items: [PhotoListItem]
         let hasNext: Bool
+        let totalCount: Int
         
         func toEntity() -> [PhotoEntity] {
             return items.map {

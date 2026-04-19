@@ -129,7 +129,7 @@ extension AlbumSelectionView {
             .frame(height: 54)
             .padding(.horizontal, 20)
             
-            Text("앨범에 추가")
+            Text(store.selectionPurpose == .upload ? "모든 앨범" : "앨범에 추가")
                 .nekiFont(.title20SemiBold)
                 .foregroundStyle(.gray900)
         }

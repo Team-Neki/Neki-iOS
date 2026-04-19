@@ -13,7 +13,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
     @Dependency(\.networkProvider) var networkProvider
     
     // MARK: - Cache
-    
+        
     private var photoCache: [Int?: [PhotoEntity]] = [:] // 사진들 캐시(앨범별), 앨범을 nil로 줄 경우 전체 사진
     private var currentSortOrder: [Int?: String] = [:]  // 앨범별 정렬 (최신순, 오래된 순)
 
@@ -21,6 +21,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
     private var favoritePhotoCache: [PhotoEntity] = []  // 즐겨찾기 사진들 캐시
     private var favoriteAlbumInfoCache: FavoriteAlbumEntity?    // 즐겨찾기 앨범 정보 캐시
     
+    private var photoTotalCountCache: [Int?: Int] = [:] // 전체사진 + 앨범별 사진 개수 캐시
     
     // Dirty Flags (데이터 유효성 검사)
     private var isPhotoCacheDirty: [Int?: Bool] = [:]   // 사진 변경사항 플래그
@@ -89,7 +90,7 @@ extension DefaultArchiveRepository {
         // 기존에 저장된 정렬 순서
         let cachedSortOrder = currentSortOrder[folderID]
         // 정렬이 바뀌었으면 무조건 Dirty로 간주하여 초기화
-        let isSortChanged = (cachedSortOrder != nil) && (cachedSortOrder != requestSortOrder)
+        let isSortChanged = cachedSortOrder != requestSortOrder
         
         if isDirty || currentCache.isEmpty || isSortChanged {
             currentPhotoPage[folderID] = 0
@@ -105,11 +106,13 @@ extension DefaultArchiveRepository {
         }
         
         let page = currentPhotoPage[folderID] ?? 0
-        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: sortOrder)
+        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: requestSortOrder)        
         let endpoint = ArchiveEndpoint.getPhotoList(request: request)
         let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
         
         guard let data = response.data else { throw NetworkError.responseDecodingError }
+        
+        self.photoTotalCountCache[folderID] = data.totalCount
         
         let newEntities = data.toEntity()
         
@@ -198,6 +201,10 @@ extension DefaultArchiveRepository {
         if data.hasNext { self.currentFavoritePage += 1 }
         
         return self.favoritePhotoCache
+    }
+    
+    func getPhotoTotalCount(folderID: Int?) async throws -> Int {
+        return photoTotalCountCache[folderID] ?? 0
     }
 }
 
@@ -388,6 +395,7 @@ extension DefaultArchiveRepository {
     
     func clearCache() async {
             // 캐시 데이터 초기화
+            self.photoTotalCountCache.removeAll()
             self.photoCache.removeAll()
             self.currentSortOrder.removeAll()
             self.albumCache.removeAll()

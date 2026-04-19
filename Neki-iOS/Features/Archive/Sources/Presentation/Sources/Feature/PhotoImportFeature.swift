@@ -18,6 +18,8 @@ struct PhotoImportFeature {
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
         var selectedIDs: Set<Int> = []
         
+        var allPhotosCount: Int = 0
+        
         var isDropdownOpen: Bool = false
         var isFetchingPhotos: Bool = false
         var isFetchingAlbums: Bool = false
@@ -42,7 +44,7 @@ struct PhotoImportFeature {
         
         case fetchPhotos
         case loadMorePhotos
-        case fetchPhotosResponse(Result<[PhotoEntity], Error>)
+        case fetchPhotosResponse(Result<[PhotoEntity], Error>, allPhotosCount: Int)
         
         case toggleDropdown
         case closeDropdown
@@ -120,18 +122,26 @@ struct PhotoImportFeature {
                 let sortOrder = "DESC"
                 
                 return .run { [id = state.selectedAlbum?.id] send in
-                    if id == -1 {
-                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchFavoritePhotoList(size: 20, sortOrder: sortOrder) }))
-                    } else {
-                        await send(.fetchPhotosResponse(Result { try await archiveClient.fetchPhotoList(folderId: targetFolderId, size: 20, sortOrder: sortOrder) }))
+                    do {
+                        let entities: [PhotoEntity]
+                        if id == -1 {
+                            entities = try await archiveClient.fetchFavoritePhotoList(size: 20, sortOrder: sortOrder)
+                        } else {
+                            entities = try await archiveClient.fetchPhotoList(folderId: targetFolderId, size: 20, sortOrder: sortOrder)
+                        }
+                        
+                        let allCount = try await archiveClient.getPhotoTotalCount(folderId: nil)
+                        await send(.fetchPhotosResponse(.success(entities), allPhotosCount: allCount))
+                        
+                    } catch {
+                        await send(.fetchPhotosResponse(.failure(error), allPhotosCount: 0))
                     }
                 }
                 
-            case .loadMorePhotos:
-                return .send(.fetchPhotos)
-                
-            case let .fetchPhotosResponse(.success(entities)):
+            case let .fetchPhotosResponse(.success(entities), allPhotosCount):
                 state.isFetchingPhotos = false
+                state.allPhotosCount = allPhotosCount
+                
                 let currentAlbumId = state.selectedAlbum?.id
                 let newItems = entities.map { entity in
                     ArchiveImageItem(id: entity.photoID, imageURLString: entity.imageURL, isFavorite: entity.isfavorite, date: entity.createdAt.toISO8601Date(), folderId: currentAlbumId, memo: entity.memo ?? "", width: entity.width, height: entity.height)
@@ -139,9 +149,12 @@ struct PhotoImportFeature {
                 state.photos = IdentifiedArray(uniqueElements: newItems)
                 return .none
                 
-            case .fetchPhotosResponse(.failure):
+            case .fetchPhotosResponse(.failure, _):
                 state.isFetchingPhotos = false
                 return .none
+                
+            case .loadMorePhotos:
+                return .send(.fetchPhotos)
                 
             case .toggleDropdown:
                 state.isDropdownOpen.toggle()

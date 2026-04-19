@@ -112,6 +112,7 @@ public struct MapFeature {
         case processNewChunk([PhotoBooth], isFirstBatch: Bool)
         case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool)
         case didFinishBackgroundCalculation(map: IdentifiedArrayOf<PhotoBooth>, list: IdentifiedArrayOf<PhotoBooth>)
+        case didSelectDirectionApp(DirectionAppType)
         
         // Binding & Child
         case binding(BindingAction<State>)
@@ -415,6 +416,15 @@ public struct MapFeature {
             case .didTapDirectionAppsButton:
                 state.directionSheetPhotoBooth = state.selectedBooth
                 return .none
+                
+            case let .didSelectDirectionApp(appType):
+                guard let photoBooth = state.directionSheetPhotoBooth else { return .none }
+                guard let url = appType.connectLink(coordinate: photoBooth.coordinate, name: photoBooth.name) else { return .none }
+                state.directionSheetPhotoBooth = nil
+                return .merge(
+                    .run { _ in analytics.logEvent(event: MapAnalyticsEvent.mapRouteClick(mapType: appType)) },
+                    .run { _ in await openURL(url) }
+                )
                 
             case .updateSDKAuthStatus(let isAuthorized):
                 state.isSDKAuthSuccessful = isAuthorized

@@ -522,7 +522,7 @@ public struct NaverMapView: View {
         }
         .onAppear { store.send(.onAppear) }
         .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
-            DirectionAppsSheet(photoBooth: photoBooth)
+            DirectionAppsSheet(store: store, photoBooth: photoBooth)
         }
         .overlay(alignment: .top) {
             if store.isSearchHereButtonVisible {

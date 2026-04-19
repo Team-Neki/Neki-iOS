@@ -156,69 +156,38 @@ public extension View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .toolbar { NekiToolbarContent(left: left, center: center, right: right) }
-            .background(NekiNavigationConfigurator(backgroundColor: backgroundColor, isOverlay: isOverlay))
-    }
-}
-
-struct NekiNavigationConfigurator: UIViewControllerRepresentable {
-    var backgroundColor: Color?
-    var isOverlay: Bool
-
-    func makeUIViewController(context: Context) -> UIViewController {
-        ConfiguratorViewController(backgroundColor: backgroundColor, isOverlay: isOverlay)
-    }
-
-    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {
-        guard let viewController = uiViewController as? ConfiguratorViewController else { return }
-        viewController.backgroundColor = backgroundColor
-        viewController.isOverlay = isOverlay
-        viewController.updateAppearance()
-    }
-
-    final class ConfiguratorViewController: UIViewController, UIGestureRecognizerDelegate {
-        var backgroundColor: Color?
-        var isOverlay: Bool
-
-        init(backgroundColor: Color?, isOverlay: Bool) {
-            self.backgroundColor = backgroundColor
-            self.isOverlay = isOverlay
-            super.init(nibName: nil, bundle: nil)
-        }
-
-        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
-        override func viewDidLoad() {
-            super.viewDidLoad()
-            view.backgroundColor = .clear
-        }
-
-        override func viewWillAppear(_ animated: Bool) {
-            super.viewWillAppear(animated)
-            navigationController?.interactivePopGestureRecognizer?.delegate = self
-            updateAppearance()
-        }
-
-        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-            (navigationController?.viewControllers.count ?? 0) > 1
-        }
-
-        func updateAppearance() {
-            guard let navigationController = navigationController else { return }
-            let appearance = UINavigationBarAppearance()
-            
-            if isOverlay {
-                appearance.configureWithTransparentBackground()
-            } else {
-                appearance.configureWithOpaqueBackground()
-                appearance.backgroundColor = UIColor(backgroundColor ?? .white)
+            .toolbarBackground(backgroundColor ?? (isOverlay ? .clear : .white), for: .navigationBar)
+            .toolbarBackground(isOverlay ? .hidden : .visible, for: .navigationBar)
+            .onAppear {
+                let appearance = UINavigationBarAppearance()
+                if isOverlay {
+                    appearance.configureWithTransparentBackground()
+                } else {
+                    appearance.configureWithOpaqueBackground()
+                    appearance.backgroundColor = UIColor(backgroundColor ?? .white)
+                }
+                
+                appearance.shadowColor = .clear
+                appearance.shadowImage = nil
+                
+                UINavigationBar.appearance().standardAppearance = appearance
+                UINavigationBar.appearance().scrollEdgeAppearance = appearance
+                UINavigationBar.appearance().compactAppearance = appearance
             }
-            
-            appearance.shadowColor = .clear
-            appearance.shadowImage = nil
-
-            navigationController.navigationBar.standardAppearance = appearance
-            navigationController.navigationBar.scrollEdgeAppearance = appearance
-            navigationController.navigationBar.compactAppearance = appearance
-        }
     }
 }
+
+extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
+    open override func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+    
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool { viewControllers.count > 1 }
+    
+    public func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool { true }
+}
+

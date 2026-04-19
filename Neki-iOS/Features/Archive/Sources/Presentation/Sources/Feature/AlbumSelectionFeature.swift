@@ -70,6 +70,7 @@ struct AlbumSelectionFeature {
     }
     
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -158,12 +159,14 @@ struct AlbumSelectionFeature {
                         case .duplicate:
                             // 복제 - sourceFolderId 없음
                             try await archiveClient.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+                            analyticsClient.logEvent(ArchiveAnalyticsEvent.photoCopy)
                             await send(.taskCompleted(message: "사진을 앨범에 추가했어요"))
                             
                         case .move:
                             // 이동 - sourceFolderId 필수
                             if let sourceFolderId = currentAlbumId {
                                 try await archiveClient.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
+                                analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMove)
                                 await send(.taskCompleted(message: "사진을 앨범으로 이동했어요"))
                             } else {
                                 await send(.taskFailed(message: "사진 이동에 실패했어요"))
@@ -204,6 +207,7 @@ struct AlbumSelectionFeature {
                 }
                 
             case .addFolderResponse(.success):
+                analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate)
                 return .merge(
                     .send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success)))),
                     .send(.onAppear)

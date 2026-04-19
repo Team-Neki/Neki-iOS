@@ -85,6 +85,7 @@ struct ArchiveFeature {
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.sharedImageClient) var sharedImageClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -138,6 +139,7 @@ struct ArchiveFeature {
                 }
                 
             case .addFolderResponse(.success):
+                analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate)
                 return .run { send in
                     await send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success))))
                     await send(.fetchAlbums)

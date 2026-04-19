@@ -37,6 +37,8 @@ struct ArchivePhotoDetailFeature {
     enum Action: BindableAction {
         case binding(BindingAction<State>)
         
+        case onAppear
+        
         case toggleMemoVisibility
         case toggleMemoExpanded(Bool)
         case startMemoEditing
@@ -81,6 +83,9 @@ struct ArchivePhotoDetailFeature {
         
         Reduce { state, action in
             switch action {
+                
+            case .onAppear:
+                return .run( _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView) )
                 
             case .onTapBackButton:
                 return .run { _ in await dismiss() }

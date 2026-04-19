@@ -61,6 +61,7 @@ struct ArchiveAllAlbumsFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -149,6 +150,7 @@ struct ArchiveAllAlbumsFeature {
                 }
                 
             case .addFolderResponse(.success):
+                analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate)
                 let toastItem = NekiToastItem("새로운 앨범을 추가했어요", style: .success)
                 
                 return .merge(

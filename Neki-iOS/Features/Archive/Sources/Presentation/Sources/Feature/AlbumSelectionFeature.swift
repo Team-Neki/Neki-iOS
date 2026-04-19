@@ -52,7 +52,7 @@ struct AlbumSelectionFeature {
         case tapConfirm
         
         // 내부 통신 결과 처리
-        case taskCompleted(message: String)
+        case taskCompleted(message: String, albumCount: Int)
         case taskFailed(message: String)
         
         // 앨범 생성 액션
@@ -62,7 +62,7 @@ struct AlbumSelectionFeature {
         
         case delegate(DelegateAction)
         enum DelegateAction {
-            case didCompleteTask(message: String)
+            case didCompleteTask(message: String, albumCount: Int)
             case didTapCancel
             case showToast(NekiToastItem)
             case didSelectForUpload(albumId: Int)
@@ -148,6 +148,7 @@ struct AlbumSelectionFeature {
                 
                 let purpose = state.selectionPurpose
                 let targetFolderIDs = Array(state.selectedAlbumIDs)
+                let albumCount = targetFolderIDs.count
                 
                 state.isLoading = true
                 let photoIDs = state.photoIDs
@@ -159,15 +160,13 @@ struct AlbumSelectionFeature {
                         case .duplicate:
                             // 복제 - sourceFolderId 없음
                             try await archiveClient.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
-                            analyticsClient.logEvent(ArchiveAnalyticsEvent.photoCopy)
-                            await send(.taskCompleted(message: "사진을 앨범에 추가했어요"))
+                            await send(.taskCompleted(message: "사진을 앨범에 추가했어요", albumCount: albumCount))
                             
                         case .move:
                             // 이동 - sourceFolderId 필수
                             if let sourceFolderId = currentAlbumId {
                                 try await archiveClient.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
-                                analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMove)
-                                await send(.taskCompleted(message: "사진을 앨범으로 이동했어요"))
+                                await send(.taskCompleted(message: "사진을 앨범으로 이동했어요", albumCount: albumCount))
                             } else {
                                 await send(.taskFailed(message: "사진 이동에 실패했어요"))
                             }
@@ -181,9 +180,9 @@ struct AlbumSelectionFeature {
                     }
                 }
                 
-            case let .taskCompleted(message):
+            case let .taskCompleted(message, albumCount):
                 state.isLoading = false
-                return .send(.delegate(.didCompleteTask(message: message)))
+                return .send(.delegate(.didCompleteTask(message: message, albumCount: albumCount)))
                 
             case let .taskFailed(message):
                 state.isLoading = false
@@ -207,7 +206,6 @@ struct AlbumSelectionFeature {
                 }
                 
             case .addFolderResponse(.success):
-                analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate)
                 return .merge(
                     .send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success)))),
                     .send(.onAppear)

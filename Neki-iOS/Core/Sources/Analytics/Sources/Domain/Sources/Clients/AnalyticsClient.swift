@@ -8,6 +8,7 @@
 import Foundation
 import Dependencies
 import DependenciesMacros
+import os
 
 @DependencyClient
 public struct AnalyticsClient {
@@ -22,6 +23,7 @@ extension AnalyticsClient: DependencyKey {
         return AnalyticsClient { userID in
             Task.detached(priority: .background) { await repository.setUserSession(with: userID) }
         } logEvent: { event in
+            Logger.domain.info("📊 [GA4 Event] 명칭: \(event.name.value, privacy: .public) | 파라미터: \(String(describing: event.parameters ?? [:]), privacy: .public)")
             Task.detached(priority: .background) { await repository.logEvent(event) }
         }
     }()

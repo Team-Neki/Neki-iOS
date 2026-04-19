@@ -98,9 +98,7 @@ struct ArchiveFeature {
             case .clearData:
                 state.photos.removeAll()
                 state.albums.removeAll()
-                return .run { _ in
-                    await archiveClient.clearCache()
-                }
+                return .run { _ in await archiveClient.clearCache() }
                 
             case .onAppear:
                 return .merge(.send(.fetchAlbums), .send(.fetchPhotos))
@@ -135,7 +133,7 @@ struct ArchiveFeature {
                 state.newAlbumTitle = ""
                 state.albumTitleErrorMessage = nil
                 return .run { send in
-                    await send(.addFolderResponse(Result { try await archiveClient.addFolder(title) }))
+                    await send(.addFolderResponse(Result { try await archiveClient.addFolder(name: title) }))
                 }
                 
             case .addFolderResponse(.success):
@@ -192,7 +190,7 @@ struct ArchiveFeature {
                 guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
                 return .run { send in
-                    await send(.photoListResponse(Result { try await archiveClient.fetchPhotoList(nil, nil, nil) }))
+                    await send(.photoListResponse(Result { try await archiveClient.fetchPhotoList(folderId: nil, size: nil, sortOrder: nil) }))
                 }
                 
             case let .photoListResponse(.success(entities)):
@@ -275,7 +273,8 @@ struct ArchiveFeature {
                 
             case let .addPhotoFromQRScanner(imageID):
                 return .run { send in
-                    try await archiveClient.registerPhotos(nil, [(imageID, nil, PhotoUploadMethod.qr)], false)
+                    try await archiveClient.registerPhotos(folderId: nil, uploads: [(imageID, nil, PhotoUploadMethod.qr)], favorite: false)
+                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .qr, count: 1))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
                 } catch: { error, send in

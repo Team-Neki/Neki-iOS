@@ -167,11 +167,19 @@ struct ArchivePhotoDetailFeature {
                 state.albumSelection = AlbumSelectionFeature.State(photoIDs: [state.currentItemID], selectionPurpose: .duplicate, currentAlbumId: state.folderId)
                 return .none
                 
+            // 🌟 에러 수정 및 단일 상세 앨범 추가 GA4 로깅 적용 부분
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message):
+                case let .didCompleteTask(message, albumCount): // 💡 누락되었던 albumCount 파라미터 추가!
                     state.albumSelection = nil
-                    return .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
+                    
+                    return .merge(
+                        .run { _ in
+                            // 🌟 요구사항: 단일 정리 행동 분석 (album_add_from_detail)
+                            analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromDetail(albumCount: albumCount))
+                        },
+                        .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
+                    )
                     
                 case .didTapCancel:
                     state.albumSelection = nil
@@ -180,7 +188,7 @@ struct ArchivePhotoDetailFeature {
                 case let .showToast(toastItem):
                     return .send(.delegate(.showToast(toastItem)))
                     
-                case .didSelectForUpload(albumId: _):
+                case .didSelectForUpload:
                     return .none
                 }
                 

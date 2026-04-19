@@ -1,15 +1,8 @@
-//
-//  ArchiveAnalyticsEvent.swift
-//  Neki-iOS
-//
-//  Created by OneTen on 4/19/26.
-//
-
 import Foundation
 
 public enum ArchiveAnalyticsEvent: AnalyticsEvent {
     case archivingView
-    case photoUpload(method: String, count: Int)
+    case photoUpload(method: PhotoUploadMethod, count: Int)
     case albumCreate
     case albumAddFromDetail(albumCount: Int)
     case albumAddFromMulti(photoCount: Int, albumCount: Int)
@@ -37,7 +30,8 @@ public enum ArchiveAnalyticsEvent: AnalyticsEvent {
     public var parameters: [AnalyticsParameterKey: Any]? {
         switch self {
         case let .photoUpload(method, count):
-            return [.method: method, .count: count]
+            let methodString = (method == .qr) ? "qr" : "gallery"
+            return [.method: methodString, .count: count]
             
         case let .albumAddFromDetail(albumCount):
             return [.albumCount: albumCount]

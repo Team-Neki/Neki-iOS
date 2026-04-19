@@ -26,7 +26,6 @@ struct ArchiveAllPhotosFeature {
             return IdentifiedArray(uniqueElements: filtered)
         }
         var isLoading: Bool = false
-        
     }
     
     enum Action: BindableAction {
@@ -62,6 +61,7 @@ struct ArchiveAllPhotosFeature {
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -180,12 +180,14 @@ struct ArchiveAllPhotosFeature {
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message):
+                case let .didCompleteTask(message, albumCount):
+                    let photoCount = state.selectedIDs.count
                     state.albumSelection = nil
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
                     
                     return .merge(
+                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )

@@ -74,6 +74,7 @@ struct ArchivePhotoDetailFeature {
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -122,6 +123,7 @@ struct ArchivePhotoDetailFeature {
                 
                 return .run { send in
                     try? await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
+                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate)
                 }
                 
             case .clearAllMemoEditing:

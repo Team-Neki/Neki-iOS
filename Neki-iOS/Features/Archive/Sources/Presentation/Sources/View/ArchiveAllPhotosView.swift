@@ -55,6 +55,7 @@ struct ArchiveAllPhotosView: View {
                 
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
         .animation(.easeInOut(duration: 0.3), value: store.photos)
         .nekiAlert(
             isPresented: $showDeleteAlert,

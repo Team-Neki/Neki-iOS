@@ -8,7 +8,6 @@
 import Foundation
 
 enum PoseAnalyticsEvent {
-    case poseView
     case randomPoseSuggestionStart
     case randomPoseSuggestionEnd(totalSwipeCount: Int)
     case poseFilterToggle(peopleCount: Int)
@@ -22,7 +21,6 @@ enum PoseAnalyticsEvent {
 extension PoseAnalyticsEvent: AnalyticsEvent {
     var name: AnalyticsEventName {
         switch self {
-        case .poseView: return .poseView
         case .randomPoseSuggestionStart: return .poseRandomStart
         case .randomPoseSuggestionEnd: return .poseRandomSessionEnd
         case .poseFilterToggle: return .poseFilterToggle

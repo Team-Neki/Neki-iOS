@@ -10,4 +10,5 @@ import Foundation
 public enum PhotoSelectionPurpose {
     case duplicate
     case move
+    case upload
 }

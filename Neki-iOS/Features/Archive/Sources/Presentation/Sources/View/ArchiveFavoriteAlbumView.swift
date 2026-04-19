@@ -18,7 +18,7 @@ struct ArchiveFavoriteAlbumView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 
-                if store.photos.count == 0 {
+                if store.photos.count == 0 && store.album.count == 0 {
                     ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n새로운 사진을 등록하고 앨범에 추가해보세요!")
                         .padding(.bottom, 54)
                 } else {
@@ -129,14 +129,16 @@ private extension ArchiveFavoriteAlbumView {
             .padding(.leading, 12)
             .contentShape(Rectangle())
             
-            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-                Text("사진 추가")
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray900)
-            }
-            .frame(width: 120, height: 34, alignment: .leading)
-            .padding(.leading, 12)
-            .contentShape(Rectangle())
+            // TODO: - 사진 추가 기능 추가되면 주석 해제
+//            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+//                Text("사진 추가")
+//                    .nekiFont(.body16Medium)
+//                    .foregroundStyle(.gray900)
+//            }
+//            .frame(width: 120, height: 34, alignment: .leading)
+//            .padding(.leading, 12)
+//            .contentShape(Rectangle())
+            
         }
         .padding(.vertical, 8)
         .frame(width: 120, alignment: .topLeading)

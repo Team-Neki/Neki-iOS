@@ -196,6 +196,9 @@ struct ArchiveAllPhotosFeature {
                     
                 case let .showToast(toastItem):
                     return .send(.delegate(.showToast(toastItem)))
+                    
+                case .didSelectForUpload(albumId: _):
+                    return .none
                 }
                 
             default: return .none

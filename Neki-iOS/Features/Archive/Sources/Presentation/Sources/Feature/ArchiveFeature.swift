@@ -34,6 +34,10 @@ struct ArchiveFeature {
         var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
         var isFetchingPhotos: Bool = false
+        
+        var isInitialFetchingPhotos: Bool {
+            return isFetchingPhotos && photos.isEmpty
+        }
     }
     
     enum Action: BindableAction {
@@ -218,7 +222,7 @@ struct ArchiveFeature {
             case let .processUploadImages(entities):
                 state.isLoading = false
                 guard !entities.isEmpty else { return .none }
-                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities, albums: state.albums)
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities)
                 return .none
                 
             case let .addPhotoFromShareExtension(appGroupID):

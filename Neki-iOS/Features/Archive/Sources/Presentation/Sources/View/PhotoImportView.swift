@@ -151,6 +151,11 @@ extension PhotoImportView {
                         Text("전체 사진")
                             .nekiFont(.body16Medium)
                             .foregroundStyle(.gray900)
+                        
+                        Text("\(store.allPhotosCount)")
+                            .nekiFont(.caption12Medium)
+                            .foregroundStyle(.gray300)
+                        
                         Spacer()
                     }
                 }
@@ -195,7 +200,7 @@ extension PhotoImportView {
             KFImage(item.imageURL)
                 .resizable()
                 .placeholder { Color.gray.opacity(0.1) }
-                .aspectRatio(1, contentMode: .fill)
+                .scaledToFill()
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 145, maxHeight: .infinity)
                 .clipped()
                 .overlay(

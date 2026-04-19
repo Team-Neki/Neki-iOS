@@ -46,6 +46,7 @@ struct AccountPreferenceFeature {
     }
     
     @Dependency(\.authClient) private var authClient
+    @Dependency(\.analyticsClient) private var analytics
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -90,9 +91,13 @@ struct AccountPreferenceFeature {
                 state.isUnregisterAlertPresented = false
                 return .none
                 
-            case .didSignOut, .didWithdraw:
+            case .didSignOut:
                 state.isLoading = false
-                return .none
+                return .run { _ in analytics.logEvent(event: MyPageAnalyticsEvent.logout) }
+                
+            case .didWithdraw:
+                state.isLoading = false
+                return .run { _ in analytics.logEvent(event: MyPageAnalyticsEvent.withdraw) }
                 
             case .onLoading(let isLoading):
                 state.isLoading = isLoading

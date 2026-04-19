@@ -38,5 +38,9 @@ public enum AnalyticsEventName: String {
     case poseBookmarkFilter = "pose_bookmark_filter"
     case poseBookmark = "pose_bookmark"
     
+    // 마이페이지
+    case logout = "mypage_logout"
+    case withdraw = "mypage_withdraw"
+    
     var value: String { self.rawValue }
 }

@@ -9,8 +9,10 @@ import Foundation
 import DeveloperToolsSupport
 
 /// 길찾기 기능으로 제공되는 외부 앱
-public enum DirectionAppType: CaseIterable {
-    case googleMap, naverMap, kakaoMap
+public enum DirectionAppType: String, CaseIterable {
+    case googleMap = "google_map"
+    case naverMap = "naver_map"
+    case kakaoMap = "kakao_map"
     
     var imageResources: ImageResource {
         switch self {

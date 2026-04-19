@@ -31,7 +31,7 @@ extension PoseAnalyticsEvent: AnalyticsEvent {
     
     var parameters: [AnalyticsParameterKey : Any]? {
         switch self {
-        case .poseView, .randomPoseSuggestionStart, .poseBookmarkFilter, .poseBookmark: return nil
+        case .randomPoseSuggestionStart, .poseBookmarkFilter, .poseBookmark: return nil
         case let .randomPoseSuggestionEnd(totalSwipeCount):
             return [.totalSwipeCount: totalSwipeCount]
         case let .poseFilterToggle(peopleCount):

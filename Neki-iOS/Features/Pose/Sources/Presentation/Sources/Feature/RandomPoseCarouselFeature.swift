@@ -25,6 +25,7 @@ struct RandomPoseCarouselFeature {
         var isScrapped: Bool { currentPose?.isScrapped ?? false }
         var isDismissing: Bool = false
         var slideDirection: SlideDirection = .none
+        var totalSwipeCount: Int = .zero
         
         init(peopleCount: PeopleCountOption) { activePeopleCount = peopleCount }
     }
@@ -54,6 +55,7 @@ struct RandomPoseCarouselFeature {
     }
     
     @Dependency(\.poseClient) private var poseClient
+    @Dependency(\.analyticsClient) private var analytics
     @Dependency(\.dismiss) private var dismiss
     
     var body: some ReducerOf<Self> {
@@ -75,7 +77,9 @@ struct RandomPoseCarouselFeature {
                 return .none
                 
             case .onTapClose:
+                let currentSwipeCount = state.totalSwipeCount
                 return .run { send in
+                    analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionEnd(totalSwipeCount: currentSwipeCount))
                     await send(.flushResources)
                     await dismiss()
                 }
@@ -83,6 +87,7 @@ struct RandomPoseCarouselFeature {
             case .tapLeft:
                 state.slideDirection = .previous
                 state.isLoading = true
+                state.totalSwipeCount += 1
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }))
                 }
@@ -91,6 +96,7 @@ struct RandomPoseCarouselFeature {
             case .tapRight:
                 state.slideDirection = .next
                 state.isLoading = true
+                state.totalSwipeCount += 1
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
                 }
@@ -102,10 +108,13 @@ struct RandomPoseCarouselFeature {
                 pose.isScrapped.toggle()
                 state.currentPose = pose
                 
-                return .run { [id = pose.id, pose] send in
+                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmark) }
+                let scrapEffect: Effect<Action> = .run { [id = pose.id, pose] send in
                     await send(.delegate(.poseUpdated(pose)))
                     await send(.scrapResponse(id, Result { try await poseClient.scrapPose(poseID: id) }))
                 }
+                
+                return .merge(trackingEffect, scrapEffect)
                 
                 // MARK: - Internal Actions
             case let .poseResponse(.success(pose)):

@@ -77,6 +77,7 @@ struct PoseFeature {
     }
     
     @Dependency(\.poseClient) private var poseClient
+    @Dependency(\.analyticsClient) private var analytics
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -85,12 +86,14 @@ struct PoseFeature {
             switch action {
                 // MARK: - View Actions
             case .onAppear:
+                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseView)}
+                let fetchEffect: Effect<Action>
                 if state.isSelectedScrap {
-                    if state.scrappedPoses.isEmpty { return fetchPoses(state: &state, refreshNeeded: true) }
+                    fetchEffect = state.scrappedPoses.isEmpty ? fetchPoses(state: &state, refreshNeeded: true) : .none
                 } else {
-                    if state.generalPoses.isEmpty { return fetchPoses(state: &state, refreshNeeded: true) }
+                    fetchEffect = state.generalPoses.isEmpty ? fetchPoses(state: &state, refreshNeeded: true) : .none
                 }
-                return .none
+                return .merge(trackingEffect, fetchEffect)
                 
             case .loadMoreItems:
                 guard state.isLoading == false, state.isCurrentLastPage == false else { return .none }
@@ -104,19 +107,26 @@ struct PoseFeature {
                 return .none
                 
             case let .selectPeopleCount(option):
-                state.selectedCountFilterOption = state.selectedCountFilterOption == option ? nil : option
+                let isDeselecting = state.selectedCountFilterOption == option
+                state.selectedCountFilterOption = isDeselecting ? nil : option
                 state.isSelectedScrap = false
-                return .none
+                let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption)
+                let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
+                return .run { _ in analytics.logEvent(event: event) }
                 
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()
                 state.selectedCountFilterOption = nil
+                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmarkFilter) }
+                let fetchEffect: Effect<Action>
                 if state.isSelectedScrap, state.scrappedPoses.isEmpty {
-                    return fetchPoses(state: &state, refreshNeeded: true)
+                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 } else if state.isLoading == false, state.generalPoses.isEmpty {
-                    return fetchPoses(state: &state, refreshNeeded: true)
+                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
+                } else {
+                    fetchEffect = .none
                 }
-                return .none
+                return .merge(trackingEffect, fetchEffect)
                 
             case let .selectPeopleCountForRandomPose(option):
                 state.selectedRandomPoseCountSelectionOption = option
@@ -128,7 +138,10 @@ struct PoseFeature {
                 
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
-                return .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
+                return .merge(
+                    .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionStart) },
+                    .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
+                )
                 
             case let .imageTapped(pose):
                 return .send(.delegate(.didTapImage(pose)))
@@ -139,10 +152,9 @@ struct PoseFeature {
             case let .onTapBookmark(pose):
                 var updatedPose = pose
                 updatedPose.isScrapped.toggle()
-                return .run { [updatedPose] send in
-                    await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) }))
-                }
-                .merge(with: .send(.updatePoseInList(updatedPose)))
+                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmark) }
+                let scrapEffect: Effect<Action> = .run { [updatedPose] send in await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) })) }
+                return .merge(trackingEffect, scrapEffect, .send(.updatePoseInList(updatedPose)))
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
@@ -203,8 +215,13 @@ struct PoseFeature {
             }
         }
     }
-    
-    private func fetchPoses(state: inout State, refreshNeeded: Bool) -> Effect<Action> {
+}
+
+
+// MARK: - PoseFeature + Helpers
+
+private extension PoseFeature {
+    func fetchPoses(state: inout State, refreshNeeded: Bool) -> Effect<Action> {
         state.isLoading = true
         let isScrapMode = state.isSelectedScrap
         
@@ -230,4 +247,6 @@ struct PoseFeature {
             }))
         }
     }
+    
+    func extractPeopleCount(from option: PeopleCountOption?) -> Int { option?.rawValue ?? .zero }
 }

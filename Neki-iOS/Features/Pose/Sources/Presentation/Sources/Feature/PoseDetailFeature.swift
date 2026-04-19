@@ -40,6 +40,7 @@ struct PoseDetailFeature {
     }
     
     @Dependency(\.poseClient) private var poseClient
+    @Dependency(\.analyticsClient) private var analytics
     @Dependency(\.dismiss) private var dismiss
     
     var body: some ReducerOf<Self> {
@@ -51,11 +52,14 @@ struct PoseDetailFeature {
                 pose.isScrapped.toggle()
                 state.poses[id: pose.id] = pose
                 
-                return .run { [pose] send in
+                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmark) }
+                let scrapEffect: Effect<Action> = .run { [pose] send in
                     await send(.delegate(.poseUpdated(pose)))
                     await send(.scrapResponse(pose.id, Result { try await poseClient.scrapPose(poseID: pose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
+                
+                return .merge(trackingEffect, scrapEffect)
                 
             case let .pageChanged(newID):
                 state.selectedID = newID

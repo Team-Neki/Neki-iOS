@@ -90,7 +90,7 @@ extension DefaultArchiveRepository {
         // 기존에 저장된 정렬 순서
         let cachedSortOrder = currentSortOrder[folderID]
         // 정렬이 바뀌었으면 무조건 Dirty로 간주하여 초기화
-        let isSortChanged = (cachedSortOrder != nil) && (cachedSortOrder != requestSortOrder)
+        let isSortChanged = cachedSortOrder != requestSortOrder
         
         if isDirty || currentCache.isEmpty || isSortChanged {
             currentPhotoPage[folderID] = 0
@@ -106,7 +106,7 @@ extension DefaultArchiveRepository {
         }
         
         let page = currentPhotoPage[folderID] ?? 0
-        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: sortOrder)
+        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: requestSortOrder)        
         let endpoint = ArchiveEndpoint.getPhotoList(request: request)
         let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
         

@@ -114,38 +114,80 @@ extension NekiToolBar {
     }
 }
 
-public struct NekiToolbarLayout<Left: View, Center: View, Right: View>: View {
+public struct NekiToolbarContent<Left: View, Center: View, Right: View>: ToolbarContent {
     let left: Left
     let center: Center
     let right: Right
-    let backgroundColor: Color
     
     public init(
-        backgroundColor: Color = .white,
         @ViewBuilder left: () -> Left,
         @ViewBuilder center: () -> Center,
         @ViewBuilder right: () -> Right
     ) {
-        self.backgroundColor = backgroundColor
         self.left = left()
         self.center = center()
         self.right = right()
     }
     
-    public var body: some View {
-        ZStack(alignment: .center) {
-            HStack(alignment: .center, spacing: 0) {
-                left
-                Spacer()
-                right
-            }
-            .padding(.leading, 8)
-            .padding(.trailing, 20)
-            .frame(height: 54)
-            
+    public var body: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            left
+                .offset(x: -8)
+        }
+        ToolbarItem(placement: .principal) {
             center
         }
-        .background(backgroundColor)
-        .frame(height: 54)
+        ToolbarItem(placement: .topBarTrailing) {
+            right
+                .offset(x: -4)
+        }
     }
 }
+
+public extension View {
+    func nekiToolbar<Left: View, Center: View, Right: View>(
+        backgroundColor: Color? = nil,
+        isOverlay: Bool = false,
+        @ViewBuilder left: () -> Left = { EmptyView() },
+        @ViewBuilder center: () -> Center = { EmptyView() },
+        @ViewBuilder right: () -> Right = { EmptyView() }
+    ) -> some View {
+        self
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden()
+            .toolbar { NekiToolbarContent(left: left, center: center, right: right) }
+            .toolbarBackground(backgroundColor ?? (isOverlay ? .clear : .white), for: .navigationBar)
+            .toolbarBackground(isOverlay ? .hidden : .visible, for: .navigationBar)
+            .onAppear {
+                let appearance = UINavigationBarAppearance()
+                if isOverlay {
+                    appearance.configureWithTransparentBackground()
+                } else {
+                    appearance.configureWithOpaqueBackground()
+                    appearance.backgroundColor = UIColor(backgroundColor ?? .white)
+                }
+                
+                appearance.shadowColor = .clear
+                appearance.shadowImage = nil
+                
+                UINavigationBar.appearance().standardAppearance = appearance
+                UINavigationBar.appearance().scrollEdgeAppearance = appearance
+                UINavigationBar.appearance().compactAppearance = appearance
+            }
+    }
+}
+
+extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
+    open override func viewDidLoad() {
+        super.viewDidLoad()
+        interactivePopGestureRecognizer?.delegate = self
+    }
+    
+    public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool { viewControllers.count > 1 }
+    
+    public func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer
+    ) -> Bool { true }
+}
+

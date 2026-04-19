@@ -85,7 +85,8 @@ struct ArchivePhotoDetailFeature {
             switch action {
                 
             case .onAppear:
-                return .run( _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView) )
+                analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView)
+                return .none
                 
             case .onTapBackButton:
                 return .run { _ in await dismiss() }

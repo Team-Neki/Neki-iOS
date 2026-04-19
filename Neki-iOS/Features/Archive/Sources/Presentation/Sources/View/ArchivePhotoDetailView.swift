@@ -21,6 +21,13 @@ struct ArchivePhotoDetailView: View {
             photoTabView
                 .ignoresSafeArea()
             
+            // 툴바
+            VStack(spacing: 0) {
+                topToolbar
+                    .background(.white)
+                Spacer()
+            }
+            
             // 딤처리
             dimmedBackground
                 .ignoresSafeArea()
@@ -54,20 +61,6 @@ struct ArchivePhotoDetailView: View {
                 .zIndex(10)
             }
         }
-        .nekiToolbar(
-            backgroundColor: Color(.systemBackground),
-            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
-            center: { NekiToolBar.textCenter(store.formattedDate) },
-            right: {
-                Button {
-                    store.send(.toggleDropDownMenu)
-                } label: {
-                    Image(.iconEllipsis)
-                        .frame(width: 24, height: 24)
-                        .padding(8)
-                }
-            }
-        )
         .onChange(of: store.currentItemID) { _, _ in
             store.send(.closeDropDownMenu)
             store.send(.binding(.set(\.isMemoVisible, false)))
@@ -120,6 +113,24 @@ struct ArchivePhotoDetailView: View {
 // MARK: - Subviews
 
 extension ArchivePhotoDetailView {
+    // 툴바
+    private var topToolbar: some View {
+        NekiToolbarLayout(
+            backgroundColor: Color(.systemBackground),
+            left: { NekiToolBar.back { store.send(.onTapBackButton) } },
+            center: { NekiToolBar.textCenter(store.formattedDate) },
+            right: {
+                Button {
+                    store.send(.toggleDropDownMenu)
+                } label: {
+                    Image(.iconEllipsis)
+                        .frame(width: 24, height: 24)
+                        .padding(8)
+                }
+            }
+        )
+    }
+    
     private var dropDownMenu: some View {
         VStack(alignment: .leading, spacing: 4) {
             Button {

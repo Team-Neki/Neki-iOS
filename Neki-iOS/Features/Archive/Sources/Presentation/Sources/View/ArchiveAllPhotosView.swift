@@ -182,7 +182,7 @@ private extension ArchiveAllPhotosView {
     var filterBar: some View {
         HStack(alignment: .center, spacing: 6) {
             Button(store.state.selectedSortedTime) {
-                withAnimation { showDropDownMenu.toggle() }
+                showDropDownMenu.toggle()
             }
             .buttonStyle(
                 .nekiChip(

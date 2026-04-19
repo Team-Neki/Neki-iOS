@@ -69,8 +69,8 @@ struct ArchiveFeature {
         
         case addPhotoFromQRScanner(imageID: Int)
         
-        case processUploadImages(entities: [ImageUploadEntity])
-        case uploadSharedImagesResponse(Result<[ImageUploadEntity], Error>)
+        case processUploadImages(entities: [ImageUploadEntity], appGroupID: String?)
+        case uploadSharedImagesResponse(Result<[ImageUploadEntity], Error>, appGroupID: String?)
         
         case addPhotoFromShareExtension(appGroupID: String)
         case cleanSharedImages(appGroupID: String)
@@ -217,12 +217,12 @@ struct ArchiveFeature {
             case .loadMorePhotos: return .send(.fetchPhotos)
                 
             case let .imagePicker(.delegate(.imagesConverted(entities))):
-                return .send(.processUploadImages(entities: entities))
+                return .send(.processUploadImages(entities: entities, appGroupID: nil))
                 
-            case let .processUploadImages(entities):
+            case let .processUploadImages(entities, appGroupID):
                 state.isLoading = false
                 guard !entities.isEmpty else { return .none }
-                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities)
+                state.selectUploadAlbum = SelectUploadAlbumFeature.State(pendingUploadImages: entities, appGroupID: appGroupID)
                 return .none
                 
             case let .addPhotoFromShareExtension(appGroupID):
@@ -232,7 +232,7 @@ struct ArchiveFeature {
                         let fileURLs = try await sharedImageClient.fetchSharedImageURLs(appGroupID: appGroupID)
                         guard !fileURLs.isEmpty else {
                             await send(.delegate(.showToast(NekiToastItem("가져올 수 있는 이미지가 없어요.", style: .error))))
-                            await send(.uploadSharedImagesResponse(.failure(UploadError.uploadFailed)))
+                            await send(.uploadSharedImagesResponse(.failure(UploadError.uploadFailed), appGroupID: appGroupID))
                             return
                         }
                         
@@ -243,10 +243,10 @@ struct ArchiveFeature {
                             }
                         }
                         await send(.cleanSharedImages(appGroupID: appGroupID))
-                        await send(.uploadSharedImagesResponse(.success(entities)))
+                        await send(.uploadSharedImagesResponse(.success(entities), appGroupID: appGroupID))
                     } catch {
                         await send(.cleanSharedImages(appGroupID: appGroupID))
-                        await send(.uploadSharedImagesResponse(.failure(error)))
+                        await send(.uploadSharedImagesResponse(.failure(error), appGroupID: appGroupID))
                     }
                 }
                 
@@ -285,10 +285,10 @@ struct ArchiveFeature {
                     try? await sharedImageClient.clearSharedImages(appGroupID: appGroupID)
                 }
                 
-            case let .uploadSharedImagesResponse(.success(entities)):
-                return .send(.processUploadImages(entities: entities))
+            case let .uploadSharedImagesResponse(.success(entities), appGroupID):
+                return .send(.processUploadImages(entities: entities, appGroupID: appGroupID))
                 
-            case .uploadSharedImagesResponse(.failure):
+            case .uploadSharedImagesResponse(.failure, _):
                 state.isLoading = false
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 

@@ -17,10 +17,18 @@ struct SelectUploadAlbumFeature {
     @ObservableState
     struct State {
         let pendingUploadImages: [ImageUploadEntity]
-        var viewMode: ViewMode = .prompt
-        var isLoading: Bool = false
+        var viewMode: ViewMode
+        var isLoading: Bool
+        var appGroupID: String?
         
         var albumSelection: AlbumSelectionFeature.State?
+        
+        init(pendingUploadImages: [ImageUploadEntity], appGroupID: String? = nil, viewMode: ViewMode = .prompt, isLoading: Bool = false) {
+            self.pendingUploadImages = pendingUploadImages
+            self.viewMode = viewMode
+            self.isLoading = isLoading
+            self.appGroupID = appGroupID
+        }
     }
     
     enum Action: BindableAction {
@@ -43,6 +51,7 @@ struct SelectUploadAlbumFeature {
     
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageUploadClient) var imageUploadClient
+    @Dependency(\.sharedImageClient) var sharedImageClient
     @Dependency(\.dismiss) var dismiss
     
     var body: some ReducerOf<Self> {
@@ -50,7 +59,12 @@ struct SelectUploadAlbumFeature {
         
         Reduce { state, action in
             switch action {
-            case .tapDimmedBackground: return .run { _ in await self.dismiss() }
+            case .tapDimmedBackground: return .run { [appGroupID = state.appGroupID] _ in
+                if let appGroupID {
+                    try? await sharedImageClient.clearSharedImages(appGroupID)
+                }
+                await self.dismiss()
+            }
                 
             case .tapUploadWithoutAlbum:
                 state.isLoading = true

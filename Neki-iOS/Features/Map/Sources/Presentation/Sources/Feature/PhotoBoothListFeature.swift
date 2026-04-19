@@ -37,14 +37,19 @@ public struct PhotoBoothListFeature {
         case binding(BindingAction<State>)
     }
     
+    @Dependency(\.analyticsClient) private var analytics
+    
     public var body: some ReducerOf<Self> {
         BindingReducer()
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case let .selectFilterOption(brand):
+                let filterAction: MapFilterAction = state.filteredBrands.contains(brand) ? .deselect : .select
                 toggleFilterOptionSelection(&state, brand: brand)
-                return .none
+                let selectedCount = state.filteredBrands.count
+                let event = MapAnalyticsEvent.mapBrandFilterToggle(action: filterAction, selectedCount: selectedCount, brandName: brand.name)
+                return .run { _ in analytics.logEvent(event: event) }
                 
             case .toggleTooltip:
                 state.$isTooltipPresented.withLock { $0.toggle() }

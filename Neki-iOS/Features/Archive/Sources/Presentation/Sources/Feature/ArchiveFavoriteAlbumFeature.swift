@@ -43,7 +43,7 @@ struct ArchiveFavoriteAlbumFeature {
         case imagePicker(ImagePickerFeature.Action)
         case processUploadImages(entities: [ImageUploadEntity])
         case registerPhotos(entities: [ImageUploadEntity])
-        case registerPhotosResponse(Result<Void, Error>)
+        case registerPhotosResponse(Result<Int, Error>)
         case onTapDeleteButton
         case deletePhotos
         case deletePhotosResponse(Result<Void, Error>)
@@ -63,6 +63,7 @@ struct ArchiveFavoriteAlbumFeature {
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -115,12 +116,14 @@ struct ArchiveFavoriteAlbumFeature {
                         let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
                         let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.direct) }
                         try await archiveClient.registerPhotos(folderId: nil, uploads: uploads, favorite: true)
+                        return entities.count
                     }))
                 }
                 
-            case .registerPhotosResponse(.success):
+            case let .registerPhotosResponse(.success(count)):
                 state.isLoading = false
                 return .run { send in
+                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchFavoritePhotos)
                 }
@@ -133,7 +136,7 @@ struct ArchiveFavoriteAlbumFeature {
                 guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
                 return .run { send in
-                    await send(.favoritePhotoListResponse(Result { try await archiveClient.fetchFavoritePhotoList(20, "DESC") }))
+                    await send(.favoritePhotoListResponse(Result { try await archiveClient.fetchFavoritePhotoList(size: 20, sortOrder: "DESC") }))
                 }
                 
             case let .favoritePhotoListResponse(.success(result)):
@@ -168,7 +171,6 @@ struct ArchiveFavoriteAlbumFeature {
                 }
                 return .none
                 
-            // 💡 캡슐화 적용
             case .onTapDuplicateButton:
                 state.albumSelection = AlbumSelectionFeature.State(photoIDs: Array(state.selectedIDs), selectionPurpose: .duplicate, currentAlbumId: state.album.id)
                 return .none
@@ -179,12 +181,14 @@ struct ArchiveFavoriteAlbumFeature {
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message):
+                case let .didCompleteTask(message, albumCount):
+                    let photoCount = state.selectedIDs.count
                     state.albumSelection = nil
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
                     
                     return .merge(
+                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchFavoritePhotos)
                     )
@@ -221,7 +225,7 @@ struct ArchiveFavoriteAlbumFeature {
             case .deletePhotos:
                 let idsToDelete = Array(state.selectedIDs)
                 return .run { send in
-                    await send(.deletePhotosResponse(Result { try await archiveClient.deletePhotoList(idsToDelete) }))
+                    await send(.deletePhotosResponse(Result { try await archiveClient.deletePhotoList(photoIds: idsToDelete) }))
                 }
                 
             case .deletePhotosResponse(.success):

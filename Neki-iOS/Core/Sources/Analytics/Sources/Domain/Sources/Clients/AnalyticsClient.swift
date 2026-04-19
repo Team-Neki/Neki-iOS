@@ -8,6 +8,7 @@
 import Foundation
 import Dependencies
 import DependenciesMacros
+import os
 
 @DependencyClient
 public struct AnalyticsClient {
@@ -25,4 +26,11 @@ extension AnalyticsClient: DependencyKey {
             Task.detached(priority: .background) { await repository.logEvent(event) }
         }
     }()
+}
+
+extension DependencyValues {
+    var analyticsClient: AnalyticsClient {
+        get { self[AnalyticsClient.self] }
+        set { self[AnalyticsClient.self] = newValue }
+    }
 }

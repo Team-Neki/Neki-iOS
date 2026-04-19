@@ -53,6 +53,7 @@ struct SelectUploadAlbumFeature {
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.sharedImageClient) var sharedImageClient
     @Dependency(\.dismiss) var dismiss
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -103,7 +104,11 @@ struct SelectUploadAlbumFeature {
                 
             case let .uploadResponse(.success(albumId)):
                 state.isLoading = false
-                return .send(.delegate(.uploadDidSuccess(albumId: albumId)))
+                let count = state.pendingUploadImages.count
+                return .merge(
+                    .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count)) },
+                    .send(.delegate(.uploadDidSuccess(albumId: albumId)))
+                )
                 
             case let .uploadResponse(.failure(error)):
                 state.isLoading = false

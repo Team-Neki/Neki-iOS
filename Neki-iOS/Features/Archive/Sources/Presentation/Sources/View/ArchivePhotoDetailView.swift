@@ -61,6 +61,9 @@ struct ArchivePhotoDetailView: View {
                 .zIndex(10)
             }
         }
+        .onAppear {
+            store.send(.onAppear)
+        }
         .onChange(of: store.currentItemID) { _, _ in
             store.send(.closeDropDownMenu)
             store.send(.binding(.set(\.isMemoVisible, false)))

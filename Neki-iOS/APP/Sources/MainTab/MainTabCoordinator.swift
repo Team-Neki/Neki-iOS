@@ -74,6 +74,9 @@ struct MainTabCoordinator {
         case dismissPermissionAlert
         case openAppSettings
         
+        case onAppear
+        case tabChanged(NekiTab)
+        
         case delegate(Delegate)
         enum Delegate {
             case signedOut
@@ -83,6 +86,7 @@ struct MainTabCoordinator {
     
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.openURL) private var openURL
+    @Dependency(\.analyticsClient) private var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -96,6 +100,20 @@ struct MainTabCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .binding: return .none
+                
+            case .onAppear:
+                return .send(.tabChanged(state.selectedTab))
+                
+            case let .tabChanged(tab):
+                return .run { _ in
+                    switch tab {
+                    case .archive: analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
+                    case .pose: analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
+                    case .map: analyticsClient.logEvent(MainTabAnalyticsEvent.mapView)
+                    default: break
+                    }
+                }
+                
             case .onTapAddButton:
                 state.destination = .uploadSelection
                 return .none
@@ -161,7 +179,6 @@ struct MainTabCoordinator {
             case let .archive(.delegate(.showToast(item))):
                 state.toast = item
                 return .none
-                
                 
             case .myPage(.delegate(.didLogout)):
                 return .run { send in

@@ -148,10 +148,6 @@ struct AlbumSelectionFeature {
                 let purpose = state.selectionPurpose
                 let targetFolderIDs = Array(state.selectedAlbumIDs)
                 
-                if purpose == .upload {
-                    return .send(.delegate(.didSelectForUpload(albumId: targetFolderIDs.first!)))
-                }
-                
                 state.isLoading = true
                 let photoIDs = state.photoIDs
                 let currentAlbumId = state.currentAlbumId
@@ -173,7 +169,8 @@ struct AlbumSelectionFeature {
                                 await send(.taskFailed(message: "사진 이동에 실패했어요"))
                             }
                             
-                        case .upload: break
+                        case .upload:
+                            await send(.delegate(.didSelectForUpload(albumId: targetFolderIDs.first!)))
                         }
                     } catch {
                         let failMsg = purpose == .duplicate ? "사진 추가에 실패했어요" : "사진 이동에 실패했어요"

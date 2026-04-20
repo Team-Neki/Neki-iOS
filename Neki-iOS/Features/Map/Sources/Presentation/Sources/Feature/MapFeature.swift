@@ -466,7 +466,7 @@ private extension MapFeature {
     }
     
     func checkIfRegionChanged(from lastLocation: CLLocation?, to currentLocation: CLLocation) -> Bool {
-        guard let lastLocation else { return true }
+        guard let lastLocation else { return false }
         return currentLocation.distance(from: lastLocation) >= Constants.regionChangeDistanceThreshold
     }
 }

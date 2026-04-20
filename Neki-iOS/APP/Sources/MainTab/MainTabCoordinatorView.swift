@@ -44,6 +44,12 @@ struct MainTabCoordinatorView: View {
                 LoadingView(message: "사진을 업로드하고 있어요.")
             }
         }
+        .onAppear {
+            store.send(.onAppear)
+        }
+        .onChange(of: store.selectedTab) { _, newTab in
+            store.send(.tabChanged(newTab))
+        }
         .nekiToast(item: $store.toast)
         .nekiAlert(
             isPresented: $store.isPermissionAlertPresented,

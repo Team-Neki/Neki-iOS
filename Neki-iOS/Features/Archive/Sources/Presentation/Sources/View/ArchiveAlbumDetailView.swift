@@ -15,13 +15,14 @@ struct ArchiveAlbumDetailView: View {
     @State private var lastDragPoint: CGFloat = 0
     @State var deleteAlbumSheetPresented: Bool = false
     @State var editAlbumNameSheetPresented: Bool = false
+    @State var deleteEntireAlbumSheetPresented: Bool = false
     
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 
-                if store.filteredAlbumPhotos.isEmpty {
+                if store.filteredAlbumPhotos.isEmpty && store.album.count == 0 {
                     ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n새로운 사진을 등록하고 앨범에 추가해보세요!")
                         .padding(.bottom, 54)
                 } else {
@@ -39,18 +40,34 @@ struct ArchiveAlbumDetailView: View {
                 VStack {
                     Spacer()
                     ArchiveImageFooter(
+                        style: .selection,
                         isEnabled: store.hasSelectedItems,
                         onDownload: { store.send(.onTapDownloadButton) },
-                        onDelete: { deleteAlbumSheetPresented = true }
+                        onDelete: { deleteAlbumSheetPresented = true },
+                        onDuplicate: { store.send(.onTapDuplicateButton) },
+                        onMove: { store.send(.onTapMoveButton) }
                     )
                 }
             }
             
             if store.isLoading {
-                LoadingView(message: "사진을 업로드하고 있어요.")
+                LoadingView(message: "요청을 처리하고 있어요.")
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
+        .animation(.easeInOut(duration: 0.3), value: store.photos)
         .task { await store.send(.onAppear).finish() }
+        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+            AlbumSelectionView(store: selectionStore)
+        }
+        // 사진 가져오기 시트
+        .sheet(item: $store.scope(state: \.photoImport, action: \.photoImport)) { importStore in
+            PhotoImportView(store: importStore)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(20)
+        }
+        // 사진 삭제 시트
         .sheet(isPresented: $deleteAlbumSheetPresented) {
             ArchiveDeleteSheet<ArchivePhotoDeleteOption>(
                 initialOption: .fromAlbumOnly,
@@ -68,6 +85,25 @@ struct ArchiveAlbumDetailView: View {
             .presentationDetents([.height(280)])
             .presentationCornerRadius(20)
         }
+        // 앨범 삭제 시트
+        .sheet(isPresented: $deleteEntireAlbumSheetPresented) {
+            ArchiveDeleteSheet<ArchiveAlbumDeleteOption>(
+                initialOption: .withPhotos,
+                title: "앨범을 삭제하시겠어요?",
+                firstOption: (.withPhotos, "사진까지 함께 삭제"),
+                secondOption: (.albumOnly, "사진은 유지하고 앨범만 삭제"),
+                onCancel: {
+                    deleteEntireAlbumSheetPresented = false
+                },
+                onConfirm: { selectedOption in
+                    store.send(.onTapExecuteDeleteAlbum(option: selectedOption))
+                    deleteEntireAlbumSheetPresented = false
+                }
+            )
+            .presentationDetents([.height(280)])
+            .presentationCornerRadius(20)
+        }
+        // 앨범 이름 수정 시트
         .sheet(isPresented: $editAlbumNameSheetPresented) {
             ArchiveAlbumInputSheet(
                 style: .edit,
@@ -130,7 +166,7 @@ private extension ArchiveAlbumDetailView {
             
             // 수정되는 모습이 바로바로 보여서 이렇게 해뒀는데, QA 후 별로라는 의견 나오면 별도 title로 관리
             Text(store.newAlbumTitle)
-                .nekiFont(.title18SemiBold)
+                .nekiFont(.title20SemiBold)
                 .foregroundStyle(.gray900)
         }
         .frame(height: 54)
@@ -149,16 +185,28 @@ private extension ArchiveAlbumDetailView {
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
-
-            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
-                Text("사진 추가")
+            
+            // TODO: - 사진 추가 기능 추가되면 주석 해제
+//            NekiImagePicker(store: store.scope(state: \.imagePicker, action: \.imagePicker)) {
+//                Text("사진 추가")
+//                    .nekiFont(.body16Medium)
+//                    .foregroundStyle(.gray900)
+//            }
+//            .frame(width: 120, height: 34, alignment: .leading)
+//            .padding(.leading, 12)
+//            .contentShape(Rectangle())
+            
+            Button {
+                store.send(.onTapImportPhotos)
+            } label: {
+                Text("사진 가져오기")
                     .nekiFont(.body16Medium)
                     .foregroundStyle(.gray900)
             }
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)
             .contentShape(Rectangle())
-
+            
             Button {
                 store.send(.closeDropDownMenu)
                 editAlbumNameSheetPresented = true
@@ -166,6 +214,18 @@ private extension ArchiveAlbumDetailView {
                 Text("앨범 이름 변경")
                     .nekiFont(.body16Medium)
                     .foregroundStyle(.gray900)
+            }
+            .frame(width: 120, height: 34, alignment: .leading)
+            .padding(.leading, 12)
+            .contentShape(Rectangle())
+            
+            Button {
+                store.send(.closeDropDownMenu)
+                deleteEntireAlbumSheetPresented = true
+            } label: {
+                Text("앨범 삭제")
+                    .nekiFont(.body16Medium)
+                    .foregroundStyle(.primary500)
             }
             .frame(width: 120, height: 34, alignment: .leading)
             .padding(.leading, 12)
@@ -219,29 +279,4 @@ private extension ArchiveAlbumDetailView {
                 .onEnded { _ in lastDragPoint = 0 }
         )
     }
-}
-
-#Preview {
-    ArchiveAlbumDetailView(
-        store: Store(
-            initialState: ArchiveAlbumDetailFeature.State(
-                photos: [
-                    ArchiveImageItem(id: 1, imageURLString: "https://picsum.photos/200/300", isFavorite: true, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 2, imageURLString: "https://picsum.photos/200/400", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 3, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 4, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 5, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 6, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 7, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 8, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 9, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1),
-                    ArchiveImageItem(id: 10, imageURLString: "https://picsum.photos/200/250", isFavorite: false, date: Date(), folderId: 1)
-                ],
-                album: AlbumItem(id: 1, title: "제주도 여행", count: 3, coverImageURL: nil, isFavorite: false)
-            ),
-            reducer: {
-                ArchiveAlbumDetailFeature()
-            }
-        )
-    )
 }

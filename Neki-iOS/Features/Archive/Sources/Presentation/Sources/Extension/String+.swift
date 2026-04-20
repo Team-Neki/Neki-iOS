@@ -35,7 +35,7 @@ extension String {
     }
 }
 
-private struct DateFormatters {
+struct DateFormatters {
     
     // 1. 밀리초 + 타임존 (Standard InternetDateTime + Fractional)
     static let iso8601Fractional: ISO8601DateFormatter = {
@@ -69,6 +69,13 @@ private struct DateFormatters {
             .withYear, .withMonth, .withDay,
             .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime
         ]
+        return formatter
+    }()
+    
+    static let dotFormat: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy.MM.dd"
+        formatter.locale = Locale(identifier: "ko_KR")
         return formatter
     }()
 }

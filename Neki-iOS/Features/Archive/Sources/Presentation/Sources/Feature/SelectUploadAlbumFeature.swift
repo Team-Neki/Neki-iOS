@@ -2,8 +2,6 @@
 //  SelectUploadAlbumFeature.swift
 //  Neki-iOS
 //
-//  Created by OneTen on 1/22/26.
-//
 
 import ComposableArchitecture
 import SwiftUI
@@ -12,37 +10,38 @@ import SwiftUI
 struct SelectUploadAlbumFeature {
     
     enum ViewMode: Equatable {
-        case prompt       // 초기 선택 팝업 (앨범 없이 / 앨범 선택)
-        case albumList    // 앨범 리스트 화면
+        case prompt
+        case albumList
     }
     
     @ObservableState
-    struct State: Equatable {
-        let uploadedImageIds: [Int]
-        var albums: IdentifiedArrayOf<AlbumItem>
-        var selectedAlbumId: Int? = nil
+    struct State {
+        let pendingUploadImages: [ImageUploadEntity]
+        var viewMode: ViewMode
+        var isLoading: Bool
+        var appGroupID: String?
         
-        var viewMode: ViewMode = .prompt
-        var isLoading: Bool = false
+        var albumSelection: AlbumSelectionFeature.State?
+        
+        init(pendingUploadImages: [ImageUploadEntity], appGroupID: String? = nil, viewMode: ViewMode = .prompt, isLoading: Bool = false) {
+            self.pendingUploadImages = pendingUploadImages
+            self.viewMode = viewMode
+            self.isLoading = isLoading
+            self.appGroupID = appGroupID
+        }
     }
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
+        case tapUploadWithoutAlbum
+        case tapSelectAlbumAndUpload
+        case tapDimmedBackground
         
-        // User Actions
-        case tapUploadWithoutAlbum // 앨범 없이 업로드하기
-        case tapSelectAlbumAndUpload // 앨범 선택 후 업로드하기
+        case executeUpload(albumId: Int?)
+        case uploadResponse(Result<Int?, Error>)
         
-        // Album List Actions
-        case tapBackToPrompt // 리스트에서 뒤로가기
+        case albumSelection(AlbumSelectionFeature.Action)
         
-        case tapAlbum(AlbumItem) // 앨범 선택
-        case tapConfirmUpload // 최종 업로드 버튼
-        
-        case registerPhotos(albumId: Int?)
-        case registerPhotosResponse(Result<Int?, Error>)
-        
-        // Delegate
         case delegate(DelegateAction)
         enum DelegateAction {
             case uploadDidSuccess(albumId: Int?)
@@ -51,68 +50,78 @@ struct SelectUploadAlbumFeature {
     }
     
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageUploadClient) var imageUploadClient
+    @Dependency(\.sharedImageClient) var sharedImageClient
+    @Dependency(\.dismiss) var dismiss
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
         
         Reduce { state, action in
             switch action {
+            case .tapDimmedBackground: return .run { [appGroupID = state.appGroupID] _ in
+                if let appGroupID {
+                    try? await sharedImageClient.clearSharedImages(appGroupID)
+                }
+                await self.dismiss()
+            }
                 
-                // 앨범 없이 최종 업로드
             case .tapUploadWithoutAlbum:
                 state.isLoading = true
-                return .send(.registerPhotos(albumId: nil))
+                return .send(.executeUpload(albumId: nil))
                 
-                // 앨범 선택 후 업로드
             case .tapSelectAlbumAndUpload:
                 state.viewMode = .albumList
+                state.albumSelection = AlbumSelectionFeature.State(
+                    photoIDs: [],
+                    uploadCount: state.pendingUploadImages.count,
+                    selectionPurpose: .upload,
+                    currentAlbumId: nil
+                )
                 return .none
                 
-                // [뒤로가기] 리스트 -> 팝업
-            case .tapBackToPrompt:
-                state.viewMode = .prompt
-                return .none
-                
-            case let .tapAlbum(album):
-                if state.selectedAlbumId == album.id {
-                    state.selectedAlbumId = nil
-                } else {
-                    state.selectedAlbumId = album.id
-                }
-                return .none
-                
-                // 앨범 리스트 화면에서 최종 업로드
-            case .tapConfirmUpload:
-                guard let albumId = state.selectedAlbumId else { return .none }
+            case let .albumSelection(.delegate(.didSelectForUpload(albumId))):
                 state.isLoading = true
-                return .send(.registerPhotos(albumId: albumId))
+                return .send(.executeUpload(albumId: albumId))
                 
-            case let .registerPhotos(albumId):
-                return .run { [mediaIds = state.uploadedImageIds] send in
-                    await send(.registerPhotosResponse(
+            case .albumSelection(.delegate(.didTapCancel)):
+                state.viewMode = .prompt
+                state.albumSelection = nil
+                return .none
+                
+            case let .executeUpload(albumId):
+                return .run { [entities = state.pendingUploadImages] send in
+                    await send(.uploadResponse(
                         Result {
-                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
+                            let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
+                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.direct) }
                             try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads, favorite: false)
-                            
                             return albumId
                         }
                     ))
                 }
                 
-            case let .registerPhotosResponse(.success(albumId)):
+            case let .uploadResponse(.success(albumId)):
                 state.isLoading = false
-                return .send(.delegate(.uploadDidSuccess(albumId: albumId)))
+                let count = state.pendingUploadImages.count
+                return .merge(
+                    .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count)) },
+                    .send(.delegate(.uploadDidSuccess(albumId: albumId)))
+                )
                 
-            case let .registerPhotosResponse(.failure(error)):
+            case let .uploadResponse(.failure(error)):
                 state.isLoading = false
                 return .send(.delegate(.uploadDidFail(error)))
                 
-            case .binding:
+            case .binding, .albumSelection:
                 return .none
                 
-            default:
-                return .none
+            default: return .none
             }
+        }
+        .ifLet(\.albumSelection, action: \.albumSelection) {
+            AlbumSelectionFeature()
         }
     }
 }

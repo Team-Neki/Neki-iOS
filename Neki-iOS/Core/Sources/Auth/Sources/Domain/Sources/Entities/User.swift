@@ -16,3 +16,7 @@ public struct User: Sendable, Equatable, Codable {
     let providerType: ProviderType
     var allRequiredTermsAgreed: Bool
 }
+
+extension User {
+    static var dummy: Self { User(id: -1, nickname: "-", email: nil, profileImageURL: nil, providerType: .local, allRequiredTermsAgreed: true) }
+}

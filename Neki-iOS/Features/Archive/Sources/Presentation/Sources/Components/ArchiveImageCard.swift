@@ -28,8 +28,15 @@ struct ArchiveImageCard: View {
         endPoint: UnitPoint(x: 0.54, y: 0.05)
     )
     
+    var imageAspectRatio: CGFloat? {
+        if let width = item.width, let height = item.height, height > 0 {
+            return CGFloat(width) / CGFloat(height)
+        }
+        return nil
+    }
+    
     //MARK: - Init
-
+    
     init(
         item: ArchiveImageItem,
         isSelectionMode: Bool = false,
@@ -55,7 +62,7 @@ struct ArchiveImageCard: View {
                     Logger.presentation.error("실패한 이미지 id: \(item.id)")
                 }
                 .cancelOnDisappear(true)
-                .aspectRatio(contentMode: .fit)
+                .aspectRatio(imageAspectRatio, contentMode: .fit)
                 .overlay(content: {
                     Color.black.opacity(0.04)
                 })

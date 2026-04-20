@@ -18,37 +18,45 @@ struct ArchiveAllPhotosView: View {
     
     
     var body: some View {
-        ZStack(alignment: .top) {
-            masonryView
+        VStack(alignment: .leading, spacing: 0) {
+            header
+                .background(.white)
+                .zIndex(9)
             
-            if !store.isSelectionMode {
-                filterBar
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 4)
-                    .padding(.bottom, 12)
-                    .background(.white)
-                    .offset(y: isFilterBarVisible ? 0 : -100)
-            }
-            
-            if store.isSelectionMode {
-                VStack {
-                    Spacer()
-                    ArchiveImageFooter(
-                        isEnabled: store.hasSelectedItems,
-                        onDownload: { store.send(.onTapDownloadButton) },
-                        onDelete: { showDeleteAlert = true }
-                    )
+            ZStack(alignment: .top) {
+                masonryView
+                
+                if !store.isSelectionMode {
+                    filterBar
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 4)
+                        .padding(.bottom, 12)
+                        .background(.white)
+                        .offset(y: isFilterBarVisible ? 0 : -100)
                 }
+                
+                if store.isSelectionMode {
+                    VStack {
+                        Spacer()
+                        ArchiveImageFooter(
+                            style: .selection,
+                            isEnabled: store.hasSelectedItems,
+                            onDownload: { store.send(.onTapDownloadButton) },
+                            onDelete: { showDeleteAlert = true },
+                            onDuplicate: { store.send(.onTapDuplicateButton) },
+                            onMove: nil
+                        )
+                    }
+                }
+                
+                if store.isLoading {
+                    LoadingView(message: "요청을 처리하고 있어요.")
+                }
+                
             }
-            
         }
-        .nekiToolbar(
-            left: { NekiToolBar.back(action: { store.send(.onTapBackButton) }) },
-            center: { NekiToolBar.textCenter("모든 사진") },
-            right: {
-                store.isSelectionMode ? NekiToolBar.textRight("취소", action: { store.send(.onTapCancelSelectButton) }) : NekiToolBar.textRight("선택", action: { store.send(.onTapSelectButton) })
-            }
-        )
+        .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
+        .animation(.easeInOut(duration: 0.3), value: store.photos)
         .nekiAlert(
             isPresented: $showDeleteAlert,
             style: .cancelable,
@@ -69,10 +77,54 @@ struct ArchiveAllPhotosView: View {
         .task {
             await store.send(.onAppear).finish()
         }
+        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+            AlbumSelectionView(store: selectionStore)
+        }
     }
 }
 
 private extension ArchiveAllPhotosView {
+    @ViewBuilder
+    var header: some View {
+        ZStack(alignment: .center) {
+            HStack(alignment: .center, spacing: 0) {
+                Button {
+                    store.send(.onTapBackButton)
+                } label: {
+                    Image(.iconChevronLeft)
+                }
+                
+                Spacer()
+                
+                HStack(alignment: .center, spacing: 12) {
+                    if store.isSelectionMode {
+                        Button {
+                            store.send(.onTapCancelSelectButton)
+                        } label: {
+                            Text("취소")
+                                .nekiFont(.body16SemiBold)
+                                .foregroundStyle(.gray800)
+                        }
+                    } else {
+                        Button {
+                            store.send(.onTapSelectButton)
+                        } label: {
+                            Text("선택")
+                                .nekiFont(.body16SemiBold)
+                                .foregroundStyle(.primary500)
+                        }
+                    }
+                }
+            }
+            
+            Text("모든 사진")
+                .nekiFont(.title20SemiBold)
+                .foregroundStyle(.gray900)
+        }
+        .frame(height: 54)
+        .padding(.horizontal, 20)
+    }
+    
     @ViewBuilder
     var masonryView: some View {
         ScrollView {
@@ -131,7 +183,7 @@ private extension ArchiveAllPhotosView {
     var filterBar: some View {
         HStack(alignment: .center, spacing: 6) {
             Button(store.state.selectedSortedTime) {
-                withAnimation { showDropDownMenu.toggle() }
+                showDropDownMenu.toggle()
             }
             .buttonStyle(
                 .nekiChip(

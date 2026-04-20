@@ -14,6 +14,8 @@ import os
 public struct MapFeature {
     enum Constants {
         static let defaultInitialPosition: CLLocation = .init(latitude: 37.498095, longitude: 127.027610)
+        static let cameraTargetDistanceThreshold: CLLocationDistance = 200
+        static let regionChangeDistanceThreshold: CLLocationDistance = 500
     }
     
     enum SheetStage {
@@ -41,6 +43,7 @@ public struct MapFeature {
         // Map State
         var cameraPosition: GeographicCoordinate?
         var currentBounds: GeographicBoundingBox?
+        var lastSearchedLocation: CLLocation?
         
         // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -109,6 +112,7 @@ public struct MapFeature {
         case processNewChunk([PhotoBooth], isFirstBatch: Bool)
         case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool)
         case didFinishBackgroundCalculation(map: IdentifiedArrayOf<PhotoBooth>, list: IdentifiedArrayOf<PhotoBooth>)
+        case didSelectDirectionApp(DirectionAppType)
         
         // Binding & Child
         case binding(BindingAction<State>)
@@ -126,6 +130,7 @@ public struct MapFeature {
     
     @Dependency(\.mapClient) private var mapClient
     @Dependency(\.photoBoothClient) private var photoBoothClient
+    @Dependency(\.analyticsClient) private var analytics
     @Dependency(\.openURL) private var openURL
     
     public var body: some ReducerOf<Self> {
@@ -261,18 +266,14 @@ public struct MapFeature {
                 
                 guard state.isFirstLoad else { return .none }
                 guard state.locationAuthorizationStatus != .notDetermined else { return .none }
-                let targetCoordinate: CLLocation
-                if state.isLocationAuthorized {
-                    guard let userLocation = state.userLocation else { return .none }
-                    targetCoordinate = userLocation
-                } else {
-                    targetCoordinate = Constants.defaultInitialPosition
-                }
                 
+                let targetCoordinate = state.isLocationAuthorized ? (state.userLocation ?? Constants.defaultInitialPosition) : Constants.defaultInitialPosition
                 let currentCameraLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
-                guard currentCameraLocation.distance(from: targetCoordinate) <= 200 else { return .none }
+                
+                guard currentCameraLocation.distance(from: targetCoordinate) <= Constants.cameraTargetDistanceThreshold else { return .none }
                 state.isFirstLoad = false
                 let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
+                state.lastSearchedLocation = currentCameraLocation
                 return .merge(
                     .send(.fetchPhotoBooths(bounds: bounds)),
                     .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
@@ -285,7 +286,13 @@ public struct MapFeature {
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
                 let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
+                let currentCenterLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
+                let isRegionChanged = checkIfRegionChanged(from: state.lastSearchedLocation, to: currentCenterLocation)
+                let hasFilter = state.photoBoothListState.filteredBrands.isEmpty == false
+                let event = MapAnalyticsEvent.mapReSearch(hasFilter: hasFilter, regionChanged: isRegionChanged)
+                state.lastSearchedLocation = currentCenterLocation
                 return .merge(
+                    .run { _ in analytics.logEvent(event: event) },
                     .send(.fetchPhotoBooths(bounds: bounds)),
                     .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
                 )
@@ -392,7 +399,8 @@ public struct MapFeature {
             case .didTapBooth(let photoBooth):
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
-                return .none
+                let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .map)
+                return .run { _ in analytics.logEvent(event: event) }
                 
             case .didTapBoothCard:
                 state.isUserTrackingMode = false
@@ -408,6 +416,15 @@ public struct MapFeature {
                 state.directionSheetPhotoBooth = state.selectedBooth
                 return .none
                 
+            case let .didSelectDirectionApp(appType):
+                guard let photoBooth = state.directionSheetPhotoBooth else { return .none }
+                guard let url = appType.connectLink(coordinate: photoBooth.coordinate, name: photoBooth.name) else { return .none }
+                state.directionSheetPhotoBooth = nil
+                return .merge(
+                    .run { _ in analytics.logEvent(event: MapAnalyticsEvent.mapRouteClick(mapType: appType)) },
+                    .run { _ in await openURL(url) }
+                )
+                
             case .updateSDKAuthStatus(let isAuthorized):
                 state.isSDKAuthSuccessful = isAuthorized
                 return .none
@@ -416,7 +433,10 @@ public struct MapFeature {
                 return .send(.startBackgroundCalculation)
                 
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
-                return .send(.didTapBooth(photoBooth))
+                state.isUserTrackingMode = false
+                selectPhotoBooth(&state, photoBooth: photoBooth)
+                let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .bottomSheet)
+                return .run { _ in analytics.logEvent(event: event) }
                 
             default:
                 return .none
@@ -443,5 +463,10 @@ private extension MapFeature {
     
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {
         state.cameraPosition = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    }
+    
+    func checkIfRegionChanged(from lastLocation: CLLocation?, to currentLocation: CLLocation) -> Bool {
+        guard let lastLocation else { return false }
+        return currentLocation.distance(from: lastLocation) >= Constants.regionChangeDistanceThreshold
     }
 }

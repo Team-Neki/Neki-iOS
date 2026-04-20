@@ -12,12 +12,10 @@ import ComposableArchitecture
 struct MyPageCoordinator {
     @ObservableState
     struct State {
-        var root: MyPageFeature.State
-        var path = StackState<Path.State>()
+        @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
         
-        init(user: User) {
-            root = MyPageFeature.State(user: user)
-        }
+        var root = MyPageFeature.State()
+        var path = StackState<Path.State>()
     }
     
     enum Action {
@@ -28,7 +26,6 @@ struct MyPageCoordinator {
         enum Delegate {
             case didLogout
             case didWithdraw
-            case profileUpdated(User)
         }
     }
     
@@ -43,11 +40,12 @@ struct MyPageCoordinator {
                 return routeMyPageCellTapped(state: &state, cellItem)
                 
             case .root(.profileTapped):
-                state.path.append(.accountPreference(.init(user: state.root.user)))
+                state.path.append(.accountPreference(.init()))
                 return .none
                 
             case .path(.element(id: _, action: .accountPreference(.editProfileButtonTapped))):
-                state.path.append(.profileEdit(.init(user: state.root.user)))
+                guard case let .signedIn(user) = state.userSessionStatus else { return .none }
+                state.path.append(.profileEdit(.init(user: user)))
                 return .none
                 
             case .path(.element(id: _, action: .accountPreference(.didSignOut))):
@@ -55,9 +53,6 @@ struct MyPageCoordinator {
                 
             case .path(.element(id: _, action: .accountPreference(.didWithdraw))):
                 return .send(.delegate(.didWithdraw))
-                
-            case let .path(.element(id: _, action: .profileEdit(.profileUpdated(user)))):
-                return .send(.delegate(.profileUpdated(user)))
                 
             default:
                 return .none

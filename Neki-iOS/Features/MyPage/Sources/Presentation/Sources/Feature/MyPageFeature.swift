@@ -12,8 +12,13 @@ import ComposableArchitecture
 struct MyPageFeature {
     @ObservableState
     struct State {
-        var user: User
+        @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
         var appVersion: AppVersion = AppVersion(major: 0, minor: 0, revision: 0)
+        
+        var user: User {
+            guard case let .signedIn(user) = userSessionStatus else { return .dummy }
+            return user
+        }
     }
     
     enum Action {

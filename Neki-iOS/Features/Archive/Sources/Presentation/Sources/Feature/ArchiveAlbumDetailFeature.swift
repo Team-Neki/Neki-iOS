@@ -10,15 +10,15 @@ import Foundation
 
 @Reducer
 struct ArchiveAlbumDetailFeature {
-    
     @ObservableState
     struct State {
+        @Presents var albumSelection: AlbumSelectionFeature.State?
+        @Presents var photoImport: PhotoImportFeature.State?
+        var selectionPurpose: PhotoSelectionPurpose?
+        
         var photos: IdentifiedArrayOf<ArchiveImageItem> = []
-        
         let album: AlbumItem
-        
         var showDropDownMenu: Bool = false
-        
         var selectedIDs: Set<Int> = []
         
         var newAlbumTitle: String = ""
@@ -29,16 +29,10 @@ struct ArchiveAlbumDetailFeature {
         }
         
         var isSelectionMode: Bool = false
-        
-        var filteredAlbumPhotos: IdentifiedArrayOf<ArchiveImageItem> {
-            return photos
-        }
-        
+        var filteredAlbumPhotos: IdentifiedArrayOf<ArchiveImageItem> { return photos }
         var isFetchingPhotos: Bool = false
-        
-        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth)
+        var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
-        
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
         
         init(photos: IdentifiedArrayOf<ArchiveImageItem> = [], album: AlbumItem) {
@@ -50,41 +44,42 @@ struct ArchiveAlbumDetailFeature {
     
     enum Action: BindableAction {
         case binding(BindingAction<State>)
-        
         case onAppear
-        
         case toggleDropDownMenu
         case closeDropDownMenu
-        
         case onTapBackButton
         case onTapSelectButton
         case onTapCancelSelectButton
-        
         case onTapFavorite(item: ArchiveImageItem)
         case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
-        
         case onTapCancelEditAlbum
         case onTapConfirmEditAlbum
         case editAlbumResponse(Result<Void, Error>)
         
         case imagePicker(ImagePickerFeature.Action)
-        case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
-        case processUploadImages(imageIDs: [Int])
-        case registerPhotos(imageIDs: [Int])
-        case registerPhotosResponse(Result<Void, Error>)
+        case processUploadImages(entities: [ImageUploadEntity])
+        case registerPhotos(entities: [ImageUploadEntity])
+        case registerPhotosResponse(Result<Int, Error>)
         
-        // 기능 액션
+        case onTapDuplicateButton
+        case onTapMoveButton
+        case albumSelection(PresentationAction<AlbumSelectionFeature.Action>)
+        
         case onTapDownloadButton
         case downloadImagesResponse(successCount: Int)
         
         case onTapDeleteButton(option: ArchivePhotoDeleteOption)
         case deletePhotosResponse(Result<Void, Error>)
         
+        case onTapExecuteDeleteAlbum(option: ArchiveAlbumDeleteOption)
+        case deleteAlbumResponse(Result<Void, Error>)
+        
+        case onTapImportPhotos
+        case photoImport(PresentationAction<PhotoImportFeature.Action>)
+        
         case fetchPhotos
         case photoListResponse(Result<[PhotoEntity], Error>)
         case loadMorePhotos
-        
-        // 네비게이션
         case imageTapped(ArchiveImageItem)
         
         case delegate(Delegate)
@@ -95,36 +90,28 @@ struct ArchiveAlbumDetailFeature {
     
     @Dependency(\.dismiss) var dismiss
     @Dependency(\.archiveClient) var archiveClient
+    @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
         
-        Scope(state: \.imagePicker, action: \.imagePicker) {
-            ImagePickerFeature()
-        }
+        Scope(state: \.imagePicker, action: \.imagePicker) { ImagePickerFeature() }
         
         Reduce { state, action in
             switch action {
-            case .onTapBackButton:
-                return .run { _ in await dismiss() }
-                
-            case .onAppear:
-                return .send(.fetchPhotos)
-                
+            case .onTapBackButton: return .run { _ in await dismiss() }
+            case .onAppear: return .send(.fetchPhotos)
             case .toggleDropDownMenu:
                 state.showDropDownMenu.toggle()
                 return .none
-                
             case .closeDropDownMenu:
                 state.showDropDownMenu = false
                 return .none
-                
             case let .onTapFavorite(item):
                 let newStatus = !item.isFavorite
-                
                 state.photos[id: item.id]?.isFavorite = newStatus
-                
                 return .run { [id = item.id, isFavorite = newStatus] send in
                     do {
                         try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
@@ -133,201 +120,189 @@ struct ArchiveAlbumDetailFeature {
                         await send(.toggleFavoriteResponse(photoID: id, result: .failure(error)))
                     }
                 }
-                
-            case .toggleFavoriteResponse(_, .success):
-                return .none
-                
+            case .toggleFavoriteResponse(_, .success): return .none
             case let .toggleFavoriteResponse(photoID, .failure):
                 state.photos[id: photoID]?.isFavorite.toggle()
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
-                
-                // MARK: - Image Upload
-                
-            case .imagePicker(.uploadStarted):
+            case let .imagePicker(.delegate(.imagesConverted(entities))):
+                state.showDropDownMenu = false
+                return .send(.processUploadImages(entities: entities))
+            case let .processUploadImages(entities):
+                state.isLoading = false
+                guard !entities.isEmpty else { return .none }
                 state.isLoading = true
-                return .send(.closeDropDownMenu)
-                
-            case let .imagePicker(.uploadCompleted(ids)):
-                return .send(.processUploadImages(imageIDs: ids))
-                
-            case .imagePicker(.uploadFailed):
-                state.isLoading = false
-                return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
-                
-            case let .processUploadImages(imageIDs):
-                state.isLoading = false
-                guard !imageIDs.isEmpty else { return .none }
-                return .send(.registerPhotos(imageIDs: imageIDs))
-                
-            case let .registerPhotos(imageIDs):
+                return .send(.registerPhotos(entities: entities))
+            case let .registerPhotos(entities):
                 let albumId = state.album.id
-                
-                return .run { [mediaIds = imageIDs, albumId] send in
-                    await send(.registerPhotosResponse(
-                        Result {
-                            let uploads = mediaIds.map { (mediaID: $0, memo: String?.none) }
-                            try await archiveClient.registerPhotos(
-                                folderId: albumId,
-                                uploads: uploads,
-                                favorite: false
-                            )
-                        }
-                    ))
+                return .run { send in
+                    await send(.registerPhotosResponse(Result {
+                        let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
+                        let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.direct) }
+                        try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads ,favorite: false)
+                        return entities.count
+                    }))
                 }
-                
-            case .registerPhotosResponse(.success):
+            case let .registerPhotosResponse(.success(count)):
                 state.isLoading = false
                 return .run { send in
+                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
                 }
-                
             case .registerPhotosResponse(.failure):
                 state.isLoading = false
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
-                
-                // MARK: - Edit Album Action
-                
             case .onTapCancelEditAlbum:
                 state.newAlbumTitle = state.album.title
                 state.albumTitleErrorMessage = nil
                 return .none
-                
             case .onTapConfirmEditAlbum:
                 guard state.isConfirmButtonEnabled else { return .none }
                 let title = state.newAlbumTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 state.albumTitleErrorMessage = nil
-                
                 return .run { [albumId = state.album.id] send in
-                    await send(.editAlbumResponse(Result {
-                        try await archiveClient.editAlbumName(albumId, title)
-                    }))
+                    await send(.editAlbumResponse(Result { try await archiveClient.editAlbumName(albumId, title) }))
                 }
-                
-            case .editAlbumResponse(.success):
-                return .run { send in
-                    await send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경했어요", style: .success))))
-                }
-                
+            case .editAlbumResponse(.success): return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경했어요", style: .success))))
             case .editAlbumResponse(.failure):
                 state.newAlbumTitle = state.album.title
                 return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경하지 못했어요", style: .error))))
-                
             case .fetchPhotos:
                 state.isFetchingPhotos = true
-                
                 return .run { [albumId = state.album.id] send in
-                    await send(.photoListResponse(
-                        Result {
-                            try await archiveClient.fetchPhotoList(
-                                folderId: albumId,
-                                size: 20,
-                                sortOrder: nil
-                            )
-                        }
-                    ))
+                    await send(.photoListResponse(Result { try await archiveClient.fetchPhotoList(folderId: albumId, size: 20, sortOrder: nil) }))
                 }
-                
             case let .photoListResponse(.success(entities)):
                 state.isFetchingPhotos = false
-                
                 let currentAlbumId = state.album.id
-                
                 let newItems = entities.map { entity in
-                    ArchiveImageItem(
-                        id: entity.photoID,
-                        imageURLString: entity.imageURL,
-                        isFavorite: entity.isfavorite,
-                        date: entity.createdAt.toISO8601Date(),
-                        folderId: currentAlbumId
-                    )
+                    ArchiveImageItem(id: entity.photoID, imageURLString: entity.imageURL, isFavorite: entity.isfavorite, date: entity.createdAt.toISO8601Date(), folderId: currentAlbumId, memo: entity.memo ?? "", width: entity.width, height: entity.height)
                 }
-                
                 state.photos = IdentifiedArray(uniqueElements: newItems)
                 return .none
-                
             case .photoListResponse(.failure):
                 state.isFetchingPhotos = false
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
-                
-            case .loadMorePhotos:
-                return .send(.fetchPhotos)
-                
+            case .loadMorePhotos: return .send(.fetchPhotos)
             case .onTapSelectButton:
                 state.showDropDownMenu = false
                 state.isSelectionMode = true
                 return .none
-                
             case .onTapCancelSelectButton:
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .none
-                
             case let .imageTapped(item):
                 if state.isSelectionMode {
-                    if state.selectedIDs.contains(item.id) {
-                        state.selectedIDs.remove(item.id)
-                    } else {
-                        state.selectedIDs.insert(item.id)
-                    }
+                    if state.selectedIDs.contains(item.id) { state.selectedIDs.remove(item.id) }
+                    else { state.selectedIDs.insert(item.id) }
                 }
                 return .none
-                
+            case .onTapDuplicateButton:
+                state.albumSelection = AlbumSelectionFeature.State(photoIDs: Array(state.selectedIDs), selectionPurpose: .duplicate, currentAlbumId: state.album.id)
+                return .none
+            case .onTapMoveButton:
+                state.albumSelection = AlbumSelectionFeature.State(photoIDs: Array(state.selectedIDs), selectionPurpose: .move, currentAlbumId: state.album.id)
+                return .none
+            case let .albumSelection(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case let .didCompleteTask(message, albumCount):
+                    let photoCount = state.selectedIDs.count
+                    state.albumSelection = nil
+                    state.isSelectionMode = false
+                    state.selectedIDs.removeAll()
+                    return .merge(
+                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
+                        .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
+                        .send(.fetchPhotos)
+                    )
+                case .didTapCancel:
+                    state.albumSelection = nil
+                    return .none
+                case let .showToast(toastItem):
+                    return .send(.delegate(.showToast(toastItem)))
+                    
+                case .didSelectForUpload(albumId: _):
+                    return .none
+                }
             case .onTapDownloadButton:
                 guard !state.selectedIDs.isEmpty else { return .none }
                 state.isLoading = true
-                
-                let urls = state.selectedIDs.compactMap { state.photos[id: $0]?.imageURL }
-                
-                return .run { send in
+                return .run { [photos = state.photos, selectedIDs = state.selectedIDs] send in
+                    let urls = selectedIDs.compactMap { photos[id: $0]?.imageURL }
                     let count = try await imageDownloadClient.downloadImages(urls: urls)
                     await send(.downloadImagesResponse(successCount: count))
                 }
-                
             case let .downloadImagesResponse(count):
                 state.isLoading = false
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                
-                if count > 0 {
-                    return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success))))
-                } else {
-                    return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error))))
-                }
-                
+                if count > 0 { return .send(.delegate(.showToast(NekiToastItem("사진을 갤러리에 다운로드했어요", style: .success)))) }
+                else { return .send(.delegate(.showToast(NekiToastItem("사진 저장에 실패했어요", style: .error)))) }
             case let .onTapDeleteButton(option):
                 guard !state.selectedIDs.isEmpty else { return .none }
-                
                 let selectedIDs = Array(state.selectedIDs)
                 let albumID = state.album.id
-                
                 return .run { send in
-                    await send(.deletePhotosResponse(
-                        Result {
-                            if option == .fromAlbumOnly {
-                                try await archiveClient.excludePhotosInAlbum(albumID, selectedIDs)
-                            } else {
-                                try await archiveClient.deletePhotoList(selectedIDs)
-                            }
-                        }
-                    ))
+                    await send(.deletePhotosResponse(Result {
+                        if option == .fromAlbumOnly { try await archiveClient.excludePhotosInAlbum(albumID, selectedIDs) }
+                        else { try await archiveClient.deletePhotoList(selectedIDs) }
+                    }))
                 }
-                
             case .deletePhotosResponse(.success):
                 let idsToDelete = state.selectedIDs
                 state.photos.removeAll { idsToDelete.contains($0.id) }
-                
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
-                
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
-                
             case .deletePhotosResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
+            case let .onTapExecuteDeleteAlbum(option):
+                let shouldDeletePhotos = (option == .withPhotos)
+                let albumId = state.album.id
+                return .run { send in
+                    await send(.deleteAlbumResponse(Result {
+                        try await archiveClient.deleteFolders([albumId], shouldDeletePhotos)
+                    }))
+                }
+            case .deleteAlbumResponse(.success):
+                return .run { send in
+                    await send(.delegate(.showToast(NekiToastItem("앨범을 삭제했어요", style: .success))))
+                    await dismiss()
+                }
+            case .deleteAlbumResponse(.failure):
+                return .send(.delegate(.showToast(NekiToastItem("앨범을 삭제하지 못했어요", style: .error))))
                 
-            default:
+            case .onTapImportPhotos:
+                state.showDropDownMenu = false
+                state.photoImport = PhotoImportFeature.State(targetAlbumId: state.album.id)
                 return .none
+                
+            case let .photoImport(.presented(.delegate(delegateAction))):
+                switch delegateAction {
+                case let .didCompleteTask(message, photoCount):
+                    let albumCount = 1
+                    state.photoImport = nil
+                    state.isSelectionMode = false
+                    state.selectedIDs.removeAll()
+                    return .merge(
+                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoAddToAlbum(photoCount: photoCount, albumCount: albumCount)) },
+                        .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
+                        .send(.fetchPhotos)
+                    )
+                    
+                case .didTapCancel:
+                    state.photoImport = nil
+                    return .none
+                    
+                case let .showToast(toastItem):
+                    return .send(.delegate(.showToast(toastItem)))
+                }
+                
+            default: return .none
             }
         }
+        .ifLet(\.$albumSelection, action: \.albumSelection) { AlbumSelectionFeature() }
+        .ifLet(\.$photoImport, action: \.photoImport) { PhotoImportFeature() }
     }
 }

@@ -24,7 +24,10 @@ public struct DefaultImageUploadRepository: ImageUploadRepository {
             PresignedURLRequestData(
                 filename: UUID().uuidString,
                 contentType: item.contentType,
-                mediaType: mediaType.rawValue
+                mediaType: mediaType.rawValue,
+                width: item.width,
+                height: item.height,
+                size: item.size
             )
         }
         let requestDTO = PresignedURLRequestDTO(items: requestItems)

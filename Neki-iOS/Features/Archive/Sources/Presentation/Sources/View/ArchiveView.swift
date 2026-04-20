@@ -82,6 +82,14 @@ struct ArchiveView: View {
         .fullScreenCover(isPresented: $store.isLoading, content: {
             LoadingView(message: "사진을 업로드하고 있어요.")
         })
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { store.isInitialFetchingPhotos },
+                set: { _ in }
+            )
+        ) {
+            LoadingView(message: "사진을 불러오고 있어요.")
+        }
         .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
@@ -179,11 +187,12 @@ private extension ArchiveView {
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
-                    ForEach(store.previewAlbums) { album in
-                        AlbumCard(album: album)
-                            .onTapGesture {
-                                store.send(.albumTapped(album))
-                            }
+                    ForEach(store.previewAlbums, id: \.id) { album in
+                        Button {
+                            store.send(.albumTapped(album))
+                        } label: {
+                            AlbumCard(album: album)
+                        }
                     }
                     
                     Button {

@@ -5,14 +5,12 @@
 //  Created by OneTen on 1/21/26.
 //
 
+import Foundation
 import ComposableArchitecture
-import SwiftUI
-import PhotosUI
 
 public struct ImageUploadClient {
     public var upload: @Sendable (_ data: [ImageUploadEntity], _ mediaType: ImageMediaType) async throws -> [Int]
     public var uploadConcurrentlyFromURLs: @Sendable (_ fileURLs: [URL], _ mediaType: ImageMediaType) async throws -> [Int]
-    public var convert: @Sendable (_ items: [PhotosPickerItem]) async -> [ImageUploadEntity]
 }
 
 extension ImageUploadClient: DependencyKey {
@@ -33,31 +31,23 @@ extension ImageUploadClient: DependencyKey {
                     var entities: [ImageUploadEntity] = []
                     for url in chunk {
                         let data = try Data(contentsOf: url)
-                        entities.append(ImageUploadEntity(data: data, format: data.detectedImageFormat))
+                        let dimensions = data.imageDimensions
+                        
+                        entities.append(
+                            ImageUploadEntity(
+                                data: data,
+                                format: data.detectedImageFormat,
+                                width: dimensions?.width,
+                                height: dimensions?.height,
+                                size: data.count
+                            )
+                        )
                     }
                     
                     let resultIDs = try await repository.upload(items: entities, mediaType: mediaType)
                     uploadedMediaIDs.append(contentsOf: resultIDs)
                 }
                 return uploadedMediaIDs
-            },
-            
-            convert: { items in
-                await withTaskGroup(of: ImageUploadEntity?.self) { group in
-                    for item in items {
-                        group.addTask {
-                            guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
-                            return ImageUploadEntity(data: data, format: data.detectedImageFormat)
-                        }
-                    }
-                    
-                    var results: [ImageUploadEntity] = []
-                    for await result in group {
-                        guard let result else { continue }
-                        results.append(result)
-                    }
-                    return results
-                }
             }
         )
     }()

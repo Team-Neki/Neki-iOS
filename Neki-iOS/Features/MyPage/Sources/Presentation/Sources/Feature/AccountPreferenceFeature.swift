@@ -13,11 +13,16 @@ import os
 struct AccountPreferenceFeature {
     @ObservableState
     struct State {
-        var user: User
+        @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
         
         var isLogoutAlertPresented: Bool = false
         var isUnregisterAlertPresented: Bool = false
         var isLoading: Bool = false
+        
+        var user: User {
+            guard case let .signedIn(user) = userSessionStatus else { return .dummy }
+            return user
+        }
     }
     
     enum Action: BindableAction {
@@ -41,6 +46,7 @@ struct AccountPreferenceFeature {
     }
     
     @Dependency(\.authClient) private var authClient
+    @Dependency(\.analyticsClient) private var analytics
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -71,9 +77,9 @@ struct AccountPreferenceFeature {
                 state.isUnregisterAlertPresented = false
                 state.isLoading = true
                 
-                return .run { [userId = state.user.id] send in
+                return .run { [userID = state.user.id] send in
                     try await authClient.withdraw()
-                    UserDefaults.standard.removeObject(forKey: "TermsAgreed_\(userId)")
+                    UserDefaults.standard.removeObject(forKey: "TermsAgreed_\(userID)")
                     await send(.didWithdraw)
                 } catch: { error, send in
                     Logger.presentation.error("회원탈퇴 과정 중 에러 발생: \(error)")
@@ -85,9 +91,13 @@ struct AccountPreferenceFeature {
                 state.isUnregisterAlertPresented = false
                 return .none
                 
-            case .didSignOut, .didWithdraw:
+            case .didSignOut:
                 state.isLoading = false
-                return .none
+                return .run { _ in analytics.logEvent(event: MyPageAnalyticsEvent.logout) }
+                
+            case .didWithdraw:
+                state.isLoading = false
+                return .run { _ in analytics.logEvent(event: MyPageAnalyticsEvent.withdraw) }
                 
             case .onLoading(let isLoading):
                 state.isLoading = isLoading

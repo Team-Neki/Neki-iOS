@@ -13,7 +13,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
     @Dependency(\.networkProvider) var networkProvider
     
     // MARK: - Cache
-    
+        
     private var photoCache: [Int?: [PhotoEntity]] = [:] // 사진들 캐시(앨범별), 앨범을 nil로 줄 경우 전체 사진
     private var currentSortOrder: [Int?: String] = [:]  // 앨범별 정렬 (최신순, 오래된 순)
 
@@ -21,6 +21,7 @@ final actor DefaultArchiveRepository: ArchiveRepository {
     private var favoritePhotoCache: [PhotoEntity] = []  // 즐겨찾기 사진들 캐시
     private var favoriteAlbumInfoCache: FavoriteAlbumEntity?    // 즐겨찾기 앨범 정보 캐시
     
+    private var photoTotalCountCache: [Int?: Int] = [:] // 전체사진 + 앨범별 사진 개수 캐시
     
     // Dirty Flags (데이터 유효성 검사)
     private var isPhotoCacheDirty: [Int?: Bool] = [:]   // 사진 변경사항 플래그
@@ -41,8 +42,10 @@ final actor DefaultArchiveRepository: ArchiveRepository {
 // MARK: - Create Logic
 
 extension DefaultArchiveRepository {
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?)], favorite: Bool? = false) async throws {
-        let uploadData = uploads.map { RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: "QR") }
+    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], favorite: Bool? = false) async throws {
+        let uploadData = uploads.map {
+            RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: $0.uploadMethod.rawValue)
+        }
         let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
         let endpoint = ArchiveEndpoint.registerPhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
@@ -87,7 +90,7 @@ extension DefaultArchiveRepository {
         // 기존에 저장된 정렬 순서
         let cachedSortOrder = currentSortOrder[folderID]
         // 정렬이 바뀌었으면 무조건 Dirty로 간주하여 초기화
-        let isSortChanged = (cachedSortOrder != nil) && (cachedSortOrder != requestSortOrder)
+        let isSortChanged = cachedSortOrder != requestSortOrder
         
         if isDirty || currentCache.isEmpty || isSortChanged {
             currentPhotoPage[folderID] = 0
@@ -103,11 +106,13 @@ extension DefaultArchiveRepository {
         }
         
         let page = currentPhotoPage[folderID] ?? 0
-        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: sortOrder)
+        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: requestSortOrder)        
         let endpoint = ArchiveEndpoint.getPhotoList(request: request)
         let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
         
         guard let data = response.data else { throw NetworkError.responseDecodingError }
+        
+        self.photoTotalCountCache[folderID] = data.totalCount
         
         let newEntities = data.toEntity()
         
@@ -197,6 +202,10 @@ extension DefaultArchiveRepository {
         
         return self.favoritePhotoCache
     }
+    
+    func getPhotoTotalCount(folderID: Int?) async throws -> Int {
+        return photoTotalCountCache[folderID] ?? 0
+    }
 }
 
 
@@ -220,7 +229,10 @@ extension DefaultArchiveRepository {
                         folderID: oldItem.folderID,
                         isfavorite: request,
                         contentType: oldItem.contentType,
-                        createdAt: oldItem.createdAt
+                        createdAt: oldItem.createdAt,
+                        memo: oldItem.memo,
+                        width: oldItem.width,
+                        height: oldItem.height
                     )
                     list[index] = newItem
                     photoCache[key] = list
@@ -250,6 +262,95 @@ extension DefaultArchiveRepository {
         
         self.isAlbumCacheDirty = true
     }
+    
+    func updatePhotoMemo(photoID: Int, memo: String) async throws {
+        var capturedAt = ""
+        if let cachedItem = photoCache.values.flatMap({ $0 }).first(where: { $0.photoID == photoID }) {
+            capturedAt = cachedItem.createdAt
+        } else if let cachedItem = favoritePhotoCache.first(where: { $0.photoID == photoID }) {
+            capturedAt = cachedItem.createdAt
+        } else {
+            capturedAt = Date().ISO8601Format()
+        }
+        
+        let requestDTO = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
+        let endpoint = ArchiveEndpoint.updateMemo(photoID: photoID, request: requestDTO)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        for (key, var list) in photoCache {
+            if let index = list.firstIndex(where: { $0.photoID == photoID }) {
+                let oldItem = list[index]
+                let newItem = PhotoEntity(
+                    photoID: oldItem.photoID,
+                    imageURL: oldItem.imageURL,
+                    folderID: oldItem.folderID,
+                    isfavorite: oldItem.isfavorite,
+                    contentType: oldItem.contentType,
+                    createdAt: oldItem.createdAt,
+                    memo: memo,
+                    width: oldItem.width,
+                    height: oldItem.height
+                )
+                list[index] = newItem
+                photoCache[key] = list
+            }
+        }
+        
+        if let index = favoritePhotoCache.firstIndex(where: { $0.photoID == photoID }) {
+            let oldItem = favoritePhotoCache[index]
+            let newItem = PhotoEntity(
+                photoID: oldItem.photoID,
+                imageURL: oldItem.imageURL,
+                folderID: oldItem.folderID,
+                isfavorite: oldItem.isfavorite,
+                contentType: oldItem.contentType,
+                createdAt: oldItem.createdAt,
+                memo: memo,
+                width: oldItem.width,
+                height: oldItem.height
+            )
+            favoritePhotoCache[index] = newItem
+        }
+        
+    }
+    
+    func duplicatePhoto(photoIDs: [Int], targetFolderIDs: [Int]) async throws {
+        let request = UpdateMappingPhotoDTO.DuplicatePhotos(
+            photoIDs: photoIDs,
+            targetFolderIDs: targetFolderIDs
+        )
+        let endpoint = ArchiveEndpoint.duplicatePhoto(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        // 앨범 정보 캐시 갱신
+        self.isAlbumCacheDirty = true
+        
+        // Target 폴더들의 캐시를 다음 진입 시 새로 받아오도록 유도
+        for targetID in targetFolderIDs {
+            self.isPhotoCacheDirty[targetID] = true
+        }
+    }
+    
+    func movePhoto(sourceFolderId: Int, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
+        let request = UpdateMappingPhotoDTO.MovePhotos(
+            sourceFolderID: sourceFolderId,
+            photoIDs: photoIDs,
+            targetFolderIDs: targetFolderIDs
+        )
+        let endpoint = ArchiveEndpoint.movePhoto(request: request)
+        let _ = try await networkProvider.request(endpoint: endpoint)
+        
+        // 앨범 정보 캐시 갱신
+        self.isAlbumCacheDirty = true
+        
+        self.isPhotoCacheDirty[sourceFolderId] = true
+        
+        // Target 폴더(혹은 전체 사진) 캐시 갱신
+        for targetID in targetFolderIDs {
+            self.isPhotoCacheDirty[targetID] = true
+        }
+    }
+    
 }
 
 
@@ -261,11 +362,18 @@ extension DefaultArchiveRepository {
         let endpoint = ArchiveEndpoint.deletePhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
         
-        for (key, var list) in photoCache {
+        for (folderID, var list) in photoCache {
+            let originalCount = list.count
             list.removeAll { photoIDs.contains($0.photoID) }
-            photoCache[key] = list
+            
+            // 기존 갯수보다 줄어들었다면 해당 앨범에서 사진이 삭제되었다는 뜻
+            if list.count < originalCount {
+                self.isPhotoCacheDirty[folderID] = true
+                photoCache[folderID] = list
+            }
         }
         
+        self.isPhotoCacheDirty[nil] = true
         self.isAlbumCacheDirty = true
         self.isFavoriteCacheDirty = true
         self.isFavoriteAlbumInfoDirty = true
@@ -291,6 +399,28 @@ extension DefaultArchiveRepository {
             self.isFavoriteAlbumInfoDirty = true
         }
     }
+    
+    func clearCache() async {
+            // 캐시 데이터 초기화
+            self.photoTotalCountCache.removeAll()
+            self.photoCache.removeAll()
+            self.currentSortOrder.removeAll()
+            self.albumCache.removeAll()
+            self.favoritePhotoCache.removeAll()
+            self.favoriteAlbumInfoCache = nil
+            
+            // Dirty Flag 초기화
+            self.isPhotoCacheDirty.removeAll()
+            self.isAlbumCacheDirty = true
+            self.isFavoriteCacheDirty = true
+            self.isFavoriteAlbumInfoDirty = true
+            
+            // 페이징 상태 초기화
+            self.currentPhotoPage.removeAll()
+            self.hasNextPhoto.removeAll()
+            self.currentFavoritePage = 0
+            self.hasNextFavorite = true
+        }
 }
 
 

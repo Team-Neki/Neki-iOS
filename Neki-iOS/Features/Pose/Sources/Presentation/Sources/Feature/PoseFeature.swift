@@ -86,14 +86,13 @@ struct PoseFeature {
             switch action {
                 // MARK: - View Actions
             case .onAppear:
-                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseView)}
                 let fetchEffect: Effect<Action>
                 if state.isSelectedScrap {
                     fetchEffect = state.scrappedPoses.isEmpty ? fetchPoses(state: &state, refreshNeeded: true) : .none
                 } else {
                     fetchEffect = state.generalPoses.isEmpty ? fetchPoses(state: &state, refreshNeeded: true) : .none
                 }
-                return .merge(trackingEffect, fetchEffect)
+                return fetchEffect
                 
             case .loadMoreItems:
                 guard state.isLoading == false, state.isCurrentLastPage == false else { return .none }
@@ -110,7 +109,7 @@ struct PoseFeature {
                 let isDeselecting = state.selectedCountFilterOption == option
                 state.selectedCountFilterOption = isDeselecting ? nil : option
                 state.isSelectedScrap = false
-                let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption)
+                guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return .none }
                 let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
                 return .run { _ in analytics.logEvent(event: event) }
                 
@@ -248,5 +247,5 @@ private extension PoseFeature {
         }
     }
     
-    func extractPeopleCount(from option: PeopleCountOption?) -> Int { option?.rawValue ?? .zero }
+    func extractPeopleCount(from option: PeopleCountOption?) -> Int? { option?.rawValue }
 }

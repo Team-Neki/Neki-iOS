@@ -144,7 +144,6 @@ public struct MapFeature {
                 // MARK: - Life Cycle & Streams
             case .onAppear:
                 return .merge(
-                    .run { _ in analytics.logEvent(MapAnalyticsEvent.mapView) },
                     .send(.loadBrands),
                     .run { send in
                         for await status in await mapClient.locationAuthorizationStatus() {

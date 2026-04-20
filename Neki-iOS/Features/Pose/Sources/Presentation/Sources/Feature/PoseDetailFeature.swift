@@ -74,7 +74,7 @@ struct PoseDetailFeature {
                 
             case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }
-                Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
+                Logger.presentation.error("Error occured while scrapping pose: ID-\(originalPose.id) / Error: \(error)")
                 
                 if state.poses[id: originalPose.id] != nil {
                     state.poses[id: originalPose.id] = originalPose

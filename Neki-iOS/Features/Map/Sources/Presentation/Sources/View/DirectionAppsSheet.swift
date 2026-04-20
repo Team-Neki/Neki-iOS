@@ -9,8 +9,7 @@ import SwiftUI
 import ComposableArchitecture
 
 struct DirectionAppsSheet: View {
-    @Environment(\.openURL) private var openURL
-    
+    let store: StoreOf<MapFeature>
     let photoBooth: PhotoBooth
     
     var body: some View {
@@ -34,7 +33,7 @@ struct DirectionAppsSheet: View {
                             .foregroundStyle(.gray900)
                     }
                     .contentShape(.rect)
-                    .onTapGesture { handleAppSelection(app) }
+                    .onTapGesture { store.send(.didSelectDirectionApp(app)) }
                 }
             }
             
@@ -44,16 +43,5 @@ struct DirectionAppsSheet: View {
         .presentationCornerRadius(20)
         .padding(.horizontal, 20)
         .padding(.top, 24)
-    }
-}
-
-
-// MARK: - DirectionAppsSheet + Methods
-
-private extension DirectionAppsSheet {
-    func handleAppSelection(_ app: DirectionAppType) {
-        // TODO: 검색 정보 유효하지 않을 경우에는 앱이 반응을 안한다고 생각할 수 있음. 보완 필요
-        guard let universalLink = app.connectLink(coordinate: photoBooth.coordinate, name: photoBooth.name) else { return }
-        openURL(universalLink)
     }
 }

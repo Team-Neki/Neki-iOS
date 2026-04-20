@@ -69,6 +69,7 @@ struct AppCoordinator {
     
     @Dependency(\.authClient) private var authClient
     @Dependency(\.appVersionClient) private var appVersionClient
+    @Dependency(\.analyticsClient) private var analytics
     @Dependency(\.continuousClock) var clock
     @Dependency(\.openURL) private var openURL
     @Dependency(\.date.now) private var now
@@ -155,6 +156,9 @@ struct AppCoordinator {
             case let .splashSequenceCompleted(finalStatus, finalVersionResult):
                 state.$userSessionStatus.withLock { $0 = finalStatus }
                 
+                let userID: Int? = extractUserID(from: finalStatus)
+                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID) }
+                
                 guard finalVersionResult.status != .mustUpdate else {
                     state.versionAlert = .updateNeeded
                     return .none
@@ -166,7 +170,10 @@ struct AppCoordinator {
                     return .none
                 }
                 
-                return navigateToNextScreen(state: &state, sessionStatus: finalStatus)
+                return .merge(
+                    configureEffect,
+                    navigateToNextScreen(state: &state, sessionStatus: finalStatus)
+                )
                 
             case .executePendingShareExtensionIfNeeded:
                 guard let appGroupID = state.pendingShareAppGroupID else { return .none }
@@ -189,26 +196,28 @@ struct AppCoordinator {
             case let .userSessionStatusChanged(newStatus):
                 if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
                 
-                if case .splash = state.route, state.versionAlert != nil { return .none }
+                let userID: Int? = extractUserID(from: newStatus)
+                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID) }
                 
+                if case .splash = state.route, state.versionAlert != nil { return configureEffect }
+                
+                let navigationEffect: Effect<Action>
                 switch newStatus {
-                case let .signedIn(user):
-                    if case .mainTab = state.route { return .none }
-                    state.route = .mainTab(.init())
-                    return .none
+                case .signedIn:
+                    if case .mainTab = state.route {
+                        navigationEffect = .none
+                    } else {
+                        state.route = .mainTab(.init())
+                        navigationEffect = .none
+                    }
                     
-                case .signedOut:
+                case .signedOut, .expired:
                     state.route = .auth(.init())
-                    guard case .expired = newStatus else { return .none }
-                    state.toastItem = .init("다시 로그인 해주세요.")
-                    return .none
-                    
-                case .expired:
-                    state.route = .auth(.init())
-                    guard case .expired = newStatus else { return .none }
-                    state.toastItem = .init("다시 로그인 해주세요.")
-                    return .none
+                    if case .expired = newStatus { state.toastItem = .init("다시 로그인 해주세요.") }
+                    navigationEffect = .none
                 }
+                
+                return .merge(configureEffect, navigationEffect)
                 
             case .route(.onboarding(.delegate(.didFinishOnboarding))):
                 state.$hasSeenOnboarding.withLock { $0 = true }
@@ -218,7 +227,11 @@ struct AppCoordinator {
             case let .route(.auth(.delegate(.moveToMainTab(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 state.route = .mainTab(.init())
-                return .send(.executePendingShareExtensionIfNeeded)
+                let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
+                return .merge(
+                    configureEffect,
+                    .send(.executePendingShareExtensionIfNeeded)
+                )
                 
             case .route(.mainTab(.delegate(.signedOut))), .route(.mainTab(.delegate(.withdraw))):
                 state.$userSessionStatus.withLock { $0 = .signedOut }
@@ -226,7 +239,7 @@ struct AppCoordinator {
                     state.initializeUserDefaults()
                 }
                 state.route = .auth(.init())
-                return .none
+                return .run { _ in analytics.configure(nil) }
                 
             case .binding(\.isAlertPresented):
                 guard state.isAlertPresented == false else { return .none }
@@ -239,8 +252,13 @@ struct AppCoordinator {
             }
         }
     }
-    
-    private func navigateToNextScreen(state: inout State, sessionStatus: UserSessionStatus) -> Effect<Action> {
+}
+
+
+// MARK: - AppCoordinator + Helpers
+
+private extension AppCoordinator {
+    func navigateToNextScreen(state: inout State, sessionStatus: UserSessionStatus) -> Effect<Action> {
         switch sessionStatus {
         case .signedIn:
             state.route = .mainTab(.init())
@@ -255,6 +273,11 @@ struct AppCoordinator {
             }
             return .none
         }
+    }
+    
+    func extractUserID(from status: UserSessionStatus) -> Int? {
+        guard case let .signedIn(user) = status else { return nil }
+        return user.id
     }
 }
 

@@ -156,8 +156,6 @@ public extension View {
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden()
             .toolbar { NekiToolbarContent(left: left, center: center, right: right) }
-            .toolbarBackground(backgroundColor ?? (isOverlay ? .clear : .white), for: .navigationBar)
-            .toolbarBackground(isOverlay ? .hidden : .visible, for: .navigationBar)
             .onAppear {
                 let appearance = UINavigationBarAppearance()
                 if isOverlay {
@@ -168,7 +166,6 @@ public extension View {
                 }
                 
                 appearance.shadowColor = .clear
-                appearance.shadowImage = nil
                 
                 UINavigationBar.appearance().standardAppearance = appearance
                 UINavigationBar.appearance().scrollEdgeAppearance = appearance
@@ -190,4 +187,3 @@ extension UINavigationController: @retroactive UIGestureRecognizerDelegate {
         shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool { true }
 }
-

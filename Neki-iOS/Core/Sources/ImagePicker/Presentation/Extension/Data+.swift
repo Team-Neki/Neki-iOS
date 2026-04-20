@@ -51,8 +51,8 @@ extension Data {
             return nil
         }
         
-        var width = properties[kCGImagePropertyPixelWidth] as? Int
-        var height = properties[kCGImagePropertyPixelHeight] as? Int
+        let width = properties[kCGImagePropertyPixelWidth] as? Int
+        let height = properties[kCGImagePropertyPixelHeight] as? Int
         
         if let w = width, let h = height {
             return (w, h)

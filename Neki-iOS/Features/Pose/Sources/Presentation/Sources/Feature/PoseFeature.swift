@@ -11,6 +11,9 @@ import os
 
 @Reducer
 struct PoseFeature {
+    private enum CancelID: Hashable {
+        case scrap(PoseID)
+    }
     
     @ObservableState
     struct State: Equatable {
@@ -30,7 +33,8 @@ struct PoseFeature {
         var isLastScrappedPage: Bool = false
         
         @ObservationIgnored let pageSize: Int = 20
-        var isLoading: Bool = false
+        var isGeneralLoading: Bool = false
+        var isScrappedLoading: Bool = false
         
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
@@ -88,14 +92,20 @@ struct PoseFeature {
             case .onAppear:
                 let fetchEffect: Effect<Action>
                 if state.isSelectedScrap {
-                    fetchEffect = state.scrappedPoses.isEmpty ? fetchPoses(state: &state, refreshNeeded: true) : .none
+                    guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return .none }
+                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 } else {
-                    fetchEffect = state.generalPoses.isEmpty ? fetchPoses(state: &state, refreshNeeded: true) : .none
+                    guard state.isGeneralLoading == false, state.generalPoses.isEmpty else { return .none }
+                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 }
                 return fetchEffect
                 
             case .loadMoreItems:
-                guard state.isLoading == false, state.isCurrentLastPage == false else { return .none }
+                if state.isSelectedScrap {
+                    guard state.isScrappedLoading == false, state.isLastScrappedPage == false else { return .none }
+                } else {
+                    guard state.isGeneralLoading == false, state.isLastGeneralPage == false else { return .none }
+                }
                 return fetchPoses(state: &state, refreshNeeded: false)
                 
             case .onRefresh:
@@ -116,14 +126,16 @@ struct PoseFeature {
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()
                 state.selectedCountFilterOption = nil
+                
                 let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmarkFilter) }
                 let fetchEffect: Effect<Action>
-                if state.isSelectedScrap, state.scrappedPoses.isEmpty {
-                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
-                } else if state.isLoading == false, state.generalPoses.isEmpty {
+                
+                if state.isSelectedScrap {
+                    guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return trackingEffect }
                     fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 } else {
-                    fetchEffect = .none
+                    guard state.isGeneralLoading == false, state.generalPoses.isEmpty else { return trackingEffect }
+                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 }
                 return .merge(trackingEffect, fetchEffect)
                 
@@ -151,9 +163,12 @@ struct PoseFeature {
             case let .onTapBookmark(pose):
                 var updatedPose = pose
                 updatedPose.isScrapped.toggle()
-                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmark) }
-                let scrapEffect: Effect<Action> = .run { [updatedPose] send in await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) })) }
-                return .merge(trackingEffect, scrapEffect, .send(.updatePoseInList(updatedPose)))
+                let scrapEffect: Effect<Action> = .run { [updatedPose] send in
+                    await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) }))
+                }
+                .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
+                
+                return .merge(scrapEffect, .send(.updatePoseInList(updatedPose)))
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
@@ -170,39 +185,33 @@ struct PoseFeature {
                 return .none
                 
             case let .fetchListResponse(isScrapResult, .success((poses, hasNext))):
-                state.isLoading = false
                 if isScrapResult {
+                    state.isScrappedLoading = false
                     state.isLastScrappedPage = hasNext == false
-                    if state.scrappedPage == .zero {
-                        state.scrappedPoses = IdentifiedArray(uniqueElements: poses)
-                    } else {
-                        state.scrappedPoses.append(contentsOf: poses)
-                    }
-                    
-                    guard hasNext else { return .none }
-                    state.scrappedPage += 1
+                    if state.scrappedPage == .zero { state.scrappedPoses = IdentifiedArray(uniqueElements: poses) }
+                    else { state.scrappedPoses.append(contentsOf: poses) }
+                    if hasNext { state.scrappedPage += 1 }
                 } else {
+                    state.isGeneralLoading = false
                     state.isLastGeneralPage = hasNext == false
-                    if state.generalPage == .zero {
-                        state.generalPoses = IdentifiedArray(uniqueElements: poses)
-                    } else {
-                        state.generalPoses.append(contentsOf: poses)
-                    }
-                    
-                    guard hasNext else { return .none }
-                    state.generalPage += 1
+                    if state.generalPage == .zero { state.generalPoses = IdentifiedArray(uniqueElements: poses) }
+                    else { state.generalPoses.append(contentsOf: poses) }
+                    if hasNext { state.generalPage += 1 }
                 }
                 return .none
                 
-            case let .fetchListResponse(_, .failure(error)):
-                state.isLoading = false
+            case let .fetchListResponse(isScrapResult, .failure(error)):
+                if isScrapResult { state.isScrappedLoading = false }
+                else { state.isGeneralLoading = false }
+                
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
                 
             case .bookmarkResponse(_, .success):
-                return .none
+                return .run { _ in analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
             case let .bookmarkResponse(pose, .failure(error)):
+                if error is CancellationError { return .none }
                 Logger.presentation.error("Bookmark toggle failed: \(error)")
                 var rolledBackPose = pose
                 rolledBackPose.isScrapped.toggle()
@@ -221,14 +230,17 @@ struct PoseFeature {
 
 private extension PoseFeature {
     func fetchPoses(state: inout State, refreshNeeded: Bool) -> Effect<Action> {
-        state.isLoading = true
         let isScrapMode = state.isSelectedScrap
         
-        if refreshNeeded {
-            if isScrapMode {
+        if isScrapMode {
+            state.isScrappedLoading = true
+            if refreshNeeded {
                 state.scrappedPage = .zero
                 state.isLastScrappedPage = false
-            } else {
+            }
+        } else {
+            state.isGeneralLoading = true
+            if refreshNeeded {
                 state.generalPage = .zero
                 state.isLastGeneralPage = false
             }

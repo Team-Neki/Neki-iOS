@@ -72,21 +72,14 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
 
-      # 9. 배포 완료 후 서버로 최신 버전 정보 POST 요청 및 환경 변수 저장
+      # 9. 배포 완료 후 최신 버전 정보 환경 변수 저장
       - name: Send Version Update to Server
         if: success()
         run: |
           APP_VERSION=$(xcodebuild -showBuildSettings -project ./Neki-iOS.xcodeproj -scheme Neki-iOS | grep " MARKETING_VERSION " | sed 's/[ ]*MARKETING_VERSION = //')
           echo "추출된 최신 버전: $APP_VERSION"
-          
           echo "APP_VERSION=$APP_VERSION" >> $GITHUB_ENV
 
-          curl -X PATCH "${{ secrets.APP_VERSION_API_ADDRESS }}" \
-          -H "Content-Type: application/json" \
-          -d "{
-            \"minVersion\": \"1.0.0\",
-            \"currentVersion\": \"$APP_VERSION\"
-          }"
 
       # 10. Discord 결과 알림 (성공 시 버전 정보 포함)
       - name: Send Discord notification

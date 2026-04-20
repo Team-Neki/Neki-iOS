@@ -59,7 +59,7 @@ struct ArchiveAlbumDetailFeature {
         case imagePicker(ImagePickerFeature.Action)
         case processUploadImages(entities: [ImageUploadEntity])
         case registerPhotos(entities: [ImageUploadEntity])
-        case registerPhotosResponse(Result<Void, Error>)
+        case registerPhotosResponse(Result<Int, Error>)
         
         case onTapDuplicateButton
         case onTapMoveButton
@@ -92,6 +92,7 @@ struct ArchiveAlbumDetailFeature {
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageUploadClient) var imageUploadClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
+    @Dependency(\.analyticsClient) var analyticsClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -138,11 +139,13 @@ struct ArchiveAlbumDetailFeature {
                         let mediaIds = try await imageUploadClient.upload(entities, .photoBooth)
                         let uploads = mediaIds.map { (mediaID: $0, memo: String?.none, uploadMethod: PhotoUploadMethod.direct) }
                         try await archiveClient.registerPhotos(folderId: albumId, uploads: uploads ,favorite: false)
+                        return entities.count
                     }))
                 }
-            case .registerPhotosResponse(.success):
+            case let .registerPhotosResponse(.success(count)):
                 state.isLoading = false
                 return .run { send in
+                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
                 }
@@ -203,11 +206,13 @@ struct ArchiveAlbumDetailFeature {
                 return .none
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message):
+                case let .didCompleteTask(message, albumCount):
+                    let photoCount = state.selectedIDs.count
                     state.albumSelection = nil
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
                     return .merge(
+                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )
@@ -270,14 +275,18 @@ struct ArchiveAlbumDetailFeature {
                 
             case .onTapImportPhotos:
                 state.showDropDownMenu = false
-                state.photoImport = PhotoImportFeature.State(targetAlbumId: state.album.id) // 목적지 ID 주입
+                state.photoImport = PhotoImportFeature.State(targetAlbumId: state.album.id)
                 return .none
                 
             case let .photoImport(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message):
+                case let .didCompleteTask(message, photoCount):
+                    let albumCount = 1
                     state.photoImport = nil
+                    state.isSelectionMode = false
+                    state.selectedIDs.removeAll()
                     return .merge(
+                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoAddToAlbum(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )

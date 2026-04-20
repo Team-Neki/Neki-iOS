@@ -8,6 +8,7 @@
 import Foundation
 import Dependencies
 import DependenciesMacros
+import os
 
 @DependencyClient
 public struct AnalyticsClient {

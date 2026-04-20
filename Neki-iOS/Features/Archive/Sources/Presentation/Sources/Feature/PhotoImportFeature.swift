@@ -54,12 +54,12 @@ struct PhotoImportFeature {
         case tapClose
         case tapUpload
         
-        case taskCompleted(message: String)
+        case taskCompleted(message: String, photoCount: Int)
         case taskFailed(message: String)
         
         case delegate(DelegateAction)
         enum DelegateAction {
-            case didCompleteTask(message: String)
+            case didCompleteTask(message: String, photoCount: Int)
             case didTapCancel
             case showToast(NekiToastItem)
         }
@@ -187,20 +187,21 @@ struct PhotoImportFeature {
                 state.isLoading = true
                 
                 let photoIDs = Array(state.selectedIDs)
+                let photoCount = photoIDs.count
                 let targetFolderIDs = [state.targetAlbumId]
                 
                 return .run { send in
                     do {
                         try await archiveClient.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
-                        await send(.taskCompleted(message: "사진을 앨범에 가져왔어요"))
+                        await send(.taskCompleted(message: "사진을 앨범에 가져왔어요", photoCount: photoCount))
                     } catch {
                         await send(.taskFailed(message: "사진을 가져오지 못했어요"))
                     }
                 }
                 
-            case let .taskCompleted(message):
+            case let .taskCompleted(message, photoCount):
                 state.isLoading = false
-                return .send(.delegate(.didCompleteTask(message: message)))
+                return .send(.delegate(.didCompleteTask(message: message, photoCount: photoCount)))
                 
             case let .taskFailed(message):
                 state.isLoading = false

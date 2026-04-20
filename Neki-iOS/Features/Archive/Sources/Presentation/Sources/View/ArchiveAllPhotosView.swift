@@ -55,6 +55,7 @@ struct ArchiveAllPhotosView: View {
                 
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
         .animation(.easeInOut(duration: 0.3), value: store.photos)
         .nekiAlert(
             isPresented: $showDeleteAlert,
@@ -182,7 +183,7 @@ private extension ArchiveAllPhotosView {
     var filterBar: some View {
         HStack(alignment: .center, spacing: 6) {
             Button(store.state.selectedSortedTime) {
-                withAnimation { showDropDownMenu.toggle() }
+                showDropDownMenu.toggle()
             }
             .buttonStyle(
                 .nekiChip(

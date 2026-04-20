@@ -354,6 +354,7 @@ extension ArchivePhotoDetailView {
                 ArchiveImageFooter(
                     isEnabled: true,
                     isFavorite: currentItem.isFavorite,
+                    hasMemo: !currentItem.memo.isEmpty,
                     onDownload: { store.send(.onTapDownload) },
                     onDelete: { showDeleteAlert = true },
                     onFavorite: { store.send(.onTapFavorite) },

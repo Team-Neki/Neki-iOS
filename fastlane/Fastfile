@@ -21,30 +21,14 @@ platform :ios do
       readonly: true
     )
 
-    # 4. 버전별 빌드 번호 자동 관리 로직
-    # 현재 Xcode 프로젝트에 설정된 버전(예: 1.2.0)을 가져옵니다.
-    current_version = get_version_number(target: "Neki-iOS")
-
-    # 해당 버전에서 TestFlight에 올라간 가장 높은 빌드 번호를 확인합니다.
-    # 만약 새 버전이라 데이터가 없다면 0을 반환합니다.
-    latest_build = latest_testflight_build_number(
-      version: current_version,
-      initial_build_number: 0
-    )
-
-    # 확인된 번호에 +1을 해서 로컬 프로젝트에 적용합니다.
-    increment_build_number(
-      build_number: latest_build + 1
-    )
-
-    # 5. 앱 빌드 및 아카이브
+    # 4. 앱 빌드 및 아카이브
     build_app(
       scheme: "Neki-iOS",
       configuration: "Release",
       export_method: "app-store"
     )
 
-    # 6. TestFlight 업로드
+    # 5. TestFlight 업로드
     upload_to_app_store(
       skip_metadata: true,
       skip_screenshots: true,

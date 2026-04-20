@@ -18,12 +18,10 @@ struct ArchiveImageFooter: View {
     
     let style: ArchiveFooterStyle
     
-    /// 버튼 활성화 여부
     let isEnabled: Bool
-    /// 즐겨찾기 상태 (상세 모드 전용)
     let isFavorite: Bool?
+    let hasMemo: Bool
     
-    // 아이콘 액션
     let onDownload: () -> Void
     let onDelete: () -> Void
     let onFavorite: (() -> Void)?
@@ -37,6 +35,7 @@ struct ArchiveImageFooter: View {
         style: ArchiveFooterStyle = .detail,
         isEnabled: Bool = true,
         isFavorite: Bool? = nil,
+        hasMemo: Bool = false,
         onDownload: @escaping () -> Void,
         onDelete: @escaping () -> Void,
         onFavorite: (() -> Void)? = nil,
@@ -47,6 +46,7 @@ struct ArchiveImageFooter: View {
         self.style = style
         self.isEnabled = isEnabled
         self.isFavorite = isFavorite
+        self.hasMemo = hasMemo
         self.onDownload = onDownload
         self.onDelete = onDelete
         self.onFavorite = onFavorite
@@ -122,14 +122,14 @@ extension ArchiveImageFooter {
                 Text(title)
                     .nekiFont(.body14Medium)
                     .foregroundStyle(isEnabled ? .gray700 : .gray400)
-
+                
             }
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
         .disabled(!isEnabled)
     }
-        
+    
     private var detailModeFooter: some View {
         HStack(alignment: .center, spacing: 0) {
             Button(action: onDownload) {
@@ -147,7 +147,7 @@ extension ArchiveImageFooter {
             
             if let onTapMemo = onTapMemo {
                 Button(action: onTapMemo) {
-                    Image(.iconNote)
+                    Image(hasMemo ? .iconNoteFill : .iconNote)
                         .foregroundStyle(.gray700)
                 }
                 .padding(.leading, 16)

@@ -26,7 +26,7 @@ struct PoseDetailFeature {
         case didTapBackButton
         
         // Internal Actions
-        case scrapResponse(PoseID, Result<Void, Error>)
+        case scrapResponse(Pose, Result<Void, Error>)
         
         // Delegate Actions
         case delegate(Delegate)
@@ -49,17 +49,17 @@ struct PoseDetailFeature {
                 // MARK: - View Actions
             case .onTapScrap:
                 guard var pose = state.currentPose else { return .none }
+                let originalPose = pose
                 pose.isScrapped.toggle()
                 state.poses[id: pose.id] = pose
                 
-                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmark) }
-                let scrapEffect: Effect<Action> = .run { [pose] send in
-                    await send(.delegate(.poseUpdated(pose)))
-                    await send(.scrapResponse(pose.id, Result { try await poseClient.scrapPose(poseID: pose.id) }))
+                let scrapEffect: Effect<Action> = .run { [originalPose, updatedPose = pose] send in
+                    await send(.delegate(.poseUpdated(updatedPose)))
+                    await send(.scrapResponse(originalPose, Result { try await poseClient.scrapPose(poseID: originalPose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
                 
-                return .merge(trackingEffect, scrapEffect)
+                return scrapEffect
                 
             case let .pageChanged(newID):
                 state.selectedID = newID
@@ -69,18 +69,18 @@ struct PoseDetailFeature {
                 return .run { _ in await dismiss() }
                 
                 // MARK: - Internal Actions
-            case let .scrapResponse(id, .failure(error)):
+            case .scrapResponse(_, .success):
+                return .run { _ in analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                
+            case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }
-                
-                if var pose = state.poses[id: id] {
-                    pose.isScrapped.toggle()
-                    state.poses[id: id] = pose
-                    return .send(.delegate(.poseUpdated(pose)))
-                }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
-                return .none
                 
-            case .scrapResponse:
+                if state.poses[id: originalPose.id] != nil {
+                    state.poses[id: originalPose.id] = originalPose
+                    return .send(.delegate(.poseUpdated(originalPose)))
+                }
+                
                 return .none
                 
             case .delegate:

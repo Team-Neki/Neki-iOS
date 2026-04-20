@@ -13,7 +13,10 @@ import os
 struct RandomPoseCarouselFeature {
     enum SlideDirection { case previous, next, none }
     
-    private enum CancelID { case poseRequest }
+    private enum CancelID: Hashable {
+        case poseRequest
+        case scrap(PoseID)
+    }
     
     @ObservableState
     struct State {
@@ -43,7 +46,7 @@ struct RandomPoseCarouselFeature {
         
         // Internal Actions
         case poseResponse(Result<Pose, Error>)
-        case scrapResponse(PoseID, Result<Void, Error>)
+        case scrapResponse(Pose, Result<Void, Error>)
         case flushResources
         
         // Delegate Actions
@@ -63,10 +66,7 @@ struct RandomPoseCarouselFeature {
             switch action {
                 // MARK: - Lifecycle & View Actions
             case .onAppear:
-                if state.currentPose != nil {
-                    return .none
-                }
-                
+                guard state.currentPose == nil else { return .none }
                 state.isLoading = true
                 return .run { [count = state.activePeopleCount] send in
                     await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }))
@@ -105,16 +105,17 @@ struct RandomPoseCarouselFeature {
                 // MARK: - Scrap Logic (Optimistic)
             case .onTapScrap:
                 guard var pose = state.currentPose else { return .none }
+                let originalPose = pose
                 pose.isScrapped.toggle()
                 state.currentPose = pose
                 
-                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmark) }
-                let scrapEffect: Effect<Action> = .run { [id = pose.id, pose] send in
-                    await send(.delegate(.poseUpdated(pose)))
-                    await send(.scrapResponse(id, Result { try await poseClient.scrapPose(poseID: id) }))
+                let scrapEffect: Effect<Action> = .run { [originalPose, updatedPose = pose] send in
+                    await send(.delegate(.poseUpdated(updatedPose)))
+                    await send(.scrapResponse(originalPose, Result { try await poseClient.scrapPose(poseID: originalPose.id) }))
                 }
+                .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
                 
-                return .merge(trackingEffect, scrapEffect)
+                return scrapEffect
                 
                 // MARK: - Internal Actions
             case let .poseResponse(.success(pose)):
@@ -127,18 +128,18 @@ struct RandomPoseCarouselFeature {
                 Logger.presentation.error("Random Pose Fetching Failed: \(error)")
                 return .none
                 
-            case let .scrapResponse(id, .failure(error)):
+            case .scrapResponse(_, .success):
+                return .run { _ in analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                
+            case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }
-                
-                if var pose = state.currentPose, pose.id == id {
-                    pose.isScrapped.toggle()
-                    state.currentPose = pose
-                    return .send(.delegate(.poseUpdated(pose)))
-                }
                 Logger.presentation.error("Error occured while scrapping pose: ID-\(id) / Error: \(error)")
-                return .none
                 
-            case .scrapResponse:
+                if state.currentPose?.id == originalPose.id {
+                    state.currentPose = originalPose
+                    return .send(.delegate(.poseUpdated(originalPose)))
+                }
+                
                 return .none
                 
                 // MARK: - Navigation

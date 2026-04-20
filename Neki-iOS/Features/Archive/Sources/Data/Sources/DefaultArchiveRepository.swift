@@ -362,11 +362,19 @@ extension DefaultArchiveRepository {
         let endpoint = ArchiveEndpoint.deletePhoto(request: request)
         let _ = try await networkProvider.request(endpoint: endpoint)
         
+        for (folderID, list) in photoCache {
+            let containsDeletedPhoto = list.contains(where: { photoIDs.contains($0.photoID) })
+            if containsDeletedPhoto {
+                self.isPhotoCacheDirty[folderID] = true
+            }
+        }
+
         for (key, var list) in photoCache {
             list.removeAll { photoIDs.contains($0.photoID) }
             photoCache[key] = list
         }
         
+        self.isPhotoCacheDirty[nil] = true
         self.isAlbumCacheDirty = true
         self.isFavoriteCacheDirty = true
         self.isFavoriteAlbumInfoDirty = true

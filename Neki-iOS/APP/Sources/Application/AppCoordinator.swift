@@ -157,7 +157,7 @@ struct AppCoordinator {
                 state.$userSessionStatus.withLock { $0 = finalStatus }
                 
                 let userID: Int? = extractUserID(from: finalStatus)
-                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID: userID) }
+                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID) }
                 
                 guard finalVersionResult.status != .mustUpdate else {
                     state.versionAlert = .updateNeeded
@@ -197,7 +197,7 @@ struct AppCoordinator {
                 if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
                 
                 let userID: Int? = extractUserID(from: newStatus)
-                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID: userID) }
+                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID) }
                 
                 if case .splash = state.route, state.versionAlert != nil { return configureEffect }
                 
@@ -227,7 +227,7 @@ struct AppCoordinator {
             case let .route(.auth(.delegate(.moveToMainTab(user)))):
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 state.route = .mainTab(.init())
-                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID: user.id) }
+                let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
                 return .merge(
                     configureEffect,
                     .send(.executePendingShareExtensionIfNeeded)
@@ -239,7 +239,7 @@ struct AppCoordinator {
                     state.initializeUserDefaults()
                 }
                 state.route = .auth(.init())
-                return .run { _ in analytics.configure(userID: nil) }
+                return .run { _ in analytics.configure(nil) }
                 
             case .binding(\.isAlertPresented):
                 guard state.isAlertPresented == false else { return .none }

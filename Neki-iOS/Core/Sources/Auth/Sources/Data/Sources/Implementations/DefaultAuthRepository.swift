@@ -16,9 +16,9 @@ public struct DefaultAuthRepository: AuthRepository {
     public init() {}
     
     public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens {
-        let platformParam: String? = (provider == .apple) ? nil : "ios"
+        let platformParameter: String = "ios"
             
-        let dto = SocialLoginDTO.Request(idToken: idToken, platform: platformParam)
+        let dto = SocialLoginDTO.Request(idToken: idToken, platform: platformParameter)
         let endpoint = AuthEndpoint.login(dto: dto, provider: provider)
         
         do {

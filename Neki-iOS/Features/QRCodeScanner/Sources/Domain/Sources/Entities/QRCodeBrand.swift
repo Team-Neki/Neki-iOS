@@ -15,6 +15,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case photoism
     case photogray
     case photosignature
+    case monoMansion
     case planBStudio
     case harufilm
     
@@ -24,6 +25,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .photoism: ["seobuk.kr"]
         case .photogray: ["aprd.io", "pgshort.aprd.io"]
         case .photosignature: ["photoqr3.kr"]
+        case .monoMansion: ["qr.mono-mansion.com"]
         case .planBStudio: []
         case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"]
         }
@@ -35,6 +37,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .photoism: return "포토이즘"
         case .photogray: return "포토그레이"
         case .photosignature: return "포토시그니처"
+        case .monoMansion: return "모노맨션"
         case .planBStudio: return "플랜비스튜디오"
         case .harufilm: return "하루필름"
         }

@@ -37,8 +37,8 @@ public struct MapFeature {
         var isSDKAuthSuccessful: Bool = false
         var detent: NekiSheetDetent = SheetStage.first.detent
         var isSearchHereButtonVisible: Bool = false
-        var isFirstLoad: Bool = true
         var isPermissionAlertPresented: Bool = false
+        var initialSearchState: MapInitialSearchState = .awaitingPermission
         
         // Map State
         var cameraPosition: GeographicCoordinate?
@@ -89,6 +89,7 @@ public struct MapFeature {
         case setUserTrackingMode(Bool)
         case didDetectMapInteraction
         case presentPermissionAlert
+        case attemptInitialSearch
         
         // Map Logic Actions
         case mapLoaded(GeographicBoundingBox)
@@ -169,6 +170,7 @@ public struct MapFeature {
                 state.locationAuthorizationStatus = status
                 switch status {
                 case .authorizedAlways, .authorizedWhenInUse:
+                    state.initialSearchState = .waitingForUserLocation
                     return .merge(
                         .run { send in
                             for await location in await mapClient.trackingLocation() {
@@ -179,17 +181,14 @@ public struct MapFeature {
                     )
                     
                 case .notDetermined:
+                    state.initialSearchState = .awaitingPermission
                     return state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
                     
                 case .denied, .restricted:
                     state.isUserTrackingMode = false
-                    
-                    guard state.isFirstLoad, let bounds = state.currentBounds else { return .none }
-                    state.isFirstLoad = false
-                    return .merge(
-                        .send(.fetchPhotoBooths(bounds: bounds)),
-                        .send(.fetchNearbyPhotoBooths(bounds.center))
-                    )
+                    state.initialSearchState = .readyForDefaultLocation
+                    updateCameraPosition(&state, to: Constants.defaultInitialPosition.coordinate)
+                    return .send(.attemptInitialSearch)
                     
                 @unknown default:
                     return .none
@@ -214,7 +213,7 @@ public struct MapFeature {
             case let .mapLoaded(bounds):
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
-                return .none
+                return .send(.attemptInitialSearch)
                 
             case .didTapCurrentLocationButton:
                 resetToMapMode(&state, for: .first)
@@ -234,11 +233,14 @@ public struct MapFeature {
             case let .updateUserLocation(.success(location)):
                 state.userLocation = location
                 
-                if state.isFirstLoad || state.isUserTrackingMode {
+                if state.isUserTrackingMode {
                     updateCameraPosition(&state, to: location.coordinate)
-                    guard state.isFirstLoad else { return .none }
-                    state.isSearchHereButtonVisible = false
                 }
+                
+                guard state.initialSearchState == .waitingForUserLocation else { return .none }
+                state.isSearchHereButtonVisible = false
+                state.initialSearchState = .readyForUserLocation
+                updateCameraPosition(&state, to: location.coordinate)
                 return .none
                 
             case .updateUserLocation(.failure):
@@ -263,21 +265,7 @@ public struct MapFeature {
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
-                
-                guard state.isFirstLoad else { return .none }
-                guard state.locationAuthorizationStatus != .notDetermined else { return .none }
-                
-                let targetCoordinate = state.isLocationAuthorized ? (state.userLocation ?? Constants.defaultInitialPosition) : Constants.defaultInitialPosition
-                let currentCameraLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
-                
-                guard currentCameraLocation.distance(from: targetCoordinate) <= Constants.cameraTargetDistanceThreshold else { return .none }
-                state.isFirstLoad = false
-                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
-                state.lastSearchedLocation = currentCameraLocation
-                return .merge(
-                    .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
-                )
+                return .send(.attemptInitialSearch)
                 
             case let .updateSearchButtonVisibility(isVisible):
                 state.isSearchHereButtonVisible = isVisible
@@ -285,7 +273,6 @@ public struct MapFeature {
                 
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
-                let nearbyTargetCoordinate = state.userGeographicCoordinate ?? bounds.center
                 let currentCenterLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
                 let isRegionChanged = checkIfRegionChanged(from: state.lastSearchedLocation, to: currentCenterLocation)
                 let hasFilter = state.photoBoothListState.filteredBrands.isEmpty == false
@@ -294,7 +281,22 @@ public struct MapFeature {
                 return .merge(
                     .run { _ in analytics.logEvent(event: event) },
                     .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(nearbyTargetCoordinate))
+                    nearbyPhotoBoothsEffect(for: state)
+                )
+                
+            case .attemptInitialSearch:
+                guard let bounds = state.currentBounds else { return .none }
+                guard let targetCoordinate = initialSearchTargetCoordinate(for: state) else { return .none }
+                
+                let currentCameraLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
+                let targetLocation = CLLocation(latitude: targetCoordinate.latitude, longitude: targetCoordinate.longitude)
+                
+                guard currentCameraLocation.distance(from: targetLocation) <= Constants.cameraTargetDistanceThreshold else { return .none }
+                state.initialSearchState = .completed
+                state.lastSearchedLocation = currentCameraLocation
+                return .merge(
+                    .send(.fetchPhotoBooths(bounds: bounds)),
+                    nearbyPhotoBoothsEffect(for: state)
                 )
                 
                 // MARK: - Data Fetching
@@ -468,5 +470,31 @@ private extension MapFeature {
     func checkIfRegionChanged(from lastLocation: CLLocation?, to currentLocation: CLLocation) -> Bool {
         guard let lastLocation else { return false }
         return currentLocation.distance(from: lastLocation) >= Constants.regionChangeDistanceThreshold
+    }
+    
+    func initialSearchTargetCoordinate(for state: State) -> GeographicCoordinate? {
+        switch state.initialSearchState {
+        case .awaitingPermission, .waitingForUserLocation, .completed:
+            return nil
+        case .readyForDefaultLocation:
+            return .init(
+                latitude: Constants.defaultInitialPosition.coordinate.latitude,
+                longitude: Constants.defaultInitialPosition.coordinate.longitude
+            )
+        case .readyForUserLocation:
+            return state.userGeographicCoordinate
+        }
+    }
+    
+    func nearbyPhotoBoothsEffect(for state: State) -> Effect<Action> {
+        guard let userGeographicCoordinate = state.userGeographicCoordinate else {
+            let emptyBooths = IdentifiedArrayOf<PhotoBooth>()
+            return .merge(
+                .send(.photoBoothListAction(.setNearbyBooths(emptyBooths))),
+                .send(.photoBoothListAction(.setVisibleBooths(emptyBooths)))
+            )
+        }
+        
+        return .send(.fetchNearbyPhotoBooths(userGeographicCoordinate))
     }
 }

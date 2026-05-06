@@ -35,7 +35,7 @@ struct MonomansionStrategy: QRCodeParsingStrategy {
             throw .fallbackToWebView(url)
         }
         
-        let pattern = #"href\s*=\s*["'](https://[^"']*ncloudstorage\.com[^"']+\.jpg)["']"#
+        let pattern = #"href\s*=\s*["'](https://[^"']*ncloudstorage\.com[^"']+\.jpg(?:\?[^"']*)?)["']"#
         guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
               let match = regex.firstMatch(
                 in: htmlString,

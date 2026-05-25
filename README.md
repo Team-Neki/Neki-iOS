@@ -28,9 +28,9 @@
 
 ## <img width="40" height="40" src="https://github.com/user-attachments/assets/06940c34-fa04-461f-acd6-f6e121ffdd61" /> Contributors
 
-| <img width="200px" height="3400" src="https://avatars.githubusercontent.com/u/99116619?v=4" /> | <img width="200px" height="3400" src="https://avatars.githubusercontent.com/u/63261054?v=4" /> |
-| :--------: | :--------: |
-| [윤금용](https://github.com/Remaked-Swain) | [김한열](https://github.com/OneTen19) |
+| <img width="200px" height="3400" src="https://avatars.githubusercontent.com/u/99116619?v=4" /> | <img width="200px" height="3400" src="https://avatars.githubusercontent.com/u/63261054?v=4" /> | <img width="200px" height="3400" src="https://avatars.githubusercontent.com/u/48792069?v=4" /> |
+| :--------: | :--------: | :--------: |
+| [윤금용](https://github.com/Remaked-Swain) | [김한열](https://github.com/OneTen19) | [권정](https://github.com/kj9470) |
 
 <br>
 

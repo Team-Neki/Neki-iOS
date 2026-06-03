@@ -19,7 +19,7 @@ fileprivate enum MarkerLayout {
     static let selectedImageRadius: CGFloat = 18.0
     static let selectedPadding: CGFloat = 6.0
     
-    static let favoriteBadgeSize: CGFloat = 24
+    static let favoriteBadgeSize: CGFloat = 36
     
     static let tailWidth: CGFloat = 12.0
     static let tailHeight: CGFloat = 10.0
@@ -150,8 +150,8 @@ struct MarkerImageRenderer {
 
             let badgeImage = UIImage(resource: .iconFavoriteBooth)
             let badgeRect = CGRect(
-                x: bodyRect.maxX - MarkerLayout.favoriteBadgeSize / 2,
-                y: bodyRect.minY - MarkerLayout.favoriteBadgeSize / 2,
+                x: imageRect.maxX - MarkerLayout.favoriteBadgeSize / 2,
+                y: imageRect.minY - MarkerLayout.favoriteBadgeSize / 2,
                 width: MarkerLayout.favoriteBadgeSize,
                 height: MarkerLayout.favoriteBadgeSize
             )

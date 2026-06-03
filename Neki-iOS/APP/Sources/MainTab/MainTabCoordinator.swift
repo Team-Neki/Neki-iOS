@@ -180,6 +180,10 @@ struct MainTabCoordinator {
                 state.toast = item
                 return .none
                 
+            case let .map(.delegate(.showToast(item))):
+                state.toast = item
+                return .none
+                
             case .myPage(.delegate(.didLogout)):
                 return .run { send in
                     await send(.archive(.root(.clearData)))

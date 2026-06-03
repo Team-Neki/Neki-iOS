@@ -33,6 +33,8 @@ public struct PhotoBoothListFeature {
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         var favoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var favoriteBoothCount: Int = .zero
 
         @Shared(.appStorage("NearbyTooltipVisibility")) var isTooltipPresented: Bool = true
     }
@@ -52,6 +54,8 @@ public struct PhotoBoothListFeature {
         case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
         case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
         case setFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
+        case setVisibleFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
+        case setFavoriteBoothCount(Int)
 
         // Delegate Actions
         case didTapBooth(PhotoBooth)
@@ -96,6 +100,14 @@ public struct PhotoBoothListFeature {
                 
             case let .setFavoriteBooths(booths):
                 state.favoriteBooths = booths
+                return .none
+
+            case let .setVisibleFavoriteBooths(booths):
+                state.visibleFavoriteBooths = booths
+                return .none
+
+            case let .setFavoriteBoothCount(count):
+                state.favoriteBoothCount = count
                 return .none
 
             default:

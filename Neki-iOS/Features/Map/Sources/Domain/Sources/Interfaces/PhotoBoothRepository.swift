@@ -19,11 +19,6 @@ protocol PhotoBoothRepository {
     /// - Returns: 거리순으로 정렬된 포토부스 배열
     func readNearbyPhotoBooths(coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
 
-    /// 특정 포토부스의 상세 정보를 가져옵니다.
-    /// - Parameter id: 포토부스 지점 식별자
-    /// - Returns: 즐겨찾기 상태를 포함한 포토부스 상세 정보
-    func readPhotoBoothDetail(id: Int) async throws -> PhotoBooth
-
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
     /// - Parameters:
     ///   - id: 포토부스 지점 식별자

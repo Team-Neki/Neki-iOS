@@ -193,23 +193,6 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return photoBooths
     }
     
-    func readPhotoBoothDetail(id: Int) async throws -> PhotoBooth {
-        let brands = try await ensureBrandsLoaded()
-        let endpoint = MapEndpoint.detail(id: id)
-        let responseDTO: BaseResponseDTO<PhotoBoothDTO> = try await networkProvider.request(endpoint: endpoint)
-        
-        guard let dto = responseDTO.data else { throw NetworkError.responseDecodingError }
-        
-        guard let brand = brands[dto.brandName] else {
-            Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
-            throw NetworkError.responseDecodingError
-        }
-
-        let photoBooth = dto.toEntity(brand: brand)
-        updateCachedPhotoBooths([photoBooth])
-        return photoBooth
-    }
-    
     func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
@@ -223,7 +206,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             .sorted {
                 let lhsOrder = $0.favoriteOrder ?? Int.max
                 let rhsOrder = $1.favoriteOrder ?? Int.max
-                return lhsOrder < rhsOrder
+                return lhsOrder > rhsOrder
             }
             .map(\.photoBooth)
     }

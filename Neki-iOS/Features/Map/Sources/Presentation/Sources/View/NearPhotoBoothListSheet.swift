@@ -11,7 +11,8 @@ import Kingfisher
 
 struct NearPhotoBoothListSheet: View {
     @Bindable var store: StoreOf<PhotoBoothListFeature>
-    
+    @Namespace private var tabNamespace
+
     private let brandNameFormatter = PhotoBoothNameFormatter()
     
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }
@@ -19,8 +20,16 @@ struct NearPhotoBoothListSheet: View {
     var body: some View {
         ScrollView(.vertical) {
             photoBoothBrandFilterOptionsSection
-            // TODO: 이곳에 가까운 포토부스 목록과 저장한 포토부스 목록을 토글할 커스텀 탭바 필요
-            nearByPhotoBoothListSection
+            listTabBar
+
+            Group {
+                switch store.selectedTab {
+                case .nearby:
+                    nearByPhotoBoothListSection
+                case .favorite:
+                    favoritePhotoBoothListSection
+                }
+            }
         }
     }
 }
@@ -89,14 +98,52 @@ private extension NearPhotoBoothListSheet {
         }
     }
     
+    var listTabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(PhotoBoothListFeature.ListTab.allCases) { tab in
+                let isSelected = store.selectedTab == tab
+                
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { store.send(.selectTab(tab)) }
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(tab == .nearby ? .iconPinClip : .iconDoubleHeart)
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .saturation(isSelected ? 1 : 0)
+                        
+                        Text(tab.title)
+                            .nekiFont(.body14SemiBold)
+                            .foregroundStyle(isSelected ? .gray800 : .gray500)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.white)
+                                .matchedGeometryEffect(id: "selectedPhotoBoothListTab", in: tabNamespace)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .clipShape(.rect(cornerRadius: 8))
+            }
+        }
+        .padding(4)
+        .background(.gray50)
+        .clipShape(.rect(cornerRadius: 8))
+        .padding(.horizontal, 20)
+    }
+
     var nearByPhotoBoothListSection: some View {
         Section {
-            if store.photoBooths.isEmpty {
-                unavailableView
+            if store.visibleBooths.isEmpty {
+                unavailableView("1km 이내에 가까운 네컷 사진관이 없어요!")
             } else {
                 LazyVStack(alignment: .leading, spacing: .zero) {
                     ForEach(store.visibleBooths) { photoBooth in
-                        nearByPhotoBoothCell(photoBooth)
+                        photoBoothCell(photoBooth)
                     }
                 }
             }
@@ -124,8 +171,28 @@ private extension NearPhotoBoothListSheet {
         .frame(maxHeight: .infinity)
     }
     
+    var favoritePhotoBoothListSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("저장한 포토부스 총 \(store.favoriteBooths.count)곳")
+                    .foregroundStyle(.gray300)
+
+                if store.favoriteBooths.isEmpty {
+                    unavailableView("저장한 포토부스가 없어요.")
+                } else {
+                    LazyVStack(alignment: .leading, spacing: .zero) {
+                        ForEach(store.favoriteBooths) { photoBooth in
+                            photoBoothCell(photoBooth)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
     @ViewBuilder
-    func nearByPhotoBoothCell(_ photoBooth: PhotoBooth) -> some View {
+    func photoBoothCell(_ photoBooth: PhotoBooth) -> some View {
         HStack(spacing: 16) {
             KFImage(photoBooth.brand.imageURL)
                 .resizable()
@@ -150,6 +217,7 @@ private extension NearPhotoBoothListSheet {
                         .frame(width: 1, height: 10)
                         .foregroundStyle(.gray100)
                     
+
                     Text(photoBooth.nearbyDistance?.distanceString ?? "")
                         .nekiFont(.body14SemiBold)
                         .foregroundStyle(.gray700)
@@ -159,20 +227,20 @@ private extension NearPhotoBoothListSheet {
             Spacer()
             
             Button {
-                
+                store.send(.didTapFavorite(photoBooth))
             } label: {
-                Image(.iconHeart20Fill)
+                Image(photoBooth.isFavorite ? .iconHeart20Fill : .iconHeart20Gray)
             }
+            .buttonStyle(.plain)
         }
         .contentShape(.rect)
         .onTapGesture { store.send(.didTapBooth(photoBooth)) }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
     }
-    
-    var unavailableView: some View {
-        // TODO: 저장한 포토부스 목록이 비어있을 경우에는 "저장한 포토부스가 없어요." 문구 노출
-        Text("1km 이내에 가까운 네컷 사진관이 없어요!")
+
+    func unavailableView(_ message: String) -> some View {
+        Text(message)
             .nekiFont(.body16Medium)
             .foregroundStyle(.gray500)
             .frame(height: 375)

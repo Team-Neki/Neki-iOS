@@ -79,6 +79,7 @@ public struct MapFeature {
         case didTapBooth(PhotoBooth)
         case didTapBoothCard
         case didTapCloseDetail
+        case didTapFavorite(PhotoBooth)
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
         case didTapSearchHereButton
@@ -107,12 +108,15 @@ public struct MapFeature {
         case photoBoothStreamFailure(Error)
         case fetchPhotoBoothDetail(id: Int)
         case photoBoothDetailResponse(Result<PhotoBooth, Error>)
+        case updatePhotoBoothFavoriteResponse(id: PhotoBooth.ID, requestedValue: Bool, Result<Void, Error>)
         case loadBrands
         case brandsResponse(Result<[PhotoBoothBrand], Error>)
         
         // Sheet
         case fetchNearbyPhotoBooths(GeographicCoordinate)
         case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
+        case fetchFavoritePhotoBooths
+        case favoritePhotoBoothsResponse(Result<[PhotoBooth], Error>)
         case startBackgroundCalculation
         case processNewChunk([PhotoBooth], isFirstBatch: Bool)
         case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool)
@@ -124,7 +128,7 @@ public struct MapFeature {
         case photoBoothListAction(PhotoBoothListFeature.Action)
     }
     
-    private enum CancelID {
+    private enum CancelID: Hashable {
         case mapFetch
         case listFetch
         case locationStream
@@ -132,6 +136,7 @@ public struct MapFeature {
         case sdkAuthorizationStream
         case calculation
         case detailFetch
+        case favorite(PhotoBooth.ID)
     }
     
     @Dependency(\.mapClient) private var mapClient
@@ -381,6 +386,42 @@ public struct MapFeature {
                 Logger.presentation.error("PhotoBooth detail fetch error: \(error)")
                 return .none
                 
+            case let .didTapFavorite(photoBooth):
+                let requestedValue = photoBooth.isFavorite == false
+                updatePhotoBoothFavoriteState(&state, id: photoBooth.id, isFavorite: requestedValue)
+
+                let action: MapFilterAction = requestedValue ? .select : .deselect
+                let event = MapAnalyticsEvent.boothFavorite(action: action, brandName: photoBooth.brand.name)
+                return .merge(
+                    .send(.startBackgroundCalculation),
+                    .send(.fetchFavoritePhotoBooths),
+                    .run { _ in analytics.logEvent(event: event) },
+                    .run { [id = photoBooth.id, requestedValue] send in
+                        await send(.updatePhotoBoothFavoriteResponse(
+                            id: id,
+                            requestedValue: requestedValue,
+                            Result { try await photoBoothClient.updatePhotoBoothFavorite(id, requestedValue) }
+                        ))
+                    }
+                    .cancellable(id: CancelID.favorite(photoBooth.id), cancelInFlight: true)
+                )
+
+            case let .updatePhotoBoothFavoriteResponse(id, requestedValue, .success):
+                updatePhotoBoothFavoriteState(&state, id: id, isFavorite: requestedValue)
+                return .merge(
+                    .send(.startBackgroundCalculation),
+                    .send(.fetchFavoritePhotoBooths)
+                )
+
+            case let .updatePhotoBoothFavoriteResponse(id, requestedValue, .failure(error)):
+                if error is CancellationError { return .none }
+                Logger.presentation.error("PhotoBooth favorite update error: \(error)")
+                updatePhotoBoothFavoriteState(&state, id: id, isFavorite: requestedValue == false)
+                return .merge(
+                    .send(.startBackgroundCalculation),
+                    .send(.fetchFavoritePhotoBooths)
+                )
+
             case let .fetchNearbyPhotoBooths(coordinate):
                 state.photoBoothListState.photoBooths.removeAll()
                 
@@ -401,7 +442,20 @@ public struct MapFeature {
             case let .nearbyPhotoBoothResponse(.failure(error)):
                 Logger.presentation.error("Nearby PhotoBooths fetch error: \(error)")
                 return .none
+
+            case .fetchFavoritePhotoBooths:
+                return .run { send in
+                    await send(.favoritePhotoBoothsResponse(Result { try await photoBoothClient.fetchFavoritePhotoBooths() }))
+                }
+
+            case let .favoritePhotoBoothsResponse(.success(photoBooths)):
+                let favoriteBooths = IdentifiedArray(uniqueElements: photoBooths)
+                return .send(.photoBoothListAction(.setFavoriteBooths(favoriteBooths)))
                 
+            case let .favoritePhotoBoothsResponse(.failure(error)):
+                Logger.presentation.error("Favorite PhotoBooths fetch error: \(error)")
+                return .none
+
             case .startBackgroundCalculation:
                 let mapBooths = state.photoBooths
                 let listBooths = state.photoBoothListState.photoBooths
@@ -461,7 +515,14 @@ public struct MapFeature {
                 
             case .photoBoothListAction(.selectFilterOption):
                 return .send(.startBackgroundCalculation)
-                
+
+            case let .photoBoothListAction(.selectTab(tab)):
+                guard tab == .favorite else { return .none }
+                return .send(.fetchFavoritePhotoBooths)
+
+            case let .photoBoothListAction(.delegate(.didTapFavorite(photoBooth))):
+                return .send(.didTapFavorite(photoBooth))
+
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
@@ -502,8 +563,42 @@ private extension MapFeature {
         state.visiblePhotoBooths[id: photoBooth.id] = photoBooth
         state.photoBoothListState.photoBooths[id: photoBooth.id] = photoBooth
         state.photoBoothListState.visibleBooths[id: photoBooth.id] = photoBooth
+        updateFavoriteBoothList(&state.photoBoothListState, with: photoBooth)
     }
     
+    func updatePhotoBoothFavoriteState(_ state: inout State, id: PhotoBooth.ID, isFavorite: Bool) {
+        if state.selectedBooth?.id == id {
+            state.selectedBooth?.isFavorite = isFavorite
+        }
+
+        state.photoBooths[id: id]?.isFavorite = isFavorite
+        state.visiblePhotoBooths[id: id]?.isFavorite = isFavorite
+        state.photoBoothListState.photoBooths[id: id]?.isFavorite = isFavorite
+        state.photoBoothListState.visibleBooths[id: id]?.isFavorite = isFavorite
+
+        if var photoBooth = state.selectedBooth, photoBooth.id == id {
+            photoBooth.isFavorite = isFavorite
+            updateFavoriteBoothList(&state.photoBoothListState, with: photoBooth)
+        } else if var photoBooth = state.photoBooths[id: id] ?? state.photoBoothListState.photoBooths[id: id] {
+            photoBooth.isFavorite = isFavorite
+            updateFavoriteBoothList(&state.photoBoothListState, with: photoBooth)
+        } else if isFavorite == false {
+            state.photoBoothListState.favoriteBooths.remove(id: id)
+        }
+    }
+
+    func updateFavoriteBoothList(_ state: inout PhotoBoothListFeature.State, with photoBooth: PhotoBooth) {
+        if photoBooth.isFavorite {
+            if state.favoriteBooths[id: photoBooth.id] != nil {
+                state.favoriteBooths[id: photoBooth.id] = photoBooth
+            } else {
+                state.favoriteBooths.append(photoBooth)
+            }
+        } else {
+            state.favoriteBooths.remove(id: photoBooth.id)
+        }
+    }
+
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {
         state.cameraPosition = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
     }

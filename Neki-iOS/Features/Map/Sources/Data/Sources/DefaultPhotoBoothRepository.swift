@@ -198,6 +198,12 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return dto.toEntity(brand: brand)
     }
     
+    func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
+        let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
+        let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+    }
+
     func loadBrands() async throws -> [PhotoBoothBrand] {
         let brands = try await ensureBrandsLoaded()
         return Array(brands.values).sorted { $0.id < $1.id }

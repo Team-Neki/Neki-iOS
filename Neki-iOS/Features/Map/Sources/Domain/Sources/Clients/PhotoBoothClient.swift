@@ -16,6 +16,8 @@ public struct PhotoBoothClient {
     public var fetchNearbyPhotoBooths: @Sendable (_ coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
     /// 특정 포토부스의 상세 정보를 가져옵니다.
     public var fetchPhotoBoothDetail: @Sendable (_ id: Int) async throws -> PhotoBooth
+    /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
+    public var updatePhotoBoothFavorite: @Sendable (_ id: Int, _ isFavorite: Bool) async throws -> Void
     /// 지원 브랜드 정보 조회
     public var loadBrands: @Sendable () async throws -> [PhotoBoothBrand]
 }
@@ -33,6 +35,8 @@ extension PhotoBoothClient: DependencyKey {
             try await photoBoothRepository.readNearbyPhotoBooths(coordinate: coordinate)
         } fetchPhotoBoothDetail: { id in
             try await photoBoothRepository.readPhotoBoothDetail(id: id)
+        } updatePhotoBoothFavorite: { id, isFavorite in
+            try await photoBoothRepository.updatePhotoBoothFavorite(id: id, isFavorite: isFavorite)
         } loadBrands: {
             try await photoBoothRepository.loadBrands()
         }

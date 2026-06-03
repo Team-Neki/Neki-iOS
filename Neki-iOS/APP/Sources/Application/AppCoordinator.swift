@@ -182,10 +182,8 @@ struct AppCoordinator {
                 return .send(.route(.mainTab(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))))
                 
             case .didTapUpdateAlert:
-                return .run { _ in
-                    let appStoreURL = URL(string: "https://apps.apple.com/kr/app/neki/id6757490609")!
-                    await openURL(appStoreURL)
-                }
+                guard let appStoreURL = URL(string: "https://apps.apple.com/kr/app/id6757490609") else { return .none }
+                return .run { _ in await openURL(appStoreURL) }
                 
             case .didTapLaterAlert:
                 state.versionAlert = nil

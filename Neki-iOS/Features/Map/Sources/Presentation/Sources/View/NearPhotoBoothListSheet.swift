@@ -104,7 +104,7 @@ private extension NearPhotoBoothListSheet {
                 let isSelected = store.selectedTab == tab
                 
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { store.send(.selectTab(tab)) }
+                    store.send(.selectTab(tab), animation: .easeInOut(duration: 0.2))
                 } label: {
                     HStack(spacing: 2) {
                         Image(tab == .nearby ? .iconPinClip : .iconDoubleHeart)
@@ -134,6 +134,7 @@ private extension NearPhotoBoothListSheet {
         .background(.gray50)
         .clipShape(.rect(cornerRadius: 8))
         .padding(.horizontal, 20)
+        .padding(.bottom, 20)
     }
 
     var nearByPhotoBoothListSection: some View {
@@ -174,14 +175,16 @@ private extension NearPhotoBoothListSheet {
     var favoritePhotoBoothListSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                Text("저장한 포토부스 총 \(store.favoriteBooths.count)곳")
+                Text("저장한 포토부스 총 \(store.favoriteBoothCount)곳")
                     .foregroundStyle(.gray300)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
 
-                if store.favoriteBooths.isEmpty {
+                if store.visibleFavoriteBooths.isEmpty {
                     unavailableView("저장한 포토부스가 없어요.")
                 } else {
                     LazyVStack(alignment: .leading, spacing: .zero) {
-                        ForEach(store.favoriteBooths) { photoBooth in
+                        ForEach(store.visibleFavoriteBooths) { photoBooth in
                             photoBoothCell(photoBooth)
                         }
                     }
@@ -229,7 +232,7 @@ private extension NearPhotoBoothListSheet {
             Button {
                 store.send(.didTapFavorite(photoBooth))
             } label: {
-                Image(photoBooth.isFavorite ? .iconHeart20Fill : .iconHeart20Gray)
+                Image(photoBooth.isFavorite ? .iconHeart28Fill : .iconHeart28Gray)
             }
             .buttonStyle(.plain)
         }
@@ -240,9 +243,13 @@ private extension NearPhotoBoothListSheet {
     }
 
     func unavailableView(_ message: String) -> some View {
-        Text(message)
-            .nekiFont(.body16Medium)
-            .foregroundStyle(.gray500)
-            .frame(height: 375)
+        VStack(alignment: .center) {
+            Image(.iconPlace)
+            
+            Text(message)
+                .nekiFont(.body16Medium)
+                .foregroundStyle(.gray500)
+                .frame(maxWidth: .infinity, minHeight: 375, alignment: .center)
+        }
     }
 }

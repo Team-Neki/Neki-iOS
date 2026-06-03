@@ -520,7 +520,7 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
 
 extension NaverMapRepresentable.Coordinator: NMFMapViewTouchDelegate {
     func mapView(_ mapView: NMFMapView, didTapMap latlng: NMGLatLng, point: CGPoint) {
-        return withAnimation { parent.store.send(.didTapCloseDetail) }
+        parent.store.send(.didTapCloseDetail, animation: .default)
     }
 }
 
@@ -552,7 +552,7 @@ public struct NaverMapView: View {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
                 .scrollDisabled(store.detent != .large)
         } controllers: {
-            mapControllers
+            mapControllers()
         }
         .nekiSheetBottomInset()
         .overlay(alignment: .bottom) {
@@ -588,7 +588,7 @@ private extension NaverMapView {
     
     func detailCardLayer(_ photoBooth: PhotoBooth) -> some View {
         VStack {
-            mapControllers
+            mapControllers(selectedBooth: photoBooth)
             
             HStack(spacing: 12) {
                 KFImage(photoBooth.brand.imageURL)
@@ -623,13 +623,6 @@ private extension NaverMapView {
                 }
                 
                 Spacer()
-                
-                Button {
-                    store.send(.didTapFavorite(photoBooth))
-                } label: {
-                    Image(photoBooth.isFavorite ? .iconHeart28Fill : .iconHeart28Gray)
-                }
-                .buttonStyle(.plain)
 
                 Button {
                     store.send(.didTapDirectionAppsButton)
@@ -649,15 +642,29 @@ private extension NaverMapView {
         .transition(.move(edge: .bottom))
     }
     
-    var mapControllers: some View {
+    func mapControllers(selectedBooth: PhotoBooth? = nil) -> some View {
         HStack {
-            Button {
-                store.send(.didTapCurrentLocationButton)
-            } label: {
-                Image(store.isUserTrackingMode ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
-                    .padding(8)
-                    .background(.white)
-                    .clipShape(.circle)
+            VStack(spacing: 8) {
+                if let selectedBooth {
+                    favoriteControlButton(
+                        isSelected: selectedBooth.isFavorite,
+                        action: { store.send(.didTapFavorite(selectedBooth)) }
+                    )
+                } else {
+                    favoriteControlButton(
+                        isSelected: store.isFavoriteMarkerFilterEnabled,
+                        action: { store.send(.didTapFavoriteMarkerFilterButton) }
+                    )
+                    
+                    Button {
+                        store.send(.didTapCurrentLocationButton)
+                    } label: {
+                        Image(store.isUserTrackingMode ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
+                            .padding(8)
+                            .background(.white)
+                            .clipShape(.circle)
+                    }
+                }
             }
             
             Spacer()
@@ -675,6 +682,15 @@ private extension NaverMapView {
         }
         .padding(.horizontal, 20)
         .shadow(color: .gray400, radius: 8, y: 4)
+    }
+    
+    func favoriteControlButton(isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(isSelected ? .iconHeart28Fill : .iconHeart28Gray)
+                .padding(8)
+                .background(.white)
+                .clipShape(.circle)
+        }
     }
     
     var searchHereControl: some View {

@@ -15,6 +15,7 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         PhotograyStrategy(),
         PhotoSignatureStrategy(),
         Life4CutStrategy(),
+        MonomansionStrategy(),
         PhotoismStrategy()
     ]
     

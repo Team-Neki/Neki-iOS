@@ -6,57 +6,71 @@
 //
 
 import Foundation
+import os
 
-// TODO: 모노맨션 브랜드는 나중에 출시
-//struct MonoMansionStrategy: QRCodeParsingStrategy {
-//    var strategyType: ParsingStrategyType { .htmlCrawling }
-//    
-//    func canHandle(host: String) -> Bool {
-//        PhotoBoothBrand.monoMansion.hostKeywords.contains(host)
-//    }
-//    
-//    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
-//        // 1. HTML 데이터 요청
-//        var request = URLRequest(url: url)
-//        // 봇 차단 방지용 헤더
-//        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1", forHTTPHeaderField: "User-Agent")
-//        
-//        let data: Data
-//        do {
-//            // 현재 단계에서는 URLSession 직접 사용
-//            (data, _) = try await URLSession.shared.data(for: request)
-//        } catch {
-//            guard let urlError = error as? URLError else { throw .parsingFailed }
-//            switch urlError.code {
-//            case .notConnectedToInternet, .networkConnectionLost:
-//                throw .networkError(.networkFail)
-//            default:
-//                throw .networkError(.unknownError(urlError))
-//            }
-//        }
-//        
-//        // 2. HTML 문자열 변환
-//        guard let htmlString = String(data: data, encoding: .utf8) else {
-//            throw .parsingFailed
-//        }
-//        
-//        // 3. 정규식을 통한 이미지 URL 추출
-//        // 제공된 정규식: href\s*=\s*["'](https://[^"']*ncloudstorage\.com[^"']+\.jpg)["']
-//        // 그룹 1번(괄호 안의 내용)이 실제 URL입니다.
-//        let pattern = "href\\s*=\\s*[\"'](https://[^\"']*ncloudstorage\\.com[^\"']+\\.jpg)[\"']"
-//        
-//        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-//              let match = regex.firstMatch(in: htmlString, options: [], range: NSRange(location: 0, length: htmlString.utf16.count)),
-//              let range = Range(match.range(at: 1), in: htmlString) else {
-//            throw .parsingFailed
-//        }
-//        
-//        let imageURLString = String(htmlString[range])
-//        
-//        guard let imageURL = URL(string: imageURLString) else {
-//            throw .urlConstructionFailed
-//        }
-//        
-//        return ParsedQRResult(brand: .monoMansion, originalImageURL: imageURL)
-//    }
-//}
+struct MonomansionStrategy: QRCodeParsingStrategy {
+    var strategyType: ParsingStrategyType { .htmlCrawling }
+    
+    func canHandle(host: String) -> Bool { QRCodeBrand.monoMansion.hostKeywords.contains { host.lowercased().contains($0.lowercased()) } }
+    
+    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
+        Logger.data.debug("모노맨션 파싱 시도: \(url.absoluteString)")
+        
+        let request = URLRequest(url: url)
+        let htmlData: Data
+        
+        do {
+            (htmlData, _) = try await URLSession.shared.data(for: request)
+        } catch {
+            Logger.network.error("모노맨션 HTML 요청 실패: \(error.localizedDescription)")
+            if let urlError = error as? URLError,
+               [.notConnectedToInternet, .networkConnectionLost].contains(urlError.code) {
+                throw .networkError(.networkFail)
+            }
+            throw .fallbackToWebView(url)
+        }
+        
+        guard let htmlString = String(data: htmlData, encoding: .utf8) else {
+            Logger.domain.warning("모노맨션 HTML 문자열 변환 실패.")
+            throw .fallbackToWebView(url)
+        }
+        
+        let pattern = #"href\s*=\s*["'](https://[^"']*ncloudstorage\.com[^"']+\.jpg(?:\?[^"']*)?)["']"#
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
+              let match = regex.firstMatch(
+                in: htmlString,
+                options: [],
+                range: NSRange(location: 0, length: htmlString.utf16.count)
+              ),
+              let range = Range(match.range(at: 1), in: htmlString)
+        else {
+            Logger.domain.warning("모노맨션 이미지 URL 추출 실패. 웹뷰 폴백.")
+            throw .fallbackToWebView(url)
+        }
+        
+        let imageURLString = String(htmlString[range])
+            .replacingOccurrences(of: "&amp;", with: "&")
+        
+        guard let imageURL = URL(string: imageURLString) else {
+            Logger.domain.error("모노맨션 이미지 URL 생성 실패.")
+            throw .fallbackToWebView(url)
+        }
+        
+        do {
+            let (data, response) = try await URLSession.shared.data(from: imageURL)
+            
+            if let httpResponse = response as? HTTPURLResponse,
+               (200..<300).contains(httpResponse.statusCode) == false {
+                Logger.network.warning("모노맨션 이미지 다운로드 실패 (상태코드: \(httpResponse.statusCode)). 웹뷰 폴백.")
+                throw QRParseError.fallbackToWebView(url)
+            }
+            
+            return ParsedQRResult(brand: .monoMansion, originalImage: data)
+        } catch let error as QRParseError {
+            throw error
+        } catch {
+            Logger.network.warning("모노맨션 이미지 다운로드 실패: \(error.localizedDescription)")
+            throw .imageDownloadFailed
+        }
+    }
+}

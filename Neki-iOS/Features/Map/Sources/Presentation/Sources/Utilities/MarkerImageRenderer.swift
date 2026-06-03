@@ -19,6 +19,8 @@ fileprivate enum MarkerLayout {
     static let selectedImageRadius: CGFloat = 18.0
     static let selectedPadding: CGFloat = 6.0
     
+    static let favoriteBadgeSize: CGFloat = 24
+    
     static let tailWidth: CGFloat = 12.0
     static let tailHeight: CGFloat = 10.0
     
@@ -31,10 +33,10 @@ fileprivate enum MarkerLayout {
 }
 
 struct MarkerImageRenderer {
-    
     static func render(
         brandImage: UIImage?,
-        isSelected: Bool
+        isSelected: Bool,
+        isFavorite: Bool
     ) -> UIImage {
         let imageSize = isSelected ? MarkerLayout.selectedImageSize : MarkerLayout.normalImageSize
         let padding = isSelected ? MarkerLayout.selectedPadding : MarkerLayout.normalPadding
@@ -42,22 +44,23 @@ struct MarkerImageRenderer {
         let bgRadius = isSelected ? MarkerLayout.selectedBgRadius : MarkerLayout.normalBgRadius
         let tailSize = CGSize(width: MarkerLayout.tailWidth, height: MarkerLayout.tailHeight)
         let bodySize = imageSize + (padding * 2)
-        
-        let totalWidth = bodySize
+
+        let badgeOverflow = isFavorite ? MarkerLayout.favoriteBadgeSize / 2 : .zero
+        let totalWidth = bodySize + badgeOverflow
         let totalHeight = bodySize + tailSize.height - 1
         
         let shadowMargin = MarkerLayout.shadowRadius * 4
         let canvasSize = CGSize(
             width: totalWidth + shadowMargin * 2,
-            height: totalHeight + shadowMargin * 2
+            height: totalHeight + badgeOverflow + shadowMargin * 2
         )
         
         let renderer = UIGraphicsImageRenderer(size: canvasSize)
         
         return renderer.image { context in
             let cgContext = context.cgContext
-            let drawOffsetX = shadowMargin
-            let drawOffsetY = MarkerLayout.shadowRadius
+            let drawOffsetX = shadowMargin + badgeOverflow / 2
+            let drawOffsetY = MarkerLayout.shadowRadius + badgeOverflow
             let bodyRect = CGRect(
                 x: drawOffsetX,
                 y: drawOffsetY,
@@ -142,6 +145,17 @@ struct MarkerImageRenderer {
                 UIRectFill(imageRect)
             }
             cgContext.restoreGState()
+
+            guard isFavorite else { return }
+
+            let badgeImage = UIImage(resource: .iconFavoriteBooth)
+            let badgeRect = CGRect(
+                x: bodyRect.maxX - MarkerLayout.favoriteBadgeSize / 2,
+                y: bodyRect.minY - MarkerLayout.favoriteBadgeSize / 2,
+                width: MarkerLayout.favoriteBadgeSize,
+                height: MarkerLayout.favoriteBadgeSize
+            )
+            badgeImage.draw(in: badgeRect)
         }
     }
 }

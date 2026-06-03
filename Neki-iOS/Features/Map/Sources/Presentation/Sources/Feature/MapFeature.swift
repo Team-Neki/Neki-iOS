@@ -62,6 +62,8 @@ public struct MapFeature {
         
         var selectedBooth: PhotoBooth?
         var directionSheetPhotoBooth: PhotoBooth?
+        var selectedBoothDetailLoading: Bool = false
+        var selectedBoothDetailError: Bool = false
         
         // Child State
         var photoBoothListState = PhotoBoothListFeature.State()
@@ -103,6 +105,8 @@ public struct MapFeature {
         case photoBoothChunkLoaded([PhotoBooth])
         case photoBoothStreamFinished
         case photoBoothStreamFailure(Error)
+        case fetchPhotoBoothDetail(id: Int)
+        case photoBoothDetailResponse(Result<PhotoBooth, Error>)
         case loadBrands
         case brandsResponse(Result<[PhotoBoothBrand], Error>)
         
@@ -127,6 +131,7 @@ public struct MapFeature {
         case locationAuthorizationStream
         case sdkAuthorizationStream
         case calculation
+        case detailFetch
     }
     
     @Dependency(\.mapClient) private var mapClient
@@ -356,6 +361,26 @@ public struct MapFeature {
                 Logger.presentation.error("PhotoBooth stream error: \(error)")
                 return .none
                 
+            case let .fetchPhotoBoothDetail(id):
+                state.selectedBoothDetailLoading = true
+                state.selectedBoothDetailError = false
+                return .run { send in
+                    await send(.photoBoothDetailResponse(Result { try await photoBoothClient.fetchPhotoBoothDetail(id) }))
+                }
+                .cancellable(id: CancelID.detailFetch, cancelInFlight: true)
+                
+            case let .photoBoothDetailResponse(.success(photoBooth)):
+                state.selectedBoothDetailLoading = false
+                state.selectedBoothDetailError = false
+                updatePhotoBoothState(&state, with: photoBooth)
+                return .none
+                
+            case let .photoBoothDetailResponse(.failure(error)):
+                state.selectedBoothDetailLoading = false
+                state.selectedBoothDetailError = true
+                Logger.presentation.error("PhotoBooth detail fetch error: \(error)")
+                return .none
+                
             case let .fetchNearbyPhotoBooths(coordinate):
                 state.photoBoothListState.photoBooths.removeAll()
                 
@@ -402,7 +427,10 @@ public struct MapFeature {
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .map)
-                return .run { _ in analytics.logEvent(event: event) }
+                return .merge(
+                    .run { _ in analytics.logEvent(event: event) },
+                    .send(.fetchPhotoBoothDetail(id: photoBooth.id))
+                )
                 
             case .didTapBoothCard:
                 state.isUserTrackingMode = false
@@ -438,7 +466,10 @@ public struct MapFeature {
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .bottomSheet)
-                return .run { _ in analytics.logEvent(event: event) }
+                return .merge(
+                    .run { _ in analytics.logEvent(event: event) },
+                    .send(.fetchPhotoBoothDetail(id: photoBooth.id))
+                )
                 
             default:
                 return .none
@@ -459,8 +490,18 @@ private extension MapFeature {
     
     func selectPhotoBooth(_ state: inout State, photoBooth: PhotoBooth) {
         state.selectedBooth = photoBooth
+        state.selectedBoothDetailError = false
         state.detent = SheetStage.photoBoothSelected.detent
         state.cameraPosition = photoBooth.coordinate   
+    }
+    
+    func updatePhotoBoothState(_ state: inout State, with photoBooth: PhotoBooth) {
+        if state.selectedBooth?.id == photoBooth.id { state.selectedBooth = photoBooth }
+        
+        state.photoBooths[id: photoBooth.id] = photoBooth
+        state.visiblePhotoBooths[id: photoBooth.id] = photoBooth
+        state.photoBoothListState.photoBooths[id: photoBooth.id] = photoBooth
+        state.photoBoothListState.visibleBooths[id: photoBooth.id] = photoBooth
     }
     
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {

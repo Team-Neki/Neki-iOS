@@ -10,6 +10,7 @@ import Foundation
 enum MapEndpoint {
     case polygon(dto: FetchPhotoBoothsDTO.Request)
     case point(dto: FetchNearbyPhotoBoothsDTO.Request)
+    case detail(id: Int)
     case fetchBrands
 }
 
@@ -21,7 +22,7 @@ extension MapEndpoint: Endpoint {
     
     var contentType: HTTPContentType {
         switch self {
-        case .polygon, .point, .fetchBrands: return .json
+        case .polygon, .point, .detail, .fetchBrands: return .json
         }
     }
     
@@ -29,6 +30,8 @@ extension MapEndpoint: Endpoint {
         switch self {
         case .polygon: return "/photo-booths/polygon"
         case .point: return "/photo-booths/point"
+        // TODO: 서버 상세 API 계약 확정 시 path를 검증합니다.
+        case let .detail(id): return "/photo-booths/\(id)"
         case .fetchBrands: return "/photo-booths/brand"
         }
     }
@@ -36,6 +39,7 @@ extension MapEndpoint: Endpoint {
     var method: HTTPMethodType {
         switch self {
         case .polygon, .point: return .post
+        case .detail: return .get
         case .fetchBrands: return .get
         }
     }
@@ -44,6 +48,7 @@ extension MapEndpoint: Endpoint {
         switch self {
         case let .polygon(dto): return dto
         case let .point(dto): return dto
+        case .detail: return nil
         case .fetchBrands: return nil
         }
     }

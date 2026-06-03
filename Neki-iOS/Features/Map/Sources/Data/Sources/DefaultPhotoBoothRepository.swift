@@ -141,7 +141,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                                         Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
                                         return nil
                                     }
-                                    return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
+                                    return dto.toEntity(brand: brand)
                                 } ?? []
                                 
                                 return (tile, photoBooths)
@@ -178,9 +178,24 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let responseDTO: BaseResponseDTO<FetchNearbyPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
             guard let brand = brands[dto.brandName] else { return nil }
-            return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
+            return dto.toEntity(brand: brand)
         } ?? []
         return photoBooths
+    }
+    
+    func readPhotoBoothDetail(id: Int) async throws -> PhotoBooth {
+        let brands = try await ensureBrandsLoaded()
+        let endpoint = MapEndpoint.detail(id: id)
+        let responseDTO: BaseResponseDTO<PhotoBoothDTO> = try await networkProvider.request(endpoint: endpoint)
+        
+        guard let dto = responseDTO.data else { throw NetworkError.responseDecodingError }
+        
+        guard let brand = brands[dto.brandName] else {
+            Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
+            throw NetworkError.responseDecodingError
+        }
+        
+        return dto.toEntity(brand: brand)
     }
     
     func loadBrands() async throws -> [PhotoBoothBrand] {

@@ -15,10 +15,22 @@ struct PhotoBoothDTO: Decodable {
     let longitude: Double
     let latitude: Double
     let nearbyDistance: Int?
+    let isFavorite: Bool?
     
     enum CodingKeys: String, CodingKey {
-        case id, address, longitude, latitude, brandName, branchName
+        case id, address, longitude, latitude, brandName, branchName, isFavorite
         case nearbyDistance = "distance"
     }
+    
+    func toEntity(brand: PhotoBoothBrand) -> PhotoBooth {
+        PhotoBooth(
+            id: id,
+            brand: brand,
+            name: branchName,
+            coordinate: .init(latitude: latitude, longitude: longitude),
+            address: address,
+            nearbyDistance: nearbyDistance,
+            isFavorite: isFavorite ?? false
+        )
+    }
 }
-

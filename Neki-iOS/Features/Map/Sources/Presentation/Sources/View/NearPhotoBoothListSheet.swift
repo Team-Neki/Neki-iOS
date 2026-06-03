@@ -19,6 +19,7 @@ struct NearPhotoBoothListSheet: View {
     var body: some View {
         ScrollView(.vertical) {
             photoBoothBrandFilterOptionsSection
+            // TODO: 이곳에 가까운 포토부스 목록과 저장한 포토부스 목록을 토글할 커스텀 탭바 필요
             nearByPhotoBoothListSection
         }
     }
@@ -93,7 +94,7 @@ private extension NearPhotoBoothListSheet {
             if store.photoBooths.isEmpty {
                 unavailableView
             } else {
-                LazyVStack(alignment: .leading) {
+                LazyVStack(alignment: .leading, spacing: .zero) {
                     ForEach(store.visibleBooths) { photoBooth in
                         nearByPhotoBoothCell(photoBooth)
                     }
@@ -134,28 +135,43 @@ private extension NearPhotoBoothListSheet {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(photoBooth.brand.name)
-                        .nekiFont(.title18SemiBold)
-                        .foregroundStyle(.gray900)
-                    
-                    Text(photoBooth.name)
-                        .nekiFont(.caption12Medium)
-                        .foregroundStyle(.gray600)
-                }
+                Text(photoBooth.brand.name)
+                    .nekiFont(.title18SemiBold)
+                    .foregroundStyle(.gray900)
+                    .lineLimit(1)
                 
-                Text(photoBooth.nearbyDistance?.distanceString ?? "")
-                    .nekiFont(.caption12Medium)
-                    .foregroundStyle(.gray400)
+                HStack(spacing: 6) {
+                    Text(photoBooth.name)
+                        .nekiFont(.body14Medium)
+                        .foregroundStyle(.gray600)
+                        .lineLimit(1)
+                    
+                    Rectangle()
+                        .frame(width: 1, height: 10)
+                        .foregroundStyle(.gray100)
+                    
+                    Text(photoBooth.nearbyDistance?.distanceString ?? "")
+                        .nekiFont(.body14SemiBold)
+                        .foregroundStyle(.gray700)
+                }
+            }
+            
+            Spacer()
+            
+            Button {
+                
+            } label: {
+                Image(.iconHeart20Fill)
             }
         }
         .contentShape(.rect)
         .onTapGesture { store.send(.didTapBooth(photoBooth)) }
         .padding(.horizontal, 20)
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
     
     var unavailableView: some View {
+        // TODO: 저장한 포토부스 목록이 비어있을 경우에는 "저장한 포토부스가 없어요." 문구 노출
         Text("1km 이내에 가까운 네컷 사진관이 없어요!")
             .nekiFont(.body16Medium)
             .foregroundStyle(.gray500)

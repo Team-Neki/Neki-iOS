@@ -571,7 +571,7 @@ private extension NaverMapView {
         VStack {
             mapControllers
             
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 KFImage(photoBooth.brand.imageURL)
                     .resizable()
                     .placeholder {
@@ -580,22 +580,27 @@ private extension NaverMapView {
                     .onFailureImage(.imgDefaultBrandOriginal)
                     .frame(width: 64, height: 64)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                    
                 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(spacing: 4) {
-                        Text(photoBooth.brand.name)
-                            .nekiFont(.title20SemiBold)
-                            .foregroundStyle(.gray900)
-                        
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(photoBooth.brand.name)
+                        .nekiFont(.title20SemiBold)
+                        .foregroundStyle(.gray900)
+                        .lineLimit(1)
+                    
+                    HStack(spacing: 6) {
                         Text(photoBooth.name)
                             .nekiFont(.body14Medium)
                             .foregroundStyle(.gray600)
+                            .lineLimit(1)
+                        
+                        Rectangle()
+                            .frame(width: 1, height: 10)
+                            .foregroundStyle(.gray100)
+                        
+                        Text(photoBooth.nearbyDistance?.distanceString ?? "")
+                            .nekiFont(.body14SemiBold)
+                            .foregroundStyle(.gray700)
                     }
-                    
-                    Text(photoBooth.nearbyDistance?.distanceString ?? "")
-                        .nekiFont(.body14Medium)
-                        .foregroundStyle(.gray400)
                 }
                 
                 Spacer()

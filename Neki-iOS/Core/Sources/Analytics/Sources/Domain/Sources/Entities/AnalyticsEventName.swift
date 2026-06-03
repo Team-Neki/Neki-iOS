@@ -28,6 +28,7 @@ public enum AnalyticsEventName: String {
     case mapReSearch = "map_re_search"
     case mapBrandFilterToggle = "map_brand_filter_toggle"
     case boothSelect = "booth_select"
+    case boothFavorite = "booth_favorite"
     case mapRouteClick = "map_route_click"
     
     // 포즈

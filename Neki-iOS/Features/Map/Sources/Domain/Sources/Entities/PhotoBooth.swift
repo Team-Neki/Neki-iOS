@@ -16,7 +16,7 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
     public let address: String
     public let nearbyDistance: Int?
     public let detailInformationURL: URL?
-    public let isFavorite: Bool
+    public var isFavorite: Bool
     
     public init(
         id: Int,

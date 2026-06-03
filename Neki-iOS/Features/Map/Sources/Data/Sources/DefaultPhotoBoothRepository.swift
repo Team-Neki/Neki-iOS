@@ -59,9 +59,16 @@ private enum TileSystem {
 public final actor DefaultPhotoBoothRepository {
     typealias BrandID = String
     
+    private struct CachedPhotoBooth {
+        var photoBooth: PhotoBooth
+        var favoriteOrder: Int?
+    }
+    
     @Dependency(\.networkProvider) private var networkProvider
     
     private var cache: [MapTile: [PhotoBooth]] = [:]
+    private var photoBoothCacheByID: [PhotoBooth.ID: CachedPhotoBooth] = [:]
+    private var nextFavoriteOrder: Int = .zero
     private var brandMap: [BrandID: PhotoBoothBrand]?
     private var brandFetchTask: Task<[BrandID: PhotoBoothBrand], Error>?
     
@@ -121,6 +128,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 }
                 
                 if !cachedBooths.isEmpty {
+                    updateCachedPhotoBooths(cachedBooths)
                     continuation.yield(cachedBooths)
                 }
                 
@@ -150,6 +158,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                         
                         for try await (tile, booths) in group {
                             self.cache[tile] = booths
+                            self.updateCachedPhotoBooths(booths)
                             continuation.yield(booths)
                         }
                     }
@@ -180,6 +189,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             guard let brand = brands[dto.brandName] else { return nil }
             return dto.toEntity(brand: brand)
         } ?? []
+        updateCachedPhotoBooths(photoBooths)
         return photoBooths
     }
     
@@ -194,18 +204,66 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
             throw NetworkError.responseDecodingError
         }
-        
-        return dto.toEntity(brand: brand)
+
+        let photoBooth = dto.toEntity(brand: brand)
+        updateCachedPhotoBooths([photoBooth])
+        return photoBooth
     }
     
     func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+        updateCachedFavoriteState(id: id, isFavorite: isFavorite)
+    }
+
+    func readFavoritePhotoBooths() async -> [PhotoBooth] {
+        photoBoothCacheByID.values
+            .filter { $0.photoBooth.isFavorite }
+            .sorted {
+                let lhsOrder = $0.favoriteOrder ?? Int.max
+                let rhsOrder = $1.favoriteOrder ?? Int.max
+                return lhsOrder < rhsOrder
+            }
+            .map(\.photoBooth)
     }
 
     func loadBrands() async throws -> [PhotoBoothBrand] {
         let brands = try await ensureBrandsLoaded()
         return Array(brands.values).sorted { $0.id < $1.id }
+    }
+}
+
+
+// MARK: - DefaultPhotoBoothRepository + Cache Helpers
+
+private extension DefaultPhotoBoothRepository {
+    func updateCachedPhotoBooths(_ photoBooths: [PhotoBooth]) {
+        photoBooths.forEach { photoBooth in
+            var entry = photoBoothCacheByID[photoBooth.id] ?? CachedPhotoBooth(photoBooth: photoBooth, favoriteOrder: nil)
+            entry.photoBooth = photoBooth
+            entry.favoriteOrder = updatedFavoriteOrder(currentOrder: entry.favoriteOrder, isFavorite: photoBooth.isFavorite)
+            photoBoothCacheByID[photoBooth.id] = entry
+        }
+    }
+
+    func updateCachedFavoriteState(id: PhotoBooth.ID, isFavorite: Bool) {
+        if var entry = photoBoothCacheByID[id] {
+            entry.photoBooth.isFavorite = isFavorite
+            entry.favoriteOrder = updatedFavoriteOrder(currentOrder: entry.favoriteOrder, isFavorite: isFavorite)
+            photoBoothCacheByID[id] = entry
+        }
+
+        for tile in cache.keys {
+            guard let index = cache[tile]?.firstIndex(where: { $0.id == id }) else { continue }
+            cache[tile]?[index].isFavorite = isFavorite
+        }
+    }
+
+    func updatedFavoriteOrder(currentOrder: Int?, isFavorite: Bool) -> Int? {
+        guard isFavorite else { return nil }
+        if let currentOrder { return currentOrder }
+        defer { nextFavoriteOrder += 1 }
+        return nextFavoriteOrder
     }
 }

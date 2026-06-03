@@ -18,6 +18,8 @@ public struct PhotoBoothClient {
     public var fetchPhotoBoothDetail: @Sendable (_ id: Int) async throws -> PhotoBooth
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
     public var updatePhotoBoothFavorite: @Sendable (_ id: Int, _ isFavorite: Bool) async throws -> Void
+    /// 캐시 기준 즐겨찾기 포토부스 목록 조회
+    public var fetchFavoritePhotoBooths: @Sendable () async throws -> [PhotoBooth]
     /// 지원 브랜드 정보 조회
     public var loadBrands: @Sendable () async throws -> [PhotoBoothBrand]
 }
@@ -37,6 +39,8 @@ extension PhotoBoothClient: DependencyKey {
             try await photoBoothRepository.readPhotoBoothDetail(id: id)
         } updatePhotoBoothFavorite: { id, isFavorite in
             try await photoBoothRepository.updatePhotoBoothFavorite(id: id, isFavorite: isFavorite)
+        } fetchFavoritePhotoBooths: {
+            await photoBoothRepository.readFavoritePhotoBooths()
         } loadBrands: {
             try await photoBoothRepository.loadBrands()
         }

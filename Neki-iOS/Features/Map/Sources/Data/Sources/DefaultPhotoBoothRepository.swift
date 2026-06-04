@@ -231,7 +231,18 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
 
     func loadBrands() async throws -> [PhotoBoothBrand] {
         let brands = try await ensureBrandsLoaded()
-        return Array(brands.values).sorted { $0.id < $1.id }
+        return orderedBrands(Array(brands.values), by: brandOrderIDs)
+    }
+
+    func updateBrandOrder(_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand] {
+        if PhotoBoothBrandOrderServerStub.isEnabled {
+            brandOrderIDs = brands.map(\.id)
+            return try await loadBrands()
+        }
+
+        // TODO: 서버 API 스펙 확정 후 실제 브랜드 순서 저장 endpoint 호출로 교체합니다.
+        brandOrderIDs = brands.map(\.id)
+        return try await loadBrands()
     }
 }
 
@@ -266,5 +277,17 @@ private extension DefaultPhotoBoothRepository {
         if let currentOrder { return currentOrder }
         defer { nextFavoriteOrder += 1 }
         return nextFavoriteOrder
+    }
+
+    func orderedBrands(_ brands: [PhotoBoothBrand], by orderIDs: [PhotoBoothBrand.ID]) -> [PhotoBoothBrand] {
+        guard orderIDs.isEmpty == false else {
+            return brands.sorted { $0.id < $1.id }
+        }
+
+        let brandsByID = Dictionary(uniqueKeysWithValues: brands.map { ($0.id, $0) })
+        var orderedBrands = orderIDs.compactMap { brandsByID[$0] }
+        let orderedIDSet = Set(orderIDs)
+        orderedBrands.append(contentsOf: brands.filter { orderedIDSet.contains($0.id) == false }.sorted { $0.id < $1.id })
+        return orderedBrands
     }
 }

@@ -20,6 +20,8 @@ public struct PhotoBoothClient {
     public var fetchFavoritePhotoBooths: @Sendable () async throws -> [PhotoBooth]
     /// 지원 브랜드 정보 조회
     public var loadBrands: @Sendable () async throws -> [PhotoBoothBrand]
+    /// 브랜드 필터칩 노출 순서 변경
+    public var updateBrandOrder: @Sendable (_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand]
 }
 
 
@@ -39,6 +41,8 @@ extension PhotoBoothClient: DependencyKey {
             await photoBoothRepository.readFavoritePhotoBooths()
         } loadBrands: {
             try await photoBoothRepository.loadBrands()
+        } updateBrandOrder: { brands in
+            try await photoBoothRepository.updateBrandOrder(brands)
         }
     }()
 }

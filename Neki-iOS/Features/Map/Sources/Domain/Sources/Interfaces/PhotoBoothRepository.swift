@@ -32,6 +32,11 @@ protocol PhotoBoothRepository {
     /// 브랜드들의 정보를 가져옵니다.
     /// - Returns: 우선순위로 정렬된 브랜드 배열
     func loadBrands() async throws -> [PhotoBoothBrand]
+
+    /// 브랜드 필터칩 노출 순서를 변경합니다.
+    /// - Parameter brands: 사용자가 저장한 브랜드 순서
+    /// - Returns: 저장된 순서가 반영된 브랜드 배열
+    func updateBrandOrder(_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand]
 }
 
 private enum PhotoBoothRepositoryKey: DependencyKey {

@@ -42,6 +42,7 @@ public struct PhotoBoothListFeature {
     public enum Action: BindableAction {
         public enum Delegate {
             case didTapFavorite(PhotoBooth)
+            case didTapBrandReorderButton
         }
 
         // View Actions
@@ -49,6 +50,7 @@ public struct PhotoBoothListFeature {
         case selectTab(ListTab)
         case toggleTooltip
         case didTapFavorite(PhotoBooth)
+        case didTapBrandReorderButton
 
         // Internal Actions
         case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
@@ -89,6 +91,9 @@ public struct PhotoBoothListFeature {
                 
             case let .didTapFavorite(photoBooth):
                 return .send(.delegate(.didTapFavorite(photoBooth)))
+
+            case .didTapBrandReorderButton:
+                return .send(.delegate(.didTapBrandReorderButton))
 
             case let .setNearbyBooths(booths):
                 state.photoBooths = booths

@@ -38,6 +38,19 @@ struct MapCoordinator {
             switch action {
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
+
+            case let .root(.delegate(.routeToBrandReorder(brands))):
+                state.path.append(.brandReorder(PhotoBoothBrandReorderFeature.State(brands: brands)))
+                return .none
+
+            case let .path(.element(_, action: .brandReorder(.delegate(.saveCompleted(brands))))):
+                state.root.photoBoothListState.brands = brands
+                state.path.removeLast()
+                return .send(.root(.startBackgroundCalculation))
+
+            case .path(.element(_, action: .brandReorder(.delegate(.dismiss)))):
+                state.path.removeLast()
+                return .none
                 
             default:
                 return .none
@@ -50,5 +63,6 @@ struct MapCoordinator {
 extension MapCoordinator {
     @Reducer
     enum Path {
+        case brandReorder(PhotoBoothBrandReorderFeature)
     }
 }

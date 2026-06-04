@@ -131,6 +131,7 @@ public struct MapFeature {
         case delegate(Delegate)
         public enum Delegate {
             case showToast(NekiToastItem)
+            case routeToBrandReorder(IdentifiedArrayOf<PhotoBoothBrand>)
         }
     }
     
@@ -330,7 +331,7 @@ public struct MapFeature {
                 // TODO: 토스트
                 Logger.presentation.error("브랜드 정보 로드 실패: \(error)")
                 return .none
-                
+
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
                 state.photoBooths.removeAll()
@@ -534,6 +535,9 @@ public struct MapFeature {
 
             case let .photoBoothListAction(.delegate(.didTapFavorite(photoBooth))):
                 return .send(.didTapFavorite(photoBooth))
+
+            case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
+                return .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands)))
 
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 state.isUserTrackingMode = false

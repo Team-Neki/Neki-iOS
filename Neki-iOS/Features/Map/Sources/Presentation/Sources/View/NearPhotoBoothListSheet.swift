@@ -51,11 +51,23 @@ private extension NearPhotoBoothListSheet {
             .contentMargins(.horizontal, 20, for: .scrollContent)
             .scrollDisabled(false)
         } header: {
-            Text("네컷 사진 브랜드")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 20)
+            HStack(spacing: .zero) {
+                Text("네컷 사진 브랜드")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 20)
+                    .padding(.top, 4)
+                    .nekiFont(.title18Bold)
+                
+                Button {
+                    store.send(.didTapBrandReorderButton)
+                } label: {
+                    Text("편집")
+                        .nekiFont(.caption12Medium)
+                        .foregroundStyle(.gray300)
+                }
                 .padding(.top, 4)
-                .nekiFont(.title18Bold)
+                .padding(.trailing, 20)
+            }
         }
     }
     
@@ -243,13 +255,13 @@ private extension NearPhotoBoothListSheet {
     }
 
     func unavailableView(_ message: String) -> some View {
-        VStack(alignment: .center) {
+        VStack(alignment: .center, spacing: 12) {
             Image(.iconPlace)
             
             Text(message)
                 .nekiFont(.body16Medium)
                 .foregroundStyle(.gray500)
-                .frame(maxWidth: .infinity, minHeight: 375, alignment: .center)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }

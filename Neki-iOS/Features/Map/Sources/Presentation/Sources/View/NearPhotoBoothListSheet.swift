@@ -262,6 +262,6 @@ private extension NearPhotoBoothListSheet {
                 .nekiFont(.body16Medium)
                 .foregroundStyle(.gray500)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, minHeight: 375, alignment: .center)
     }
 }

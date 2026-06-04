@@ -11,6 +11,18 @@ import Dependencies
 import DependenciesMacros
 import os
 
+private enum PhotoBoothBrandOrderServerStub {
+    // 서버 브랜드 순서 저장 API 준비 전 실기기 검증용입니다.
+    // 서버 API 연동 시 이 플래그와 updateBrandOrder의 stub 분기를 제거합니다.
+    static let isEnabled = true
+}
+
+private enum PhotoBoothFavoriteServerStub {
+    // 서버 포토부스 즐겨찾기 API 준비 전 실기기 검증용입니다.
+    // 서버 API 연동 시 이 플래그와 updatePhotoBoothFavorite의 stub 분기를 제거합니다.
+    static let isEnabled = true
+}
+
 private enum TileSystem {
     static let defaultZoomLevel: Int = 15
     
@@ -70,6 +82,7 @@ public final actor DefaultPhotoBoothRepository {
     private var photoBoothCacheByID: [PhotoBooth.ID: CachedPhotoBooth] = [:]
     private var nextFavoriteOrder: Int = .zero
     private var brandMap: [BrandID: PhotoBoothBrand]?
+    private var brandOrderIDs: [PhotoBoothBrand.ID] = []
     private var brandFetchTask: Task<[BrandID: PhotoBoothBrand], Error>?
     
     public init() {}
@@ -194,6 +207,11 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
     }
     
     func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
+        if PhotoBoothFavoriteServerStub.isEnabled {
+            updateCachedFavoriteState(id: id, isFavorite: isFavorite)
+            return
+        }
+
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)

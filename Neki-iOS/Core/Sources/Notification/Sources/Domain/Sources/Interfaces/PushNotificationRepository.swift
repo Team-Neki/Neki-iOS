@@ -1,0 +1,20 @@
+//
+//  PushNotificationRepository.swift
+//  Neki-iOS
+//
+//  Created by SwainYun on 6/13/26.
+//
+
+import Foundation
+import UserNotifications
+
+protocol PushNotificationRepository {
+    func checkAuthorizationStatus() async -> UNAuthorizationStatus
+    func requestAuthorization() async throws -> Bool
+    func fetchFCMToken() async throws -> PushNotificationToken
+    func updateAPNSToken(_ token: Data)
+    func updateDeviceToken(
+        _ token: PushNotificationToken,
+        isPushNotificationAgreed: Bool
+    ) async throws
+}

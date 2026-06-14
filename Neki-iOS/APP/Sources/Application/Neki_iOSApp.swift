@@ -11,6 +11,8 @@ import Firebase
 
 @main
 struct Neki_iOSApp: App {
+    @UIApplicationDelegateAdaptor(NekiApplicationDelegate.self) private var applicationDelegate
+
     let store = Store(initialState: AppCoordinator.State()) {
         AppCoordinator()
     }

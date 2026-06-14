@@ -26,6 +26,7 @@ struct NekiAlertModifier: ViewModifier {
     // 액션 클로저
     let onConfirm: (() -> Void)?
     let onCancel: (() -> Void)?
+    let onDismiss: (() -> Void)?
     let onSecondary: (() -> Void)?
     
     func body(content: Content) -> some View {
@@ -39,7 +40,10 @@ struct NekiAlertModifier: ViewModifier {
                     .zIndex(1)
                     .transition(.opacity)
                     .onTapGesture {
-                        if let onCancel = onCancel {
+                        guard isProcessing == false else { return }
+                        if let onDismiss {
+                            onDismiss()
+                        } else if let onCancel {
                             onCancel()
                         } else {
                             isPresented.toggle()
@@ -187,6 +191,7 @@ public extension View {
         hasIcon: Bool = true,
         onConfirm: (() -> Void)? = nil,
         onCancel: (() -> Void)? = nil,
+        onDismiss: (() -> Void)? = nil,
         onSecondary: (() -> Void)? = nil
     ) -> some View {
         self.modifier(NekiAlertModifier(
@@ -202,6 +207,7 @@ public extension View {
             hasIcon: hasIcon,
             onConfirm: onConfirm,
             onCancel: onCancel,
+            onDismiss: onDismiss,
             onSecondary: onSecondary
         ))
     }

@@ -34,8 +34,9 @@ struct MyPageView: View {
         .nekiToolbar(
             left: { NekiToolBar.textLeft("마이페이지") },
             right: {
-                // TODO: 알림 기능 보류
-                // NekiToolBar.icon(.iconBellFill)
+                NekiToolBar.icon(.iconBellFill) {
+                    store.send(.notificationButtonTapped)
+                }
             }
         )
         .task { await store.send(.onAppear).finish() }

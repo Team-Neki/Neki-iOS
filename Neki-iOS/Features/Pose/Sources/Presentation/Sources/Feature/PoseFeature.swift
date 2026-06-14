@@ -62,6 +62,7 @@ struct PoseFeature {
         case onTapBookmark(Pose)
         case onRefresh
         case qrScanButtonTapped
+        case notificationButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
@@ -74,6 +75,7 @@ struct PoseFeature {
             case didTapImage(Pose)
             case didTapStartRandomPose(PeopleCountOption)
             case qrScanButtonTapped
+            case requestNotificationList
         }
         
         // Binding Action
@@ -159,6 +161,9 @@ struct PoseFeature {
                 
             case .qrScanButtonTapped:
                 return .send(.delegate(.qrScanButtonTapped))
+
+            case .notificationButtonTapped:
+                return .send(.delegate(.requestNotificationList))
                 
             case let .onTapBookmark(pose):
                 var updatedPose = pose

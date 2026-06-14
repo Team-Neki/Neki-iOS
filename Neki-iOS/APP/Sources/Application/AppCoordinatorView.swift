@@ -9,9 +9,28 @@ import SwiftUI
 import ComposableArchitecture
 
 struct AppCoordinatorView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     @Bindable var store: StoreOf<AppCoordinator>
     
     var body: some View {
+        routeContent
+            .task { await store.send(.onAppLaunched).finish() }
+            .onChange(of: store.userSessionStatus) { _, newValue in
+                store.send(.userSessionStatusChanged(newValue))
+            }
+            .onChange(of: scenePhase) { _, newValue in
+                store.send(.scenePhaseChanged(newValue))
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .didRegisterAPNSToken)) { _ in
+                store.send(.didRegisterAPNSToken)
+            }
+            .nekiToast(item: $store.toastItem)
+            .modifier(VersionUpdateAlertModifier(store: store))
+    }
+
+    @ViewBuilder
+    private var routeContent: some View {
         Group {
             switch store.route {
             case .splash:
@@ -33,18 +52,26 @@ struct AppCoordinatorView: View {
                 }
             }
         }
-        .task { await store.send(.onAppLaunched).finish() }
-        .onChange(of: store.userSessionStatus) { _, newValue in
-            store.send(.userSessionStatusChanged(newValue))
-        }
-        .nekiToast(item: $store.toastItem)
-        .nekiAlert(
+    }
+}
+
+
+// MARK: - VersionUpdateAlertModifier
+
+private struct VersionUpdateAlertModifier: ViewModifier {
+    @Bindable var store: StoreOf<AppCoordinator>
+
+    func body(content: Content) -> some View {
+        let alert: AppCoordinator.VersionUpdateAlertType? = store.versionAlert
+
+        content.nekiAlert(
             isPresented: $store.isAlertPresented,
-            style: store.versionAlert?.style ?? .cancelable,
-            title: store.versionAlert?.title ?? "",
-            subtitle: store.versionAlert?.subtitle ?? "",
-            confirmText: store.versionAlert?.confirmText ?? "",
-            cancelText: store.versionAlert?.cancelText,
+            style: alert?.style ?? NekiAlertStyle.cancelable,
+            contentStyle: .standard,
+            title: alert?.title ?? "",
+            subtitle: alert?.subtitle ?? "",
+            confirmText: alert?.confirmText ?? "",
+            cancelText: alert?.cancelText ?? nil,
             hasIcon: true,
             onConfirm: { store.send(.didTapUpdateAlert) },
             onCancel: { store.send(.didTapLaterAlert) }

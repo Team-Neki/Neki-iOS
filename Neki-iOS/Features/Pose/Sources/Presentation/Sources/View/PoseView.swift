@@ -47,12 +47,11 @@ struct PoseView: View {
                     Image(.iconQrCode)
                 }
                 
-                // 알림
-//                Button {
-//                    
-//                } label: {
-//                    Image(.iconBellFill)
-//                }
+                Button {
+                    store.send(.notificationButtonTapped)
+                } label: {
+                    Image(.iconBellFill)
+                }
             } }
         )
         .sheet(item: $store.sheetItem) { item in

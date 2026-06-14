@@ -53,6 +53,7 @@ struct ArchiveFeature {
         case onTapConfirmAddAlbum
         case addFolderResponse(Result<Int, Error>)
         case onTapQRScan
+        case notificationButtonTapped
         case fetchAlbums
         case fetchPhotos
         case albumsResponse(Result<[AlbumItem], Error>)
@@ -79,6 +80,7 @@ struct ArchiveFeature {
         enum DelegateAction {
             case showToast(NekiToastItem)
             case requestQRScan
+            case requestNotificationList
         }
     }
     
@@ -147,6 +149,9 @@ struct ArchiveFeature {
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 만들지 못했어요", style: .error))))
                 
             case .onTapQRScan: return .send(.delegate(.requestQRScan))
+
+            case .notificationButtonTapped:
+                return .send(.delegate(.requestNotificationList))
                 
             case .fetchAlbums:
                 return .merge(

@@ -13,30 +13,30 @@ struct DeviceAuthorizationPreferenceView: View {
     
     var body: some View {
         VStack {
-            Section {
-                VStack(spacing: 24) {
-                    cell(for: .camera, isAuthorized: store.isCameraAuthorized) {
-                        store.send(.cameraCellTapped)
+            VStack(spacing: 32) {
+                settingsSection(title: "권한 설정") {
+                    VStack(spacing: 24) {
+                        cell(for: .camera, isAuthorized: store.isCameraAuthorized) {
+                            store.send(.cameraCellTapped)
+                        }
+                        
+                        cell(for: .location, isAuthorized: store.isLocationAuthorized) {
+                            store.send(.locationCellTapped)
+                        }
+                        
+                        cell(for: .photos, isAuthorized: store.isPhotosAuthorized) {
+                            store.send(.photosCellTapped)
+                        }
+                        
+                        cell(for: .notifications, isAuthorized: store.isNotificationAuthorized) {
+                            store.send(.notificationsCellTapped)
+                        }
                     }
-                    
-                    cell(for: .location, isAuthorized: store.isLocationAuthorized) {
-                        store.send(.locationCellTapped)
-                    }
-                    
-                    cell(for: .photos, isAuthorized: store.isPhotosAuthorized) {
-                        store.send(.photosCellTapped)
-                    }
-                    
-                    // TODO: 알림 기능부터 구현 필요
-//                    cell(for: .notifications, isAuthorized: true) {
-//                        <#code#>
-//                    }
                 }
-            } header: {
-                Text("권한 설정")
-                    .nekiFont(.body14Medium)
-                    .foregroundStyle(.gray400)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                settingsSection(title: "알람 설정") {
+                    marketingNotificationToggle
+                }
             }
             .padding(.horizontal)
             .padding(.top)
@@ -46,19 +46,8 @@ struct DeviceAuthorizationPreferenceView: View {
         .nekiToolbar {
             NekiToolBar.back { store.send(.dismissButtonTapped) }
         } center: {
-            NekiToolBar.textCenter("기기 권한")
+            NekiToolBar.textCenter("기기 권한 및 알림")
         }
-        .nekiAlert(
-            isPresented: $store.isAlertPresented,
-            style: .cancelable,
-            title: store.alertItem?.title ?? "권한 안내",
-            subtitle: store.alertItem?.description ?? "원활한 서비스 제공을 위해 권한을 허용해주세요.",
-            confirmText: "허용",
-            cancelText: "취소",
-            hasIcon: true,
-            onConfirm: { store.send(.openAppSettings) },
-            onCancel: { store.send(.alertDismissed) }
-        )
         .onAppear { store.send(.onAppear) }
     }
 }
@@ -67,6 +56,35 @@ struct DeviceAuthorizationPreferenceView: View {
 // MARK: - DeviceAuthorizationPreferenceView + Subviews
 
 private extension DeviceAuthorizationPreferenceView {
+    func settingsSection<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(title)
+                .nekiFont(.body14Medium)
+                .foregroundStyle(.gray400)
+
+            content()
+        }
+    }
+
+    var marketingNotificationToggle: some View {
+        Toggle(isOn: $store.isMarketingNotificationEnabled) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(AuthorizationType.marketingNotifications.cellTitle)
+                    .nekiFont(.title18Medium)
+                    .foregroundStyle(.gray900)
+
+                Text(AuthorizationType.marketingNotifications.cellSubtitle)
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray400)
+            }
+        }
+        .toggleStyle(.nekiSwitch)
+        .disabled(store.isUpdatingMarketingNotification)
+    }
+
     func cell(for type: AuthorizationType, isAuthorized: Bool, _ onTap: @escaping () -> Void) -> some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -100,7 +118,7 @@ private extension DeviceAuthorizationPreferenceView {
 
 private extension DeviceAuthorizationPreferenceView {
     enum AuthorizationType {
-        case camera, location, photos, notifications
+        case camera, location, photos, notifications, marketingNotifications
         
         var cellTitle: String {
             switch self {
@@ -108,6 +126,7 @@ private extension DeviceAuthorizationPreferenceView {
             case .location: return "위치"
             case .photos: return "저장소"
             case .notifications: return "알림"
+            case .marketingNotifications: return "혜택·소식 알림"
             }
         }
         
@@ -117,6 +136,7 @@ private extension DeviceAuthorizationPreferenceView {
             case .location: return "주변 포토부스 탐색에 필요해요."
             case .photos: return "사진 저장 및 업로드에 필요해요."
             case .notifications: return "저장 사진 및 추억 리마인드에 필요해요."
+            case .marketingNotifications: return "이벤트, 혜택, 신규 기능 소식 등을 알려드려요."
             }
         }
     }

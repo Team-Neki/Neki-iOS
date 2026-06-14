@@ -51,6 +51,7 @@ struct MainTabCoordinatorView: View {
             store.send(.tabChanged(newTab))
         }
         .nekiToast(item: $store.toast)
+        .modifier(MarketingConsentAlertModifier(store: store))
         .nekiAlert(
             isPresented: $store.isPermissionAlertPresented,
             style: .cancelable,
@@ -69,12 +70,48 @@ struct MainTabCoordinatorView: View {
         .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in
             QRCodeScannerView(store: qrStore)
         }
+        .fullScreenCover(item: $store.scope(state: \.destination?.notificationList, action: \.destination.notificationList)) { notificationStore in
+            PushNotificationListView(store: notificationStore)
+        }
         .photosPicker(
             isPresented: $store.isPhotoPickerPresented.sending(\.setPhotosPickerPresented),
             selection: $store.imagePicker.pickerItems.sending(\.imagePicker.pickerItemsChanged),
             maxSelectionCount: store.imagePicker.remainingCount,
             matching: .images
         )
+    }
+}
+
+
+// MARK: - MarketingConsentAlertModifier
+
+private struct MarketingConsentAlertModifier: ViewModifier {
+    @Bindable var store: StoreOf<MainTabCoordinator>
+
+    func body(content: Content) -> some View {
+        content.nekiAlert(
+            isPresented: $store.isMarketingConsentAlertPresented,
+            style: .cancelable,
+            contentStyle: .marketingConsent(description: description),
+            title: "놓치지 마세요!",
+            subtitle: "네키의 이벤트, 혜택 프로모션,\n신규 업데이트 소식을 선별해서 알려드려요.",
+            confirmText: "네, 알려주세요",
+            cancelText: "괜찮아요",
+            isProcessing: store.isUpdatingMarketingConsent,
+            hasIcon: true,
+            onConfirm: { store.send(.updateMarketingConsent(true)) },
+            onCancel: { store.send(.updateMarketingConsent(false)) },
+            onDismiss: { store.send(.dismissMarketingConsentAlert) }
+        )
+    }
+
+    private var description: Text {
+        Text("마케팅 정보 푸시 수신 동의 여부는 ")
+            .foregroundColor(.gray400)
+        + Text("마이페이지 >\n권한 설정 > 알림 설정")
+            .foregroundColor(.primary500)
+        + Text("에서 변경 가능해요.")
+            .foregroundColor(.gray400)
     }
 }
 

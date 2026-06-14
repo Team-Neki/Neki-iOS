@@ -29,10 +29,10 @@ public struct TermsAgreementFeature {
         
         // Internal Actions
         case fetchTermsResponse(Result<[Term], Error>)
-        case agreeTermsResponse(Result<Void, Error>)
+        case agreeTermsResponse(Result<User, Error>)
         
         // Delegate Actions
-        case didFinishOnboarding
+        case didFinishOnboarding(User)
         
         // Binding Action
         case binding(BindingAction<State>)
@@ -67,7 +67,10 @@ public struct TermsAgreementFeature {
                 let agreementsToSend = Array(state.agreements)
                 
                 return .run { send in
-                    await send(.agreeTermsResponse(Result { try await authClient.agreeWithTerms(agreementsToSend) }))
+                    await send(.agreeTermsResponse(Result {
+                        try await authClient.agreeWithTerms(agreementsToSend)
+                        return try await authClient.fetchUser()
+                    }))
                 }
                 
             case let .fetchTermsResponse(.success(terms)):
@@ -81,9 +84,9 @@ public struct TermsAgreementFeature {
                 Logger.presentation.error("Error occured while fetching terms: \(error)")
                 return .none
                 
-            case .agreeTermsResponse(.success):
+            case let .agreeTermsResponse(.success(user)):
                 state.isLoading = false
-                return .send(.didFinishOnboarding)
+                return .send(.didFinishOnboarding(user))
                 
             case let .agreeTermsResponse(.failure(error)):
                 state.isLoading = false

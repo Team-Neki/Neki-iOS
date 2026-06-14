@@ -10,6 +10,10 @@ import Dependencies
 import os
 
 public struct DefaultAuthRepository: AuthRepository {
+    private enum Constants {
+        static let marketingTermType = "MARKETING"
+    }
+
     @Dependency(\.networkProvider) private var networkProvider
     @Dependency(\.tokenStorage) private var tokenStorage
     
@@ -42,7 +46,16 @@ public struct DefaultAuthRepository: AuthRepository {
             else { throw AuthRepositoryError.networkError(.responseDecodingError) }
             
             let profileImageURL = URL(string: data.profileImageURLString ?? "")
-            return User(id: data.id, nickname: data.nickname, email: data.email, profileImageURL: profileImageURL, providerType: providerType, allRequiredTermsAgreed: data.agreedTerms)
+            return User(
+                id: data.id,
+                nickname: data.nickname,
+                email: data.email,
+                profileImageURL: profileImageURL,
+                providerType: providerType,
+                allRequiredTermsAgreed: data.agreedTerms,
+                marketingTermAgreed: data.marketingTerm,
+                pushNotificationAgreed: data.pushNotificationAgreed
+            )
         } catch let error as NetworkError {
             throw .networkError(error)
         } catch {
@@ -103,21 +116,51 @@ public struct DefaultAuthRepository: AuthRepository {
     }
     
     public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {
+        try await fetchTermDTOs().map { $0.toEntity() }
+    }
+    
+    public func agreeWithTerms(agreements: [UserAgreement]) async throws(AuthRepositoryError) {
+        let agreements = agreements.map { AgreementsDTO(termID: $0.id, agreed: $0.isAgreed) }
+        try await requestTermsAgreement(agreements)
+    }
+
+    public func updateMarketingConsent(isAgreed: Bool) async throws(AuthRepositoryError) {
+        let terms = try await fetchTermDTOs()
+        guard let marketingTerm = terms.first(where: {
+            $0.termType?.caseInsensitiveCompare(Constants.marketingTermType) == .orderedSame
+        }) else {
+            throw .unknown
+        }
+
+        try await requestTermsAgreement([
+            AgreementsDTO(termID: marketingTerm.id, agreed: isAgreed)
+        ])
+    }
+}
+
+
+// MARK: - DefaultAuthRepository + Helpers
+
+private extension DefaultAuthRepository {
+    func fetchTermDTOs() async throws(AuthRepositoryError) -> [TermDTO] {
         let endpoint = AuthEndpoint.fetchTerms
-        
+
         do {
             let responseDTO: BaseResponseDTO<FetchTermsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let data = responseDTO.data else { throw AuthRepositoryError.networkError(.responseDecodingError) }
-            return data.terms.map { $0.toEntity() }
+            guard let data = responseDTO.data else {
+                throw AuthRepositoryError.networkError(.responseDecodingError)
+            }
+            return data.terms
+        } catch let error as AuthRepositoryError {
+            throw error
         } catch let error as NetworkError {
             throw .networkError(error)
         } catch {
             throw .unknown
         }
     }
-    
-    public func agreeWithTerms(agreements: [UserAgreement]) async throws(AuthRepositoryError) {
-        let agreements = agreements.map { AgreementsDTO(termID: $0.id, agreed: $0.isAgreed) }
+
+    func requestTermsAgreement(_ agreements: [AgreementsDTO]) async throws(AuthRepositoryError) {
         let dto = AgreeTermsDTO.Request(agreements: agreements)
         let endpoint = AuthEndpoint.agreeWithTerms(dto: dto)
         
@@ -129,12 +172,7 @@ public struct DefaultAuthRepository: AuthRepository {
             throw .unknown
         }
     }
-}
 
-
-// MARK: - DefaultAuthRepository + Helpers
-
-private extension DefaultAuthRepository {
     func requestUpdateProfileImage(id: ProfileImageEditAction.ImageID?) async throws(AuthRepositoryError) {
         let requestDTO = EditProfileImageDTO.Request(imageID: id)
         let endpoint = AuthEndpoint.editProfileImage(dto: requestDTO)

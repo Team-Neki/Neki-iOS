@@ -11,6 +11,7 @@ struct NekiAlertModifier: ViewModifier {
     @Binding var isPresented: Bool
     
     let style: NekiAlertStyle
+    let contentStyle: NekiAlertContentStyle
     let title: String
     let subtitle: String
     
@@ -46,17 +47,7 @@ struct NekiAlertModifier: ViewModifier {
                     }
                 
                 NekiAlertModal(hasIcon: hasIcon) {
-                    VStack(spacing: 4) {
-                        Text(title)
-                            .nekiFont(.title18Bold)
-                            .foregroundStyle(.gray900)
-                            .multilineTextAlignment(.center)
-                        
-                        Text(subtitle)
-                            .nekiFont(.body14Regular)
-                            .foregroundStyle(.gray500)
-                            .multilineTextAlignment(.center)
-                    }
+                    alertContent
                 } actions: {
                     buttonStack
                 }
@@ -66,6 +57,58 @@ struct NekiAlertModifier: ViewModifier {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: isPresented)
+    }
+
+    @ViewBuilder
+    private var alertContent: some View {
+        switch contentStyle {
+        case .standard:
+            VStack(spacing: 4) {
+                titleText
+                    .nekiFont(.title18Bold)
+
+                subtitleText
+            }
+
+        case let .marketingConsent(description):
+            VStack(spacing: 2) {
+                titleText
+                    .nekiFont(.title24SemiBold)
+
+                subtitleText
+                    .padding(.top, 4)
+
+                description
+                    .nekiFont(.caption12Regular)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity)
+                    .padding(16)
+                    .background {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(.gray50)
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .strokeBorder(.gray100, lineWidth: 1)
+                    }
+                    .padding(.top, 20)
+            }
+        }
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .foregroundStyle(.gray900)
+            .multilineTextAlignment(.center)
+    }
+
+    private var subtitleText: some View {
+        Text(subtitle)
+            .nekiFont(.body14Regular)
+            .foregroundStyle(.gray500)
+            .multilineTextAlignment(.center)
     }
     
     // MARK: - Button Logic
@@ -134,6 +177,7 @@ public extension View {
     func nekiAlert(
         isPresented: Binding<Bool>,
         style: NekiAlertStyle = .plain,
+        contentStyle: NekiAlertContentStyle = .standard,
         title: String,
         subtitle: String,
         confirmText: String = "확인",
@@ -148,6 +192,7 @@ public extension View {
         self.modifier(NekiAlertModifier(
             isPresented: isPresented,
             style: style,
+            contentStyle: contentStyle,
             title: title,
             subtitle: subtitle,
             confirmText: confirmText,

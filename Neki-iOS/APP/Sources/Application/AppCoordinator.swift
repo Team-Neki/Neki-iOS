@@ -67,6 +67,8 @@ struct AppCoordinator {
         case didRegisterAPNSToken
         case checkPushNotificationAuthorization
         case checkPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
+        case requestPushNotificationAuthorization
+        case requestPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case synchronizePushNotification
         case synchronizePushNotificationResponse(Result<UNAuthorizationStatus, Error>)
         
@@ -184,8 +186,7 @@ struct AppCoordinator {
                 
                 return .merge(
                     configureEffect,
-                    navigateToNextScreen(state: &state, sessionStatus: finalStatus),
-                    synchronizePushNotificationIfNeeded(for: finalStatus)
+                    navigateToNextScreen(state: &state, sessionStatus: finalStatus)
                 )
                 
             case .executePendingShareExtensionIfNeeded:
@@ -211,10 +212,7 @@ struct AppCoordinator {
                 state.versionAlert = nil
                 guard let pendingSessionStatus = state.pendingSessionStatus else { return .none }
                 state.pendingSessionStatus = nil
-                return .merge(
-                    navigateToNextScreen(state: &state, sessionStatus: pendingSessionStatus),
-                    synchronizePushNotificationIfNeeded(for: pendingSessionStatus)
-                )
+                return navigateToNextScreen(state: &state, sessionStatus: pendingSessionStatus)
                 
             case let .userSessionStatusChanged(newStatus):
                 if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
@@ -226,11 +224,13 @@ struct AppCoordinator {
                 
                 let navigationEffect: Effect<Action>
                 switch newStatus {
-                case .signedIn:
+                case let .signedIn(user):
                     if case .mainTab = state.route {
                         navigationEffect = .none
                     } else {
-                        state.route = .mainTab(.init())
+                        state.route = .mainTab(.init(
+                            shouldPresentMarketingConsentAlert: isMarketingConsentAlertEligible(for: user)
+                        ))
                         navigationEffect = .none
                     }
                     
@@ -246,7 +246,7 @@ struct AppCoordinator {
                 return .merge(
                     configureEffect,
                     navigationEffect,
-                    synchronizePushNotificationIfNeeded(for: newStatus)
+                    .send(.checkPushNotificationAuthorization)
                 )
                 
             case .route(.onboarding(.delegate(.didFinishOnboarding))):
@@ -261,27 +261,65 @@ struct AppCoordinator {
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 state.route = .mainTab(.init(
                     shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                        || isMarketingConsentAlertEligible(for: user)
                 ))
                 let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
                 return .merge(
                     configureEffect,
-                    .send(.synchronizePushNotification),
+                    .send(.checkPushNotificationAuthorization),
                     .send(.executePendingShareExtensionIfNeeded)
                 )
 
-            case .checkPushNotificationAuthorization:
+            case .route(.mainTab(.delegate(.pushNotificationAuthorizationResolved))):
                 guard case .signedIn = state.userSessionStatus else { return .none }
+                state.hasSynchronizedPushNotification = false
+                guard state.isSynchronizingPushNotification == false else {
+                    state.shouldRetryPushNotificationSynchronization = true
+                    return .none
+                }
+                return .send(.synchronizePushNotification)
+
+            case .checkPushNotificationAuthorization:
+                guard case .signedIn = state.userSessionStatus,
+                      case .mainTab = state.route
+                else { return .none }
                 return .run { send in
                     await send(.checkPushNotificationAuthorizationResponse( Result { try await pushNotificationClient.checkAuthorizationStatus() } ))
                 }
 
             case let .checkPushNotificationAuthorizationResponse(.success(status)):
+                if status == .notDetermined {
+                    guard case let .signedIn(user) = state.userSessionStatus,
+                          user.marketingTermAgreed
+                    else { return .none }
+                    return .send(.requestPushNotificationAuthorization)
+                }
+
                 let currentAgreement = status.isPushNotificationAgreed
                 guard state.lastSynchronizedPushAgreement != currentAgreement else { return .none }
                 state.hasSynchronizedPushNotification = false
                 return .send(.synchronizePushNotification)
 
             case .checkPushNotificationAuthorizationResponse(.failure):
+                return .none
+
+            case .requestPushNotificationAuthorization:
+                return .run { send in
+                    await send(.requestPushNotificationAuthorizationResponse(Result {
+                        _ = try await pushNotificationClient.requestAuthorization()
+                        return try await pushNotificationClient.checkAuthorizationStatus()
+                    }))
+                }
+
+            case .requestPushNotificationAuthorizationResponse(.success):
+                state.hasSynchronizedPushNotification = false
+                guard state.isSynchronizingPushNotification == false else {
+                    state.shouldRetryPushNotificationSynchronization = true
+                    return .none
+                }
+                return .send(.synchronizePushNotification)
+
+            case .requestPushNotificationAuthorizationResponse(.failure):
                 return .none
 
             case .synchronizePushNotification:
@@ -350,9 +388,14 @@ private extension UNAuthorizationStatus {
 private extension AppCoordinator {
     func navigateToNextScreen(state: inout State, sessionStatus: UserSessionStatus) -> Effect<Action> {
         switch sessionStatus {
-        case .signedIn:
-            state.route = .mainTab(.init())
-            return .send(.executePendingShareExtensionIfNeeded)
+        case let .signedIn(user):
+            state.route = .mainTab(.init(
+                shouldPresentMarketingConsentAlert: isMarketingConsentAlertEligible(for: user)
+            ))
+            return .merge(
+                .send(.checkPushNotificationAuthorization),
+                .send(.executePendingShareExtensionIfNeeded)
+            )
             
         case .signedOut, .expired:
             if state.hasSeenOnboarding {
@@ -370,12 +413,12 @@ private extension AppCoordinator {
         return user.id
     }
 
-    func synchronizePushNotificationIfNeeded(
-        for status: UserSessionStatus
-    ) -> Effect<Action> {
-        guard case .signedIn = status else { return .none }
-        return .send(.synchronizePushNotification)
+    func isMarketingConsentAlertEligible(for user: User) -> Bool {
+        guard user.marketingTermAgreed == false else { return false }
+        let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+        return UserDefaults.standard.integer(forKey: key) < 2
     }
+
 }
 
 extension AppCoordinator {

@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import AVFoundation
+import UserNotifications
 // import Pose
 // import Archive
 
@@ -83,6 +84,8 @@ struct MainTabCoordinator {
         case dismissMarketingConsentAlert
         case updateMarketingConsent(Bool)
         case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
+        case requestPushNotificationAuthorizationIfNeeded
+        case pushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         
         case onAppear
         case tabChanged(NekiTab)
@@ -91,6 +94,7 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
+            case pushNotificationAuthorizationResolved
         }
     }
     
@@ -98,6 +102,7 @@ struct MainTabCoordinator {
     @Dependency(\.openURL) private var openURL
     @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.authClient) private var authClient
+    @Dependency(\.pushNotificationClient) private var pushNotificationClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -117,6 +122,11 @@ struct MainTabCoordinator {
                    state.shouldPresentMarketingConsentAlert {
                     state.shouldPresentMarketingConsentAlert = false
                     state.isMarketingConsentAlertPresented = true
+                    let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: state.user.id)
+                    UserDefaults.standard.set(
+                        UserDefaults.standard.integer(forKey: key) + 1,
+                        forKey: key
+                    )
                 }
                 return .send(.tabChanged(state.selectedTab))
                 
@@ -207,10 +217,26 @@ struct MainTabCoordinator {
                 state.isUpdatingMarketingConsent = false
                 state.isMarketingConsentAlertPresented = false
                 state.user.marketingTermAgreed = isAgreed
-                return .none
+                return .send(.requestPushNotificationAuthorizationIfNeeded)
 
             case .marketingConsentUpdateResponse(_, .failure):
                 state.isUpdatingMarketingConsent = false
+                return .none
+
+            case .requestPushNotificationAuthorizationIfNeeded:
+                return .run { send in
+                    await send(.pushNotificationAuthorizationResponse(Result {
+                        let status = try await pushNotificationClient.checkAuthorizationStatus()
+                        guard status == .notDetermined else { return status }
+                        _ = try await pushNotificationClient.requestAuthorization()
+                        return try await pushNotificationClient.checkAuthorizationStatus()
+                    }))
+                }
+
+            case .pushNotificationAuthorizationResponse(.success):
+                return .send(.delegate(.pushNotificationAuthorizationResolved))
+
+            case .pushNotificationAuthorizationResponse(.failure):
                 return .none
                 
             case .archive(.delegate(.requestQRScan)), .pose(.delegate(.requestQRScan)):

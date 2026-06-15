@@ -22,9 +22,6 @@ struct AppCoordinatorView: View {
             .onChange(of: scenePhase) { _, newValue in
                 store.send(.scenePhaseChanged(newValue))
             }
-            .onReceive(NotificationCenter.default.publisher(for: .didRegisterAPNSToken)) { _ in
-                store.send(.didRegisterAPNSToken)
-            }
             .nekiToast(item: $store.toastItem)
             .modifier(VersionUpdateAlertModifier(store: store))
     }

@@ -6,8 +6,8 @@
 //
 
 import SwiftUI
+import Combine
 import ComposableArchitecture
-import Firebase
 
 @main
 struct Neki_iOSApp: App {
@@ -17,13 +17,16 @@ struct Neki_iOSApp: App {
         AppCoordinator()
     }
     
-    init() {
-        FirebaseApp.configure()
-    }
-    
     var body: some Scene {
         WindowGroup {
             AppCoordinatorView(store: store)
+                .onReceive(
+                    applicationDelegate.$isAPNSTokenRegistered
+                        .removeDuplicates()
+                        .filter { $0 }
+                ) { _ in
+                    store.send(.didRegisterAPNSToken)
+                }
                 .onOpenURL { handleIncomingURL($0) }
         }
     }

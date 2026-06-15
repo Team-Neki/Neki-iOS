@@ -198,6 +198,10 @@ struct DeviceAuthorizationPreferenceFeature {
                     user.marketingTermAgreed = requestedValue
                     $0 = .signedIn(user)
                 }
+                if case let .signedIn(user) = state.userSessionStatus {
+                    let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+                    UserDefaults.standard.set(2, forKey: key)
+                }
                 let message = requestedValue
                     ? "마케팅 알림 수신에 동의했어요."
                     : "마케팅 알림 수신을 거부했어요.\n마이페이지에서 언제든지 변경할 수 있어요."

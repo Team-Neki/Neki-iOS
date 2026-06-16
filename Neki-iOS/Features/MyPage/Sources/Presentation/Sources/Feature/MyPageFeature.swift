@@ -25,6 +25,7 @@ struct MyPageFeature {
         case onAppear
         case cellTapped(SectionCellItem)
         case profileTapped
+        case notificationButtonTapped
     }
     
     @Dependency(\.appVersionClient) private var appVersionClient

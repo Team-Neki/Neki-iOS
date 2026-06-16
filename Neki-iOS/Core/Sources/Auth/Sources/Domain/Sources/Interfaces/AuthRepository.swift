@@ -42,4 +42,6 @@ public protocol AuthRepository {
     func fetchTerms() async throws(AuthRepositoryError) -> [Term]
     /// 이용약관 동의
     func agreeWithTerms(agreements: [UserAgreement]) async throws(AuthRepositoryError) -> Void
+    /// 마케팅 수신 동의 변경
+    func updateMarketingConsent(isAgreed: Bool) async throws(AuthRepositoryError) -> Void
 }

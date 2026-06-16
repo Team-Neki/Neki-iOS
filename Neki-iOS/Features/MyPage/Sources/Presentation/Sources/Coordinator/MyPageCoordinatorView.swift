@@ -31,5 +31,6 @@ struct MyPageCoordinatorView: View {
 
             }
         }
+        .nekiToast(item: $store.toastItem)
     }
 }

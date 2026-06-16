@@ -62,9 +62,9 @@ struct NekiToastView: View {
             Text(item.message)
                 .nekiFont(.body16Medium)
                 .foregroundStyle(.white)
-                .lineLimit(2)
-            
-            Spacer()
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
             
             if let buttonTitle = item.buttonTitle, let action = item.action {
                 Button {
@@ -81,7 +81,7 @@ struct NekiToastView: View {
                 }
             }
         }
-        .frame(width: 303, height: 26)
+        .frame(width: 303)
         .padding(16)
         .background(.gray800)
         .clipShape(RoundedRectangle(cornerRadius: 12))

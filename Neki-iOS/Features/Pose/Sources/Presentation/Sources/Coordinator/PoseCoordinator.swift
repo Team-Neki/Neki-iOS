@@ -29,6 +29,7 @@ struct PoseCoordinator {
         enum Delegate {
             case logout
             case requestQRScan
+            case requestNotificationList
         }
     }
     
@@ -51,6 +52,9 @@ struct PoseCoordinator {
                 
             case .root(.delegate(.qrScanButtonTapped)):
                 return .send(.delegate(.requestQRScan))
+
+            case .root(.delegate(.requestNotificationList)):
+                return .send(.delegate(.requestNotificationList))
                 
                 // MARK: - Data Synchronization (Coordinator's Main Job)
             case let .path(.element(_, action: .detail(.delegate(.poseUpdated(pose))))):

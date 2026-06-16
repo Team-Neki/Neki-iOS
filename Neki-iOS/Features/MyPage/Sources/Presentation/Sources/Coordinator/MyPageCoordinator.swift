@@ -16,22 +16,29 @@ struct MyPageCoordinator {
         
         var root = MyPageFeature.State()
         var path = StackState<Path.State>()
+        var toastItem: NekiToastItem?
     }
     
-    enum Action {
+    enum Action: BindableAction {
         case root(MyPageFeature.Action)
         case path(StackActionOf<Path>)
         
         case delegate(Delegate)
+        
+        case binding(BindingAction<State>)
+        
         enum Delegate {
             case didLogout
             case didWithdraw
+            case requestNotificationList
         }
     }
     
     @Dependency(\.openURL) private var openURL
     
     var body: some ReducerOf<Self> {
+        BindingReducer()
+        
         Scope(state: \.root, action: \.root) { MyPageFeature() }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
@@ -42,6 +49,9 @@ struct MyPageCoordinator {
             case .root(.profileTapped):
                 state.path.append(.accountPreference(.init()))
                 return .none
+
+            case .root(.notificationButtonTapped):
+                return .send(.delegate(.requestNotificationList))
                 
             case .path(.element(id: _, action: .accountPreference(.editProfileButtonTapped))):
                 guard case let .signedIn(user) = state.userSessionStatus else { return .none }
@@ -53,6 +63,13 @@ struct MyPageCoordinator {
                 
             case .path(.element(id: _, action: .accountPreference(.didWithdraw))):
                 return .send(.delegate(.didWithdraw))
+
+            case let .path(.element(
+                id: _,
+                action: .deviceAuthorizationPreference(.delegate(.showToast(item)))
+            )):
+                state.toastItem = item
+                return .none
                 
             default:
                 return .none

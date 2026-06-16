@@ -27,8 +27,10 @@ public struct AuthClient {
     public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
     public var loginWithKakao: @Sendable () async throws -> User
     public var autoLogin: @Sendable () async throws -> User
+    public var fetchUser: @Sendable () async throws -> User
     public var fetchTerms: @Sendable () async throws -> [Term]
     public var agreeWithTerms: @Sendable (_ agreements: [UserAgreement]) async throws -> Void
+    public var updateMarketingConsent: @Sendable (_ isAgreed: Bool) async throws -> Void
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
     public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User
@@ -81,6 +83,14 @@ extension AuthClient: DependencyKey {
                 throw AuthClient.mapError(error)
             }
         }
+
+        @Sendable func fetchUser() async throws -> User {
+            do {
+                return try await authRepository.fetchUser()
+            } catch {
+                throw AuthClient.mapError(error)
+            }
+        }
         
         @Sendable func fetchTerms() async throws -> [Term] {
             do {
@@ -93,6 +103,14 @@ extension AuthClient: DependencyKey {
         @Sendable func agreeWithTerms(agreements: [UserAgreement]) async throws -> Void {
             do {
                 try await authRepository.agreeWithTerms(agreements: agreements)
+            } catch {
+                throw AuthClient.mapError(error)
+            }
+        }
+
+        @Sendable func updateMarketingConsent(isAgreed: Bool) async throws -> Void {
+            do {
+                try await authRepository.updateMarketingConsent(isAgreed: isAgreed)
             } catch {
                 throw AuthClient.mapError(error)
             }
@@ -168,8 +186,10 @@ extension AuthClient: DependencyKey {
             loginWithApple: loginWithApple,
             loginWithKakao: loginWithKakao,
             autoLogin: autoLogin,
+            fetchUser: fetchUser,
             fetchTerms: fetchTerms,
             agreeWithTerms: agreeWithTerms,
+            updateMarketingConsent: updateMarketingConsent,
             signOut: signOut,
             withdraw: withdraw,
             updateProfile: updateProfile,

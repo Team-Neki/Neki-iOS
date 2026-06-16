@@ -10,23 +10,31 @@ import ComposableArchitecture
 import AVFoundation
 import CoreLocation
 import Photos
-// TODO: 알림 관련 임포팅 필요
-// import Firebase
+import UserNotifications
 
 @Reducer
 struct DeviceAuthorizationPreferenceFeature {
     @ObservableState
     struct State: Equatable {
+        @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
+
         var cameraAuthorizationStatus: AVAuthorizationStatus = .notDetermined
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
         var photosAuthorizationStatus: PHAuthorizationStatus = .notDetermined
+        var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
+        var isMarketingNotificationEnabled: Bool = false
+        var isUpdatingMarketingNotification: Bool = false
         
         var isCameraAuthorized: Bool { cameraAuthorizationStatus == .authorized }
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
         var isPhotosAuthorized: Bool { photosAuthorizationStatus == .authorized || photosAuthorizationStatus == .limited }
-        
-        var isAlertPresented: Bool = false
-        var alertItem: AlertItem?
+        var isNotificationAuthorized: Bool {
+            switch notificationAuthorizationStatus {
+            case .authorized, .provisional, .ephemeral: true
+            case .notDetermined, .denied: false
+            @unknown default: false
+            }
+        }
     }
     
     enum Action: BindableAction {
@@ -36,43 +44,32 @@ struct DeviceAuthorizationPreferenceFeature {
         case cameraCellTapped
         case locationCellTapped
         case photosCellTapped
+        case notificationsCellTapped
         
         // Internal Actions
         case updateCameraStatus(AVAuthorizationStatus)
         case updateLocationStatus(CLAuthorizationStatus)
         case updatePhotosStatus(PHAuthorizationStatus)
+        case updateNotificationStatus(UNAuthorizationStatus)
+        case marketingNotificationUpdateResponse(Bool, Result<Void, Error>)
+        case pushNotificationSynchronizationResponse(Result<UNAuthorizationStatus, Error>)
         case openAppSettings
-        case alertDismissed
+
+        // Delegate Actions
+        case delegate(Delegate)
+        enum Delegate {
+            case showToast(NekiToastItem)
+        }
         
         // Binding Actions
         case binding(BindingAction<State>)
     }
     
-    enum AlertItem {
-        case notification, photos, location, camera
-        
-        var title: String {
-            switch self {
-            case .notification: return "알림 권한"
-            case .photos: return "갤러리 권한"
-            case .location: return "위치 권한"
-            case .camera: return "카메라 권한"
-            }
-        }
-        
-        var description: String {
-            switch self {
-            case .notification: return "사진 저장 완료 오류 안내를 알려드리기 위해 알림 권한이 필요해요."
-            case .photos: return "사진을 불러와 네키에 저장 및 관리하기 위해 갤러리 접근 권한이 필요해요."
-            case .location: return "주변 포토부스를 찾기 위해 위치 사용 권한이 필요해요"
-            case .camera: return "QR 인식을 위해 카메라 접근이 필요해요."
-            }
-        }
-    }
-    
     @Dependency(\.dismiss) private var dismiss
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.mapClient) private var mapClient
+    @Dependency(\.pushNotificationClient) private var pushNotificationClient
+    @Dependency(\.authClient) private var authClient
     @Dependency(\.openURL) private var openURL
     
     var body: some ReducerOf<Self> {
@@ -81,6 +78,9 @@ struct DeviceAuthorizationPreferenceFeature {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppear:
+                if case let .signedIn(user) = state.userSessionStatus {
+                    state.isMarketingNotificationEnabled = user.marketingTermAgreed
+                }
                 return .merge(
                     .run { send in
                         let status = qrScannerClient.checkAuthorizationStatus()
@@ -94,6 +94,10 @@ struct DeviceAuthorizationPreferenceFeature {
                     .run { send in
                         let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
                         await send(.updatePhotosStatus(status))
+                    },
+                    .run { send in
+                        let status = try await pushNotificationClient.checkAuthorizationStatus()
+                        await send(.updateNotificationStatus(status))
                     }
                 )
                 
@@ -110,9 +114,7 @@ struct DeviceAuthorizationPreferenceFeature {
                     }
                     
                 case .denied, .restricted:
-                    state.alertItem = .camera
-                    state.isAlertPresented = true
-                    return .none
+                    return .send(.openAppSettings)
                     
                 case .authorized:
                     return .send(.openAppSettings)
@@ -129,9 +131,7 @@ struct DeviceAuthorizationPreferenceFeature {
                     }
                     
                 case .denied, .restricted:
-                    state.alertItem = .location
-                    state.isAlertPresented = true
-                    return .none
+                    return .send(.openAppSettings)
                     
                 case .authorizedAlways, .authorizedWhenInUse:
                     return .send(.openAppSettings)
@@ -149,9 +149,7 @@ struct DeviceAuthorizationPreferenceFeature {
                     }
                     
                 case .denied, .restricted:
-                    state.alertItem = .photos
-                    state.isAlertPresented = true
-                    return .none
+                    return .send(.openAppSettings)
                     
                 case .authorized, .limited:
                     return .send(.openAppSettings)
@@ -159,19 +157,78 @@ struct DeviceAuthorizationPreferenceFeature {
                 @unknown default:
                     return .none
                 }
+
+            case .notificationsCellTapped:
+                switch state.notificationAuthorizationStatus {
+                case .notDetermined:
+                    return .run { send in
+                        _ = try await pushNotificationClient.requestAuthorization()
+                        await send(.pushNotificationSynchronizationResponse(
+                            Result { try await pushNotificationClient.synchronizeDeviceToken() }
+                        ))
+                    }
+
+                case .denied:
+                    return .send(.openAppSettings)
+
+                case .authorized, .provisional, .ephemeral:
+                    return .send(.openAppSettings)
+
+                @unknown default:
+                    return .none
+                }
+
+            case .binding(\.isMarketingNotificationEnabled):
+                guard state.isUpdatingMarketingNotification == false else { return .none }
+
+                state.isUpdatingMarketingNotification = true
+                let requestedValue = state.isMarketingNotificationEnabled
+                return .run { send in
+                    await send(.marketingNotificationUpdateResponse(
+                        requestedValue,
+                        Result { try await authClient.updateMarketingConsent(requestedValue) }
+                    ))
+                }
+
+            case let .marketingNotificationUpdateResponse(requestedValue, .success):
+                state.isUpdatingMarketingNotification = false
+                state.$userSessionStatus.withLock {
+                    guard case let .signedIn(currentUser) = $0 else { return }
+                    var user = currentUser
+                    user.marketingTermAgreed = requestedValue
+                    $0 = .signedIn(user)
+                }
+                if case let .signedIn(user) = state.userSessionStatus {
+                    let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+                    UserDefaults.standard.set(2, forKey: key)
+                }
+                let message = requestedValue
+                    ? "마케팅 알림 수신에 동의했어요."
+                    : "마케팅 알림 수신을 거부했어요.\n마이페이지에서 언제든지 변경할 수 있어요."
+                return .send(.delegate(.showToast(
+                    NekiToastItem(message, style: .success)
+                )))
+
+            case let .marketingNotificationUpdateResponse(requestedValue, .failure):
+                state.isUpdatingMarketingNotification = false
+                state.isMarketingNotificationEnabled = !requestedValue
+                return .none
+
+            case let .pushNotificationSynchronizationResponse(.success(status)):
+                state.notificationAuthorizationStatus = status
+                return .none
+
+            case .pushNotificationSynchronizationResponse(.failure):
+                return .run { send in
+                    let status = try await pushNotificationClient.checkAuthorizationStatus()
+                    await send(.updateNotificationStatus(status))
+                }
                 
             case .openAppSettings:
-                state.alertItem = nil
-                state.isAlertPresented = false
-                return .run { send in
+                return .run { _ in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)
                 }
-                
-            case .alertDismissed:
-                state.alertItem = nil
-                state.isAlertPresented = false
-                return .none
                 
             case let .updateCameraStatus(status):
                 state.cameraAuthorizationStatus = status
@@ -183,6 +240,10 @@ struct DeviceAuthorizationPreferenceFeature {
                 
             case let .updateLocationStatus(status):
                 state.locationAuthorizationStatus = status
+                return .none
+
+            case let .updateNotificationStatus(status):
+                state.notificationAuthorizationStatus = status
                 return .none
                 
             default:

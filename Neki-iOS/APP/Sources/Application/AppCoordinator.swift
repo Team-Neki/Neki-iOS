@@ -41,6 +41,7 @@ struct AppCoordinator {
         var shouldRetryPushNotificationSynchronization: Bool = false
         var hasSynchronizedPushNotification: Bool = false
         var lastSynchronizedPushAgreement: Bool?
+        var pushNotificationEvent = PushNotificationEventFeature.State()
         
         init() {
             self.route = .splash
@@ -72,6 +73,7 @@ struct AppCoordinator {
         case requestPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case synchronizePushNotification
         case synchronizePushNotificationResponse(Result<UNAuthorizationStatus, Error>)
+        case pushNotificationEvent(PushNotificationEventFeature.Action)
         
         // Binding Actions
         case binding(BindingAction<State>)
@@ -90,6 +92,10 @@ struct AppCoordinator {
     
     var body: some ReducerOf<Self> {
         BindingReducer()
+
+        Scope(state: \.pushNotificationEvent, action: \.pushNotificationEvent) {
+            PushNotificationEventFeature()
+        }
         
         Scope(state: \.route, action: \.route) { Route() }
         
@@ -98,7 +104,7 @@ struct AppCoordinator {
             case .onAppLaunched:
                 state.lastVersionCheckedTime = now
                 
-                return .run { [currentStatus = state.userSessionStatus] send in
+                let launchEffect: Effect<Action> = .run { [currentStatus = state.userSessionStatus] send in
                     async let timer: Void = clock.sleep(for: .milliseconds(1500))
                     
                     async let nextStatus: UserSessionStatus = {
@@ -125,6 +131,10 @@ struct AppCoordinator {
                     
                     await send(.splashSequenceCompleted(finalStatus, finalVersionResult))
                 }
+                return .merge(
+                    .send(.pushNotificationEvent(.task)),
+                    launchEffect
+                )
                 
             case let .onOpenURL(url):
                 guard (url.scheme == "neki" || url.scheme == "neki-dev") && url.host == "shareExtension" else { return .none }

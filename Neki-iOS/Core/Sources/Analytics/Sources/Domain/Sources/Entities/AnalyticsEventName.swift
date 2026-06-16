@@ -10,6 +10,7 @@ import Foundation
 public enum AnalyticsEventName: String {
     // 공통
     case appOpen = "app_open"
+    case pushNotificationClick = "push_notification_click"
     
     // 아카이빙
     case archivingView = "archiving_view"

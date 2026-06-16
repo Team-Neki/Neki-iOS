@@ -42,6 +42,11 @@ struct AppCoordinatorView: View {
                 if let store = store.scope(state: \.route.auth, action: \.route.auth) {
                     LoginCoordinatorView(store: store)
                 }
+
+            case .termsAgreement:
+                if let store = store.scope(state: \.route.termsAgreement, action: \.route.termsAgreement) {
+                    TermsAgreementView(store: store)
+                }
                 
             case .mainTab:
                 if let store = store.scope(state: \.route.mainTab, action: \.route.mainTab) {

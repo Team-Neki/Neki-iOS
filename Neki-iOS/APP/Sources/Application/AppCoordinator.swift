@@ -13,6 +13,7 @@ import UserNotifications
 struct AppCoordinator {
     enum Constants {
         static let versionCheckInterval: TimeInterval = 60 *  60 * 24 // 1일
+        static let requiredTermsAgreementPolicyVersion: String = "2026-06-push-notification"
     }
     
     @ObservableState
@@ -256,18 +257,31 @@ struct AppCoordinator {
                 
             case let .route(.auth(.delegate(.moveToMainTab(
                 user,
-                shouldPresentMarketingConsentAlert
+                shouldPresentMarketingConsentAlert,
+                didCompleteTermsAgreement
             )))):
+                if didCompleteTermsAgreement {
+                    markRequiredTermsAgreementPolicyCompleted(for: user)
+                }
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
-                state.route = .mainTab(.init(
-                    shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
-                        || isMarketingConsentAlertEligible(for: user)
-                ))
                 let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
                 return .merge(
                     configureEffect,
-                    .send(.checkPushNotificationAuthorization),
+                    navigateToNextScreen(
+                        state: &state,
+                        sessionStatus: .signedIn(user),
+                        shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                    ),
                     .send(.executePendingShareExtensionIfNeeded)
+                )
+
+            case let .route(.termsAgreement(.didFinishOnboarding(user))):
+                markRequiredTermsAgreementPolicyCompleted(for: user)
+                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
+                return navigateToNextScreen(
+                    state: &state,
+                    sessionStatus: .signedIn(user),
+                    shouldPresentMarketingConsentAlert: user.marketingTermAgreed == false
                 )
 
             case .route(.mainTab(.delegate(.pushNotificationAuthorizationResolved))):
@@ -386,11 +400,21 @@ private extension UNAuthorizationStatus {
 // MARK: - AppCoordinator + Helpers
 
 private extension AppCoordinator {
-    func navigateToNextScreen(state: inout State, sessionStatus: UserSessionStatus) -> Effect<Action> {
+    func navigateToNextScreen(
+        state: inout State,
+        sessionStatus: UserSessionStatus,
+        shouldPresentMarketingConsentAlert: Bool = false
+    ) -> Effect<Action> {
         switch sessionStatus {
         case let .signedIn(user):
+            guard shouldPresentRequiredTermsAgreement(for: user) == false else {
+                state.route = .termsAgreement(.init())
+                return .none
+            }
+
             state.route = .mainTab(.init(
-                shouldPresentMarketingConsentAlert: isMarketingConsentAlertEligible(for: user)
+                shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                    || isMarketingConsentAlertEligible(for: user)
             ))
             return .merge(
                 .send(.checkPushNotificationAuthorization),
@@ -419,6 +443,17 @@ private extension AppCoordinator {
         return UserDefaults.standard.integer(forKey: key) < 2
     }
 
+    func shouldPresentRequiredTermsAgreement(for user: User) -> Bool {
+        guard user.allRequiredTermsAgreed else { return false }
+        let key = AppStorageKey.requiredTermsAgreementPolicyVersion(userID: user.id)
+        return UserDefaults.standard.string(forKey: key) != Constants.requiredTermsAgreementPolicyVersion
+    }
+
+    func markRequiredTermsAgreementPolicyCompleted(for user: User) {
+        let key = AppStorageKey.requiredTermsAgreementPolicyVersion(userID: user.id)
+        UserDefaults.standard.set(Constants.requiredTermsAgreementPolicyVersion, forKey: key)
+    }
+
 }
 
 extension AppCoordinator {
@@ -429,6 +464,7 @@ extension AppCoordinator {
             case splash
             case onboarding(OnboardingCoordinator.State)
             case auth(LoginCoordinator.State)
+            case termsAgreement(TermsAgreementFeature.State)
             case mainTab(MainTabCoordinator.State)
         }
         
@@ -436,6 +472,7 @@ extension AppCoordinator {
             case splash
             case onboarding(OnboardingCoordinator.Action)
             case auth(LoginCoordinator.Action)
+            case termsAgreement(TermsAgreementFeature.Action)
             case mainTab(MainTabCoordinator.Action)
         }
         
@@ -445,6 +482,7 @@ extension AppCoordinator {
             }
             .ifCaseLet(\.onboarding, action: \.onboarding) { OnboardingCoordinator() }
             .ifCaseLet(\.auth, action: \.auth) { LoginCoordinator() }
+            .ifCaseLet(\.termsAgreement, action: \.termsAgreement) { TermsAgreementFeature() }
             .ifCaseLet(\.mainTab, action: \.mainTab) { MainTabCoordinator() }
         }
     }

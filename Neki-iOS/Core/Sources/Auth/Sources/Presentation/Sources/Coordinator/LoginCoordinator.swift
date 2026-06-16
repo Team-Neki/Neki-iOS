@@ -24,7 +24,11 @@ public struct LoginCoordinator {
         
         case delegate(Delegate)
         public enum Delegate {
-            case moveToMainTab(User, shouldPresentMarketingConsentAlert: Bool)
+            case moveToMainTab(
+                User,
+                shouldPresentMarketingConsentAlert: Bool,
+                didCompleteTermsAgreement: Bool
+            )
         }
     }
     
@@ -38,7 +42,8 @@ public struct LoginCoordinator {
                 if user.allRequiredTermsAgreed {
                     return .send(.delegate(.moveToMainTab(
                         user,
-                        shouldPresentMarketingConsentAlert: false
+                        shouldPresentMarketingConsentAlert: false,
+                        didCompleteTermsAgreement: false
                     )))
                 } else {
                     state.pendingUser = user
@@ -61,7 +66,8 @@ public struct LoginCoordinator {
                 state.path.pop(from: id)
                 return .send(.delegate(.moveToMainTab(
                     user,
-                    shouldPresentMarketingConsentAlert: user.marketingTermAgreed == false
+                    shouldPresentMarketingConsentAlert: user.marketingTermAgreed == false,
+                    didCompleteTermsAgreement: true
                 )))
                 
             default:

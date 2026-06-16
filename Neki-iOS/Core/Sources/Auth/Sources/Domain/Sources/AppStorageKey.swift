@@ -13,4 +13,8 @@ public struct AppStorageKey {
     public static func marketingConsentAlertPresentationCount(userID: Int) -> String {
         "MarketingConsentAlertPresentationCount_\(userID)"
     }
+
+    public static func requiredTermsAgreementPolicyVersion(userID: Int) -> String {
+        "RequiredTermsAgreementPolicyVersion_\(userID)"
+    }
 }

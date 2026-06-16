@@ -32,7 +32,7 @@ public struct TermsAgreementFeature {
         case agreeTermsResponse(Result<User, Error>)
         
         // Delegate Actions
-        case didFinishOnboarding(User)
+        case didFinishOnboarding(User, marketingConsentStatus: MarketingConsentManagementStatus?)
         
         // Binding Action
         case binding(BindingAction<State>)
@@ -86,7 +86,10 @@ public struct TermsAgreementFeature {
                 
             case let .agreeTermsResponse(.success(user)):
                 state.isLoading = false
-                return .send(.didFinishOnboarding(user))
+                return .send(.didFinishOnboarding(
+                    user,
+                    marketingConsentStatus: state.marketingConsentManagementStatus
+                ))
                 
             case let .agreeTermsResponse(.failure(error)):
                 state.isLoading = false
@@ -103,5 +106,15 @@ public struct TermsAgreementFeature {
                 return .none
             }
         }
+    }
+}
+
+private extension TermsAgreementFeature.State {
+    var marketingConsentManagementStatus: MarketingConsentManagementStatus? {
+        guard let agreement = agreements.first(where: {
+            $0.term.termType?.caseInsensitiveCompare("MARKETING") == .orderedSame
+        }) else { return nil }
+
+        return agreement.isAgreed ? .approved : .rejected
     }
 }

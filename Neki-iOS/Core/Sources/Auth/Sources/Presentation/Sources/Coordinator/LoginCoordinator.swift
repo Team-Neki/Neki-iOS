@@ -27,7 +27,8 @@ public struct LoginCoordinator {
             case moveToMainTab(
                 User,
                 shouldPresentMarketingConsentAlert: Bool,
-                didCompleteTermsAgreement: Bool
+                didCompleteTermsAgreement: Bool,
+                marketingConsentStatus: MarketingConsentManagementStatus?
             )
         }
     }
@@ -43,7 +44,8 @@ public struct LoginCoordinator {
                     return .send(.delegate(.moveToMainTab(
                         user,
                         shouldPresentMarketingConsentAlert: false,
-                        didCompleteTermsAgreement: false
+                        didCompleteTermsAgreement: false,
+                        marketingConsentStatus: nil
                     )))
                 } else {
                     state.pendingUser = user
@@ -56,7 +58,7 @@ public struct LoginCoordinator {
                 return .none
                 
                 // MARK: - Onboarding Flow
-            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user)))):
+            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user, marketingConsentStatus)))):
                 guard state.pendingUser != nil else {
                     Logger.presentation.error("온보딩 과정 중 중단됨.")
                     return .none
@@ -66,8 +68,9 @@ public struct LoginCoordinator {
                 state.path.pop(from: id)
                 return .send(.delegate(.moveToMainTab(
                     user,
-                    shouldPresentMarketingConsentAlert: user.marketingTermAgreed == false,
-                    didCompleteTermsAgreement: true
+                    shouldPresentMarketingConsentAlert: marketingConsentStatus == nil && user.marketingTermAgreed == false,
+                    didCompleteTermsAgreement: true,
+                    marketingConsentStatus: marketingConsentStatus
                 )))
                 
             default:

@@ -86,6 +86,7 @@ struct MainTabCoordinator {
         case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
         case requestPushNotificationAuthorizationIfNeeded
         case pushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
+        case route(AppRouteRequest)
         
         case onAppear
         case tabChanged(NekiTab)
@@ -103,6 +104,7 @@ struct MainTabCoordinator {
     @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.authClient) private var authClient
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
+    @Dependency(\.date.now) private var now
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -122,11 +124,7 @@ struct MainTabCoordinator {
                    state.shouldPresentMarketingConsentAlert {
                     state.shouldPresentMarketingConsentAlert = false
                     state.isMarketingConsentAlertPresented = true
-                    let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: state.user.id)
-                    UserDefaults.standard.set(
-                        UserDefaults.standard.integer(forKey: key) + 1,
-                        forKey: key
-                    )
+                    recordMarketingConsentAlertPresentation(for: state.user)
                 }
                 return .send(.tabChanged(state.selectedTab))
                 
@@ -201,6 +199,10 @@ struct MainTabCoordinator {
             case .dismissMarketingConsentAlert:
                 guard state.isUpdatingMarketingConsent == false else { return .none }
                 state.isMarketingConsentAlertPresented = false
+                recordMarketingConsentManaged(
+                    for: state.user,
+                    status: .unconfirmed
+                )
                 return .none
 
             case let .updateMarketingConsent(isAgreed):
@@ -217,6 +219,10 @@ struct MainTabCoordinator {
                 state.isUpdatingMarketingConsent = false
                 state.isMarketingConsentAlertPresented = false
                 state.user.marketingTermAgreed = isAgreed
+                recordMarketingConsentManaged(
+                    for: state.user,
+                    status: isAgreed ? .approved : .rejected
+                )
                 return .send(.requestPushNotificationAuthorizationIfNeeded)
 
             case .marketingConsentUpdateResponse(_, .failure):
@@ -238,6 +244,9 @@ struct MainTabCoordinator {
 
             case .pushNotificationAuthorizationResponse(.failure):
                 return .none
+
+            case let .route(request):
+                return route(state: &state, to: request)
                 
             case .archive(.delegate(.requestQRScan)), .pose(.delegate(.requestQRScan)):
                 state.destination = nil
@@ -303,6 +312,74 @@ struct MainTabCoordinator {
             case .myPage: state.isTabbarHidden = !state.myPage.path.isEmpty
             }
             return .none
+        }
+    }
+}
+
+private extension MainTabCoordinator {
+    func recordMarketingConsentAlertPresentation(for user: User) {
+        let countKey = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+        UserDefaults.standard.set(
+            UserDefaults.standard.integer(forKey: countKey) + 1,
+            forKey: countKey
+        )
+        recordMarketingConsentManaged(for: user, status: .unconfirmed)
+    }
+
+    func recordMarketingConsentManaged(
+        for user: User,
+        status: MarketingConsentManagementStatus
+    ) {
+        UserDefaults.standard.set(
+            now,
+            forKey: AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
+        )
+        UserDefaults.standard.set(
+            status.rawValue,
+            forKey: AppStorageKey.marketingConsentManagementStatus(userID: user.id)
+        )
+    }
+
+    func route(
+        state: inout MainTabCoordinator.State,
+        to request: AppRouteRequest
+    ) -> Effect<MainTabCoordinator.Action> {
+        state.destination = nil
+
+        switch request {
+        case .archive:
+            state.selectedTab = .archive
+            state.archive.path.removeAll()
+            return .none
+
+        case .archivePhoto(_):
+            state.selectedTab = .archive
+            state.archive.path.removeAll()
+            return .none
+
+        case .pose:
+            state.selectedTab = .pose
+            state.pose.path.removeAll()
+            return .none
+
+        case .map, .mapBrand(_), .mapBooth(_):
+            state.selectedTab = .map
+            state.map.path.removeAll()
+            return .none
+
+        case .myPage:
+            state.selectedTab = .myPage
+            state.myPage.path.removeAll()
+            return .none
+
+        case .notificationList:
+            state.destination = .notificationList(.init())
+            return .none
+
+        case let .shareExtension(appGroupID):
+            state.selectedTab = .archive
+            state.archive.path.removeAll()
+            return .send(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))
         }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  PushNotificationLinkBuilder.swift
+//  AppRouteLinkBuilder.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 6/14/26.
@@ -7,21 +7,21 @@
 
 import Foundation
 
-public protocol PushNotificationLinkBuilding: Sendable {
-    func makeLink(for route: PushNotificationRoute) throws -> URL
+protocol AppRouteLinkBuilding: Sendable {
+    func makeLink(for route: AppRouteRequest) throws -> URL
 }
 
-public struct PushNotificationLinkBuilder: PushNotificationLinkBuilding {
+struct AppRouteLinkBuilder: AppRouteLinkBuilding {
     private let scheme: String
     private let allowedSchemes: Set<String> = ["neki", "neki-dev"]
 
-    public init(scheme: String = "neki") {
+    init(scheme: String = "neki") {
         self.scheme = scheme.lowercased()
     }
 
-    public func makeLink(for route: PushNotificationRoute) throws -> URL {
+    func makeLink(for route: AppRouteRequest) throws -> URL {
         guard allowedSchemes.contains(scheme) else {
-            throw PushNotificationLinkError.unsupportedScheme
+            throw AppRouteLinkError.unsupportedScheme
         }
 
         var components = URLComponents()
@@ -51,20 +51,29 @@ public struct PushNotificationLinkBuilder: PushNotificationLinkBuilding {
 
         case .myPage:
             components.host = "mypage"
+
+        case .notificationList:
+            components.host = "notification"
+
+        case let .shareExtension(appGroupID):
+            components.host = "shareExtension"
+            components.queryItems = [
+                URLQueryItem(name: "appGroupID", value: appGroupID)
+            ]
         }
 
         guard let url = components.url else {
-            throw PushNotificationLinkError.invalidURL
+            throw AppRouteLinkError.invalidURL
         }
         return url
     }
 
     private func resourcePath(
         type: String,
-        id: PushNotificationRoute.ResourceID
+        id: AppRouteRequest.ResourceID
     ) throws -> String {
         guard id > 0 else {
-            throw PushNotificationLinkError.invalidResourceID
+            throw AppRouteLinkError.invalidResourceID
         }
         return "/\(type)/\(id)"
     }

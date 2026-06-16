@@ -13,6 +13,8 @@ struct PoseDTO: Decodable {
     let imageURLString: String
     let isScrapped: Bool?
     let contentType: String
+    let width: Int?
+    let height: Int?
     let createdAt: Date
     
     enum CodingKeys: String, CodingKey {
@@ -21,6 +23,8 @@ struct PoseDTO: Decodable {
         case imageURLString = "imageUrl"
         case isScrapped = "scrap"
         case contentType
+        case width
+        case height
         case createdAt
     }
     
@@ -38,6 +42,15 @@ struct PoseDTO: Decodable {
         let imageURL = URL(string: imageURLString)
         let imageContentType = ImageContentType(contentType) ?? .jpeg
         
-        return Pose(id: id, peopleCountOption: peopleCountOption, imageURL: imageURL, isScrapped: isScrapped ?? false, contentType: imageContentType, createdAt: createdAt)
+        return Pose(
+            id: id,
+            peopleCountOption: peopleCountOption,
+            imageURL: imageURL,
+            isScrapped: isScrapped ?? false,
+            contentType: imageContentType,
+            width: width,
+            height: height,
+            createdAt: createdAt
+        )
     }
 }

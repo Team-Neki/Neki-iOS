@@ -15,6 +15,7 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
     let columns: Int
     let horizontalSpacing: CGFloat
     let verticalSpacing: CGFloat
+    let estimatedHeight: ((Item) -> CGFloat?)?
     let content: (Item) -> ItemView
     let columnItems: [[Item]]
     
@@ -25,18 +26,37 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         columns: Int = 2,
         horizontalSpacing: CGFloat = 12,
         verticalSpacing: CGFloat = 12,
+        estimatedHeight: ((Item) -> CGFloat?)? = nil,
         @ViewBuilder content: @escaping (Item) -> ItemView
     ) {
         self.items = items
         self.columns = max(1, columns)
         self.horizontalSpacing = horizontalSpacing
         self.verticalSpacing = verticalSpacing
+        self.estimatedHeight = estimatedHeight
         self.content = content
-        
-        var result = Array(repeating: [Item](), count: self.columns)
-        for (index, item) in items.enumerated() {
-            result[index % self.columns].append(item)
+
+        guard let estimatedHeight else {
+            var result = Array(repeating: [Item](), count: self.columns)
+            for (index, item) in items.enumerated() {
+                result[index % self.columns].append(item)
+            }
+            self.columnItems = result
+            return
         }
+
+        var result = Array(repeating: [Item](), count: self.columns)
+        var columnHeights = Array(repeating: CGFloat.zero, count: self.columns)
+
+        for item in items {
+            let columnIndex = columnHeights
+                .enumerated()
+                .min(by: { $0.element < $1.element })?
+                .offset ?? .zero
+            result[columnIndex].append(item)
+            columnHeights[columnIndex] += (estimatedHeight(item) ?? 1) + verticalSpacing
+        }
+
         self.columnItems = result
     }
     

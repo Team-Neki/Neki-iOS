@@ -12,6 +12,8 @@ public enum AnalyticsParameterKey: String {
     case userId = "user_id"
     case platform = "platform"
     case appVersion = "app_version"
+    case notificationType = "notification_type"
+    case notificationTone = "notification_tone"
     
     // 아카이빙
     case method = "method"

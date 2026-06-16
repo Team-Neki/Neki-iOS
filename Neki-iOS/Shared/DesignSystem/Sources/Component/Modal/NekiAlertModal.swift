@@ -13,6 +13,11 @@ public enum NekiAlertStyle {
     case primarySecondary
 }
 
+public enum NekiAlertContentStyle {
+    case standard
+    case marketingConsent(description: Text)
+}
+
 public struct NekiAlertModal<Content: View, Actions: View>: View {
     let content: Content
     let actions: Actions

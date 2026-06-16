@@ -26,6 +26,7 @@ struct ArchiveCoordinator {
         enum Delegate {
             case showToast(NekiToastItem)
             case requestQRScan
+            case requestNotificationList
         }
     }
     
@@ -40,6 +41,9 @@ struct ArchiveCoordinator {
                 // root action
             case .root(.delegate(.requestQRScan)):
                 return .send(.delegate(.requestQRScan))
+
+            case .root(.delegate(.requestNotificationList)):
+                return .send(.delegate(.requestNotificationList))
                 
             case .root(.addPhotoFromQRScanner):
                 state.path.removeAll()

@@ -47,12 +47,11 @@ struct PoseView: View {
                     Image(.iconQrCode)
                 }
                 
-                // 알림
-//                Button {
-//                    
-//                } label: {
-//                    Image(.iconBellFill)
-//                }
+                Button {
+                    store.send(.notificationButtonTapped)
+                } label: {
+                    Image(.iconBellFill)
+                }
             } }
         )
         .sheet(item: $store.sheetItem) { item in
@@ -84,7 +83,16 @@ private extension PoseView {
         ScrollView {
             MasonryGridView(
                 items: Array(store.filteredPoses),
-                columns: 2
+                columns: 2,
+                estimatedHeight: { item in
+                    guard let width = item.width,
+                          let height = item.height,
+                          width > 0,
+                          height > 0
+                    else { return nil }
+
+                    return CGFloat(height) / CGFloat(width)
+                }
             ) { item in
                 FeedImageView(item: item, onTapBookmark: { store.send(.onTapBookmark(item)) })
                     .onTapGesture {

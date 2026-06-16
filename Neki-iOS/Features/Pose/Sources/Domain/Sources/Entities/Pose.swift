@@ -13,5 +13,7 @@ public struct Pose: Identifiable, Sendable, Equatable {
     public let imageURL: URL?
     public var isScrapped: Bool
     public let contentType: ImageContentType
+    public let width: Int?
+    public let height: Int?
     public let createdAt: Date
 }

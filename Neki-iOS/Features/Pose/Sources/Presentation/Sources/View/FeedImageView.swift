@@ -15,6 +15,15 @@ struct FeedImageView: View {
     
     let item: Pose
     let onTapBookmark: (() -> Void)?
+    private var imageAspectRatio: CGFloat? {
+        guard let width = item.width,
+              let height = item.height,
+              width > 0,
+              height > 0
+        else { return nil }
+
+        return CGFloat(width) / CGFloat(height)
+    }
     
     let gradientColor: LinearGradient = LinearGradient(
         colors: [
@@ -38,7 +47,7 @@ struct FeedImageView: View {
                     Logger.presentation.error("실패한 이미지 id: \(item.id)")
                 }
                 .cancelOnDisappear(true)
-                .aspectRatio(contentMode: .fit)
+                .aspectRatio(imageAspectRatio, contentMode: .fit)
         }
         .overlay { Color.black.opacity(0.04) }
         .overlay { gradientColor.opacity(0.2) }

@@ -52,5 +52,6 @@ struct PoseDetailView: View {
             center: { NekiToolBar.textCenter("포즈 상세") }
         )
         .background(.white)
+        .task { await store.send(.onAppear).finish() }
     }
 }

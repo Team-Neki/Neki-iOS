@@ -82,7 +82,6 @@ private extension DeviceAuthorizationPreferenceView {
             }
         }
         .toggleStyle(.nekiSwitch)
-        .disabled(store.isUpdatingMarketingNotification)
     }
 
     func cell(for type: AuthorizationType, isAuthorized: Bool, _ onTap: @escaping () -> Void) -> some View {

@@ -1,5 +1,5 @@
 //
-//  PushNotificationLinkParser.swift
+//  AppRouteLinkParser.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 6/14/26.
@@ -7,33 +7,43 @@
 
 import Foundation
 
-public protocol PushNotificationLinkParsing: Sendable {
-    func parse(_ url: URL) throws -> PushNotificationRoute
+protocol AppRouteLinkParsing: Sendable {
+    func parse(_ url: URL) throws -> AppRouteRequest
 }
 
-public struct PushNotificationLinkParser: PushNotificationLinkParsing {
+struct AppRouteLinkParser: AppRouteLinkParsing {
     private let allowedSchemes: Set<String>
 
-    public init(allowedSchemes: Set<String> = ["neki", "neki-dev"]) {
+    init(allowedSchemes: Set<String> = ["neki", "neki-dev"]) {
         self.allowedSchemes = allowedSchemes
     }
 
-    public func parse(_ url: URL) throws -> PushNotificationRoute {
+    func parse(_ url: URL) throws -> AppRouteRequest {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let scheme = components.scheme?.lowercased(),
               allowedSchemes.contains(scheme)
         else {
-            throw PushNotificationLinkError.unsupportedScheme
+            throw AppRouteLinkError.unsupportedScheme
         }
 
         guard components.user == nil,
               components.password == nil,
               components.port == nil,
-              components.query == nil,
               components.fragment == nil,
               let host = components.host?.lowercased()
         else {
-            throw PushNotificationLinkError.unsupportedRoute
+            throw AppRouteLinkError.unsupportedRoute
+        }
+
+        if host == "shareextension" {
+            guard let appGroupID = components.queryItems?.first(where: { $0.name == "appGroupID" })?.value else {
+                throw AppRouteLinkError.unsupportedRoute
+            }
+            return .shareExtension(appGroupID: appGroupID)
+        }
+
+        guard components.query == nil else {
+            throw AppRouteLinkError.unsupportedRoute
         }
 
         let pathComponents = components.path
@@ -46,7 +56,7 @@ public struct PushNotificationLinkParser: PushNotificationLinkParsing {
                 return .map
             }
             guard pathComponents.count == 2 else {
-                throw PushNotificationLinkError.unsupportedRoute
+                throw AppRouteLinkError.unsupportedRoute
             }
             switch pathComponents[0] {
             case "brand":
@@ -54,7 +64,7 @@ public struct PushNotificationLinkParser: PushNotificationLinkParsing {
             case "booth":
                 return .mapBooth(try resourceID(from: pathComponents[1]))
             default:
-                throw PushNotificationLinkError.unsupportedRoute
+                throw AppRouteLinkError.unsupportedRoute
             }
 
         case "archive":
@@ -62,32 +72,38 @@ public struct PushNotificationLinkParser: PushNotificationLinkParsing {
                 return .archive
             }
             guard pathComponents.count == 2, pathComponents[0] == "photo" else {
-                throw PushNotificationLinkError.unsupportedRoute
+                throw AppRouteLinkError.unsupportedRoute
             }
             return .archivePhoto(try resourceID(from: pathComponents[1]))
 
         case "pose":
             guard pathComponents.isEmpty else {
-                throw PushNotificationLinkError.unsupportedRoute
+                throw AppRouteLinkError.unsupportedRoute
             }
             return .pose
 
         case "mypage":
             guard pathComponents.isEmpty else {
-                throw PushNotificationLinkError.unsupportedRoute
+                throw AppRouteLinkError.unsupportedRoute
             }
             return .myPage
 
+        case "notification":
+            guard pathComponents.isEmpty else {
+                throw AppRouteLinkError.unsupportedRoute
+            }
+            return .notificationList
+
         default:
-            throw PushNotificationLinkError.unsupportedRoute
+            throw AppRouteLinkError.unsupportedRoute
         }
     }
 
     private func resourceID(
         from rawValue: String
-    ) throws -> PushNotificationRoute.ResourceID {
+    ) throws -> AppRouteRequest.ResourceID {
         guard let id = Int(rawValue), id > 0 else {
-            throw PushNotificationLinkError.invalidResourceID
+            throw AppRouteLinkError.invalidResourceID
         }
         return id
     }

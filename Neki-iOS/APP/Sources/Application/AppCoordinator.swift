@@ -13,6 +13,7 @@ import UserNotifications
 struct AppCoordinator {
     enum Constants {
         static let versionCheckInterval: TimeInterval = 60 *  60 * 24 // 1일
+        static let marketingConsentAlertRevisitInterval: TimeInterval = 60 * 60 * 24 * 7 // 7일
         static let requiredTermsAgreementPolicyVersion: String = "2026-06-push-notification"
     }
     
@@ -35,7 +36,7 @@ struct AppCoordinator {
             }
         }
         var pendingSessionStatus: UserSessionStatus?
-        var pendingShareAppGroupID: String?
+        var pendingRouteRequest: AppRouteRequest?
         var lastVersionCheckedTime: Date?
         var isSynchronizingPushNotification: Bool = false
         var shouldRetryPushNotificationSynchronization: Bool = false
@@ -65,7 +66,7 @@ struct AppCoordinator {
         case userSessionStatusChanged(UserSessionStatus)
         case scenePhaseChanged(ScenePhase)
         case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
-        case executePendingShareExtensionIfNeeded
+        case executePendingRouteIfNeeded
         case didRegisterAPNSToken
         case checkPushNotificationAuthorization
         case checkPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
@@ -89,6 +90,7 @@ struct AppCoordinator {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.openURL) private var openURL
     @Dependency(\.date.now) private var now
+    private let appRouter = AppRouter()
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -137,14 +139,7 @@ struct AppCoordinator {
                 )
                 
             case let .onOpenURL(url):
-                guard (url.scheme == "neki" || url.scheme == "neki-dev") && url.host == "shareExtension" else { return .none }
-                guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                      let appGroupID = components.queryItems?.first(where: { $0.name == "appGroupID" })?.value
-                else { return .none }
-                state.pendingShareAppGroupID = appGroupID
-                
-                guard case .mainTab = state.route else { return .none }
-                return .send(.executePendingShareExtensionIfNeeded)
+                return appRouter.handleOpenURL(state: &state, url: url)
                 
             case let .scenePhaseChanged(phase):
                 guard phase == .active else { return .none }
@@ -200,11 +195,8 @@ struct AppCoordinator {
                     navigateToNextScreen(state: &state, sessionStatus: finalStatus)
                 )
                 
-            case .executePendingShareExtensionIfNeeded:
-                guard let appGroupID = state.pendingShareAppGroupID else { return .none }
-                guard case .mainTab = state.route else { return .none }
-                state.pendingShareAppGroupID = nil
-                return .send(.route(.mainTab(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))))
+            case .executePendingRouteIfNeeded:
+                return appRouter.executePendingRouteIfNeeded(state: &state)
 
             case .didRegisterAPNSToken:
                 guard case .signedIn = state.userSessionStatus else { return .none }
@@ -239,10 +231,10 @@ struct AppCoordinator {
                     if case .mainTab = state.route {
                         navigationEffect = .none
                     } else {
-                        state.route = .mainTab(.init(
-                            shouldPresentMarketingConsentAlert: isMarketingConsentAlertEligible(for: user)
-                        ))
-                        navigationEffect = .none
+                        navigationEffect = navigateToNextScreen(
+                            state: &state,
+                            sessionStatus: .signedIn(user)
+                        )
                     }
                     
                 case .signedOut, .expired:
@@ -268,10 +260,17 @@ struct AppCoordinator {
             case let .route(.auth(.delegate(.moveToMainTab(
                 user,
                 shouldPresentMarketingConsentAlert,
-                didCompleteTermsAgreement
+                didCompleteTermsAgreement,
+                marketingConsentStatus
             )))):
                 if didCompleteTermsAgreement {
                     markRequiredTermsAgreementPolicyCompleted(for: user)
+                    if let marketingConsentStatus {
+                        markMarketingConsentManaged(
+                            for: user,
+                            status: marketingConsentStatus
+                        )
+                    }
                 }
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
@@ -282,16 +281,22 @@ struct AppCoordinator {
                         sessionStatus: .signedIn(user),
                         shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
                     ),
-                    .send(.executePendingShareExtensionIfNeeded)
+                    .send(.executePendingRouteIfNeeded)
                 )
 
-            case let .route(.termsAgreement(.didFinishOnboarding(user))):
+            case let .route(.termsAgreement(.didFinishOnboarding(user, marketingConsentStatus))):
                 markRequiredTermsAgreementPolicyCompleted(for: user)
+                if let marketingConsentStatus {
+                    markMarketingConsentManaged(
+                        for: user,
+                        status: marketingConsentStatus
+                    )
+                }
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 return navigateToNextScreen(
                     state: &state,
                     sessionStatus: .signedIn(user),
-                    shouldPresentMarketingConsentAlert: user.marketingTermAgreed == false
+                    shouldPresentMarketingConsentAlert: false
                 )
 
             case .route(.mainTab(.delegate(.pushNotificationAuthorizationResolved))):
@@ -415,31 +420,13 @@ private extension AppCoordinator {
         sessionStatus: UserSessionStatus,
         shouldPresentMarketingConsentAlert: Bool = false
     ) -> Effect<Action> {
-        switch sessionStatus {
-        case let .signedIn(user):
-            guard shouldPresentRequiredTermsAgreement(for: user) == false else {
-                state.route = .termsAgreement(.init())
-                return .none
-            }
-
-            state.route = .mainTab(.init(
-                shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
-                    || isMarketingConsentAlertEligible(for: user)
-            ))
-            return .merge(
-                .send(.checkPushNotificationAuthorization),
-                .send(.executePendingShareExtensionIfNeeded)
-            )
-            
-        case .signedOut, .expired:
-            if state.hasSeenOnboarding {
-                state.route = .auth(.init())
-                if case .expired = sessionStatus { state.toastItem = .init("다시 로그인 해주세요.") }
-            } else {
-                state.route = .onboarding(.init())
-            }
-            return .none
-        }
+        appRouter.navigateToNextScreen(
+            state: &state,
+            sessionStatus: sessionStatus,
+            shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert,
+            shouldPresentRequiredTermsAgreement: { shouldPresentRequiredTermsAgreement(for: $0) },
+            isMarketingConsentAlertEligible: { isMarketingConsentAlertEligible(for: $0) }
+        )
     }
     
     func extractUserID(from status: UserSessionStatus) -> Int? {
@@ -449,8 +436,21 @@ private extension AppCoordinator {
 
     func isMarketingConsentAlertEligible(for user: User) -> Bool {
         guard user.marketingTermAgreed == false else { return false }
-        let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
-        return UserDefaults.standard.integer(forKey: key) < 2
+        let statusKey = AppStorageKey.marketingConsentManagementStatus(userID: user.id)
+        let status = UserDefaults.standard.string(forKey: statusKey)
+            .flatMap(MarketingConsentManagementStatus.init(rawValue:)) ?? .unconfirmed
+        guard status == .unconfirmed else { return false }
+
+        let countKey = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+        guard UserDefaults.standard.integer(forKey: countKey) < 2 else { return false }
+
+        let managedAtKey = AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
+        guard let lastManagedAt = UserDefaults.standard.object(forKey: managedAtKey) as? Date else {
+            UserDefaults.standard.set(now, forKey: managedAtKey)
+            return false
+        }
+
+        return now.timeIntervalSince(lastManagedAt) >= Constants.marketingConsentAlertRevisitInterval
     }
 
     func shouldPresentRequiredTermsAgreement(for user: User) -> Bool {
@@ -462,6 +462,26 @@ private extension AppCoordinator {
     func markRequiredTermsAgreementPolicyCompleted(for user: User) {
         let key = AppStorageKey.requiredTermsAgreementPolicyVersion(userID: user.id)
         UserDefaults.standard.set(Constants.requiredTermsAgreementPolicyVersion, forKey: key)
+    }
+
+    func markMarketingConsentManaged(
+        for user: User,
+        status: MarketingConsentManagementStatus
+    ) {
+        UserDefaults.standard.set(
+            now,
+            forKey: AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
+        )
+        UserDefaults.standard.set(
+            status.rawValue,
+            forKey: AppStorageKey.marketingConsentManagementStatus(userID: user.id)
+        )
+        if status != .unconfirmed {
+            UserDefaults.standard.set(
+                2,
+                forKey: AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+            )
+        }
     }
 
 }

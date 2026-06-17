@@ -1,5 +1,5 @@
 //
-//  PushNotificationRoute.swift
+//  AppRouteRequest.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 6/14/26.
@@ -7,8 +7,8 @@
 
 import Foundation
 
-public enum PushNotificationRoute: Equatable, Sendable {
-    public typealias ResourceID = Int
+enum AppRouteRequest: Equatable, Sendable {
+    typealias ResourceID = Int
 
     case map
     case mapBrand(ResourceID)
@@ -17,12 +17,13 @@ public enum PushNotificationRoute: Equatable, Sendable {
     case archivePhoto(ResourceID)
     case pose
     case myPage
+    case notificationList
+    case shareExtension(appGroupID: String)
 }
 
-public enum PushNotificationLinkError: Error, Equatable {
+enum AppRouteLinkError: Error, Equatable {
     case invalidResourceID
     case invalidURL
     case unsupportedScheme
     case unsupportedRoute
 }
-

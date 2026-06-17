@@ -16,6 +16,7 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
     public let address: String
     public let nearbyDistance: Int?
     public let detailInformationURL: URL?
+    public var isFavorite: Bool
     
     public init(
         id: Int,
@@ -24,7 +25,8 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
         coordinate: GeographicCoordinate,
         address: String,
         nearbyDistance: Int? = nil,
-        detailInformationURL: URL? = nil
+        detailInformationURL: URL? = nil,
+        isFavorite: Bool = false
     ) {
         self.id = id
         self.brand = brand
@@ -33,5 +35,6 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
         self.address = address
         self.nearbyDistance = nearbyDistance
         self.detailInformationURL = detailInformationURL
+        self.isFavorite = isFavorite
     }
 }

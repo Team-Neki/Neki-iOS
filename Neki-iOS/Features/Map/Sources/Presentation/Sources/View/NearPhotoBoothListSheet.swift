@@ -11,7 +11,8 @@ import Kingfisher
 
 struct NearPhotoBoothListSheet: View {
     @Bindable var store: StoreOf<PhotoBoothListFeature>
-    
+    @Namespace private var tabNamespace
+
     private let brandNameFormatter = PhotoBoothNameFormatter()
     
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }
@@ -19,7 +20,19 @@ struct NearPhotoBoothListSheet: View {
     var body: some View {
         ScrollView(.vertical) {
             photoBoothBrandFilterOptionsSection
-            nearByPhotoBoothListSection
+
+            VStack(spacing: 12) {
+                listTabBar
+
+                Group {
+                    switch store.selectedTab {
+                    case .nearby:
+                        nearByPhotoBoothListSection
+                    case .favorite:
+                        favoritePhotoBoothListSection
+                    }
+                }
+            }
         }
     }
 }
@@ -41,11 +54,23 @@ private extension NearPhotoBoothListSheet {
             .contentMargins(.horizontal, 20, for: .scrollContent)
             .scrollDisabled(false)
         } header: {
-            Text("네컷 사진 브랜드")
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 20)
+            HStack(spacing: .zero) {
+                Text("네컷 사진 브랜드")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 20)
+                    .padding(.top, 4)
+                    .nekiFont(.title18Bold)
+                
+                Button {
+                    store.send(.didTapBrandReorderButton)
+                } label: {
+                    Text("편집")
+                        .nekiFont(.caption12Medium)
+                        .foregroundStyle(.gray300)
+                }
                 .padding(.top, 4)
-                .nekiFont(.title18Bold)
+                .padding(.trailing, 20)
+            }
         }
     }
     
@@ -88,14 +113,52 @@ private extension NearPhotoBoothListSheet {
         }
     }
     
+    var listTabBar: some View {
+        HStack(spacing: 0) {
+            ForEach(PhotoBoothListFeature.ListTab.allCases) { tab in
+                let isSelected = store.selectedTab == tab
+                
+                Button {
+                    store.send(.selectTab(tab), animation: .easeInOut(duration: 0.2))
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(tab == .nearby ? .iconPinClip : .iconDoubleHeart)
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .saturation(isSelected ? 1 : 0)
+                        
+                        Text(tab.title)
+                            .nekiFont(.body14SemiBold)
+                            .foregroundStyle(isSelected ? .gray800 : .gray500)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 9)
+                    .background {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(.white)
+                                .matchedGeometryEffect(id: "selectedPhotoBoothListTab", in: tabNamespace)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .clipShape(.rect(cornerRadius: 8))
+            }
+        }
+        .padding(4)
+        .background(.gray50)
+        .clipShape(.rect(cornerRadius: 8))
+        .padding(.horizontal, 20)
+    }
+
     var nearByPhotoBoothListSection: some View {
         Section {
-            if store.photoBooths.isEmpty {
-                unavailableView
+            if store.visibleBooths.isEmpty {
+                unavailableView("1km 이내에 가까운 네컷 사진관이 없어요!")
             } else {
-                LazyVStack(alignment: .leading) {
+                LazyVStack(alignment: .leading, spacing: .zero) {
                     ForEach(store.visibleBooths) { photoBooth in
-                        nearByPhotoBoothCell(photoBooth)
+                        photoBoothCell(photoBooth)
                     }
                 }
             }
@@ -123,8 +186,45 @@ private extension NearPhotoBoothListSheet {
         .frame(maxHeight: .infinity)
     }
     
+    var favoritePhotoBoothListSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                favoriteBoothCountText
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+
+                if store.visibleFavoriteBooths.isEmpty {
+                    unavailableView("저장한 포토부스가 없어요.")
+                } else {
+                    LazyVStack(alignment: .leading, spacing: .zero) {
+                        ForEach(store.visibleFavoriteBooths) { photoBooth in
+                            photoBoothCell(photoBooth)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    var favoriteBoothCountText: some View {
+        HStack(spacing: 0) {
+            Text("저장한 포토부스 총 ")
+                .nekiFont(.body14Medium)
+                .foregroundStyle(.gray300)
+
+            Text("\(store.favoriteBoothCount)")
+                .nekiFont(.body14SemiBold)
+                .foregroundStyle(.gray400)
+
+            Text("곳")
+                .nekiFont(.body14Medium)
+                .foregroundStyle(.gray300)
+        }
+    }
+
     @ViewBuilder
-    func nearByPhotoBoothCell(_ photoBooth: PhotoBooth) -> some View {
+    func photoBoothCell(_ photoBooth: PhotoBooth) -> some View {
         HStack(spacing: 16) {
             KFImage(photoBooth.brand.imageURL)
                 .resizable()
@@ -134,31 +234,42 @@ private extension NearPhotoBoothListSheet {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             
             VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    Text(photoBooth.brand.name)
-                        .nekiFont(.title18SemiBold)
-                        .foregroundStyle(.gray900)
-                    
-                    Text(photoBooth.name)
-                        .nekiFont(.caption12Medium)
-                        .foregroundStyle(.gray600)
-                }
+                Text(photoBooth.brand.name)
+                    .nekiFont(.title18SemiBold)
+                    .foregroundStyle(.gray900)
+                    .lineLimit(1)
                 
-                Text(photoBooth.nearbyDistance?.distanceString ?? "")
-                    .nekiFont(.caption12Medium)
-                    .foregroundStyle(.gray400)
+                HStack(spacing: 6) {
+                    Text(photoBooth.name)
+                        .nekiFont(.body14Medium)
+                        .foregroundStyle(.gray600)
+                        .lineLimit(1)
+                }
             }
+            
+            Spacer()
+            
+            Button {
+                store.send(.didTapFavorite(photoBooth))
+            } label: {
+                Image(photoBooth.isFavorite ? .iconHeart28Fill : .iconHeart28Gray)
+            }
+            .buttonStyle(.plain)
         }
         .contentShape(.rect)
         .onTapGesture { store.send(.didTapBooth(photoBooth)) }
         .padding(.horizontal, 20)
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
     }
-    
-    var unavailableView: some View {
-        Text("1km 이내에 가까운 네컷 사진관이 없어요!")
-            .nekiFont(.body16Medium)
-            .foregroundStyle(.gray500)
-            .frame(height: 375)
+
+    func unavailableView(_ message: String) -> some View {
+        VStack(alignment: .center, spacing: 12) {
+            Image(.iconPlace)
+            
+            Text(message)
+                .nekiFont(.body16Medium)
+                .foregroundStyle(.gray500)
+        }
+        .frame(maxWidth: .infinity, minHeight: 375, alignment: .center)
     }
 }

@@ -11,6 +11,18 @@ import Dependencies
 import DependenciesMacros
 import os
 
+private enum PhotoBoothBrandOrderServerStub {
+    // 서버 브랜드 순서 저장 API 준비 전 실기기 검증용입니다.
+    // 서버 API 연동 시 이 플래그와 updateBrandOrder의 stub 분기를 제거합니다.
+    static let isEnabled = true
+}
+
+private enum PhotoBoothFavoriteServerStub {
+    // 서버 포토부스 즐겨찾기 API 준비 전 실기기 검증용입니다.
+    // 서버 API 연동 시 이 플래그와 updatePhotoBoothFavorite의 stub 분기를 제거합니다.
+    static let isEnabled = true
+}
+
 private enum TileSystem {
     static let defaultZoomLevel: Int = 15
     
@@ -59,10 +71,18 @@ private enum TileSystem {
 public final actor DefaultPhotoBoothRepository {
     typealias BrandID = String
     
+    private struct CachedPhotoBooth {
+        var photoBooth: PhotoBooth
+        var favoriteOrder: Int?
+    }
+    
     @Dependency(\.networkProvider) private var networkProvider
     
     private var cache: [MapTile: [PhotoBooth]] = [:]
+    private var photoBoothCacheByID: [PhotoBooth.ID: CachedPhotoBooth] = [:]
+    private var nextFavoriteOrder: Int = .zero
     private var brandMap: [BrandID: PhotoBoothBrand]?
+    private var brandOrderIDs: [PhotoBoothBrand.ID] = []
     private var brandFetchTask: Task<[BrandID: PhotoBoothBrand], Error>?
     
     public init() {}
@@ -121,6 +141,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 }
                 
                 if !cachedBooths.isEmpty {
+                    updateCachedPhotoBooths(cachedBooths)
                     continuation.yield(cachedBooths)
                 }
                 
@@ -141,7 +162,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                                         Logger.data.error("Brand Mapping Failed: '\(dto.brandName)' not found in brand keys: \(brands.keys)")
                                         return nil
                                     }
-                                    return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
+                                    return dto.toEntity(brand: brand)
                                 } ?? []
                                 
                                 return (tile, photoBooths)
@@ -150,6 +171,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                         
                         for try await (tile, booths) in group {
                             self.cache[tile] = booths
+                            self.updateCachedPhotoBooths(booths)
                             continuation.yield(booths)
                         }
                     }
@@ -178,13 +200,94 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let responseDTO: BaseResponseDTO<FetchNearbyPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let photoBooths = responseDTO.data?.photoBooths.compactMap { dto -> PhotoBooth? in
             guard let brand = brands[dto.brandName] else { return nil }
-            return PhotoBooth(id: dto.id, brand: brand, name: dto.branchName, coordinate: .init(latitude: dto.latitude, longitude: dto.longitude), address: dto.address, nearbyDistance: dto.nearbyDistance)
+            return dto.toEntity(brand: brand)
         } ?? []
+        updateCachedPhotoBooths(photoBooths)
         return photoBooths
     }
     
+    func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
+        if PhotoBoothFavoriteServerStub.isEnabled {
+            updateCachedFavoriteState(id: id, isFavorite: isFavorite)
+            return
+        }
+
+        let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
+        let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+        updateCachedFavoriteState(id: id, isFavorite: isFavorite)
+    }
+
+    func readFavoritePhotoBooths() async -> [PhotoBooth] {
+        photoBoothCacheByID.values
+            .filter { $0.photoBooth.isFavorite }
+            .sorted {
+                let lhsOrder = $0.favoriteOrder ?? Int.max
+                let rhsOrder = $1.favoriteOrder ?? Int.max
+                return lhsOrder > rhsOrder
+            }
+            .map(\.photoBooth)
+    }
+
     func loadBrands() async throws -> [PhotoBoothBrand] {
         let brands = try await ensureBrandsLoaded()
-        return Array(brands.values).sorted { $0.id < $1.id }
+        return orderedBrands(Array(brands.values), by: brandOrderIDs)
+    }
+
+    func updateBrandOrder(_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand] {
+        if PhotoBoothBrandOrderServerStub.isEnabled {
+            brandOrderIDs = brands.map(\.id)
+            return try await loadBrands()
+        }
+
+        // TODO: 서버 API 스펙 확정 후 실제 브랜드 순서 저장 endpoint 호출로 교체합니다.
+        brandOrderIDs = brands.map(\.id)
+        return try await loadBrands()
+    }
+}
+
+
+// MARK: - DefaultPhotoBoothRepository + Cache Helpers
+
+private extension DefaultPhotoBoothRepository {
+    func updateCachedPhotoBooths(_ photoBooths: [PhotoBooth]) {
+        photoBooths.forEach { photoBooth in
+            var entry = photoBoothCacheByID[photoBooth.id] ?? CachedPhotoBooth(photoBooth: photoBooth, favoriteOrder: nil)
+            entry.photoBooth = photoBooth
+            entry.favoriteOrder = updatedFavoriteOrder(currentOrder: entry.favoriteOrder, isFavorite: photoBooth.isFavorite)
+            photoBoothCacheByID[photoBooth.id] = entry
+        }
+    }
+
+    func updateCachedFavoriteState(id: PhotoBooth.ID, isFavorite: Bool) {
+        if var entry = photoBoothCacheByID[id] {
+            entry.photoBooth.isFavorite = isFavorite
+            entry.favoriteOrder = updatedFavoriteOrder(currentOrder: entry.favoriteOrder, isFavorite: isFavorite)
+            photoBoothCacheByID[id] = entry
+        }
+
+        for tile in cache.keys {
+            guard let index = cache[tile]?.firstIndex(where: { $0.id == id }) else { continue }
+            cache[tile]?[index].isFavorite = isFavorite
+        }
+    }
+
+    func updatedFavoriteOrder(currentOrder: Int?, isFavorite: Bool) -> Int? {
+        guard isFavorite else { return nil }
+        if let currentOrder { return currentOrder }
+        defer { nextFavoriteOrder += 1 }
+        return nextFavoriteOrder
+    }
+
+    func orderedBrands(_ brands: [PhotoBoothBrand], by orderIDs: [PhotoBoothBrand.ID]) -> [PhotoBoothBrand] {
+        guard orderIDs.isEmpty == false else {
+            return brands.sorted { $0.id < $1.id }
+        }
+
+        let brandsByID = Dictionary(uniqueKeysWithValues: brands.map { ($0.id, $0) })
+        var orderedBrands = orderIDs.compactMap { brandsByID[$0] }
+        let orderedIDSet = Set(orderIDs)
+        orderedBrands.append(contentsOf: brands.filter { orderedIDSet.contains($0.id) == false }.sorted { $0.id < $1.id })
+        return orderedBrands
     }
 }

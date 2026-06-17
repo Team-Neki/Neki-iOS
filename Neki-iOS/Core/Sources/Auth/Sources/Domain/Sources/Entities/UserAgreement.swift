@@ -9,12 +9,20 @@ import Foundation
 
 public struct Term: Identifiable, Equatable, Sendable {
     public let id: Int
+    public let termType: String?
     public let title: String
     public let isRequired: Bool
     public let termInformationURL: URL?
     
-    public init(id: Int, title: String, isRequired: Bool = true, termInformationURL: URL? = nil) {
+    public init(
+        id: Int,
+        termType: String? = nil,
+        title: String,
+        isRequired: Bool = true,
+        termInformationURL: URL? = nil
+    ) {
         self.id = id
+        self.termType = termType
         self.title = title
         self.isRequired = isRequired
         self.termInformationURL = termInformationURL

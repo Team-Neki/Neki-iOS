@@ -12,8 +12,6 @@ import Kingfisher
 public struct PhotoBoothBrandReorderView: View {
     @Bindable var store: StoreOf<PhotoBoothBrandReorderFeature>
 
-    private let brandNameFormatter = PhotoBoothNameFormatter()
-
     public init(store: StoreOf<PhotoBoothBrandReorderFeature>) {
         self.store = store
     }
@@ -53,7 +51,7 @@ public struct PhotoBoothBrandReorderView: View {
     private func brandCell(_ brand: PhotoBoothBrand) -> some View {
         BrandReorderCell(
             brand: brand,
-            brandName: brandNameFormatter.format(brand: brand)
+            brandName: brand.name
         )
         .listRowInsets(.init(top: 0, leading: 20, bottom: 0, trailing: 20))
         .listRowSeparator(.hidden)
@@ -81,19 +79,22 @@ private struct BrandReorderCell: View {
                 .onFailureImage(.imgDefaultBrandOriginal)
                 .cancelOnDisappear(true)
                 .frame(width: 48, height: 48)
-                .clipShape(.circle)
+                .clipShape(.rect(cornerRadius: 8))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(brandName)
                     .nekiFont(.body16SemiBold)
                     .foregroundStyle(.gray900)
                     .lineLimit(1)
+                    .layoutPriority(1)
 
                 Text(brand.englishName)
                     .nekiFont(.caption12Medium)
                     .foregroundStyle(.gray500)
                     .lineLimit(1)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .layoutPriority(1)
         }
     }
 }

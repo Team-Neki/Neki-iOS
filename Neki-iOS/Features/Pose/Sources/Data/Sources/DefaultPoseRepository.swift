@@ -10,14 +10,6 @@ import Dependencies
 import DependenciesMacros
 import os
 
-private final class RandomPoseNode {
-    var pose: Pose
-    var next: RandomPoseNode?
-    var previous: RandomPoseNode?
-    
-    init(pose: Pose) { self.pose = pose }
-}
-
 private struct Page {
     let poseIDs: [PoseID]
     let hasNext: Bool
@@ -25,10 +17,17 @@ private struct Page {
 
 public final actor DefaultPoseRepository {
     private var cache: [PoseID: Pose] = [:]
+    private var cachedPoseIDsByPeopleCount: [PeopleCountOption: Set<PoseID>] = [:]
     private var generalPages: [PageID: Page] = [:]
     private var scrappedPages: [PageID: Page] = [:]
     private var activeRandomPosePeopleCount: PeopleCountOption = .solo
-    private var currentRandomNode: RandomPoseNode?
+    private var randomPoseHistoryIDs: [PoseID] = []
+    private var currentRandomPoseIndex: Int?
+    private var randomPosePrefetchTask: Task<Pose, Error>?
+    private var randomPoseRequestSequence: Int = .zero
+    private var randomPoseCommitSequence: Int = .zero
+    private var pendingRandomPoseTasks: [Int: Task<Pose, Error>] = [:]
+    private var committedRandomPoseIDs: [Int: PoseID] = [:]
     private var scrapTasks: [PoseID: Task<Void, Error>] = [:]
     
     private let maxRetryCount: Int = 3
@@ -52,9 +51,8 @@ private extension DefaultPoseRepository {
         }
     }
     
-    func syncNodeWithCache(_ node: RandomPoseNode) -> Pose {
-        guard let cached = cache[node.pose.id] else { return node.pose }
-        node.pose = cached; return cached
+    func cachedPose(id: PoseID) -> Pose? {
+        cache[id]
     }
     
     /// 캐시 정책을 적용하여 데이터를 병합합니다.
@@ -63,39 +61,43 @@ private extension DefaultPoseRepository {
     ///   - preserved: `true`일 경우 로컬의 상태(스크랩 여부 등)를 유지하고, `false`일 경우 새 데이터로 덮어씁니다.
     func cacheOrUpdate(_ newPose: Pose, preserved: Bool = false) -> Pose {
         guard let cachedPose = cache[newPose.id] else {
-            cache[newPose.id] = newPose
+            updateCachedPose(newPose)
             return newPose
         }
         
         guard preserved else {
-            cache[newPose.id] = newPose
+            updateCachedPose(newPose, replacing: cachedPose)
             return newPose
         }
         
         var merged = newPose
         merged.isScrapped = cachedPose.isScrapped
-        cache[newPose.id] = merged
+        updateCachedPose(merged, replacing: cachedPose)
         return merged
     }
     
-    func prefetchNext(from node: RandomPoseNode) async throws {
-        guard node.next == nil else { return }
-        let recentIDs = checkRecentPoseIDs(from: node, limit: maxRetryCount)
-        
-        do {
-            let newPose = try await fetchRandomPose(excluding: recentIDs)
-            let handled = cacheOrUpdate(newPose)
-            appendNode(handled, to: node)
-        } catch {
-            Logger.data.error("Random Pose Prefetching Failed: \(error)")
+    func startRandomPosePrefetchIfNeeded() {
+        guard randomPosePrefetchTask == nil else { return }
+        let peopleCount = activeRandomPosePeopleCount
+        let excludedIDs = recentPoseIDs(limit: maxRetryCount)
+        randomPosePrefetchTask = Task { [weak self] in
+            guard let self else { throw PoseRepositoryError.noHistory }
+            return try await self.fetchRandomPose(
+                peopleCount: peopleCount,
+                excluding: excludedIDs
+            )
         }
     }
-    
-    func appendNode(_ pose: Pose, to previous: RandomPoseNode) {
-        guard previous.next == nil else { return }
-        let newNode = RandomPoseNode(pose: pose)
-        previous.next = newNode
-        newNode.previous = previous
+
+    func appendRandomPoseToHistory(_ pose: Pose) -> Pose {
+        let handled = cacheOrUpdate(pose, preserved: true)
+
+        if let currentIndex = currentRandomPoseIndex,
+           currentIndex < randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex) { randomPoseHistoryIDs.removeSubrange(randomPoseHistoryIDs.index(after: currentIndex)..<randomPoseHistoryIDs.endIndex) }
+
+        randomPoseHistoryIDs.append(handled.id)
+        currentRandomPoseIndex = randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex)
+        return handled
     }
     
     /// 스크랩 목록에서 캐시를 갱신합니다. (스크랩 등록 또는 취소 시)
@@ -119,12 +121,17 @@ private extension DefaultPoseRepository {
         scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext)
     }
     
-    func fetchRandomPose(retryCount: Int = .zero, excluding excludedIDs: Set<PoseID>) async throws -> Pose {
-        let peopleCountValue = convertToRawValue(activeRandomPosePeopleCount)
+    func fetchRandomPose(
+        peopleCount: PeopleCountOption,
+        excluding excludedIDs: Set<PoseID>
+    ) async throws -> Pose {
+        let peopleCountValue = convertToRawValue(peopleCount)
         let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
         
         @Sendable func requestSinglePose() async throws -> Pose {
+            try Task.checkCancellation()
             let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
+            try Task.checkCancellation()
             guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
             return newPose
         }
@@ -151,36 +158,95 @@ private extension DefaultPoseRepository {
             Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
             guard cache.isEmpty == false else { throw error }
             
-            let validCachedPoses = cache.values.filter {
-                excludedIDs.contains($0.id) == false &&
-                $0.peopleCountOption == activeRandomPosePeopleCount
-            }
+            let countMatchedIDs = cachedPoseIDsByPeopleCount[peopleCount] ?? []
+            let validCachedPoses = countMatchedIDs.lazy
+                .filter { excludedIDs.contains($0) == false }
+                .compactMap { cache[$0] }
             
             if let randomFallbackPose = validCachedPoses.randomElement() {
                 return randomFallbackPose
             } else {
-                let anyCountMatch = cache.values.filter { $0.peopleCountOption == activeRandomPosePeopleCount }
-                guard let fallback = anyCountMatch.randomElement() else { throw error }
+                guard let fallbackID = countMatchedIDs.randomElement(),
+                      let fallback = cache[fallbackID]
+                else { throw error }
                 return fallback
             }
             
         }
     }
     
-    func checkRecentPoseIDs(from anchorNode: RandomPoseNode?, limit: Int) -> Set<PoseID> {
-        var ids: Set<PoseID> = []
-        var currentNode = anchorNode
-        var count: Int = .zero
-        
-        if let current = currentNode { ids.insert(current.pose.id) }
-        
-        while let previous = currentNode?.previous, count < limit {
-            ids.insert(previous.pose.id)
-            currentNode = previous
-            count += 1
+    func recentPoseIDs(limit: Int) -> Set<PoseID> {
+        guard let currentIndex = currentRandomPoseIndex else { return [] }
+        let lowerBound = max(randomPoseHistoryIDs.startIndex, currentIndex - limit)
+        return Set(randomPoseHistoryIDs[lowerBound...currentIndex])
+    }
+
+    func resetRandomPoseBuffer() {
+        pendingRandomPoseTasks.values.forEach { $0.cancel() }
+        pendingRandomPoseTasks.removeAll(keepingCapacity: true)
+        committedRandomPoseIDs.removeAll(keepingCapacity: true)
+        randomPoseRequestSequence = .zero
+        randomPoseCommitSequence = .zero
+        randomPosePrefetchTask?.cancel()
+        randomPosePrefetchTask = nil
+        randomPoseHistoryIDs.removeAll(keepingCapacity: true)
+        currentRandomPoseIndex = nil
+    }
+
+    func updateCachedPose(_ pose: Pose, replacing oldPose: Pose? = nil) {
+        if let oldPose, oldPose.peopleCountOption != pose.peopleCountOption { removeCachedPoseID(pose.id, from: oldPose.peopleCountOption) }
+        cache[pose.id] = pose
+        cachedPoseIDsByPeopleCount[pose.peopleCountOption, default: []].insert(pose.id)
+    }
+
+    func removeCachedPoseID(_ poseID: PoseID, from peopleCount: PeopleCountOption?) {
+        guard let peopleCount else { return }
+        cachedPoseIDsByPeopleCount[peopleCount]?.remove(poseID)
+        if cachedPoseIDsByPeopleCount[peopleCount]?.isEmpty == true { cachedPoseIDsByPeopleCount[peopleCount] = nil }
+    }
+
+    func initializeRandomPoseHistory(peopleCount: PeopleCountOption) async throws -> Pose {
+        activeRandomPosePeopleCount = peopleCount
+        randomPosePrefetchTask?.cancel()
+        randomPosePrefetchTask = nil
+        randomPoseHistoryIDs.removeAll(keepingCapacity: true)
+        currentRandomPoseIndex = nil
+
+        let pose = try await fetchRandomPose(peopleCount: peopleCount, excluding: [])
+        let handled = appendRandomPoseToHistory(pose)
+        startRandomPosePrefetchIfNeeded()
+        return handled
+    }
+
+    func makeRandomPoseTask(peopleCount: PeopleCountOption) -> Task<Pose, Error> {
+        if let task = randomPosePrefetchTask {
+            randomPosePrefetchTask = nil
+            return task
         }
-        
-        return ids
+
+        let excludedIDs = recentPoseIDs(limit: maxRetryCount)
+        return Task { [weak self] in
+            guard let self else { throw PoseRepositoryError.noHistory }
+            return try await self.fetchRandomPose(
+                peopleCount: peopleCount,
+                excluding: excludedIDs
+            )
+        }
+    }
+
+    func fetchReplacementIfNeeded(_ pose: Pose, peopleCount: PeopleCountOption) async throws -> Pose {
+        var candidate = pose
+        var retryCount: Int = .zero
+
+        while recentPoseIDs(limit: maxRetryCount).contains(candidate.id), retryCount < maxRetryCount {
+            retryCount += 1
+            candidate = try await fetchRandomPose(
+                peopleCount: peopleCount,
+                excluding: recentPoseIDs(limit: maxRetryCount)
+            )
+        }
+
+        return candidate
     }
 }
 
@@ -211,7 +277,12 @@ extension DefaultPoseRepository: PoseRepository {
         let poses = responseDTO.data?.items.compactMap { $0.toEntity() } ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
         
-        let handled = poses.map { var pose = $0; pose.isScrapped = true; cache[pose.id] = pose; return pose }
+        let handled = poses.map { pose in
+            var pose = pose
+            pose.isScrapped = true
+            updateCachedPose(pose)
+            return pose
+        }
         scrappedPages[page] = Page(poseIDs: handled.map(\.id), hasNext: hasNext)
         return (handled, hasNext)
     }
@@ -231,7 +302,7 @@ extension DefaultPoseRepository: PoseRepository {
         let originalState = pose.isScrapped
         let newState = originalState == false
         pose.isScrapped = newState
-        cache[poseID] = pose
+        updateCachedPose(pose)
         
         updateScrappedPagesCache(poseID: poseID, isScrapped: newState)
         
@@ -246,7 +317,7 @@ extension DefaultPoseRepository: PoseRepository {
                 scrapTasks[pose.id] = nil
                 if var rolledBack = cache[poseID] {
                     rolledBack.isScrapped = originalState
-                    cache[poseID] = rolledBack
+                    updateCachedPose(rolledBack)
                 }
                 updateScrappedPagesCache(poseID: poseID, isScrapped: originalState)
                 throw error
@@ -259,75 +330,97 @@ extension DefaultPoseRepository: PoseRepository {
     
     public func initializeRandomPoseBuffer(peopleCount: PeopleCountOption) async throws -> Pose {
         await flushRandomPoseBuffer()
-        
-        activeRandomPosePeopleCount = peopleCount
-        let peopleCountValue = convertToRawValue(peopleCount)
-        let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
-        async let request: BaseResponseDTO<PoseDTO> = networkProvider.request(endpoint: endpoint)
-        async let requestSpare: BaseResponseDTO<PoseDTO> = networkProvider.request(endpoint: endpoint)
-        
-        let (requestDTO, requestDTOSpare) = try await (request, requestSpare)
-        guard let pose = requestDTO.data?.toEntity(), let poseSpare = requestDTOSpare.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
-        let node1 = RandomPoseNode(pose: cacheOrUpdate(pose, preserved: true))
-        let node2 = RandomPoseNode(pose: cacheOrUpdate(poseSpare, preserved: true))
-        node1.next = node2
-        node2.previous = node1
-        currentRandomNode = node1
-        return node1.pose
+        return try await initializeRandomPoseHistory(peopleCount: peopleCount)
     }
     
     public func flushRandomPoseBuffer() async {
-        guard var node = currentRandomNode else { return }
-        
-        // 앞으로 가면서 연결 끊기
-        var forward = node.next
-        while let next = forward {
-            node.next = nil
-            next.previous = nil
-            forward = next.next
-            node = next
-        }
-        
-        // 뒤로 가면서 연결 끊기
-        node = currentRandomNode!
-        var backward = node.previous
-        while let prev = backward {
-            node.previous = nil
-            prev.next = nil
-            backward = prev.previous
-            node = prev
-        }
-        
-        currentRandomNode = nil
+        resetRandomPoseBuffer()
     }
     
     public func fetchNextRandomPose() async throws -> Pose {
-        guard let currentNode = currentRandomNode else { return try await initializeRandomPoseBuffer(peopleCount: activeRandomPosePeopleCount) }
-        
-        if let nextNode = currentNode.next {
-            currentRandomNode = nextNode
-            Task { [weak self] in try await self?.prefetchNext(from: nextNode) }
-            return syncNodeWithCache(nextNode)
+        try Task.checkCancellation()
+        guard let currentIndex = currentRandomPoseIndex else { return try await initializeRandomPoseHistory(peopleCount: activeRandomPosePeopleCount) }
+
+        let nextIndex = randomPoseHistoryIDs.index(after: currentIndex)
+        if pendingRandomPoseTasks.isEmpty,
+           randomPoseHistoryIDs.indices.contains(nextIndex),
+           let pose = cachedPose(id: randomPoseHistoryIDs[nextIndex]) {
+            currentRandomPoseIndex = nextIndex
+            startRandomPosePrefetchIfNeeded()
+            return pose
         }
-        
-        let recentIDs = checkRecentPoseIDs(from: currentNode, limit: maxRetryCount)
-        let handled = try await fetchRandomPose(excluding: recentIDs)
-        let cachedPose = cacheOrUpdate(handled)
-        
-        guard let existingNext = currentNode.next else {
-            appendNode(cachedPose, to: currentNode)
-            guard let newNext = currentNode.next else { return cachedPose }
-            currentRandomNode = newNext
-            return newNext.pose
+
+        let peopleCount = activeRandomPosePeopleCount
+        randomPoseRequestSequence += 1
+        let sequence = randomPoseRequestSequence
+        pendingRandomPoseTasks[sequence] = makeRandomPoseTask(peopleCount: peopleCount)
+
+        while randomPoseCommitSequence < sequence {
+            let nextSequence = randomPoseCommitSequence + 1
+
+            if let committedPoseID = committedRandomPoseIDs[sequence],
+               let committedPose = cachedPose(id: committedPoseID) {
+                return committedPose
+            }
+
+            guard let task = pendingRandomPoseTasks[nextSequence] else {
+                randomPoseCommitSequence = nextSequence
+                guard nextSequence != sequence else { throw PoseRepositoryError.noHistory }
+                continue
+            }
+
+            let pose: Pose
+            do {
+                pose = try await task.value
+            } catch {
+                pendingRandomPoseTasks[nextSequence] = nil
+                randomPoseCommitSequence = nextSequence
+                guard nextSequence != sequence else { throw error }
+                continue
+            }
+
+            guard pendingRandomPoseTasks[nextSequence] != nil else { continue }
+
+            pendingRandomPoseTasks[nextSequence] = nil
+            let uniquePose: Pose
+            do {
+                uniquePose = try await fetchReplacementIfNeeded(
+                    pose,
+                    peopleCount: peopleCount
+                )
+            } catch {
+                randomPoseCommitSequence = nextSequence
+                guard nextSequence != sequence else { throw error }
+                continue
+            }
+            let handled = appendRandomPoseToHistory(uniquePose)
+            committedRandomPoseIDs[nextSequence] = handled.id
+            randomPoseCommitSequence = nextSequence
+            startRandomPosePrefetchIfNeeded()
+
+            guard nextSequence != sequence else { return handled }
         }
-        
-        currentRandomNode = existingNext
-        return syncNodeWithCache(existingNext)
+
+        guard let poseID = committedRandomPoseIDs[sequence],
+              let pose = cachedPose(id: poseID)
+        else {
+            throw PoseRepositoryError.noHistory
+        }
+        return pose
     }
     
     public func fetchPreviousRandomPose() async throws -> Pose {
-        guard let previous = currentRandomNode?.previous else { throw PoseRepositoryError.noHistory }
-        currentRandomNode = previous
-        return syncNodeWithCache(previous)
+        guard let currentIndex = currentRandomPoseIndex,
+              currentIndex > randomPoseHistoryIDs.startIndex
+        else {
+            throw PoseRepositoryError.noHistory
+        }
+
+        let previousIndex = randomPoseHistoryIDs.index(before: currentIndex)
+        guard let pose = cachedPose(id: randomPoseHistoryIDs[previousIndex]) else { throw PoseRepositoryError.noHistory }
+
+        currentRandomPoseIndex = previousIndex
+        startRandomPosePrefetchIfNeeded()
+        return pose
     }
 }

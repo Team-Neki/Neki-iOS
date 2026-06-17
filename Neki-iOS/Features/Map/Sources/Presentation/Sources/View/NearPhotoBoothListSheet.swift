@@ -20,14 +20,17 @@ struct NearPhotoBoothListSheet: View {
     var body: some View {
         ScrollView(.vertical) {
             photoBoothBrandFilterOptionsSection
-            listTabBar
 
-            Group {
-                switch store.selectedTab {
-                case .nearby:
-                    nearByPhotoBoothListSection
-                case .favorite:
-                    favoritePhotoBoothListSection
+            VStack(spacing: 12) {
+                listTabBar
+
+                Group {
+                    switch store.selectedTab {
+                    case .nearby:
+                        nearByPhotoBoothListSection
+                    case .favorite:
+                        favoritePhotoBoothListSection
+                    }
                 }
             }
         }
@@ -146,7 +149,6 @@ private extension NearPhotoBoothListSheet {
         .background(.gray50)
         .clipShape(.rect(cornerRadius: 8))
         .padding(.horizontal, 20)
-        .padding(.bottom, 20)
     }
 
     var nearByPhotoBoothListSection: some View {
@@ -187,8 +189,7 @@ private extension NearPhotoBoothListSheet {
     var favoritePhotoBoothListSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                Text("저장한 포토부스 총 \(store.favoriteBoothCount)곳")
-                    .foregroundStyle(.gray300)
+                favoriteBoothCountText
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
 
@@ -204,6 +205,22 @@ private extension NearPhotoBoothListSheet {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    var favoriteBoothCountText: some View {
+        HStack(spacing: 0) {
+            Text("저장한 포토부스 총 ")
+                .nekiFont(.body14Medium)
+                .foregroundStyle(.gray300)
+
+            Text("\(store.favoriteBoothCount)")
+                .nekiFont(.body14SemiBold)
+                .foregroundStyle(.gray400)
+
+            Text("곳")
+                .nekiFont(.body14Medium)
+                .foregroundStyle(.gray300)
+        }
     }
 
     @ViewBuilder
@@ -227,15 +244,6 @@ private extension NearPhotoBoothListSheet {
                         .nekiFont(.body14Medium)
                         .foregroundStyle(.gray600)
                         .lineLimit(1)
-                    
-                    Rectangle()
-                        .frame(width: 1, height: 10)
-                        .foregroundStyle(.gray100)
-                    
-
-                    Text(photoBooth.nearbyDistance?.distanceString ?? "")
-                        .nekiFont(.body14SemiBold)
-                        .foregroundStyle(.gray700)
                 }
             }
             

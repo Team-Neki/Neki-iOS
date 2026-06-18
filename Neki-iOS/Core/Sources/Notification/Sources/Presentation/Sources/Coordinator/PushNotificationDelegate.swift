@@ -8,6 +8,7 @@
 import Foundation
 import UserNotifications
 
+@MainActor
 final class PushNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
     private let eventBroker: PushNotificationEventBroker
 

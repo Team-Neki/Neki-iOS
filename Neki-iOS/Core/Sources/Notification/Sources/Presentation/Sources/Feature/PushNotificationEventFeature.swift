@@ -44,7 +44,9 @@ struct PushNotificationEventFeature {
             case let .eventReceived(.responseReceived(payload)):
                 Logger.data.debug("푸시 알림 클릭 이벤트 수신: \(payload.redactedLogDescription)")
                 return .run { _ in
-                    analyticsClient.logEvent(PushNotificationAnalyticsEvent.notificationClick(payload: payload))
+                    await MainActor.run {
+                        analyticsClient.logEvent(PushNotificationAnalyticsEvent.notificationClick(payload: payload))
+                    }
                 }
             }
         }

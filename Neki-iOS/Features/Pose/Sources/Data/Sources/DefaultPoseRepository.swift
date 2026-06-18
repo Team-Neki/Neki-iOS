@@ -156,18 +156,19 @@ private extension DefaultPoseRepository {
             }
         } catch {
             Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
-            guard cache.isEmpty == false else { throw error }
+            let cachedPoses = cache
+            guard cachedPoses.isEmpty == false else { throw error }
             
             let countMatchedIDs = cachedPoseIDsByPeopleCount[peopleCount] ?? []
             let validCachedPoses = countMatchedIDs.lazy
                 .filter { excludedIDs.contains($0) == false }
-                .compactMap { cache[$0] }
+                .compactMap { cachedPoses[$0] }
             
             if let randomFallbackPose = validCachedPoses.randomElement() {
                 return randomFallbackPose
             } else {
                 guard let fallbackID = countMatchedIDs.randomElement(),
-                      let fallback = cache[fallbackID]
+                      let fallback = cachedPoses[fallbackID]
                 else { throw error }
                 return fallback
             }

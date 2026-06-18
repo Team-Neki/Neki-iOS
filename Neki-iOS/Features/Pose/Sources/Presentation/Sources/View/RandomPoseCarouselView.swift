@@ -101,6 +101,7 @@ private extension RandomPoseCarouselView {
             
             Spacer()
             
+            /* 26.06.17 랜덤포즈 페이지에서 상세보기 화면으로 이동할 수 없도록 하자는 기획의도 반영
             Button {
                 guard let pose = store.currentPose else { return }
                 store.send(.onTapDetail(pose))
@@ -112,6 +113,7 @@ private extension RandomPoseCarouselView {
                             .fill(.primary400)
                     }
             }
+             */
             
             Button {
                 store.send(.onTapScrap)

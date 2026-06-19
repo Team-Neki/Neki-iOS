@@ -62,8 +62,8 @@ private extension DeviceAuthorizationPreferenceView {
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             Text(title)
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray400)
+                .nekiFont(.body14Regular)
+                .foregroundStyle(.gray300)
 
             content()
         }

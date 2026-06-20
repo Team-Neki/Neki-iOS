@@ -78,10 +78,16 @@ public struct DefaultAuthRepository: AuthRepository {
     }
     
     public func logout() async throws(AuthRepositoryError) {
+        let endpoint = AuthEndpoint.logout
         do {
+            let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
             try tokenStorage.delete()
-        } catch {
+        } catch let error as NetworkError {
+            throw .networkError(error)
+        } catch is TokenStorageError {
             throw .userNotFound
+        } catch {
+            throw .unknown
         }
     }
     

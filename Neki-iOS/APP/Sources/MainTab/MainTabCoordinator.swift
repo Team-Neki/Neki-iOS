@@ -37,6 +37,7 @@ struct MainTabCoordinator {
         var isTabbarHidden: Bool = false
         var toast: NekiToastItem? = nil
         var isPermissionAlertPresented: Bool = false
+        var isPushNotificationPermissionAlertPresented: Bool = false
         var shouldPresentMarketingConsentAlert: Bool
         var isMarketingConsentAlertPresented: Bool = false
         var isUpdatingMarketingConsent: Bool = false
@@ -80,6 +81,9 @@ struct MainTabCoordinator {
         case setPhotosPickerPresented(Bool)
         case presentPermissionAlert
         case dismissPermissionAlert
+        case requestNotificationList
+        case pushNotificationListAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
+        case dismissPushNotificationPermissionAlert
         case openAppSettings
         case dismissMarketingConsentAlert
         case updateMarketingConsent(Bool)
@@ -188,9 +192,44 @@ struct MainTabCoordinator {
             case .dismissPermissionAlert:
                 state.isPermissionAlertPresented = false
                 return .none
+
+            case .requestNotificationList:
+                return .run { send in
+                    await send(.pushNotificationListAuthorizationResponse(Result {
+                        let status = try await pushNotificationClient.checkAuthorizationStatus()
+                        let resolvedStatus: UNAuthorizationStatus
+                        if status == .notDetermined {
+                            _ = try await pushNotificationClient.requestAuthorization()
+                            resolvedStatus = try await pushNotificationClient.checkAuthorizationStatus()
+                        } else {
+                            resolvedStatus = status
+                        }
+                        if resolvedStatus.canPresentNotificationList {
+                            _ = try? await pushNotificationClient.synchronizeDeviceToken()
+                        }
+                        return resolvedStatus
+                    }))
+                }
+
+            case let .pushNotificationListAuthorizationResponse(.success(status)):
+                guard status.canPresentNotificationList else {
+                    state.isPushNotificationPermissionAlertPresented = true
+                    return .none
+                }
+                state.destination = .notificationList(.init())
+                return .none
+
+            case .pushNotificationListAuthorizationResponse(.failure):
+                state.isPushNotificationPermissionAlertPresented = true
+                return .none
+
+            case .dismissPushNotificationPermissionAlert:
+                state.isPushNotificationPermissionAlertPresented = false
+                return .none
                 
             case .openAppSettings:
                 state.isPermissionAlertPresented = false
+                state.isPushNotificationPermissionAlertPresented = false
                 return .run { _ in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)
@@ -255,8 +294,7 @@ struct MainTabCoordinator {
             case .archive(.delegate(.requestNotificationList)),
                  .pose(.delegate(.requestNotificationList)),
                  .myPage(.delegate(.requestNotificationList)):
-                state.destination = .notificationList(.init())
-                return .none
+                return .send(.requestNotificationList)
                 
             case let .archive(.delegate(.showToast(item))):
                 state.toast = item
@@ -393,5 +431,15 @@ extension MainTabCoordinator {
     }
     enum PendingPresentation {
         case gallery
+    }
+}
+
+private extension UNAuthorizationStatus {
+    var canPresentNotificationList: Bool {
+        switch self {
+        case .authorized, .provisional, .ephemeral: true
+        case .notDetermined, .denied: false
+        @unknown default: false
+        }
     }
 }

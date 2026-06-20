@@ -13,6 +13,7 @@ import UserNotifications
 public struct PushNotificationClient {
     public var checkAuthorizationStatus: @Sendable () async throws -> UNAuthorizationStatus
     public var requestAuthorization: @Sendable () async throws -> Bool
+    public var fetchNotificationList: @Sendable () async throws -> [PushNotificationListItem]
     public var synchronizeDeviceToken: @Sendable () async throws -> UNAuthorizationStatus
     public var updateAPNSToken: @Sendable (_ token: Data) async throws -> Void
 }
@@ -27,6 +28,9 @@ extension PushNotificationClient: DependencyKey {
             },
             requestAuthorization: {
                 try await repository.requestAuthorization()
+            },
+            fetchNotificationList: {
+                try await repository.fetchNotificationList()
             },
             synchronizeDeviceToken: {
                 let deviceToken = try await repository.fetchFCMToken()
@@ -48,6 +52,7 @@ extension PushNotificationClient: TestDependencyKey {
     public static let testValue = PushNotificationClient(
         checkAuthorizationStatus: { .notDetermined },
         requestAuthorization: { false },
+        fetchNotificationList: { [] },
         synchronizeDeviceToken: { .notDetermined },
         updateAPNSToken: { _ in }
     )

@@ -26,6 +26,11 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
         try await notificationCenter.requestAuthorization(options: [.alert, .badge, .sound])
     }
 
+    func fetchNotificationList() async throws -> [PushNotificationListItem] {
+        // TODO: Replace this stub with the real notification list API when the server contract is finalized.
+        []
+    }
+
     func fetchFCMToken() async throws -> PushNotificationToken {
         guard Messaging.messaging().apnsToken != nil else { throw PushNotificationRepositoryError.missingAPNSToken }
 

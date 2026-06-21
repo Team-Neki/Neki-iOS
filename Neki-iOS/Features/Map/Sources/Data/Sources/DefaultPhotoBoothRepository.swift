@@ -17,12 +17,6 @@ private enum PhotoBoothBrandOrderServerStub {
     static let isEnabled = true
 }
 
-private enum PhotoBoothFavoriteServerStub {
-    // 서버 포토부스 즐겨찾기 API 준비 전 실기기 검증용입니다.
-    // 서버 API 연동 시 이 플래그와 updatePhotoBoothFavorite의 stub 분기를 제거합니다.
-    static let isEnabled = true
-}
-
 private enum TileSystem {
     static let defaultZoomLevel: Int = 15
     
@@ -207,26 +201,24 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
     }
     
     func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
-        if PhotoBoothFavoriteServerStub.isEnabled {
-            updateCachedFavoriteState(id: id, isFavorite: isFavorite)
-            return
-        }
-
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
         updateCachedFavoriteState(id: id, isFavorite: isFavorite)
     }
 
-    func readFavoritePhotoBooths() async -> [PhotoBooth] {
-        photoBoothCacheByID.values
-            .filter { $0.photoBooth.isFavorite }
-            .sorted {
-                let lhsOrder = $0.favoriteOrder ?? Int.max
-                let rhsOrder = $1.favoriteOrder ?? Int.max
-                return lhsOrder > rhsOrder
-            }
-            .map(\.photoBooth)
+    func readFavoritePhotoBooths() async throws -> [PhotoBooth] {
+        let brands = try await ensureBrandsLoaded()
+        let endpoint = MapEndpoint.fetchFavorites
+        let responseDTO: BaseResponseDTO<FetchFavoritePhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        let photoBooths = responseDTO.data?.items.compactMap { dto -> PhotoBooth? in
+            guard let brand = brands[dto.brandName] else { return nil }
+            var photoBooth = dto.toEntity(brand: brand)
+            photoBooth.isFavorite = true
+            return photoBooth
+        } ?? []
+        updateCachedFavoritePhotoBooths(photoBooths)
+        return photoBooths
     }
 
     func loadBrands() async throws -> [PhotoBoothBrand] {
@@ -270,6 +262,28 @@ private extension DefaultPhotoBoothRepository {
             guard let index = cache[tile]?.firstIndex(where: { $0.id == id }) else { continue }
             cache[tile]?[index].isFavorite = isFavorite
         }
+    }
+
+    func updateCachedFavoritePhotoBooths(_ photoBooths: [PhotoBooth]) {
+        let favoriteIDs = Set(photoBooths.map(\.id))
+
+        for id in Array(photoBoothCacheByID.keys) {
+            guard favoriteIDs.contains(id) == false else { continue }
+            updateCachedFavoriteState(id: id, isFavorite: false)
+        }
+
+        let count = photoBooths.count
+        photoBooths.enumerated().forEach { index, photoBooth in
+            var favoriteBooth = photoBooth
+            favoriteBooth.isFavorite = true
+            var entry = photoBoothCacheByID[favoriteBooth.id] ?? CachedPhotoBooth(photoBooth: favoriteBooth, favoriteOrder: nil)
+            entry.photoBooth = favoriteBooth
+            entry.favoriteOrder = count - index
+            photoBoothCacheByID[favoriteBooth.id] = entry
+            updateCachedFavoriteState(id: favoriteBooth.id, isFavorite: true)
+        }
+
+        nextFavoriteOrder = max(nextFavoriteOrder, count + 1)
     }
 
     func updatedFavoriteOrder(currentOrder: Int?, isFavorite: Bool) -> Int? {

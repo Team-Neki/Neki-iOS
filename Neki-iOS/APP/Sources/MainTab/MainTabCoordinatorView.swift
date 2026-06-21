@@ -62,6 +62,16 @@ struct MainTabCoordinatorView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.dismissPermissionAlert) }
         )
+        .nekiAlert(
+            isPresented: $store.isPushNotificationPermissionAlertPresented,
+            style: .cancelable,
+            title: "알림이 꺼져있어요.",
+            subtitle: "네키 알림을 받으려면\n기기 설정에서 알림 권한을 허용해주세요.",
+            confirmText: "설정으로 이동",
+            cancelText: "나중에",
+            onConfirm: { store.send(.openAppSettings) },
+            onCancel: { store.send(.dismissPushNotificationPermissionAlert) }
+        )
         .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) {
             store.send(.uploadSelectionSheetDismissed)
         } content: { _ in

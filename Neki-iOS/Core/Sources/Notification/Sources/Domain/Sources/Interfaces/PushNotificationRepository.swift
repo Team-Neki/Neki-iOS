@@ -11,6 +11,7 @@ import UserNotifications
 protocol PushNotificationRepository {
     func checkAuthorizationStatus() async -> UNAuthorizationStatus
     func requestAuthorization() async throws -> Bool
+    func fetchNotificationList() async throws -> [PushNotificationListItem]
     func fetchFCMToken() async throws -> PushNotificationToken
     func updateAPNSToken(_ token: Data)
     func updateDeviceToken(

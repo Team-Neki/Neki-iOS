@@ -65,8 +65,8 @@ private extension NearPhotoBoothListSheet {
                     store.send(.didTapBrandReorderButton)
                 } label: {
                     Text("편집")
-                        .nekiFont(.caption12Medium)
-                        .foregroundStyle(.gray300)
+                        .nekiFont(.body14Medium)
+                        .foregroundStyle(.gray600)
                 }
                 .padding(.top, 4)
                 .padding(.trailing, 20)

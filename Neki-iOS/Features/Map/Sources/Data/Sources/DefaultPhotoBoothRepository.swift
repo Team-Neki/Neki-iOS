@@ -211,13 +211,15 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let brands = try await ensureBrandsLoaded()
         let endpoint = MapEndpoint.fetchFavorites
         let responseDTO: BaseResponseDTO<FetchFavoritePhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        let photoBooths = responseDTO.data?.items.compactMap { dto -> PhotoBooth? in
+        guard let items = responseDTO.data?.items else { return [] }
+        let serverFavoriteIDs = Set(items.map(\.id))
+        let photoBooths = items.compactMap { dto -> PhotoBooth? in
             guard let brand = brands[dto.brandName] else { return nil }
             var photoBooth = dto.toEntity(brand: brand)
             photoBooth.isFavorite = true
             return photoBooth
-        } ?? []
-        updateCachedFavoritePhotoBooths(photoBooths)
+        }
+        updateCachedFavoritePhotoBooths(photoBooths, serverFavoriteIDs: serverFavoriteIDs)
         return photoBooths
     }
 
@@ -264,11 +266,12 @@ private extension DefaultPhotoBoothRepository {
         }
     }
 
-    func updateCachedFavoritePhotoBooths(_ photoBooths: [PhotoBooth]) {
-        let favoriteIDs = Set(photoBooths.map(\.id))
-
+    func updateCachedFavoritePhotoBooths(
+        _ photoBooths: [PhotoBooth],
+        serverFavoriteIDs: Set<PhotoBooth.ID>
+    ) {
         for id in Array(photoBoothCacheByID.keys) {
-            guard favoriteIDs.contains(id) == false else { continue }
+            guard serverFavoriteIDs.contains(id) == false else { continue }
             updateCachedFavoriteState(id: id, isFavorite: false)
         }
 

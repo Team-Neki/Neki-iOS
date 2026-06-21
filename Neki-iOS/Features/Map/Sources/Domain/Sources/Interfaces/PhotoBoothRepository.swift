@@ -25,9 +25,9 @@ protocol PhotoBoothRepository {
     ///   - isFavorite: 변경할 즐겨찾기 상태
     func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws
 
-    /// 레포지토리 캐시 기준으로 즐겨찾기한 포토부스 목록을 가져옵니다.
-    /// - Returns: 즐겨찾기한 순서대로 정렬된 포토부스 배열
-    func readFavoritePhotoBooths() async -> [PhotoBooth]
+    /// 서버 기준으로 즐겨찾기한 포토부스 목록을 가져옵니다.
+    /// - Returns: 서버에서 내려준 순서의 즐겨찾기 포토부스 배열
+    func readFavoritePhotoBooths() async throws -> [PhotoBooth]
 
     /// 브랜드들의 정보를 가져옵니다.
     /// - Returns: 우선순위로 정렬된 브랜드 배열

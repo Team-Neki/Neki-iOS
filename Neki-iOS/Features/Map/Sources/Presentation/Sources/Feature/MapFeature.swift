@@ -378,8 +378,9 @@ public struct MapFeature {
                 let requestedValue = photoBooth.isFavorite == false
                 updatePhotoBoothFavoriteState(&state, id: photoBooth.id, isFavorite: requestedValue)
 
-                let action: MapFilterAction = requestedValue ? .select : .deselect
-                let event = MapAnalyticsEvent.boothFavorite(action: action, brandName: photoBooth.brand.name)
+                let event: MapAnalyticsEvent = requestedValue
+                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name)
+                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name)
                 let stateEffect: Effect<Action> = .send(.startBackgroundCalculation)
                 let analyticsEffect: Effect<Action> = .run { _ in analytics.logEvent(event: event) }
                 let requestEffect: Effect<Action> = .run { [id = photoBooth.id, requestedValue] send in
@@ -440,10 +441,12 @@ public struct MapFeature {
 
             case let .favoritePhotoBoothsResponse(.success(photoBooths)):
                 let favoriteBooths = IdentifiedArray(uniqueElements: photoBooths)
+                let favoriteBoothCount = favoriteBooths.count
                 return .merge(
                     .send(.photoBoothListAction(.setFavoriteBooths(favoriteBooths))),
-                    .send(.photoBoothListAction(.setFavoriteBoothCount(favoriteBooths.count))),
-                    .send(.startBackgroundCalculation)
+                    .send(.photoBoothListAction(.setFavoriteBoothCount(favoriteBoothCount))),
+                    .send(.startBackgroundCalculation),
+                    .run { _ in analytics.logEvent(event: MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: favoriteBoothCount)) }
                 )
                 
             case let .favoritePhotoBoothsResponse(.failure(error)):
@@ -503,7 +506,13 @@ public struct MapFeature {
                 
             case .didTapFavoriteMarkerFilterButton:
                 state.isFavoriteMarkerFilterEnabled.toggle()
-                return .send(.startBackgroundCalculation)
+                let action: MapFilterAction = state.isFavoriteMarkerFilterEnabled ? .select : .deselect
+                let favoriteBoothCount = state.photoBoothListState.favoriteBoothCount
+                let event = MapAnalyticsEvent.favoriteBoothFilterToggle(action: action, favoriteBoothCount: favoriteBoothCount)
+                return .merge(
+                    .send(.startBackgroundCalculation),
+                    .run { _ in analytics.logEvent(event: event) }
+                )
                 
             case let .didSelectDirectionApp(appType):
                 guard let photoBooth = state.directionSheetPhotoBooth else { return .none }
@@ -537,7 +546,12 @@ public struct MapFeature {
                 return .send(.didTapFavorite(photoBooth))
 
             case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
-                return .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands)))
+                let totalBrandCount = state.photoBoothListState.brands.count
+                let event = MapAnalyticsEvent.brandFilterManageView(pinnedBrandCount: .zero, totalBrandCount: totalBrandCount)
+                return .merge(
+                    .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands))),
+                    .run { _ in analytics.logEvent(event: event) }
+                )
 
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 state.isUserTrackingMode = false

@@ -27,6 +27,10 @@ public enum AnalyticsParameterKey: String {
     case action = "action"
     case selectedCount = "selected_count"
     case brandName = "brand_name"
+    case boothName = "booth_name"
+    case favoriteBoothCount = "favorite_booth_count"
+    case pinnedBrandCount = "pinned_brand_count"
+    case totalBrandCount = "total_brand_count"
     case entryPoint = "entry_point"
     case mapType = "map_type"
     

@@ -11,12 +11,6 @@ import Dependencies
 import DependenciesMacros
 import os
 
-private enum PhotoBoothBrandOrderServerStub {
-    // 서버 브랜드 순서 저장 API 준비 전 실기기 검증용입니다.
-    // 서버 API 연동 시 이 플래그와 updateBrandOrder의 stub 분기를 제거합니다.
-    static let isEnabled = true
-}
-
 private enum TileSystem {
     static let defaultZoomLevel: Int = 15
     
@@ -77,30 +71,37 @@ public final actor DefaultPhotoBoothRepository {
     private var nextFavoriteOrder: Int = .zero
     private var brandMap: [BrandID: PhotoBoothBrand]?
     private var brandOrderIDs: [PhotoBoothBrand.ID] = []
-    private var brandFetchTask: Task<[BrandID: PhotoBoothBrand], Error>?
+    private var brandFetchTask: Task<([BrandID: PhotoBoothBrand], [PhotoBoothBrand.ID]), Error>?
     
     public init() {}
     
     private func ensureBrandsLoaded() async throws -> [BrandID: PhotoBoothBrand] {
         if let existingMap = brandMap { return existingMap }
         
-        if let existingTask = brandFetchTask { return try await existingTask.value }
+        if let existingTask = brandFetchTask {
+            let (map, orderIDs) = try await existingTask.value
+            if map.isEmpty == false { brandMap = map }
+            brandOrderIDs = orderIDs
+            return map
+        }
         
-        let task = Task<[BrandID: PhotoBoothBrand], Error> {
+        let task = Task<([BrandID: PhotoBoothBrand], [PhotoBoothBrand.ID]), Error> {
             let endpoint = MapEndpoint.fetchBrands
             let responseDTO: BaseResponseDTO<FetchPhotoBrandsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let brandList = responseDTO.data else { return [:] }
-            return brandList.reduce(into: [BrandID: PhotoBoothBrand]()) { dict, dto in
-                let brandEntity = dto.toEntity()
-                dict[brandEntity.name] = brandEntity
-            }
+            guard let brandList = responseDTO.data else { return ([:], []) }
+            let brandEntities = brandList.map { $0.toEntity() }
+            return (
+                Dictionary(uniqueKeysWithValues: brandEntities.map { ($0.name, $0) }),
+                brandEntities.map(\.id)
+            )
         }
         
         brandFetchTask = task
         
         do {
-            let map = try await task.value
+            let (map, orderIDs) = try await task.value
             if map.isEmpty == false { brandMap = map }
+            brandOrderIDs = orderIDs
             brandFetchTask = nil
             return map
         } catch {
@@ -229,14 +230,12 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
     }
 
     func updateBrandOrder(_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand] {
-        if PhotoBoothBrandOrderServerStub.isEnabled {
-            brandOrderIDs = brands.map(\.id)
-            return try await loadBrands()
-        }
-
-        // TODO: 서버 API 스펙 확정 후 실제 브랜드 순서 저장 endpoint 호출로 교체합니다.
-        brandOrderIDs = brands.map(\.id)
-        return try await loadBrands()
+        let orderedIDs = brands.map(\.id)
+        let dto = UpdatePhotoBoothBrandOrderDTO.Request(brandIDs: orderedIDs)
+        let endpoint = MapEndpoint.updateBrandOrder(dto: dto)
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+        brandOrderIDs = orderedIDs
+        return brands
     }
 }
 

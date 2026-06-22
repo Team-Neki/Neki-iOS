@@ -8,7 +8,8 @@
 import Foundation
 
 public struct PushNotificationListItem: Identifiable, Equatable, Sendable {
-    public let id: String
+    public let id: Int
+    public let type: String
     public let title: String
     public let body: String
     public let receivedAt: Date?
@@ -16,7 +17,8 @@ public struct PushNotificationListItem: Identifiable, Equatable, Sendable {
     public let isRead: Bool
 
     public init(
-        id: String,
+        id: Int,
+        type: String,
         title: String,
         body: String,
         receivedAt: Date? = nil,
@@ -24,6 +26,7 @@ public struct PushNotificationListItem: Identifiable, Equatable, Sendable {
         isRead: Bool = false
     ) {
         self.id = id
+        self.type = type
         self.title = title
         self.body = body
         self.receivedAt = receivedAt

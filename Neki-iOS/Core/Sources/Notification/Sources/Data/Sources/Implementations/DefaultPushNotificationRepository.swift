@@ -27,8 +27,10 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
     }
 
     func fetchNotificationList() async throws -> [PushNotificationListItem] {
-        // TODO: Replace this stub with the real notification list API when the server contract is finalized.
-        []
+        let endpoint = PushNotificationEndpoint.fetchRecentNotifications
+        let responseDTO: BaseResponseDTO<FetchRecentPushNotificationsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+        return data.map { $0.toEntity() }
     }
 
     func fetchFCMToken() async throws -> PushNotificationToken {

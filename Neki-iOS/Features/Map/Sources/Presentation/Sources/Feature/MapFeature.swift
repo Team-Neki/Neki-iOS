@@ -547,7 +547,8 @@ public struct MapFeature {
 
             case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
                 let totalBrandCount = state.photoBoothListState.brands.count
-                let event = MapAnalyticsEvent.brandFilterManageView(pinnedBrandCount: .zero, totalBrandCount: totalBrandCount)
+                let selectedBrandCount = state.photoBoothListState.filteredBrands.count
+                let event = MapAnalyticsEvent.brandFilterManageView(pinnedBrandCount: selectedBrandCount, totalBrandCount: totalBrandCount)
                 return .merge(
                     .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands))),
                     .run { _ in analytics.logEvent(event: event) }

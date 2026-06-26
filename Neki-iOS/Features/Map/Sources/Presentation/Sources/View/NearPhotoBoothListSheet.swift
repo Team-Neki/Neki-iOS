@@ -162,26 +162,6 @@ private extension NearPhotoBoothListSheet {
                     }
                 }
             }
-        } header: {
-            HStack {
-                HStack(spacing: 2) {
-                    Text("가까운").foregroundStyle(.primary400) +
-                    Text(" ") +
-                    Text("포토") +
-                    Text(" ") +
-                    Text("부스")
-                    
-                    Image(.iconPinClip)
-                }
-                
-                Spacer()
-                
-                Image(.iconExclamationMarkGray)
-                    .onTapGesture { store.send(.toggleTooltip) }
-                    .nekiTooltip(isPresented: $store.isTooltipPresented, "가까운 네컷 사진 브랜드는\n1Km 기준으로 표시돼요.")
-            }
-            .nekiFont(.title18Bold)
-            .padding(.horizontal, 20)
         }
         .frame(maxHeight: .infinity)
     }

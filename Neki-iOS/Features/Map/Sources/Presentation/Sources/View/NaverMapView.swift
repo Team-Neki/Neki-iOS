@@ -10,6 +10,7 @@ import ComposableArchitecture
 import NMapsMap
 import Kingfisher
 import os
+import QuartzCore
 
 fileprivate enum Constants {
     // Map Settings
@@ -34,6 +35,7 @@ fileprivate enum Constants {
     static let clusterCaptionTextSize: CGFloat = 14.0
     static let captionColorHex: UInt = 0x202227
     static let brandClusteringThreshold: Double = 15.0
+    static let favoriteMarkerViewportUpdateInterval: TimeInterval = 0.15
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
@@ -149,6 +151,7 @@ extension NaverMapRepresentable {
         var isMapLoaded: Bool = false
         
         let parent: NaverMapRepresentable
+        private var lastFavoriteMarkerViewportUpdateTime: TimeInterval = .zero
         
         private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
         private var overlayImageCache: NSCache<NSString, NMFOverlayImage> = {
@@ -502,6 +505,13 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
             parent.store.send(.didDetectMapInteraction)
         }
         parent.store.send(.cameraMotionStarted)
+    }
+
+    func mapView(_ mapView: NMFMapView, cameraIsChangingByReason reason: Int) {
+        let currentTime = CACurrentMediaTime()
+        guard currentTime - lastFavoriteMarkerViewportUpdateTime >= Constants.favoriteMarkerViewportUpdateInterval else { return }
+        lastFavoriteMarkerViewportUpdateTime = currentTime
+        parent.store.send(.cameraMotionChanged(mapView.contentBounds.toDomain()))
     }
     
     func mapViewCameraIdle(_ mapView: NMFMapView) {

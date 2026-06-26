@@ -540,7 +540,7 @@ public struct MapFeature {
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
                     visibleListBooths = activeFilters.isEmpty ? listBooths : listBooths.filter { activeFilters.contains($0.brand) }
-                    visibleFavoriteBooths = activeFilters.isEmpty ? favoriteBooths : favoriteBooths.filter { activeFilters.contains($0.brand) }
+                    visibleFavoriteBooths = favoriteBooths.filter { $0.isFavorite && (activeFilters.isEmpty || activeFilters.contains($0.brand)) }
                     await send(.didFinishBackgroundCalculation(map: visibleMapBooths, list: visibleListBooths, favoriteList: visibleFavoriteBooths))
                 }
                 .cancellable(id: CancelID.calculation, cancelInFlight: true)

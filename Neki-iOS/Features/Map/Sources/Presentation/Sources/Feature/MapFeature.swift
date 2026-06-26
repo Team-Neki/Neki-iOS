@@ -668,13 +668,14 @@ private extension MapFeature {
     }
 
     func localPhotoBooth(id: PhotoBooth.ID, state: State) -> PhotoBooth? {
-        if let photoBooth = state.selectedBooth, photoBooth.id == id { return photoBooth }
-        if let photoBooth = state.photoBooths[id: id] { return photoBooth }
-        if let photoBooth = state.visiblePhotoBooths[id: id] { return photoBooth }
-        if let photoBooth = state.photoBoothListState.photoBooths[id: id] { return photoBooth }
-        if let photoBooth = state.photoBoothListState.visibleBooths[id: id] { return photoBooth }
-        if let photoBooth = state.photoBoothListState.favoriteBooths[id: id] { return photoBooth }
-        return state.photoBoothListState.visibleFavoriteBooths[id: id]
+        let selectedBooth = state.selectedBooth?.id == id ? state.selectedBooth : nil
+        return selectedBooth ??
+            state.photoBooths[id: id] ??
+            state.visiblePhotoBooths[id: id] ??
+            state.photoBoothListState.photoBooths[id: id] ??
+            state.photoBoothListState.visibleBooths[id: id] ??
+            state.photoBoothListState.favoriteBooths[id: id] ??
+            state.photoBoothListState.visibleFavoriteBooths[id: id]
     }
 
     static func visibleMapPhotoBooths(

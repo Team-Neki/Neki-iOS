@@ -19,7 +19,7 @@ struct NekiToastModifier: ViewModifier {
                     nekiToastView(currentItem)
                 }
             }
-            .onChange(of: item) { newItem in
+            .onChange(of: item) { _, newItem in
                 presentLatestToast(newItem)
             }
             .onAppear {

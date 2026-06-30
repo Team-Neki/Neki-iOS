@@ -17,7 +17,7 @@ public actor PushNotificationEventBroker {
         let id = UUID()
 
         return AsyncStream { continuation in
-            Task { await self.addContinuation(continuation, id: id) }
+            Task { self.addContinuation(continuation, id: id) }
 
             continuation.onTermination = { [weak self] _ in
                 Task { await self?.removeContinuation(id: id) }

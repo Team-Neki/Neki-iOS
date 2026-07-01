@@ -30,9 +30,15 @@ public struct PushNotificationPayload: Equatable, Sendable {
             }
         }
     }
+
+    var userInfo: [AnyHashable: Any] {
+        Dictionary(uniqueKeysWithValues: values.map { (AnyHashable($0.key), $0.value) })
+    }
 }
 
 public enum PushNotificationEvent: Equatable, Sendable {
+    case apnsTokenRegistered
+    case fcmRegistrationTokenReceived
     case foregroundReceived(PushNotificationPayload)
     case responseReceived(PushNotificationPayload)
 }

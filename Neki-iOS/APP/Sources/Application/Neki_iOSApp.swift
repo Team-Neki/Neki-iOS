@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Combine
 import ComposableArchitecture
 
 @main
@@ -20,13 +19,6 @@ struct Neki_iOSApp: App {
     var body: some Scene {
         WindowGroup {
             AppCoordinatorView(store: store)
-                .onReceive(
-                    applicationDelegate.$isAPNSTokenRegistered
-                        .removeDuplicates()
-                        .filter { $0 }
-                ) { _ in
-                    store.send(.didRegisterAPNSToken)
-                }
                 .onOpenURL { handleIncomingURL($0) }
         }
     }

@@ -6,17 +6,13 @@
 //
 
 import UIKit
-import Combine
 import Dependencies
 import FirebaseCore
-import FirebaseMessaging
 import os
 import UserNotifications
 
-final class NekiApplicationDelegate: NSObject, UIApplicationDelegate, MessagingDelegate, ObservableObject {
+final class NekiApplicationDelegate: NSObject, UIApplicationDelegate {
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
-
-    @Published private(set) var isAPNSTokenRegistered = false
 
     private let pushNotificationDelegate = PushNotificationDelegate()
 
@@ -25,9 +21,10 @@ final class NekiApplicationDelegate: NSObject, UIApplicationDelegate, MessagingD
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
-        Messaging.messaging().delegate = self
+        pushNotificationClient.configureMessaging()
         UNUserNotificationCenter.current().delegate = pushNotificationDelegate
         application.registerForRemoteNotifications()
+        Logger.data.debug("APNs 원격 알림 등록 요청")
         return true
     }
 
@@ -38,9 +35,8 @@ final class NekiApplicationDelegate: NSObject, UIApplicationDelegate, MessagingD
         Task {
             do {
                 try await pushNotificationClient.updateAPNSToken(deviceToken)
-                await MainActor.run {
-                    isAPNSTokenRegistered = true
-                }
+                Logger.data.debug("APNs 토큰 등록 감지")
+                await pushNotificationClient.publishEvent(.apnsTokenRegistered)
             } catch {
                 Logger.data.error("APNs 토큰을 Firebase Messaging에 전달하지 못함: \(error)")
             }
@@ -54,11 +50,17 @@ final class NekiApplicationDelegate: NSObject, UIApplicationDelegate, MessagingD
         Logger.data.error("APNs 원격 알림 등록 실패: \(error)")
     }
 
-    func messaging(
-        _ messaging: Messaging,
-        didReceiveRegistrationToken fcmToken: String?
+    func application(
+        _ application: UIApplication,
+        didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        guard fcmToken?.isEmpty == false else { return }
-        Logger.data.debug("FCM 등록 토큰 갱신 감지")
+        let payload = PushNotificationPayload(userInfo: userInfo)
+        pushNotificationClient.processReceivedNotification(payload)
+        if application.applicationState == .active {
+            let notificationClient = pushNotificationClient
+            Task { await notificationClient.publishEvent(.foregroundReceived(payload)) }
+        }
+        completionHandler(.noData)
     }
 }

@@ -312,19 +312,18 @@ struct AppCoordinator {
 
             case let .checkPushNotificationAuthorizationResponse(.success(status)):
                 if status == .notDetermined {
-                    guard case let .signedIn(user) = state.userSessionStatus,
-                          user.marketingTermAgreed
-                    else { return .none }
                     return .send(.requestPushNotificationAuthorization)
                 }
 
                 let currentAgreement = status.isPushNotificationAgreed
-                guard state.lastSynchronizedPushAgreement != currentAgreement else { return .none }
-                state.hasSynchronizedPushNotification = false
-                return .send(.synchronizePushNotification)
+                guard state.hasSynchronizedPushNotification == false ||
+                      state.lastSynchronizedPushAgreement != currentAgreement
+                else { return .none }
+                return synchronizePushNotificationIfReady(&state)
 
-            case .checkPushNotificationAuthorizationResponse(.failure):
-                return .none
+            case let .checkPushNotificationAuthorizationResponse(.failure(error)):
+                Logger.presentation.error("Push notification authorization check failed: \(error)")
+                return synchronizePushNotificationIfReady(&state)
 
             case .requestPushNotificationAuthorization:
                 return .run { send in
@@ -335,15 +334,11 @@ struct AppCoordinator {
                 }
 
             case .requestPushNotificationAuthorizationResponse(.success):
-                state.hasSynchronizedPushNotification = false
-                guard state.isSynchronizingPushNotification == false else {
-                    state.shouldRetryPushNotificationSynchronization = true
-                    return .none
-                }
-                return .send(.synchronizePushNotification)
+                return synchronizePushNotificationIfReady(&state)
 
-            case .requestPushNotificationAuthorizationResponse(.failure):
-                return .none
+            case let .requestPushNotificationAuthorizationResponse(.failure(error)):
+                Logger.presentation.error("Push notification authorization request failed: \(error)")
+                return synchronizePushNotificationIfReady(&state)
 
             case .synchronizePushNotification:
                 guard case .signedIn = state.userSessionStatus else { return .none }

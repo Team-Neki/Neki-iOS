@@ -12,6 +12,7 @@ import DependenciesMacros
 @DependencyClient
 public struct SharedImageClient {
     public var fetchSharedImageURLs: @Sendable (_ appGroupID: String) async throws -> [URL]
+    public var fetchSharedImages: @Sendable (_ appGroupID: String) async throws -> [ImageUploadEntity]
     public var clearSharedImages: @Sendable (_ appGroupID: String) async throws -> Void
 }
 
@@ -21,6 +22,8 @@ extension SharedImageClient: DependencyKey {
         
         return SharedImageClient { appGroupID in
             try await sharedImageRepository.fetchSharedImageURLs(appGroupID: appGroupID)
+        } fetchSharedImages: { appGroupID in
+            try await sharedImageRepository.fetchSharedImages(appGroupID: appGroupID)
         } clearSharedImages: { appGroupID in
             try await sharedImageRepository.clearSharedImages(appGroupID: appGroupID)
         }

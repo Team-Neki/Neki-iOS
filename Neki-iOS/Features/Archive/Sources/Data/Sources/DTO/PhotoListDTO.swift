@@ -23,17 +23,18 @@ public enum PhotoListDTO {
         let totalCount: Int
         
         func toEntity() -> [PhotoEntity] {
-            return items.map {
+            items.map {
                 PhotoEntity(
-                    photoID: $0.photoID,
-                    imageURL: $0.imageURL,
+                    id: $0.photoID,
+                    imageURL: URL(string: $0.imageURL),
+                    isFavorite: $0.favorite,
+                    createdAt: $0.createdAt.toISO8601DateOrNil() ?? Date(),
                     folderID: $0.folderID,
-                    isfavorite: $0.favorite,
-                    contentType: $0.contentType,
-                    createdAt: $0.createdAt,
-                    memo: $0.memo,
+                    memo: $0.memo ?? "",
                     width: $0.width,
-                    height: $0.height
+                    height: $0.height,
+                    contentType: $0.contentType,
+                    createdAtRawValue: $0.createdAt
                 )
             }
         }
@@ -58,4 +59,3 @@ public enum PhotoListDTO {
     }
     
 }
-

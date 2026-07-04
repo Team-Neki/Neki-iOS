@@ -62,9 +62,9 @@ struct ArchiveView: View {
                         }
                     }
                     .onPreferenceChange(ScrollOffsetKey.self) { value in
-                        withAnimation {
-                            showScrollToTopButton = value < -20
-                        }
+                        let shouldShowButton = value < -20
+                        guard showScrollToTopButton != shouldShowButton else { return }
+                        withAnimation { showScrollToTopButton = shouldShowButton }
                     }
                 }
             }
@@ -224,7 +224,9 @@ private extension ArchiveView {
     }
     
     var recentPhotoSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let lastPhotoID = store.photos.last?.id
+
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("최근 사진")
                     .nekiFont(.title20Bold)
@@ -251,18 +253,18 @@ private extension ArchiveView {
                     .padding(.top, 70)
             } else {
                 MasonryGridView(
-                    items: Array(store.photos),
-                    columns: 2
-                ) { item in
-                    ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
-                        .onTapGesture {
-                            store.send(.imageTapped(item))
-                        }
-                        .onAppear {
-                            if item == store.photos.last {
+                    columnItems: store.photoColumns
+                ) { gridItem in
+                    if let item = store.photos[id: gridItem.id] {
+                        ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
+                            .onTapGesture {
+                                store.send(.imageTapped(item))
+                            }
+                            .onAppear {
+                                guard item.id == lastPhotoID else { return }
                                 store.send(.loadMorePhotos)
                             }
-                        }
+                    }
                 }
                 .padding(.bottom, 76)
             }

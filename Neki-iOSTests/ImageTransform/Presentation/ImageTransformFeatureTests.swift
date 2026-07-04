@@ -13,7 +13,7 @@ import UIKit
 @MainActor
 struct ImageTransformFeatureTests {
     private let mockImage = createMockImage()
-    private let mockData = createMockImageData()
+    private let mockCGImage = createMockImage().cgImage!
     
     // MARK: - Tests
     
@@ -94,7 +94,7 @@ struct ImageTransformFeatureTests {
     func transformCompleted_setsOutputImage() async {
         // given
         let store = makeStore(initialState: ImageTransformFeature.State(inputImage: mockImage)) { _ in
-            return self.mockData
+            return self.mockCGImage
         }
         await store.send(.transformButtonTapped) // 실행 트리거
         
@@ -115,7 +115,7 @@ struct ImageTransformFeatureTests {
 private extension ImageTransformFeatureTests {
     func makeStore(
         initialState: ImageTransformFeature.State = .init(),
-        transformResult: @Sendable @escaping (Data) async throws -> Data = { data in data }
+        transformResult: @Sendable @escaping (CGImage) async throws -> CGImage = { image in image }
     ) -> TestStore<ImageTransformFeature.State, ImageTransformFeature.Action> {
         let store = TestStore(initialState: initialState) {
             ImageTransformFeature()
@@ -136,7 +136,4 @@ private extension ImageTransformFeatureTests {
         return image
     }
     
-    static func createMockImageData() -> Data {
-        createMockImage().pngData()!
-    }
 }

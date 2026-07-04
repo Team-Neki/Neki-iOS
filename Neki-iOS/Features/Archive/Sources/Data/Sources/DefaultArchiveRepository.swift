@@ -5,424 +5,448 @@
 //  Created by OneTen on 1/25/26.
 //
 
-import Foundation
 import Dependencies
+import Foundation
 
 final actor DefaultArchiveRepository: ArchiveRepository {
-    
-    @Dependency(\.networkProvider) var networkProvider
-    
-    // MARK: - Cache
-        
-    private var photoCache: [Int?: [PhotoEntity]] = [:] // 사진들 캐시(앨범별), 앨범을 nil로 줄 경우 전체 사진
-    private var currentSortOrder: [Int?: String] = [:]  // 앨범별 정렬 (최신순, 오래된 순)
+    @Dependency(\.networkProvider) private var networkProvider
 
-    private var albumCache: [AlbumEntity] = []  // 앨범들 정보 캐시
-    private var favoritePhotoCache: [PhotoEntity] = []  // 즐겨찾기 사진들 캐시
-    private var favoriteAlbumInfoCache: FavoriteAlbumEntity?    // 즐겨찾기 앨범 정보 캐시
-    
-    private var photoTotalCountCache: [Int?: Int] = [:] // 전체사진 + 앨범별 사진 개수 캐시
-    
-    // Dirty Flags (데이터 유효성 검사)
-    private var isPhotoCacheDirty: [Int?: Bool] = [:]   // 사진 변경사항 플래그
-    private var isAlbumCacheDirty: Bool = true  // 앨범 변경사항 플래그
-    private var isFavoriteCacheDirty: Bool = true   // 즐겨찾는 사진 변경사항 플래그
-    private var isFavoriteAlbumInfoDirty: Bool = true   // 즐겨찾기 앨범 정보 변경사항 플래그
-    
-    
-    // MARK: - Pagination State
-    
-    private var currentPhotoPage: [Int?: Int] = [:]
-    private var hasNextPhoto: [Int?: Bool] = [:]
-    private var currentFavoritePage: Int = 0
-    private var hasNextFavorite: Bool = true
+    private var photosByID: [Int: PhotoEntity] = [:]
+    private var photoReferenceCounts: [Int: Int] = [:]
+    private var pagesByScope: [ArchivePhotoScope: PhotoPageState] = [:]
+    private var inFlightRequests: [PhotoRequestKey: Task<PhotoPagePayload, Error>] = [:]
+
+    private var albumCache: [AlbumEntity] = []
+    private var favoriteAlbumInfoCache: FavoriteAlbumEntity?
+    private var isAlbumCacheDirty = true
+    private var isFavoriteAlbumInfoDirty = true
 }
 
+// MARK: - Cache Types
 
-// MARK: - Create Logic
+private extension DefaultArchiveRepository {
+    struct PhotoPageState {
+        var orderedIDs: [Int] = []
+        var knownIDs: Set<Int> = []
+        var loadedPages: Set<Int> = []
+        var nextPage = 0
+        var hasNext = true
+        var totalCount = 0
+        var sortOrder: ArchivePhotoSortOrder?
+        var isDirty = true
+        var generation = 0
+    }
+
+    struct PhotoRequestKey: Hashable {
+        let scope: ArchivePhotoScope
+        let page: Int
+        let size: Int?
+        let sortOrder: ArchivePhotoSortOrder?
+        let generation: Int
+    }
+
+    struct PhotoPagePayload: Sendable {
+        let photos: [PhotoEntity]
+        let hasNext: Bool
+        let totalCount: Int
+    }
+}
+
+// MARK: - Create
 
 extension DefaultArchiveRepository {
-    func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], favorite: Bool? = false) async throws {
+    func registerPhoto(
+        folderID: Int?,
+        uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)],
+        favorite: Bool? = false
+    ) async throws {
         let uploadData = uploads.map {
-            RegisterPhotoDTO.RegisterPhotoData(mediaID: $0.mediaID, memo: $0.memo, uploadMethod: $0.uploadMethod.rawValue)
+            RegisterPhotoDTO.RegisterPhotoData(
+                mediaID: $0.mediaID,
+                memo: $0.memo,
+                uploadMethod: $0.uploadMethod.rawValue
+            )
         }
         let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
-        let endpoint = ArchiveEndpoint.registerPhoto(request: request)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        
-        self.isPhotoCacheDirty[nil] = true  // 전체 사진 캐시에 변경 신호
-        if let folderID = folderID {        // 앨범을 선택해 업로드 했다면 해당 앨범내 사진 캐시와 전체 앨범 캐시에도 변경 신호
-            self.isPhotoCacheDirty[folderID] = true
-            self.isAlbumCacheDirty = true
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.registerPhoto(request: request)
+        )
+
+        markPhotoScopeDirty(.all)
+        if let folderID {
+            markPhotoScopeDirty(.album(folderID))
+            isAlbumCacheDirty = true
         }
-        
         if favorite == true {
-            self.isFavoriteCacheDirty = true
-            self.isFavoriteAlbumInfoDirty = true
+            markPhotoScopeDirty(.favorites)
+            isFavoriteAlbumInfoDirty = true
         }
     }
-    
+
     func addFolder(name: String) async throws -> Int {
         let request = FolderDTO.Request(name: name)
-        let result: BaseResponseDTO<FolderDTO.Response> = try await networkProvider.request(endpoint: ArchiveEndpoint.addFolder(request: request))
+        let result: BaseResponseDTO<FolderDTO.Response> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.addFolder(request: request)
+        )
         guard let data = result.data else { throw NetworkError.responseDecodingError }
-        
-        self.isAlbumCacheDirty = true
+        isAlbumCacheDirty = true
         return data.folderId
     }
 }
 
-
-// MARK: - Read Logic
+// MARK: - Read
 
 extension DefaultArchiveRepository {
-    
-    func fetchPhotoList(folderID: Int?, size: Int? = 20, sortOrder: String? = "DESC") async throws -> [PhotoEntity] {
-        
-        /// 캐시가 더렵혀졌거나(변경사항이 있거나) 비어있으면 실행
-        /// 첫 페이지부터 다시 불러오고 기존에 저장되어 있던 캐시들 삭제
-        let isDirty = isPhotoCacheDirty[folderID] ?? true
-        let currentCache = photoCache[folderID] ?? []
-        
-        // 요청한 정렬 순서 (기본값 DESC)
-        let requestSortOrder = sortOrder
-        // 기존에 저장된 정렬 순서
-        let cachedSortOrder = currentSortOrder[folderID]
-        // 정렬이 바뀌었으면 무조건 Dirty로 간주하여 초기화
-        let isSortChanged = cachedSortOrder != requestSortOrder
-        
-        if isDirty || currentCache.isEmpty || isSortChanged {
-            currentPhotoPage[folderID] = 0
-            hasNextPhoto[folderID] = true
-            photoCache[folderID] = []
-            isPhotoCacheDirty[folderID] = false
-            currentSortOrder[folderID] = requestSortOrder
+    func refreshPhotos(
+        scope: ArchivePhotoScope,
+        size: Int?,
+        sortOrder: ArchivePhotoSortOrder?
+    ) async throws -> ArchivePhotoSnapshot {
+        if let pageState = pagesByScope[scope],
+           pageState.isDirty == false,
+           pageState.sortOrder == sortOrder {
+            let hasCachedResult = pageState.orderedIDs.isEmpty == false || pageState.loadedPages.isEmpty == false
+            let hasInFlightRequest = inFlightRequests.keys.contains {
+                $0.scope == scope && $0.generation == pageState.generation
+            }
+            if hasCachedResult { return snapshot(for: scope) }
+            if hasInFlightRequest { return try await fetchPage(scope: scope, size: size, sortOrder: sortOrder) }
         }
-        
-        // 마지막 페이지면 실행
-        if let hasNext = hasNextPhoto[folderID], !hasNext {
-            return photoCache[folderID] ?? []
-        }
-        
-        let page = currentPhotoPage[folderID] ?? 0
-        let request = PhotoListDTO.Request(folderId: folderID, page: page, size: size, sortOrder: requestSortOrder)        
-        let endpoint = ArchiveEndpoint.getPhotoList(request: request)
-        let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
-        
-        guard let data = response.data else { throw NetworkError.responseDecodingError }
-        
-        self.photoTotalCountCache[folderID] = data.totalCount
-        
-        let newEntities = data.toEntity()
-        
-        /// 캐시 업데이트 (해당 폴더 Key에 추가)
-        /// 테스트해보니 라이프사이클 시점 문제인지 같은 아이디의 사진을 받고 있어서 앱이 꺼지는 현상 발견
-        /// 따라서 캐시에 존재하는 값들을 set으로 만든 후 새로운 데이터와 비교해 없는 값만 캐시에 추가
-        var currentList = photoCache[folderID] ?? []
-        let existingIDs = Set(currentList.map { $0.photoID })
-        
-        // 새로운 데이터 중 기존에 없는 것만 필터링
-        let uniqueNewEntities = newEntities.filter { !existingIDs.contains($0.photoID) }
-        
-        // 중복 없는 데이터만 추가
-        currentList.append(contentsOf: uniqueNewEntities)
-        
-        photoCache[folderID] = currentList
-        
-        // 페이지 상태 업데이트
-        hasNextPhoto[folderID] = data.hasNext
-        if data.hasNext {
-            currentPhotoPage[folderID] = page + 1
-        }
-        
-        return currentList
+        resetPhotoPage(for: scope, sortOrder: sortOrder)
+        return try await fetchPage(scope: scope, size: size, sortOrder: sortOrder)
     }
-    
+
+    func fetchNextPhotos(
+        scope: ArchivePhotoScope,
+        size: Int?,
+        sortOrder: ArchivePhotoSortOrder?
+    ) async throws -> ArchivePhotoSnapshot {
+        let pageState = pagesByScope[scope] ?? PhotoPageState()
+        guard pageState.isDirty == false,
+              pageState.orderedIDs.isEmpty == false,
+              pageState.sortOrder == sortOrder
+        else {
+            return try await refreshPhotos(scope: scope, size: size, sortOrder: sortOrder)
+        }
+        guard pageState.hasNext else { return snapshot(for: scope) }
+        return try await fetchPage(scope: scope, size: size, sortOrder: sortOrder)
+    }
+
     func getAlbumList() async throws -> [AlbumEntity] {
-        // 캐시에 변경사항이 없고, 비어있지도 않으면 캐시된 값 리턴
-        if !isAlbumCacheDirty, !albumCache.isEmpty {
-            return albumCache
-        }
-        
-        let result: BaseResponseDTO<AlbumInfoDTO> = try await networkProvider.request(endpoint: ArchiveEndpoint.getAlbumList)
+        if isAlbumCacheDirty == false, albumCache.isEmpty == false { return albumCache }
+
+        let result: BaseResponseDTO<AlbumInfoDTO> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.getAlbumList
+        )
         guard let data = result.data else { throw NetworkError.responseDecodingError }
-        
-        let entities: [AlbumEntity] = data.items.map {
-            AlbumEntity(id: $0.folderID, name: $0.name, photoCount: $0.totalCount, coverImageURLString: $0.latestImageURL ?? "")
+
+        albumCache = data.items.map {
+            AlbumEntity(
+                id: $0.folderID,
+                name: $0.name,
+                photoCount: $0.totalCount,
+                coverImageURLString: $0.latestImageURL ?? ""
+            )
         }
-        
-        self.albumCache = entities
-        self.isAlbumCacheDirty = false
-        
-        return entities
+        isAlbumCacheDirty = false
+        return albumCache
     }
-    
+
     func getFavoriteAlbumInfo() async throws -> FavoriteAlbumEntity {
-        if !isFavoriteAlbumInfoDirty, let cache = favoriteAlbumInfoCache {
-            return cache
-        }
-        
-        let result: BaseResponseDTO<FavoriteAlbumInfoDTO> = try await networkProvider.request(endpoint: ArchiveEndpoint.getFavoriteAlbumInfo)
+        if isFavoriteAlbumInfoDirty == false, let favoriteAlbumInfoCache { return favoriteAlbumInfoCache }
+
+        let result: BaseResponseDTO<FavoriteAlbumInfoDTO> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.getFavoriteAlbumInfo
+        )
         guard let data = result.data else { throw NetworkError.responseDecodingError }
-        
-        let entity = FavoriteAlbumEntity(latestImageURL: data.latestImageURL ?? "", totalCount: data.totalCount)
-        
-        self.favoriteAlbumInfoCache = entity
-        self.isFavoriteAlbumInfoDirty = false
-        
+
+        let entity = FavoriteAlbumEntity(
+            latestImageURL: data.latestImageURL ?? "",
+            totalCount: data.totalCount
+        )
+        favoriteAlbumInfoCache = entity
+        isFavoriteAlbumInfoDirty = false
         return entity
-    }
-    
-    func fetchFavoritePhotoList(size: Int? = 20, sortOrder: String?) async throws -> [PhotoEntity] {
-        
-        if isFavoriteCacheDirty || favoritePhotoCache.isEmpty {
-            currentFavoritePage = 0
-            hasNextFavorite = true
-            favoritePhotoCache.removeAll()
-            isFavoriteCacheDirty = false
-        }
-        
-        if !hasNextFavorite { return favoritePhotoCache }
-        
-        let request = PhotoListDTO.Request(folderId: nil, page: currentFavoritePage, size: size, sortOrder: sortOrder)
-        let endpoint = ArchiveEndpoint.getFavoritePhotoList(request: request)
-        let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(endpoint: endpoint)
-        
-        guard let data = response.data else { throw NetworkError.responseDecodingError }
-        
-        let newEntities = data.toEntity()
-        let existingIDs = Set(self.favoritePhotoCache.map { $0.photoID })
-        let uniqueNewEntities = newEntities.filter { !existingIDs.contains($0.photoID) }
-        
-        self.favoritePhotoCache.append(contentsOf: uniqueNewEntities)
-        
-        self.hasNextFavorite = data.hasNext
-        if data.hasNext { self.currentFavoritePage += 1 }
-        
-        return self.favoritePhotoCache
-    }
-    
-    func getPhotoTotalCount(folderID: Int?) async throws -> Int {
-        return photoTotalCountCache[folderID] ?? 0
     }
 }
 
-
-// MARK: - Update Logic
+// MARK: - Update
 
 extension DefaultArchiveRepository {
-    
     func toggleFavorite(photoID: Int, request: Bool) async throws {
         let dto = ToggleFavoriteDTO(favorite: request)
-        let endpoint = ArchiveEndpoint.toggleFavorite(photoID: photoID, request: dto)
-        
-        do {
-            let _ = try await networkProvider.request(endpoint: endpoint)
-            
-            for (key, var list) in photoCache {
-                if let index = list.firstIndex(where: { $0.photoID == photoID }) {
-                    let oldItem = list[index]
-                    let newItem = PhotoEntity(
-                        photoID: oldItem.photoID,
-                        imageURL: oldItem.imageURL,
-                        folderID: oldItem.folderID,
-                        isfavorite: request,
-                        contentType: oldItem.contentType,
-                        createdAt: oldItem.createdAt,
-                        memo: oldItem.memo,
-                        width: oldItem.width,
-                        height: oldItem.height
-                    )
-                    list[index] = newItem
-                    photoCache[key] = list
-                }
-            }
-            
-            self.isFavoriteCacheDirty = true
-            self.isFavoriteAlbumInfoDirty = true
-        } catch {
-            throw error
-        }
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.toggleFavorite(photoID: photoID, request: dto)
+        )
+
+        photosByID[photoID]?.isFavorite = request
+        markPhotoScopeDirty(.favorites)
+        isFavoriteAlbumInfoDirty = true
     }
-    
+
     func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws {
         let request = DeletePhotoRequestDTO(photoIds: photoIDs)
-        let endpoint = ArchiveEndpoint.excludePhotosInAlbum(albumID: albumID, request: request)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        self.isAlbumCacheDirty = true
-        self.isPhotoCacheDirty[albumID] = true
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.excludePhotosInAlbum(albumID: albumID, request: request)
+        )
+        isAlbumCacheDirty = true
+        markPhotoScopeDirty(.album(albumID))
     }
-    
+
     func editAlbumName(albumID: Int, name: String) async throws {
         let request = FolderDTO.Request(name: name)
-        let endpoint = ArchiveEndpoint.editFolderName(albumID: albumID, request: request)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        self.isAlbumCacheDirty = true
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.editFolderName(albumID: albumID, request: request)
+        )
+        isAlbumCacheDirty = true
     }
-    
+
     func updatePhotoMemo(photoID: Int, memo: String) async throws {
-        var capturedAt = ""
-        if let cachedItem = photoCache.values.flatMap({ $0 }).first(where: { $0.photoID == photoID }) {
-            capturedAt = cachedItem.createdAt
-        } else if let cachedItem = favoritePhotoCache.first(where: { $0.photoID == photoID }) {
-            capturedAt = cachedItem.createdAt
-        } else {
-            capturedAt = Date().ISO8601Format()
-        }
-        
-        let requestDTO = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
-        let endpoint = ArchiveEndpoint.updateMemo(photoID: photoID, request: requestDTO)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        for (key, var list) in photoCache {
-            if let index = list.firstIndex(where: { $0.photoID == photoID }) {
-                let oldItem = list[index]
-                let newItem = PhotoEntity(
-                    photoID: oldItem.photoID,
-                    imageURL: oldItem.imageURL,
-                    folderID: oldItem.folderID,
-                    isfavorite: oldItem.isfavorite,
-                    contentType: oldItem.contentType,
-                    createdAt: oldItem.createdAt,
-                    memo: memo,
-                    width: oldItem.width,
-                    height: oldItem.height
-                )
-                list[index] = newItem
-                photoCache[key] = list
-            }
-        }
-        
-        if let index = favoritePhotoCache.firstIndex(where: { $0.photoID == photoID }) {
-            let oldItem = favoritePhotoCache[index]
-            let newItem = PhotoEntity(
-                photoID: oldItem.photoID,
-                imageURL: oldItem.imageURL,
-                folderID: oldItem.folderID,
-                isfavorite: oldItem.isfavorite,
-                contentType: oldItem.contentType,
-                createdAt: oldItem.createdAt,
-                memo: memo,
-                width: oldItem.width,
-                height: oldItem.height
-            )
-            favoritePhotoCache[index] = newItem
-        }
-        
+        let capturedAt = photosByID[photoID]?.createdAtRawValue ?? Date().ISO8601Format()
+        let request = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.updateMemo(photoID: photoID, request: request)
+        )
+        photosByID[photoID]?.memo = memo
     }
-    
+
     func duplicatePhoto(photoIDs: [Int], targetFolderIDs: [Int]) async throws {
         let request = UpdateMappingPhotoDTO.DuplicatePhotos(
             photoIDs: photoIDs,
             targetFolderIDs: targetFolderIDs
         )
-        let endpoint = ArchiveEndpoint.duplicatePhoto(request: request)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        // 앨범 정보 캐시 갱신
-        self.isAlbumCacheDirty = true
-        
-        // Target 폴더들의 캐시를 다음 진입 시 새로 받아오도록 유도
-        for targetID in targetFolderIDs {
-            self.isPhotoCacheDirty[targetID] = true
-        }
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.duplicatePhoto(request: request)
+        )
+
+        isAlbumCacheDirty = true
+        targetFolderIDs.forEach { markPhotoScopeDirty(.album($0)) }
     }
-    
+
     func movePhoto(sourceFolderId: Int, photoIDs: [Int], targetFolderIDs: [Int]) async throws {
         let request = UpdateMappingPhotoDTO.MovePhotos(
             sourceFolderID: sourceFolderId,
             photoIDs: photoIDs,
             targetFolderIDs: targetFolderIDs
         )
-        let endpoint = ArchiveEndpoint.movePhoto(request: request)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        // 앨범 정보 캐시 갱신
-        self.isAlbumCacheDirty = true
-        
-        self.isPhotoCacheDirty[sourceFolderId] = true
-        
-        // Target 폴더(혹은 전체 사진) 캐시 갱신
-        for targetID in targetFolderIDs {
-            self.isPhotoCacheDirty[targetID] = true
-        }
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.movePhoto(request: request)
+        )
+
+        isAlbumCacheDirty = true
+        markPhotoScopeDirty(.album(sourceFolderId))
+        targetFolderIDs.forEach { markPhotoScopeDirty(.album($0)) }
     }
-    
 }
 
-
-// MARK: - Delete Logic
+// MARK: - Delete
 
 extension DefaultArchiveRepository {
     func deletePhotoList(photoIDs: [Int]) async throws {
         let request = DeletePhotoRequestDTO(photoIds: photoIDs)
-        let endpoint = ArchiveEndpoint.deletePhoto(request: request)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        for (folderID, var list) in photoCache {
-            let originalCount = list.count
-            list.removeAll { photoIDs.contains($0.photoID) }
-            
-            // 기존 갯수보다 줄어들었다면 해당 앨범에서 사진이 삭제되었다는 뜻
-            if list.count < originalCount {
-                self.isPhotoCacheDirty[folderID] = true
-                photoCache[folderID] = list
-            }
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.deletePhoto(request: request)
+        )
+
+        let deletedIDs = Set(photoIDs)
+        var affectedScopes = Set(pagesByScope.keys)
+        affectedScopes.insert(.all)
+        affectedScopes.insert(.favorites)
+        affectedScopes.forEach { scope in
+            removePhotoIDs(deletedIDs, from: scope)
+            markPhotoScopeDirty(scope)
         }
-        
-        self.isPhotoCacheDirty[nil] = true
-        self.isAlbumCacheDirty = true
-        self.isFavoriteCacheDirty = true
-        self.isFavoriteAlbumInfoDirty = true
+        deletedIDs.forEach { photosByID.removeValue(forKey: $0) }
+        isAlbumCacheDirty = true
+        isFavoriteAlbumInfoDirty = true
     }
-    
+
     func deleteFolders(folderIDs: [Int], deletePhotos: Bool) async throws {
         let request = DeleteFoldersRequestDTO(folderIds: folderIDs)
-        let endpoint = ArchiveEndpoint.deleteFolders(request: request, deletePhotos: deletePhotos)
-        let _ = try await networkProvider.request(endpoint: endpoint)
-        
-        self.isAlbumCacheDirty = true
-        
-        for folderID in folderIDs {
-            self.photoCache.removeValue(forKey: folderID)
-            self.currentPhotoPage.removeValue(forKey: folderID)
-            self.hasNextPhoto.removeValue(forKey: folderID)
-            self.isPhotoCacheDirty.removeValue(forKey: folderID)
-        }
-        
-        if deletePhotos {
-            self.isPhotoCacheDirty[nil] = true
-            self.isFavoriteCacheDirty = true
-            self.isFavoriteAlbumInfoDirty = true
-        }
+        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
+            endpoint: ArchiveEndpoint.deleteFolders(request: request, deletePhotos: deletePhotos)
+        )
+
+        isAlbumCacheDirty = true
+        folderIDs.forEach { removePhotoPage(for: .album($0)) }
+        guard deletePhotos else { return }
+        markPhotoScopeDirty(.all)
+        markPhotoScopeDirty(.favorites)
+        isFavoriteAlbumInfoDirty = true
     }
-    
-    func clearCache() async {
-            // 캐시 데이터 초기화
-            self.photoTotalCountCache.removeAll()
-            self.photoCache.removeAll()
-            self.currentSortOrder.removeAll()
-            self.albumCache.removeAll()
-            self.favoritePhotoCache.removeAll()
-            self.favoriteAlbumInfoCache = nil
-            
-            // Dirty Flag 초기화
-            self.isPhotoCacheDirty.removeAll()
-            self.isAlbumCacheDirty = true
-            self.isFavoriteCacheDirty = true
-            self.isFavoriteAlbumInfoDirty = true
-            
-            // 페이징 상태 초기화
-            self.currentPhotoPage.removeAll()
-            self.hasNextPhoto.removeAll()
-            self.currentFavoritePage = 0
-            self.hasNextFavorite = true
-        }
+
+    func clearCache() async throws {
+        inFlightRequests.values.forEach { $0.cancel() }
+        inFlightRequests.removeAll()
+        photosByID.removeAll()
+        photoReferenceCounts.removeAll()
+        pagesByScope.removeAll()
+        albumCache.removeAll()
+        favoriteAlbumInfoCache = nil
+        isAlbumCacheDirty = true
+        isFavoriteAlbumInfoDirty = true
+    }
 }
 
+// MARK: - Photo Cache
+
+private extension DefaultArchiveRepository {
+    func fetchPage(
+        scope: ArchivePhotoScope,
+        size: Int?,
+        sortOrder: ArchivePhotoSortOrder?
+    ) async throws -> ArchivePhotoSnapshot {
+        var pageState = pagesByScope[scope] ?? PhotoPageState()
+        let page = pageState.nextPage
+        let requestKey = PhotoRequestKey(
+            scope: scope,
+            page: page,
+            size: size,
+            sortOrder: sortOrder,
+            generation: pageState.generation
+        )
+
+        if pageState.loadedPages.contains(page) { return snapshot(for: scope) }
+
+        let requestTask: Task<PhotoPagePayload, Error>
+        if let inFlightRequest = inFlightRequests[requestKey] {
+            requestTask = inFlightRequest
+        } else {
+            requestTask = Task {
+                try await self.requestPhotoPage(
+                    scope: scope,
+                    page: page,
+                    size: size,
+                    sortOrder: sortOrder
+                )
+            }
+            inFlightRequests[requestKey] = requestTask
+        }
+
+        do {
+            let payload = try await requestTask.value
+            inFlightRequests[requestKey] = nil
+
+            pageState = pagesByScope[scope] ?? PhotoPageState()
+            guard pageState.generation == requestKey.generation else { return snapshot(for: scope) }
+            guard pageState.loadedPages.contains(page) == false else { return snapshot(for: scope) }
+
+            payload.photos.forEach { photosByID[$0.id] = $0 }
+            payload.photos.forEach {
+                guard pageState.knownIDs.insert($0.id).inserted else { return }
+                pageState.orderedIDs.append($0.id)
+                photoReferenceCounts[$0.id, default: 0] += 1
+            }
+            pageState.loadedPages.insert(page)
+            pageState.hasNext = payload.hasNext
+            pageState.totalCount = payload.totalCount
+            pageState.sortOrder = sortOrder
+            pageState.isDirty = false
+            if payload.hasNext { pageState.nextPage = page + 1 }
+            pagesByScope[scope] = pageState
+            return snapshot(for: scope)
+        } catch {
+            inFlightRequests[requestKey] = nil
+            throw error
+        }
+    }
+
+    func requestPhotoPage(
+        scope: ArchivePhotoScope,
+        page: Int,
+        size: Int?,
+        sortOrder: ArchivePhotoSortOrder?
+    ) async throws -> PhotoPagePayload {
+        let request = PhotoListDTO.Request(
+            folderId: scope.folderID,
+            page: page,
+            size: size,
+            sortOrder: sortOrder?.rawValue
+        )
+        let endpoint: ArchiveEndpoint = scope == .favorites
+            ? .getFavoritePhotoList(request: request)
+            : .getPhotoList(request: request)
+        let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(
+            endpoint: endpoint
+        )
+        guard let data = response.data else { throw NetworkError.responseDecodingError }
+        var photos = data.toEntity()
+        if scope == .favorites {
+            photos.indices.forEach { photos[$0].isFavorite = true }
+        }
+        return PhotoPagePayload(
+            photos: photos,
+            hasNext: data.hasNext,
+            totalCount: data.totalCount
+        )
+    }
+
+    func snapshot(for scope: ArchivePhotoScope) -> ArchivePhotoSnapshot {
+        let pageState = pagesByScope[scope] ?? PhotoPageState()
+        return ArchivePhotoSnapshot(
+            photos: pageState.orderedIDs.compactMap { photosByID[$0] },
+            totalCount: pageState.totalCount,
+            hasNext: pageState.hasNext
+        )
+    }
+
+    func resetPhotoPage(
+        for scope: ArchivePhotoScope,
+        sortOrder: ArchivePhotoSortOrder?
+    ) {
+        let nextGeneration = (pagesByScope[scope]?.generation ?? 0) + 1
+        cancelRequests(for: scope)
+        releasePhotoReferences(pagesByScope[scope]?.orderedIDs ?? [])
+        pagesByScope[scope] = PhotoPageState(
+            sortOrder: sortOrder,
+            isDirty: false,
+            generation: nextGeneration
+        )
+    }
+
+    func markPhotoScopeDirty(_ scope: ArchivePhotoScope) {
+        var pageState = pagesByScope[scope] ?? PhotoPageState()
+        pageState.isDirty = true
+        pageState.generation += 1
+        pagesByScope[scope] = pageState
+        cancelRequests(for: scope)
+    }
+
+    func removePhotoIDs(_ photoIDs: Set<Int>, from scope: ArchivePhotoScope) {
+        guard var pageState = pagesByScope[scope] else { return }
+        let removedIDs = photoIDs.intersection(pageState.knownIDs)
+        pageState.orderedIDs.removeAll { photoIDs.contains($0) }
+        pageState.knownIDs.subtract(photoIDs)
+        pagesByScope[scope] = pageState
+        releasePhotoReferences(removedIDs)
+    }
+
+    func removePhotoPage(for scope: ArchivePhotoScope) {
+        cancelRequests(for: scope)
+        releasePhotoReferences(pagesByScope[scope]?.orderedIDs ?? [])
+        pagesByScope[scope] = nil
+    }
+
+    func cancelRequests(for scope: ArchivePhotoScope) {
+        let requestKeys = inFlightRequests.keys.filter { $0.scope == scope }
+        requestKeys.forEach {
+            inFlightRequests[$0]?.cancel()
+            inFlightRequests[$0] = nil
+        }
+    }
+
+    func releasePhotoReferences<S: Sequence>(_ photoIDs: S) where S.Element == Int {
+        photoIDs.forEach { photoID in
+            guard let referenceCount = photoReferenceCounts[photoID] else { return }
+            guard referenceCount > 1 else {
+                photoReferenceCounts[photoID] = nil
+                photosByID[photoID] = nil
+                return
+            }
+            photoReferenceCounts[photoID] = referenceCount - 1
+        }
+    }
+}
 
 // MARK: - Dependency
 

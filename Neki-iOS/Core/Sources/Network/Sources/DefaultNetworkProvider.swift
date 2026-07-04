@@ -55,6 +55,10 @@ public final actor DefaultNetworkProvider: NetworkProvider {
             }
             
             return
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw NetworkError.unknownError(error)
         }
@@ -106,6 +110,10 @@ private extension DefaultNetworkProvider {
             let (data, response) = try await session.data(for: request, delegate: nil)
             responseLog(data: data, response: response)
             return (data, response)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw NetworkError.unknownError(error)
         }

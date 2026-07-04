@@ -7,7 +7,8 @@
 
 import Foundation
 
-public protocol SharedImageRepository {
+public protocol SharedImageRepository: Sendable {
     func fetchSharedImageURLs(appGroupID: String) async throws -> [URL]
+    func fetchSharedImages(appGroupID: String) async throws -> [ImageUploadEntity]
     func clearSharedImages(appGroupID: String) async throws
 }

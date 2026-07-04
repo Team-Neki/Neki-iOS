@@ -8,37 +8,38 @@
 import Testing
 import Foundation
 import CoreGraphics
-import UniformTypeIdentifiers
-import ImageIO
 @testable import Neki_iOS
 
+@Suite(.serialized)
 struct DefaultImageTransformRepositoryTests {
     
-    @Test("시나리오 1: 정상적인 이미지 데이터를 넣으면 변환된 PNG 데이터를 반환한다")
-    func transform_whenValidData_returnsPNGData() async throws {
+    @Test("시나리오 1: 정상적인 이미지를 넣으면 변환된 CGImage를 반환한다")
+    func transform_whenValidImage_returnsCGImage() async throws {
         // given
         let repository = DefaultImageTransformRepository()
-        let inputData = try createValidPNGData()
+        let inputImage = try createValidCGImage()
         
         // when
-        let outputData = try await repository.transform(data: inputData)
-        let imageSource = CGImageSourceCreateWithData(outputData as CFData, nil)
+        let outputImage = try await repository.transform(image: inputImage)
 
         // then
-        #expect(!outputData.isEmpty, "변환된 이미지 데이터가 비어있으면 안 됩니다.")
-        #expect(imageSource != nil, "결과물이 정상적인 이미지 소스로 읽혀야 합니다.")
+        #expect(outputImage.width > 0)
+        #expect(outputImage.height > 0)
     }
     
-    @Test("시나리오 2: 손상되거나 이미지가 아닌 데이터를 넣으면 에러를 던진다")
-    func transform_whenInvalidData_throwsError() async {
+    @Test("시나리오 2: 같은 Repository의 후속 요청에서도 변환 결과를 반환한다")
+    func transform_whenRequestedAgain_reusesLoadedModel() async throws {
         // given
         let repository = DefaultImageTransformRepository()
-        let garbageData = Data([0x00, 0xFF, 0x11, 0x22, 0x33])
+        let inputImage = try createValidCGImage()
         
-        // when & then
-        await #expect(throws: Error.self) {
-            _ = try await repository.transform(data: garbageData)
-        }
+        // when
+        _ = try await repository.transform(image: inputImage)
+        let outputImage = try await repository.transform(image: inputImage)
+
+        // then
+        #expect(outputImage.width > 0)
+        #expect(outputImage.height > 0)
     }
 }
 
@@ -46,7 +47,7 @@ struct DefaultImageTransformRepositoryTests {
 // MARK: - Helper Methods
 
 private extension DefaultImageTransformRepositoryTests {
-    func createValidPNGData() throws -> Data {
+    func createValidCGImage() throws -> CGImage {
         let width = 100
         let height = 100
         let colorSpace = CGColorSpaceCreateDeviceRGB()
@@ -64,16 +65,10 @@ private extension DefaultImageTransformRepositoryTests {
         context.setFillColor(red: 1.0, green: 0.0, blue: 0.0, alpha: 1.0)
         context.fill(CGRect(x: 0, y: 0, width: width, height: height))
         
-        guard let cgImage = context.makeImage() else {
+        guard let image = context.makeImage() else {
             struct ImageError: Error {}
             throw ImageError()
         }
-        
-        let mutableData = CFDataCreateMutable(kCFAllocatorDefault, 0)!
-        let destination = CGImageDestinationCreateWithData(mutableData, UTType.png.identifier as CFString, 1, nil)!
-        CGImageDestinationAddImage(destination, cgImage, nil)
-        CGImageDestinationFinalize(destination)
-        
-        return mutableData as Data
+        return image
     }
 }

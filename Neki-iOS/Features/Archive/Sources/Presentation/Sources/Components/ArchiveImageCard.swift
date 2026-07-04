@@ -10,16 +10,14 @@ import Kingfisher
 import os
 
 struct ArchiveImageCard: View {
+    @Environment(\.displayScale) private var displayScale
     
-    //MARK: - Properties
-    
-    let item: ArchiveImageItem
+    let item: PhotoEntity
     let isSelectionMode: Bool
     let isSelected: Bool
-    
     let onTapFavorite: (() -> Void)
     
-    let gradientColor: LinearGradient = LinearGradient(
+    private static let gradientColor = LinearGradient(
         colors: [
             .black.opacity(0),
             .black
@@ -28,17 +26,23 @@ struct ArchiveImageCard: View {
         endPoint: UnitPoint(x: 0.54, y: 0.05)
     )
     
-    var imageAspectRatio: CGFloat? {
+    private var imageAspectRatio: CGFloat? {
         if let width = item.width, let height = item.height, height > 0 {
             return CGFloat(width) / CGFloat(height)
         }
         return nil
     }
+
+    private var imageProcessor: DownsamplingImageProcessor {
+        let targetWidth = 200 * displayScale
+        let targetHeight = min(800, 200 / (imageAspectRatio ?? 0.5)) * displayScale
+        return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
+    }
     
     //MARK: - Init
     
     init(
-        item: ArchiveImageItem,
+        item: PhotoEntity,
         isSelectionMode: Bool = false,
         isSelected: Bool = false,
         onTapFavorite: @escaping () -> Void
@@ -54,6 +58,8 @@ struct ArchiveImageCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             KFImage(item.imageURL)
+                .setProcessor(imageProcessor)
+                .cacheOriginalImage()
                 .resizable()
                 .fade(duration: 0.25)
                 .retry(maxCount: 3, interval: .seconds(5))
@@ -67,7 +73,7 @@ struct ArchiveImageCard: View {
                     Color.black.opacity(0.04)
                 })
                 .overlay(content: {
-                    gradientColor.opacity(0.2)
+                    Self.gradientColor.opacity(0.2)
                 })
                 .overlay(alignment: .topTrailing) {
                     Button {

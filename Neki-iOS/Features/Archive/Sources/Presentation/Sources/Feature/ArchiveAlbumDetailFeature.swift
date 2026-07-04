@@ -16,7 +16,8 @@ struct ArchiveAlbumDetailFeature {
         @Presents var photoImport: PhotoImportFeature.State?
         var selectionPurpose: PhotoSelectionPurpose?
         
-        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+        var photos: IdentifiedArrayOf<PhotoEntity> = []
+        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
         let album: AlbumItem
         var showDropDownMenu: Bool = false
         var selectedIDs: Set<Int> = []
@@ -29,14 +30,15 @@ struct ArchiveAlbumDetailFeature {
         }
         
         var isSelectionMode: Bool = false
-        var filteredAlbumPhotos: IdentifiedArrayOf<ArchiveImageItem> { return photos }
         var isFetchingPhotos: Bool = false
+        var hasNextPhotos: Bool = true
         var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
         var hasSelectedItems: Bool { !selectedIDs.isEmpty }
         
-        init(photos: IdentifiedArrayOf<ArchiveImageItem> = [], album: AlbumItem) {
+        init(photos: IdentifiedArrayOf<PhotoEntity> = [], album: AlbumItem) {
             self.photos = photos
+            self.photoColumns = ArchiveMasonryLayout.columns(for: photos)
             self.album = album
             self.newAlbumTitle = album.title
         }
@@ -50,7 +52,7 @@ struct ArchiveAlbumDetailFeature {
         case onTapBackButton
         case onTapSelectButton
         case onTapCancelSelectButton
-        case onTapFavorite(item: ArchiveImageItem)
+        case onTapFavorite(item: PhotoEntity)
         case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
         case onTapCancelEditAlbum
         case onTapConfirmEditAlbum
@@ -78,9 +80,9 @@ struct ArchiveAlbumDetailFeature {
         case photoImport(PresentationAction<PhotoImportFeature.Action>)
         
         case fetchPhotos
-        case photoListResponse(Result<[PhotoEntity], Error>)
+        case photoListResponse(Result<ArchivePhotoSnapshot, Error>)
         case loadMorePhotos
-        case imageTapped(ArchiveImageItem)
+        case imageTapped(PhotoEntity)
         
         case delegate(Delegate)
         enum Delegate {
@@ -168,22 +170,30 @@ struct ArchiveAlbumDetailFeature {
                 state.newAlbumTitle = state.album.title
                 return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경하지 못했어요", style: .error))))
             case .fetchPhotos:
+                guard state.isFetchingPhotos == false else { return .none }
                 state.isFetchingPhotos = true
                 return .run { [albumId = state.album.id] send in
-                    await send(.photoListResponse(Result { try await archiveClient.fetchPhotoList(folderId: albumId, size: 20, sortOrder: nil) }))
+                    await send(.photoListResponse(Result {
+                        try await archiveClient.refreshPhotos(.album(albumId), 20, nil)
+                    }))
                 }
-            case let .photoListResponse(.success(entities)):
+            case let .photoListResponse(.success(snapshot)):
                 state.isFetchingPhotos = false
-                let currentAlbumId = state.album.id
-                let newItems = entities.map { entity in
-                    ArchiveImageItem(id: entity.photoID, imageURLString: entity.imageURL, isFavorite: entity.isfavorite, date: entity.createdAt.toISO8601Date(), folderId: currentAlbumId, memo: entity.memo ?? "", width: entity.width, height: entity.height)
-                }
-                state.photos = IdentifiedArray(uniqueElements: newItems)
+                state.hasNextPhotos = snapshot.hasNext
+                state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
+                state.photoColumns = ArchiveMasonryLayout.columns(for: snapshot.photos)
                 return .none
             case .photoListResponse(.failure):
                 state.isFetchingPhotos = false
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
-            case .loadMorePhotos: return .send(.fetchPhotos)
+            case .loadMorePhotos:
+                guard state.isFetchingPhotos == false, state.hasNextPhotos else { return .none }
+                state.isFetchingPhotos = true
+                return .run { [albumId = state.album.id] send in
+                    await send(.photoListResponse(Result {
+                        try await archiveClient.fetchNextPhotos(.album(albumId), 20, nil)
+                    }))
+                }
             case .onTapSelectButton:
                 state.showDropDownMenu = false
                 state.isSelectionMode = true
@@ -252,6 +262,7 @@ struct ArchiveAlbumDetailFeature {
             case .deletePhotosResponse(.success):
                 let idsToDelete = state.selectedIDs
                 state.photos.removeAll { idsToDelete.contains($0.id) }
+                state.photoColumns = ArchiveMasonryLayout.columns(for: state.photos)
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))

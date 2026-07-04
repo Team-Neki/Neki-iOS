@@ -14,7 +14,8 @@ struct ArchiveFeature {
     
     @ObservableState
     struct State {
-        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+        var photos: IdentifiedArrayOf<PhotoEntity> = []
+        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
         var albums: IdentifiedArrayOf<AlbumItem> = []
         
         var previewAlbums: IdentifiedArrayOf<AlbumItem> {
@@ -34,6 +35,7 @@ struct ArchiveFeature {
         var imagePicker = ImagePickerFeature.State(maxCount: 10, mediaType: .photoBooth, autoUpload: false)
         var isLoading: Bool = false
         var isFetchingPhotos: Bool = false
+        var hasNextPhotos: Bool = true
         
         var isInitialFetchingPhotos: Bool {
             return isFetchingPhotos && photos.isEmpty
@@ -47,7 +49,7 @@ struct ArchiveFeature {
         case onTapAllPhotos
         case onTapAllAlbums
         case openAppSettings
-        case onTapFavorite(item: ArchiveImageItem)
+        case onTapFavorite(item: PhotoEntity)
         case toggleFavoriteResponse(photoID: Int, result: Result<Void, Error>)
         case onTapCancelAddAlbum
         case onTapConfirmAddAlbum
@@ -58,13 +60,13 @@ struct ArchiveFeature {
         case fetchPhotos
         case albumsResponse(Result<[AlbumItem], Error>)
         case favoriteAlbumResponse(Result<AlbumItem, Error>)
-        case photoListResponse(Result<[PhotoEntity], Error>)
+        case photoListResponse(Result<ArchivePhotoSnapshot, Error>)
         
         case imagePicker(ImagePickerFeature.Action)
         case selectUploadAlbum(PresentationAction<SelectUploadAlbumFeature.Action>)
         
         case loadMorePhotos
-        case imageTapped(ArchiveImageItem)
+        case imageTapped(PhotoEntity)
         case albumTapped(AlbumItem)
         case afterUploadNavigateToAlbumDetail(AlbumItem)
         
@@ -99,8 +101,9 @@ struct ArchiveFeature {
                 
             case .clearData:
                 state.photos.removeAll()
+                state.photoColumns = [[], []]
                 state.albums.removeAll()
-                return .run { _ in await archiveClient.clearCache() }
+                return .run { _ in try await archiveClient.clearCache() }
                 
             case .onAppear:
                 return .merge(.send(.fetchAlbums), .send(.fetchPhotos))
@@ -195,31 +198,30 @@ struct ArchiveFeature {
                 guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
                 return .run { send in
-                    await send(.photoListResponse(Result { try await archiveClient.fetchPhotoList(folderId: nil, size: nil, sortOrder: nil) }))
+                    await send(.photoListResponse(Result {
+                        try await archiveClient.refreshPhotos(.all, nil, nil)
+                    }))
                 }
                 
-            case let .photoListResponse(.success(entities)):
+            case let .photoListResponse(.success(snapshot)):
                 state.isFetchingPhotos = false
-                let items = entities.map { entity in
-                    ArchiveImageItem(
-                        id: entity.photoID,
-                        imageURLString: entity.imageURL,
-                        isFavorite: entity.isfavorite,
-                        date: entity.createdAt.toISO8601Date(),
-                        folderId: entity.folderID,
-                        memo: entity.memo ?? "",
-                        width: entity.width,
-                        height: entity.height
-                    )
-                }
-                state.photos = IdentifiedArray(uniqueElements: items)
+                state.hasNextPhotos = snapshot.hasNext
+                state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
+                state.photoColumns = ArchiveMasonryLayout.columns(for: snapshot.photos)
                 return .none
                 
             case .photoListResponse(.failure):
                 state.isFetchingPhotos = false
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
-            case .loadMorePhotos: return .send(.fetchPhotos)
+            case .loadMorePhotos:
+                guard state.isFetchingPhotos == false, state.hasNextPhotos else { return .none }
+                state.isFetchingPhotos = true
+                return .run { send in
+                    await send(.photoListResponse(Result {
+                        try await archiveClient.fetchNextPhotos(.all, nil, nil)
+                    }))
+                }
                 
             case let .imagePicker(.delegate(.imagesConverted(entities))):
                 return .send(.processUploadImages(entities: entities, appGroupID: nil))
@@ -234,18 +236,11 @@ struct ArchiveFeature {
                 state.isLoading = true
                 return .run { send in
                     do {
-                        let fileURLs = try await sharedImageClient.fetchSharedImageURLs(appGroupID: appGroupID)
-                        guard !fileURLs.isEmpty else {
+                        let entities = try await sharedImageClient.fetchSharedImages(appGroupID: appGroupID)
+                        guard !entities.isEmpty else {
                             await send(.delegate(.showToast(NekiToastItem("가져올 수 있는 이미지가 없어요.", style: .error))))
                             await send(.uploadSharedImagesResponse(.failure(UploadError.uploadFailed), appGroupID: appGroupID))
                             return
-                        }
-                        
-                        var entities: [ImageUploadEntity] = []
-                        for url in fileURLs {
-                            if let data = try? Data(contentsOf: url) {
-                                entities.append(ImageUploadEntity(data: data, format: .jpeg, size: data.count))
-                            }
                         }
                         await send(.cleanSharedImages(appGroupID: appGroupID))
                         await send(.uploadSharedImagesResponse(.success(entities), appGroupID: appGroupID))

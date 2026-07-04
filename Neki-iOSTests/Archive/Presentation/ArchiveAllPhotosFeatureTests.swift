@@ -33,9 +33,20 @@ struct ArchiveAllPhotosFeatureTests {
     func loadMorePhotos_whenHasNoNextPage_doesNothing() async {
         var state = ArchiveAllPhotosFeature.State()
         state.hasNextPhotos = false
-        let store = makeStore(initialState: state)
+        let requestCounter = RequestCounter()
+        let store = TestStore(initialState: state) {
+            ArchiveAllPhotosFeature()
+        } withDependencies: {
+            $0.archiveClient.fetchNextPhotos = { _, _, _ in
+                await requestCounter.increment()
+                return ArchivePhotoSnapshot(photos: [], totalCount: 0, hasNext: false)
+            }
+        }
+        store.exhaustivity = .off
 
         await store.send(.loadMorePhotos)
+        let requestCount = await requestCounter.count
+        #expect(requestCount == 0)
     }
 
     @Test("즐겨찾기 필터는 즐겨찾기 사진 ID만 column에 유지한다")
@@ -56,6 +67,12 @@ struct ArchiveAllPhotosFeatureTests {
             $0.lastVisiblePhotoID = 3
         }
     }
+}
+
+private actor RequestCounter {
+    private(set) var count = 0
+
+    func increment() { count += 1 }
 }
 
 private extension ArchiveAllPhotosFeatureTests {

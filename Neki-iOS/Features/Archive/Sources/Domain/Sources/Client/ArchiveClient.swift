@@ -11,22 +11,21 @@ import DependenciesMacros
 
 @DependencyClient
 struct ArchiveClient {
-    public var fetchPhotoList: (_ folderId: Int?, _ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
+    public var refreshPhotos: (_ scope: ArchivePhotoScope, _ size: Int?, _ sortOrder: ArchivePhotoSortOrder?) async throws -> ArchivePhotoSnapshot
+    public var fetchNextPhotos: (_ scope: ArchivePhotoScope, _ size: Int?, _ sortOrder: ArchivePhotoSortOrder?) async throws -> ArchivePhotoSnapshot
     public var getAlbumList: () async throws -> [AlbumEntity]
     public var deletePhotoList: (_ photoIds: [Int]) async throws -> Void
     public var registerPhotos: (_ folderId: Int?, _ uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], _ favorite: Bool?) async throws -> Void
     public var getFavoriteAlbumInfo: () async throws -> FavoriteAlbumEntity
     public var addFolder: (_ name: String) async throws -> Int
     public var deleteFolders: (_ folderIDs: [Int], _ deletePhotos: Bool) async throws -> Void
-    public var fetchFavoritePhotoList: (_ size: Int?, _ sortOrder: String?) async throws -> [PhotoEntity]
     public var toggleFavorite: (_ photoID: Int, _ request: Bool) async throws -> Void
     public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
     public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
     public var updatePhotoMemo: (_ photoID: Int, _ memo: String) async throws -> Void
-    public var clearCache: () async -> Void
+    public var clearCache: () async throws -> Void
     public var duplicatePhoto: (_ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
     public var movePhoto: (_ sourceFolderId: Int, _ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
-    public var getPhotoTotalCount: (_ folderId: Int?) async throws -> Int
 }
 
 extension ArchiveClient: DependencyKey {
@@ -34,8 +33,11 @@ extension ArchiveClient: DependencyKey {
         @Dependency(\.archiveRepository) var archiveRepository
         
         return ArchiveClient(
-            fetchPhotoList: { folderId, size, sortOrder in
-                try await archiveRepository.fetchPhotoList(folderID: folderId, size: size, sortOrder: sortOrder)
+            refreshPhotos: { scope, size, sortOrder in
+                try await archiveRepository.refreshPhotos(scope: scope, size: size, sortOrder: sortOrder)
+            },
+            fetchNextPhotos: { scope, size, sortOrder in
+                try await archiveRepository.fetchNextPhotos(scope: scope, size: size, sortOrder: sortOrder)
             },
             getAlbumList: {
                 try await archiveRepository.getAlbumList()
@@ -54,9 +56,6 @@ extension ArchiveClient: DependencyKey {
             },
             deleteFolders: { folderIDs, deletePhotos in
                 try await archiveRepository.deleteFolders(folderIDs: folderIDs, deletePhotos: deletePhotos)
-            },
-            fetchFavoritePhotoList: { size, sortOrder in
-                try await archiveRepository.fetchFavoritePhotoList(size: size, sortOrder: sortOrder)
             },
             toggleFavorite: { photoID, request in
                 try await archiveRepository.toggleFavorite(photoID: photoID, request: request)
@@ -78,9 +77,6 @@ extension ArchiveClient: DependencyKey {
             },
             movePhoto: { sourceFolderId, photoIDs, targetFolderIDs in
                 try await archiveRepository.movePhoto(sourceFolderId: sourceFolderId, photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)
-            },
-            getPhotoTotalCount: { folderId in
-                try await archiveRepository.getPhotoTotalCount(folderID: folderId)
             }
         )
     }

@@ -13,11 +13,10 @@ protocol ArchiveRepository: Sendable {
     func registerPhoto(folderID: Int?, uploads: [(mediaID: Int, memo: String?, uploadMethod: PhotoUploadMethod)], favorite: Bool?) async throws
     
     // Read
-    func fetchPhotoList(folderID: Int?, size: Int?, sortOrder: String?) async throws -> [PhotoEntity]
+    func refreshPhotos(scope: ArchivePhotoScope, size: Int?, sortOrder: ArchivePhotoSortOrder?) async throws -> ArchivePhotoSnapshot
+    func fetchNextPhotos(scope: ArchivePhotoScope, size: Int?, sortOrder: ArchivePhotoSortOrder?) async throws -> ArchivePhotoSnapshot
     func getAlbumList() async throws -> [AlbumEntity]
     func getFavoriteAlbumInfo() async throws -> FavoriteAlbumEntity
-    func fetchFavoritePhotoList(size: Int?, sortOrder: String?) async throws -> [PhotoEntity]
-    func getPhotoTotalCount(folderID: Int?) async throws -> Int
     
     // Update
     func toggleFavorite(photoID: Int, request: Bool) async throws

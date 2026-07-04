@@ -150,22 +150,24 @@ private extension ArchiveFavoriteAlbumView {
     
     @ViewBuilder
     var masonryView: some View {
+        let lastPhotoID = store.photos.last?.id
+
         ScrollView {
             MasonryGridView(
-                items: Array(store.photos),
-                columns: 2
-            ) { item in
-                ArchiveImageCard(
-                    item: item,
-                    isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id),
-                    onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                )
-                .onTapGesture {
-                    store.send(.imageTapped(item))
-                }
-                .onAppear {
-                    if item == store.photos.last {
+                columnItems: store.photoColumns
+            ) { gridItem in
+                if let item = store.photos[id: gridItem.id] {
+                    ArchiveImageCard(
+                        item: item,
+                        isSelectionMode: store.isSelectionMode,
+                        isSelected: store.selectedIDs.contains(item.id),
+                        onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                    )
+                    .onTapGesture {
+                        store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        guard item.id == lastPhotoID else { return }
                         store.send(.loadMorePhotos)
                     }
                 }

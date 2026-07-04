@@ -11,7 +11,7 @@ import Foundation
 @Reducer
 struct AlbumSelectionFeature {
     @ObservableState
-    struct State {
+    struct State: Equatable {
         var albums: IdentifiedArrayOf<AlbumItem> = []
         var selectedAlbumIDs: Set<Int> = []
         var uploadCount: Int

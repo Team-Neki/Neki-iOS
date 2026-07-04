@@ -10,12 +10,16 @@ import Foundation
 
 @Reducer
 struct PhotoImportFeature {
+    private enum CancelID: Hashable {
+        case photoRequest
+    }
+
     @ObservableState
     struct State {
         var albums: IdentifiedArrayOf<AlbumItem> = []
         var selectedAlbum: AlbumItem? = nil
         
-        var photos: IdentifiedArrayOf<ArchiveImageItem> = []
+        var photos: IdentifiedArrayOf<PhotoEntity> = []
         var selectedIDs: Set<Int> = []
         
         var allPhotosCount: Int = 0
@@ -24,6 +28,7 @@ struct PhotoImportFeature {
         var isFetchingPhotos: Bool = false
         var isFetchingAlbums: Bool = false
         var isLoading: Bool = false
+        var hasNextPhotos: Bool = true
         
         var targetAlbumId: Int
         
@@ -44,7 +49,7 @@ struct PhotoImportFeature {
         
         case fetchPhotos
         case loadMorePhotos
-        case fetchPhotosResponse(Result<[PhotoEntity], Error>, allPhotosCount: Int)
+        case fetchPhotosResponse(Result<ArchivePhotoSnapshot, Error>, scope: ArchivePhotoScope)
         
         case toggleDropdown
         case closeDropdown
@@ -118,43 +123,40 @@ struct PhotoImportFeature {
             case .fetchPhotos:
                 guard !state.isFetchingPhotos else { return .none }
                 state.isFetchingPhotos = true
-                let targetFolderId = state.selectedAlbum?.id == -1 ? nil : state.selectedAlbum?.id
-                let sortOrder = "DESC"
-                
-                return .run { [id = state.selectedAlbum?.id] send in
-                    do {
-                        let entities: [PhotoEntity]
-                        if id == -1 {
-                            entities = try await archiveClient.fetchFavoritePhotoList(size: 20, sortOrder: sortOrder)
-                        } else {
-                            entities = try await archiveClient.fetchPhotoList(folderId: targetFolderId, size: 20, sortOrder: sortOrder)
-                        }
-                        
-                        let allCount = try await archiveClient.getPhotoTotalCount(folderId: nil)
-                        await send(.fetchPhotosResponse(.success(entities), allPhotosCount: allCount))
-                        
-                    } catch {
-                        await send(.fetchPhotosResponse(.failure(error), allPhotosCount: 0))
-                    }
+                let scope = photoScope(for: state.selectedAlbum)
+
+                return .run { send in
+                    await send(.fetchPhotosResponse(
+                        Result { try await archiveClient.refreshPhotos(scope, 20, .descending) },
+                        scope: scope
+                    ))
                 }
+                .cancellable(id: CancelID.photoRequest, cancelInFlight: true)
                 
-            case let .fetchPhotosResponse(.success(entities), allPhotosCount):
+            case let .fetchPhotosResponse(.success(snapshot), scope):
+                if scope == .all { state.allPhotosCount = snapshot.totalCount }
+                guard scope == photoScope(for: state.selectedAlbum) else { return .none }
                 state.isFetchingPhotos = false
-                state.allPhotosCount = allPhotosCount
-                
-                let currentAlbumId = state.selectedAlbum?.id
-                let newItems = entities.map { entity in
-                    ArchiveImageItem(id: entity.photoID, imageURLString: entity.imageURL, isFavorite: entity.isfavorite, date: entity.createdAt.toISO8601Date(), folderId: currentAlbumId, memo: entity.memo ?? "", width: entity.width, height: entity.height)
-                }
-                state.photos = IdentifiedArray(uniqueElements: newItems)
+                state.hasNextPhotos = snapshot.hasNext
+                state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
                 return .none
                 
-            case .fetchPhotosResponse(.failure, _):
+            case let .fetchPhotosResponse(.failure, scope):
+                guard scope == photoScope(for: state.selectedAlbum) else { return .none }
                 state.isFetchingPhotos = false
                 return .none
                 
             case .loadMorePhotos:
-                return .send(.fetchPhotos)
+                guard state.isFetchingPhotos == false, state.hasNextPhotos else { return .none }
+                state.isFetchingPhotos = true
+                let scope = photoScope(for: state.selectedAlbum)
+                return .run { send in
+                    await send(.fetchPhotosResponse(
+                        Result { try await archiveClient.fetchNextPhotos(scope, 20, .descending) },
+                        scope: scope
+                    ))
+                }
+                .cancellable(id: CancelID.photoRequest, cancelInFlight: true)
                 
             case .toggleDropdown:
                 state.isDropdownOpen.toggle()
@@ -169,7 +171,11 @@ struct PhotoImportFeature {
                 state.selectedAlbum = album
                 state.isDropdownOpen = false
                 state.photos.removeAll()
-                return .send(.fetchPhotos)
+                state.isFetchingPhotos = false
+                return .merge(
+                    .cancel(id: CancelID.photoRequest),
+                    .send(.fetchPhotos)
+                )
                 
             case let .toggleSelection(id):
                 if state.selectedIDs.contains(id) {
@@ -211,5 +217,12 @@ struct PhotoImportFeature {
                 return .none
             }
         }
+    }
+}
+
+private extension PhotoImportFeature {
+    func photoScope(for album: AlbumItem?) -> ArchivePhotoScope {
+        guard let album else { return .all }
+        return album.isFavorite ? .favorites : .album(album.id)
     }
 }

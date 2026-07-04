@@ -10,6 +10,8 @@ import ComposableArchitecture
 import Kingfisher
 
 struct PhotoImportView: View {
+    @Environment(\.displayScale) private var displayScale
+
     @Bindable var store: StoreOf<PhotoImportFeature>
     
     let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
@@ -35,15 +37,15 @@ struct PhotoImportView: View {
                             Spacer()
                         }
                     } else {
+                        let lastPhotoID = store.photos.last?.id
                         ScrollView {
                             VStack(spacing: 0) {
                                 LazyVGrid(columns: columns, spacing: 2) {
                                     ForEach(store.photos) { item in
                                         imageCell(for: item)
                                             .onAppear {
-                                                if item == store.photos.last {
-                                                    store.send(.loadMorePhotos)
-                                                }
+                                                guard item.id == lastPhotoID else { return }
+                                                store.send(.loadMorePhotos)
                                             }
                                     }
                                 }
@@ -193,11 +195,17 @@ extension PhotoImportView {
     }
     
     @ViewBuilder
-    private func imageCell(for item: ArchiveImageItem) -> some View {
+    private func imageCell(for item: PhotoEntity) -> some View {
         let isSelected = store.selectedIDs.contains(item.id)
         
         ZStack(alignment: .topTrailing) {
             KFImage(item.imageURL)
+                .setProcessor(
+                    DownsamplingImageProcessor(
+                        size: CGSize(width: 160 * displayScale, height: 160 * displayScale)
+                    )
+                )
+                .cacheOriginalImage()
                 .resizable()
                 .placeholder { Color.gray.opacity(0.1) }
                 .scaledToFill()

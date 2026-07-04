@@ -73,11 +73,16 @@ extension FileManagerSharedImageRepository: SharedImageRepository {
 private extension FileManagerSharedImageRepository {
     static func loadSharedImage(at fileURL: URL, index: Int) async -> (Int, ImageUploadEntity?) {
         await Task.detached(priority: .userInitiated) {
-            guard let data = try? Data(contentsOf: fileURL) else { return (index, nil) }
-            return (
-                index,
-                ImageUploadEntity(data: data, format: .jpeg, size: data.count)
-            )
+            do {
+                let data = try Data(contentsOf: fileURL)
+                return (
+                    index,
+                    ImageUploadEntity(data: data, format: .jpeg, size: data.count)
+                )
+            } catch {
+                Logger.data.error("공유 이미지 로드 실패: \(fileURL.lastPathComponent) - \(error.localizedDescription)")
+                return (index, nil)
+            }
         }.value
     }
 }

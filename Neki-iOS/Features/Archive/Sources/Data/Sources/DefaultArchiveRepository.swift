@@ -275,7 +275,7 @@ extension DefaultArchiveRepository {
         isFavoriteAlbumInfoDirty = true
     }
 
-    func clearCache() async {
+    func clearCache() async throws {
         inFlightRequests.values.forEach { $0.cancel() }
         inFlightRequests.removeAll()
         photosByID.removeAll()

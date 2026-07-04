@@ -70,7 +70,7 @@ extension ArchiveClient: DependencyKey {
                 try await archiveRepository.updatePhotoMemo(photoID: photoID, memo: memo)
             },
             clearCache: {
-                await archiveRepository.clearCache()
+                try await archiveRepository.clearCache()
             },
             duplicatePhoto: { photoIDs, targetFolderIDs in
                 try await archiveRepository.duplicatePhoto(photoIDs: photoIDs, targetFolderIDs: targetFolderIDs)

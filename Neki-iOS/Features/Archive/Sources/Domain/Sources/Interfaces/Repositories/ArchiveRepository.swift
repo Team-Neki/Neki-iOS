@@ -29,7 +29,7 @@ protocol ArchiveRepository: Sendable {
     // Delete
     func deletePhotoList(photoIDs: [Int]) async throws
     func deleteFolders(folderIDs: [Int], deletePhotos: Bool) async throws
-    func clearCache() async
+    func clearCache() async throws
 }
 
 public enum PhotoUploadMethod: String, Sendable {

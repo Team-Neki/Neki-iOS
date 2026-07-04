@@ -42,8 +42,21 @@ struct PhotoListDTOTests {
 
         let response = try JSONDecoder().decode(PhotoListDTO.PhotoListData.self, from: data)
         let photo = try #require(response.toEntity().first)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+        let nanosecond = dateValue.contains(".") ? 123_456_000 : 0
+        let expectedDate = try #require(calendar.date(from: DateComponents(
+            year: 2026,
+            month: 7,
+            day: 3,
+            hour: 10,
+            minute: 20,
+            second: 30,
+            nanosecond: nanosecond
+        )))
 
         #expect(photo.createdAtRawValue == dateValue)
+        #expect(abs(photo.createdAt.timeIntervalSince(expectedDate)) < 0.001)
         #expect(photo.memo.isEmpty)
     }
 

@@ -12,16 +12,23 @@ import UIKit
 
 struct DefaultArchiveMediaRepository: ArchiveMediaRepository {
     func fetchOriginalImageData(from url: URL) async throws -> Data {
-        let image = try await withCheckedThrowingContinuation { continuation in
+        try await withCheckedThrowingContinuation { continuation in
             KingfisherManager.shared.retrieveImage(
                 with: url,
                 options: [.cacheOriginalImage]
             ) { result in
-                continuation.resume(with: result.map(\.image))
+                switch result {
+                case let .success(value):
+                    guard let data = value.data() else {
+                        continuation.resume(throwing: ArchiveMediaError.originalImageDataUnavailable)
+                        return
+                    }
+                    continuation.resume(returning: data)
+                case let .failure(error):
+                    continuation.resume(throwing: error)
+                }
             }
         }
-        guard let imageData = image.pngData() else { throw ArchiveMediaError.imageEncodingFailed }
-        return imageData
     }
 
     @MainActor
@@ -43,7 +50,7 @@ struct DefaultArchiveMediaRepository: ArchiveMediaRepository {
 }
 
 private enum ArchiveMediaError: Error {
-    case imageEncodingFailed
+    case originalImageDataUnavailable
 }
 
 private enum ArchiveMediaRepositoryKey: DependencyKey {

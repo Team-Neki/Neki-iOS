@@ -179,8 +179,9 @@ struct ArchiveAllPhotosFeature {
                 state.updatePhotoColumns()
                 return .none
                 
-            case .photoListResponse(.failure):
+            case let .photoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
+                guard error is CancellationError == false else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
             case .loadMorePhotos:

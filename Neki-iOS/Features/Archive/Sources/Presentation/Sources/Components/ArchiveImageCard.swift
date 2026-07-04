@@ -11,6 +11,7 @@ import os
 
 struct ArchiveImageCard: View {
     @Environment(\.displayScale) private var displayScale
+    @State private var cardWidth: CGFloat = 200
     
     let item: PhotoEntity
     let isSelectionMode: Bool
@@ -27,15 +28,15 @@ struct ArchiveImageCard: View {
     )
     
     private var imageAspectRatio: CGFloat? {
-        if let width = item.width, let height = item.height, height > 0 {
+        if let width = item.width, let height = item.height, width > 0, height > 0 {
             return CGFloat(width) / CGFloat(height)
         }
         return nil
     }
 
     private var imageProcessor: DownsamplingImageProcessor {
-        let targetWidth = 200 * displayScale
-        let targetHeight = min(800, 200 / (imageAspectRatio ?? 0.5)) * displayScale
+        let targetWidth = cardWidth * displayScale
+        let targetHeight = min(800, cardWidth / (imageAspectRatio ?? 0.5)) * displayScale
         return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
     }
     
@@ -104,5 +105,9 @@ struct ArchiveImageCard: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .clipped()
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { width in
+            guard width > .zero, abs(cardWidth - width) > 1 else { return }
+            cardWidth = width
+        }
     }
 }

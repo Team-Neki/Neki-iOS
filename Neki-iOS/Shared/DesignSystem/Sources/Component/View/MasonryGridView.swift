@@ -11,11 +11,9 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
     
     //MARK: - Properties
 
-    let items: [Item]
     let columns: Int
     let horizontalSpacing: CGFloat
     let verticalSpacing: CGFloat
-    let estimatedHeight: ((Item) -> CGFloat?)?
     let content: (Item) -> ItemView
     let columnItems: [[Item]]
     
@@ -29,11 +27,9 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         estimatedHeight: ((Item) -> CGFloat?)? = nil,
         @ViewBuilder content: @escaping (Item) -> ItemView
     ) {
-        self.items = items
         self.columns = max(1, columns)
         self.horizontalSpacing = horizontalSpacing
         self.verticalSpacing = verticalSpacing
-        self.estimatedHeight = estimatedHeight
         self.content = content
 
         guard let estimatedHeight else {
@@ -58,6 +54,19 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         }
 
         self.columnItems = result
+    }
+
+    public init(
+        columnItems: [[Item]],
+        horizontalSpacing: CGFloat = 12,
+        verticalSpacing: CGFloat = 12,
+        @ViewBuilder content: @escaping (Item) -> ItemView
+    ) {
+        self.columns = max(1, columnItems.count)
+        self.horizontalSpacing = horizontalSpacing
+        self.verticalSpacing = verticalSpacing
+        self.content = content
+        self.columnItems = columnItems.isEmpty ? [[]] : columnItems
     }
     
     //MARK: - Main Body

@@ -600,7 +600,7 @@ private extension NaverMapView {
     }
     
     func detailCardLayer(_ photoBooth: PhotoBooth) -> some View {
-        VStack {
+        VStack(spacing: 8) {
             mapControllers(selectedBooth: photoBooth)
             
             HStack(spacing: 12) {
@@ -610,7 +610,7 @@ private extension NaverMapView {
                         ProgressView()
                     }
                     .onFailureImage(.imgDefaultBrandOriginal)
-                    .frame(width: 64, height: 64)
+                    .frame(width: 70, height: 70)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 VStack(alignment: .leading, spacing: 6) {
@@ -637,10 +637,21 @@ private extension NaverMapView {
                 
                 Spacer()
 
-                Button {
-                    store.send(.didTapDirectionAppsButton)
-                } label: {
-                    Image(.iconDirections)
+                VStack(spacing: 6) {
+                    Button {
+                        store.send(.didTapFavorite(photoBooth))
+                    } label: {
+                        Image(photoBooth.isFavorite ? .iconFavoriteHeartFill : .iconFavoriteHeart)
+                            .padding(5)
+                            .background { Circle().fill(.gray25) }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        store.send(.didTapDirectionAppsButton)
+                    } label: {
+                        Image(.iconDirections)
+                    }
                 }
             }
             .padding(16)
@@ -658,12 +669,7 @@ private extension NaverMapView {
     func mapControllers(selectedBooth: PhotoBooth? = nil) -> some View {
         HStack {
             VStack(spacing: 8) {
-                if let selectedBooth {
-                    favoriteControlButton(
-                        isSelected: selectedBooth.isFavorite,
-                        action: { store.send(.didTapFavorite(selectedBooth)) }
-                    )
-                } else {
+                if selectedBooth == nil {
                     favoriteControlButton(
                         isSelected: store.isFavoriteMarkerFilterEnabled,
                         action: { store.send(.didTapFavoriteMarkerFilterButton) }

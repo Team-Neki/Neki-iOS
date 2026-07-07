@@ -79,6 +79,7 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
                         content(item)
                     }
                 }
+                .frame(maxWidth: .infinity)
             }
         }
     }

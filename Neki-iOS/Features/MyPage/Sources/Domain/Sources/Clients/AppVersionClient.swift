@@ -37,13 +37,7 @@ extension AppVersionClient: DependencyKey {
         } currentVersion: {
             return fetchLocalVersion()
         } isDeveloperDiagnosticsAvailable: {
-            #if DEBUG
-            return true
-            #else
-            let isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-            let isDevelopmentBundle = Bundle.main.bundleIdentifier?.contains("Neki-dev") == true
-            return isTestFlight || isDevelopmentBundle
-            #endif
+            AppRuntimeEnvironment.isDeveloperDiagnosticsAvailable
         }
     }()
 }

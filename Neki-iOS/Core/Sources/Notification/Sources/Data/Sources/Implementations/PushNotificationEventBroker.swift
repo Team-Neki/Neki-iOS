@@ -117,6 +117,12 @@ extension PushNotificationClient: DependencyKey {
             checkAPNSTokenRegistration: {
                 Messaging.messaging().apnsToken != nil
             },
+            fetchCurrentAPNSToken: {
+                Messaging.messaging().apnsToken?.hexString
+            },
+            fetchCurrentFCMToken: {
+                Messaging.messaging().fcmToken
+            },
             configureMessaging: {
                 messagingDelegate.configureMessaging()
             },
@@ -142,5 +148,11 @@ private extension UNAuthorizationStatus {
         @unknown default:
             false
         }
+    }
+}
+
+private extension Data {
+    var hexString: String {
+        map { String(format: "%02x", $0) }.joined()
     }
 }

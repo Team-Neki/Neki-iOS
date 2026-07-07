@@ -23,6 +23,10 @@ struct DeveloperDiagnosticsFeature {
 
     @Dependency(\.appDiagnosticsClient) private var appDiagnosticsClient
 
+    private enum CancelID: Hashable {
+        case fetchDiagnostics
+    }
+
     var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
@@ -31,6 +35,7 @@ struct DeveloperDiagnosticsFeature {
                 return .run { send in
                     await send(.diagnosticsResponse(appDiagnosticsClient.fetch()))
                 }
+                .cancellable(id: CancelID.fetchDiagnostics, cancelInFlight: true)
 
             case let .diagnosticsResponse(diagnostics):
                 state.isLoading = false

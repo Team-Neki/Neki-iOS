@@ -14,6 +14,8 @@ struct NearPhotoBoothListSheet: View {
     @Namespace private var tabNamespace
     @State private var favoriteButtonOverrides: [PhotoBooth.ID: Bool] = [:]
     @State private var pendingFavoriteRemovalIDs: Set<PhotoBooth.ID> = []
+    @State private var pendingFavoriteRemovalBooths: IdentifiedArrayOf<PhotoBooth> = []
+    @State private var favoriteRemovalReferenceBooths: IdentifiedArrayOf<PhotoBooth> = []
     @State private var delayedFavoriteTasks: [PhotoBooth.ID: Task<Void, Never>] = [:]
 
     private let brandNameFormatter = PhotoBoothNameFormatter()
@@ -51,6 +53,8 @@ struct NearPhotoBoothListSheet: View {
             delayedFavoriteTasks.values.forEach { $0.cancel() }
             delayedFavoriteTasks.removeAll()
             pendingFavoriteRemovalIDs.removeAll()
+            pendingFavoriteRemovalBooths.removeAll()
+            favoriteRemovalReferenceBooths.removeAll()
             favoriteButtonOverrides.removeAll()
         }
     }
@@ -188,22 +192,24 @@ private extension NearPhotoBoothListSheet {
     }
     
     var favoritePhotoBoothListSection: some View {
+        let favoriteBooths = displayedFavoriteBooths
+
         Section {
             VStack(alignment: .leading, spacing: 12) {
                 favoriteBoothCountText
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
 
-                if store.visibleFavoriteBooths.isEmpty {
+                if favoriteBooths.isEmpty {
                     unavailableView("저장한 포토부스가 없어요.")
                 } else {
                     LazyVStack(alignment: .leading, spacing: .zero) {
-                        ForEach(store.visibleFavoriteBooths) { photoBooth in
+                        ForEach(favoriteBooths) { photoBooth in
                             photoBoothCell(photoBooth)
                                 .transition(Self.FavoriteRemovalEffect.transition)
                         }
                     }
-                    .animation(Self.FavoriteRemovalEffect.animation, value: store.visibleFavoriteBooths.map(\.id))
+                    .animation(Self.FavoriteRemovalEffect.animation, value: favoriteBooths.map(\.id))
                 }
             }
         }
@@ -296,14 +302,26 @@ private extension NearPhotoBoothListSheet {
         }
 
         guard pendingFavoriteRemovalIDs.contains(photoBooth.id) == false else { return }
+        if favoriteRemovalReferenceBooths.isEmpty {
+            favoriteRemovalReferenceBooths = store.visibleFavoriteBooths
+        }
+        if pendingFavoriteRemovalBooths[id: photoBooth.id] == nil {
+            pendingFavoriteRemovalBooths.append(photoBooth)
+        }
         pendingFavoriteRemovalIDs.insert(photoBooth.id)
+        store.send(.didTapFavorite(photoBooth), animation: Self.FavoriteRemovalEffect.animation)
         delayedFavoriteTasks[photoBooth.id]?.cancel()
         delayedFavoriteTasks[photoBooth.id] = Task { @MainActor in
             try? await Task.sleep(for: Self.FavoriteRemovalEffect.delay)
             guard Task.isCancelled == false else { return }
-            store.send(.didTapFavorite(photoBooth), animation: Self.FavoriteRemovalEffect.animation)
-            pendingFavoriteRemovalIDs.remove(photoBooth.id)
-            favoriteButtonOverrides[photoBooth.id] = nil
+            withAnimation(Self.FavoriteRemovalEffect.animation) {
+                pendingFavoriteRemovalIDs.remove(photoBooth.id)
+                pendingFavoriteRemovalBooths.remove(id: photoBooth.id)
+                favoriteButtonOverrides[photoBooth.id] = nil
+                if pendingFavoriteRemovalIDs.isEmpty {
+                    favoriteRemovalReferenceBooths.removeAll()
+                }
+            }
             delayedFavoriteTasks[photoBooth.id] = nil
         }
     }
@@ -316,5 +334,29 @@ private extension NearPhotoBoothListSheet {
             favoriteButtonOverrides[id] = nil
             delayedFavoriteTasks[id] = nil
         }
+    }
+
+    var displayedFavoriteBooths: [PhotoBooth] {
+        guard pendingFavoriteRemovalIDs.isEmpty == false else { return Array(store.visibleFavoriteBooths) }
+
+        let referenceBooths = favoriteRemovalReferenceBooths.isEmpty
+            ? store.visibleFavoriteBooths
+            : favoriteRemovalReferenceBooths
+        var displayedBooths: [PhotoBooth] = []
+
+        referenceBooths.forEach { photoBooth in
+            if let visibleBooth = store.visibleFavoriteBooths[id: photoBooth.id] {
+                displayedBooths.append(visibleBooth)
+            } else if pendingFavoriteRemovalIDs.contains(photoBooth.id),
+                      let pendingBooth = pendingFavoriteRemovalBooths[id: photoBooth.id] {
+                displayedBooths.append(pendingBooth)
+            }
+        }
+
+        store.visibleFavoriteBooths.forEach { photoBooth in
+            if referenceBooths[id: photoBooth.id] == nil { displayedBooths.append(photoBooth) }
+        }
+
+        return displayedBooths
     }
 }

@@ -15,6 +15,10 @@ private actor PushNotificationEventBroker {
     private var continuations: [UUID: AsyncStream<PushNotificationEvent>.Continuation] = [:]
     private var pendingEvents: [PushNotificationEvent] = []
 
+    deinit {
+        continuations.values.forEach { $0.finish() }
+    }
+
     func events() -> AsyncStream<PushNotificationEvent> {
         let id = UUID()
 
@@ -113,7 +117,6 @@ extension PushNotificationClient: DependencyKey {
             },
             updateAPNSToken: { token in
                 repository.updateAPNSToken(token)
-                _ = try await repository.fetchFCMToken()
             },
             processReceivedNotification: { payload in
                 repository.processReceivedNotification(payload)

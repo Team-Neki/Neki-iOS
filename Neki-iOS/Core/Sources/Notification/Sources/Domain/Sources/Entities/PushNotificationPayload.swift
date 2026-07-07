@@ -7,10 +7,12 @@
 
 import Foundation
 
-public struct PushNotificationPayload: Equatable, Sendable {
+public struct PushNotificationPayload: Equatable, @unchecked Sendable {
+    let userInfo: [AnyHashable: Any]
     public let values: [String: String]
 
     public init(userInfo: [AnyHashable: Any]) {
+        self.userInfo = userInfo
         self.values = userInfo.reduce(into: [:]) { result, element in
             guard let key = element.key as? String else { return }
 
@@ -31,8 +33,11 @@ public struct PushNotificationPayload: Equatable, Sendable {
         }
     }
 
-    var userInfo: [AnyHashable: Any] {
-        Dictionary(uniqueKeysWithValues: values.map { (AnyHashable($0.key), $0.value) })
+    public static func == (
+        lhs: PushNotificationPayload,
+        rhs: PushNotificationPayload
+    ) -> Bool {
+        lhs.values == rhs.values
     }
 }
 

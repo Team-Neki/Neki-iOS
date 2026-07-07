@@ -16,7 +16,7 @@ enum MapAnalyticsEvent {
     case boothFavoriteRemove(boothName: String, brandName: String)
     case favoriteBoothFilterToggle(action: MapFilterAction, favoriteBoothCount: Int)
     case favoriteBoothView(favoriteBoothCount: Int)
-    case brandFilterManageView(pinnedBrandCount: Int, totalBrandCount: Int)
+    case brandOrderSave(orderedBrands: [PhotoBoothBrand])
     case brandFavoriteAdd(brandName: String)
     case brandFavoriteRemove(brandName: String)
     case mapRouteClick(mapType: DirectionAppType)
@@ -36,7 +36,7 @@ extension MapAnalyticsEvent: AnalyticsEvent {
         case .boothFavoriteRemove: return .boothFavoriteRemove
         case .favoriteBoothFilterToggle: return .favoriteBoothFilterToggle
         case .favoriteBoothView: return .favoriteBoothView
-        case .brandFilterManageView: return .brandFilterManageView
+        case .brandOrderSave: return .brandOrderSave
         case .brandFavoriteAdd: return .brandFavoriteAdd
         case .brandFavoriteRemove: return .brandFavoriteRemove
         case .mapRouteClick: return .mapRouteClick
@@ -61,8 +61,14 @@ extension MapAnalyticsEvent: AnalyticsEvent {
             return [.action: action.rawValue, .favoriteBoothCount: favoriteBoothCount]
         case let .favoriteBoothView(favoriteBoothCount):
             return [.favoriteBoothCount: favoriteBoothCount]
-        case let .brandFilterManageView(pinnedBrandCount, totalBrandCount):
-            return [.pinnedBrandCount: pinnedBrandCount, .totalBrandCount: totalBrandCount]
+        case let .brandOrderSave(orderedBrands):
+            let priorityBrandNames = orderedBrands.map(\.name)
+            return [
+                .orderedBrandCount: orderedBrands.count,
+                .priorityBrand1: priorityBrandNames.indices.contains(0) ? priorityBrandNames[0] : "",
+                .priorityBrand2: priorityBrandNames.indices.contains(1) ? priorityBrandNames[1] : "",
+                .priorityBrand3: priorityBrandNames.indices.contains(2) ? priorityBrandNames[2] : ""
+            ]
         case let .brandFavoriteAdd(brandName):
             return [.brandName: brandName]
         case let .brandFavoriteRemove(brandName):

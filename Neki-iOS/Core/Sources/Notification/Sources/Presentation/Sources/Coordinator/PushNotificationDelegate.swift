@@ -6,22 +6,20 @@
 //
 
 import Foundation
+import Dependencies
 import UserNotifications
 
 @MainActor
 final class PushNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
-    private let eventBroker: PushNotificationEventBroker
-
-    init(eventBroker: PushNotificationEventBroker = .shared) {
-        self.eventBroker = eventBroker
-    }
+    @Dependency(\.pushNotificationClient) private var pushNotificationClient
 
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         let payload = PushNotificationPayload(userInfo: notification.request.content.userInfo)
-        await eventBroker.publish(.foregroundReceived(payload))
+        pushNotificationClient.processReceivedNotification(payload)
+        await pushNotificationClient.publishEvent(.foregroundReceived(payload))
         return [.banner, .sound, .badge]
     }
 
@@ -30,6 +28,7 @@ final class PushNotificationDelegate: NSObject, UNUserNotificationCenterDelegate
         didReceive response: UNNotificationResponse
     ) async {
         let payload = PushNotificationPayload(userInfo: response.notification.request.content.userInfo)
-        await eventBroker.publish(.responseReceived(payload))
+        pushNotificationClient.processReceivedNotification(payload)
+        await pushNotificationClient.publishEvent(.responseReceived(payload))
     }
 }

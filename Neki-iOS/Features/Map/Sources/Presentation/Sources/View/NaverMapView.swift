@@ -29,12 +29,12 @@ fileprivate enum Constants {
     // Clustering Settings
     static let clusterMaxZoom: Int = 20
     static let clusterMinZoom: Int = 12
-    static let clusterThresholdZoomIn: Double = 60.0
-    static let clusterThresholdZoomOut: Double = 70.0
+    static let clusterThresholdZoomIn: Double = 48.0
+    static let clusterThresholdZoomOut: Double = 60.0
     static let leafCaptionTextSize: CGFloat = 12.0
     static let clusterCaptionTextSize: CGFloat = 14.0
     static let captionColorHex: UInt = 0x202227
-    static let brandClusteringThreshold: Double = 15.0
+    static let brandClusteringThreshold: Double = 14.0
     static let favoriteMarkerViewportUpdateInterval: TimeInterval = 0.15
 }
 
@@ -187,12 +187,15 @@ extension NaverMapRepresentable {
         
         private func setupClusterer(mapView: NMFMapView) {
             let builder = NMCComplexBuilder<BoothClusteringKey>()
+            let clusterStrategy = ClusterStrategy()
             builder.markerManager = BoothMarkerManager()
             builder.leafMarkerUpdater = leafUpdater
             builder.clusterMarkerUpdater = BoothClusterMarkerUpdater(mapView: mapView)
             builder.maxClusteringZoom = Constants.clusterMaxZoom
             builder.minClusteringZoom = Constants.clusterMinZoom
-            builder.thresholdStrategy = ClusterStrategy()
+            builder.maxScreenDistance = Constants.clusterThresholdZoomOut
+            builder.thresholdStrategy = clusterStrategy
+            builder.distanceStrategy = clusterStrategy
             builder.tagMergeStrategy = BoothTagMergeStrategy()
             
             let clusterer = builder.build()
@@ -336,7 +339,7 @@ extension NaverMapRepresentable {
     
     final class ClusterStrategy: NMCDefaultDistanceStrategy, NMCThresholdStrategy {
         func getThreshold(_ zoom: Int) -> Double {
-            guard zoom < 15 else { return Constants.clusterThresholdZoomIn }
+            guard Double(zoom) < Constants.brandClusteringThreshold else { return Constants.clusterThresholdZoomIn }
             return Constants.clusterThresholdZoomOut
         }
         
@@ -597,7 +600,7 @@ private extension NaverMapView {
     }
     
     func detailCardLayer(_ photoBooth: PhotoBooth) -> some View {
-        VStack {
+        VStack(spacing: 8) {
             mapControllers(selectedBooth: photoBooth)
             
             HStack(spacing: 12) {
@@ -607,7 +610,7 @@ private extension NaverMapView {
                         ProgressView()
                     }
                     .onFailureImage(.imgDefaultBrandOriginal)
-                    .frame(width: 64, height: 64)
+                    .frame(width: 70, height: 70)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 
                 VStack(alignment: .leading, spacing: 6) {
@@ -634,10 +637,21 @@ private extension NaverMapView {
                 
                 Spacer()
 
-                Button {
-                    store.send(.didTapDirectionAppsButton)
-                } label: {
-                    Image(.iconDirections)
+                VStack(spacing: 6) {
+                    Button {
+                        store.send(.didTapFavorite(photoBooth))
+                    } label: {
+                        Image(photoBooth.isFavorite ? .iconFavoriteHeartFill : .iconFavoriteHeart)
+                            .padding(5)
+                            .background { Circle().fill(.gray25) }
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        store.send(.didTapDirectionAppsButton)
+                    } label: {
+                        Image(.iconDirections)
+                    }
                 }
             }
             .padding(16)
@@ -655,12 +669,7 @@ private extension NaverMapView {
     func mapControllers(selectedBooth: PhotoBooth? = nil) -> some View {
         HStack {
             VStack(spacing: 8) {
-                if let selectedBooth {
-                    favoriteControlButton(
-                        isSelected: selectedBooth.isFavorite,
-                        action: { store.send(.didTapFavorite(selectedBooth)) }
-                    )
-                } else {
+                if selectedBooth == nil {
                     favoriteControlButton(
                         isSelected: store.isFavoriteMarkerFilterEnabled,
                         action: { store.send(.didTapFavoriteMarkerFilterButton) }

@@ -50,7 +50,11 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
     }
 
     nonisolated func updateAPNSToken(_ token: Data) {
-        Messaging.messaging().apnsToken = token
+        Messaging.messaging().setAPNSToken(token, type: .unknown)
+    }
+
+    nonisolated func processReceivedNotification(_ payload: PushNotificationPayload) {
+        Messaging.messaging().appDidReceiveMessage(payload.userInfo)
     }
 
     func updateDeviceToken(

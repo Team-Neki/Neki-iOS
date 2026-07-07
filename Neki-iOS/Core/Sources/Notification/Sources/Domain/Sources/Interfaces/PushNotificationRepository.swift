@@ -14,6 +14,7 @@ protocol PushNotificationRepository {
     func fetchNotificationList() async throws -> [PushNotificationListItem]
     func fetchFCMToken() async throws -> PushNotificationToken
     func updateAPNSToken(_ token: Data)
+    func processReceivedNotification(_ payload: PushNotificationPayload)
     func updateDeviceToken(
         _ token: PushNotificationToken,
         isPushNotificationAgreed: Bool

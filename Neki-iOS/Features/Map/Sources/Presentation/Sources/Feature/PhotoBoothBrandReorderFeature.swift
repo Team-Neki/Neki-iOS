@@ -38,6 +38,7 @@ public struct PhotoBoothBrandReorderFeature {
     }
 
     @Dependency(\.photoBoothClient) private var photoBoothClient
+    @Dependency(\.analyticsClient) private var analytics
     
     public var body: some ReducerOf<Self> {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
@@ -62,7 +63,10 @@ public struct PhotoBoothBrandReorderFeature {
                 let orderedBrands = IdentifiedArray(uniqueElements: brands)
                 state.initialBrands = orderedBrands
                 state.brands = orderedBrands
-                return .send(.delegate(.saveCompleted(orderedBrands)))
+                return .merge(
+                    .send(.delegate(.saveCompleted(orderedBrands))),
+                    .run { _ in analytics.logEvent(event: MapAnalyticsEvent.brandOrderSave(orderedBrands: Array(orderedBrands))) }
+                )
 
             case .saveResponse(.failure):
                 state.isSaving = false

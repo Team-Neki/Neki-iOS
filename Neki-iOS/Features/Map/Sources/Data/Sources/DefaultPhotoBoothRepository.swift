@@ -59,16 +59,14 @@ private enum TileSystem {
 public final actor DefaultPhotoBoothRepository {
     typealias BrandID = String
     
-    private struct CachedPhotoBooth {
-        var photoBooth: PhotoBooth
-        var favoriteOrder: Int?
-    }
-    
     @Dependency(\.networkProvider) private var networkProvider
     
-    private var cache: [MapTile: [PhotoBooth]] = [:]
-    private var photoBoothCacheByID: [PhotoBooth.ID: CachedPhotoBooth] = [:]
-    private var nextFavoriteOrder: Int = .zero
+    private var cache: [MapTile: [PhotoBooth.ID]] = [:]
+    private var photoBoothCacheByID: [PhotoBooth.ID: PhotoBooth] = [:]
+    private var favoritePhotoBoothIDs: [PhotoBooth.ID] = []
+    private var favoritePhotoBoothIDSet: Set<PhotoBooth.ID> = []
+    private var hasLoadedFavoritePhotoBoothSnapshot: Bool = false
+    private var favoriteMutationRevision: UInt = .zero
     private var brandMap: [BrandID: PhotoBoothBrand]?
     private var brandOrderIDs: [PhotoBoothBrand.ID] = []
     private var brandFetchTask: Task<([BrandID: PhotoBoothBrand], [PhotoBoothBrand.ID]), Error>?
@@ -130,13 +128,11 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 
                 var cachedBooths: [PhotoBooth] = []
                 for tile in requiredTiles {
-                    if let cached = cache[tile] {
-                        cachedBooths.append(contentsOf: cached)
-                    }
+                    guard let cachedIDs = cache[tile] else { continue }
+                    cachedBooths.append(contentsOf: cachedIDs.compactMap { photoBoothCacheByID[$0] })
                 }
                 
                 if !cachedBooths.isEmpty {
-                    updateCachedPhotoBooths(cachedBooths)
                     continuation.yield(cachedBooths)
                 }
                 
@@ -165,9 +161,9 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                         }
                         
                         for try await (tile, booths) in group {
-                            self.cache[tile] = booths
-                            self.updateCachedPhotoBooths(booths)
-                            continuation.yield(booths)
+                            let mergedPhotoBooths = self.updateCachedPhotoBooths(booths)
+                            self.cache[tile] = mergedPhotoBooths.map(\.id)
+                            continuation.yield(mergedPhotoBooths)
                         }
                     }
                 }
@@ -197,31 +193,33 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             guard let brand = brands[dto.brandName] else { return nil }
             return dto.toEntity(brand: brand)
         } ?? []
-        updateCachedPhotoBooths(photoBooths)
-        return photoBooths
+        return updateCachedPhotoBooths(photoBooths)
     }
     
     func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+        favoriteMutationRevision &+= 1
         updateCachedFavoriteState(id: id, isFavorite: isFavorite)
     }
 
     func readFavoritePhotoBooths() async throws -> [PhotoBooth] {
         let brands = try await ensureBrandsLoaded()
+        let requestRevision = favoriteMutationRevision
         let endpoint = MapEndpoint.fetchFavorites
         let responseDTO: BaseResponseDTO<FetchFavoritePhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         guard let items = responseDTO.data?.items else { throw NetworkError.responseDecodingError }
-        let serverFavoriteIDs = Set(items.map(\.id))
+        let serverFavoriteIDs = items.map(\.id)
         let photoBooths = items.compactMap { dto -> PhotoBooth? in
             guard let brand = brands[dto.brandName] else { return nil }
             var photoBooth = dto.toEntity(brand: brand)
             photoBooth.isFavorite = true
             return photoBooth
         }
+        guard requestRevision == favoriteMutationRevision else { return photoBooths }
         updateCachedFavoritePhotoBooths(photoBooths, serverFavoriteIDs: serverFavoriteIDs)
-        return photoBooths
+        return favoritePhotoBoothIDs.compactMap { photoBoothCacheByID[$0] }
     }
 
     func loadBrands() async throws -> [PhotoBoothBrand] {
@@ -243,56 +241,57 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
 // MARK: - DefaultPhotoBoothRepository + Cache Helpers
 
 private extension DefaultPhotoBoothRepository {
-    func updateCachedPhotoBooths(_ photoBooths: [PhotoBooth]) {
-        photoBooths.forEach { photoBooth in
-            var entry = photoBoothCacheByID[photoBooth.id] ?? CachedPhotoBooth(photoBooth: photoBooth, favoriteOrder: nil)
-            entry.photoBooth = photoBooth
-            entry.favoriteOrder = updatedFavoriteOrder(currentOrder: entry.favoriteOrder, isFavorite: photoBooth.isFavorite)
-            photoBoothCacheByID[photoBooth.id] = entry
+    func updateCachedPhotoBooths(_ photoBooths: [PhotoBooth]) -> [PhotoBooth] {
+        photoBooths.map { photoBooth in
+            var updatedPhotoBooth = photoBooth
+            if hasLoadedFavoritePhotoBoothSnapshot {
+                updatedPhotoBooth.isFavorite = favoritePhotoBoothIDSet.contains(photoBooth.id)
+            } else if let cachedPhotoBooth = photoBoothCacheByID[photoBooth.id] {
+                updatedPhotoBooth.isFavorite = cachedPhotoBooth.isFavorite || photoBooth.isFavorite
+            }
+            photoBoothCacheByID[updatedPhotoBooth.id] = updatedPhotoBooth
+            return updatedPhotoBooth
         }
     }
 
     func updateCachedFavoriteState(id: PhotoBooth.ID, isFavorite: Bool) {
-        if var entry = photoBoothCacheByID[id] {
-            entry.photoBooth.isFavorite = isFavorite
-            entry.favoriteOrder = updatedFavoriteOrder(currentOrder: entry.favoriteOrder, isFavorite: isFavorite)
-            photoBoothCacheByID[id] = entry
-        }
+        updateFavoritePhotoBoothOrder(id: id, isFavorite: isFavorite)
 
-        for tile in cache.keys {
-            guard let index = cache[tile]?.firstIndex(where: { $0.id == id }) else { continue }
-            cache[tile]?[index].isFavorite = isFavorite
+        if var photoBooth = photoBoothCacheByID[id] {
+            photoBooth.isFavorite = isFavorite
+            photoBoothCacheByID[id] = photoBooth
         }
     }
 
     func updateCachedFavoritePhotoBooths(
         _ photoBooths: [PhotoBooth],
-        serverFavoriteIDs: Set<PhotoBooth.ID>
+        serverFavoriteIDs: [PhotoBooth.ID]
     ) {
-        for id in Array(photoBoothCacheByID.keys) {
-            guard serverFavoriteIDs.contains(id) == false else { continue }
-            updateCachedFavoriteState(id: id, isFavorite: false)
+        favoritePhotoBoothIDs = serverFavoriteIDs
+        favoritePhotoBoothIDSet = Set(serverFavoriteIDs)
+        hasLoadedFavoritePhotoBoothSnapshot = true
+
+        Array(photoBoothCacheByID.keys).forEach { id in
+            guard var photoBooth = photoBoothCacheByID[id] else { return }
+            photoBooth.isFavorite = favoritePhotoBoothIDSet.contains(id)
+            photoBoothCacheByID[id] = photoBooth
         }
 
-        let count = photoBooths.count
-        photoBooths.enumerated().forEach { index, photoBooth in
+        photoBooths.forEach { photoBooth in
             var favoriteBooth = photoBooth
             favoriteBooth.isFavorite = true
-            var entry = photoBoothCacheByID[favoriteBooth.id] ?? CachedPhotoBooth(photoBooth: favoriteBooth, favoriteOrder: nil)
-            entry.photoBooth = favoriteBooth
-            entry.favoriteOrder = count - index
-            photoBoothCacheByID[favoriteBooth.id] = entry
-            updateCachedFavoriteState(id: favoriteBooth.id, isFavorite: true)
+            photoBoothCacheByID[favoriteBooth.id] = favoriteBooth
         }
-
-        nextFavoriteOrder = max(nextFavoriteOrder, count + 1)
     }
 
-    func updatedFavoriteOrder(currentOrder: Int?, isFavorite: Bool) -> Int? {
-        guard isFavorite else { return nil }
-        if let currentOrder { return currentOrder }
-        defer { nextFavoriteOrder += 1 }
-        return nextFavoriteOrder
+    func updateFavoritePhotoBoothOrder(id: PhotoBooth.ID, isFavorite: Bool) {
+        if isFavorite {
+            guard favoritePhotoBoothIDSet.insert(id).inserted else { return }
+            favoritePhotoBoothIDs.insert(id, at: .zero)
+        } else {
+            guard favoritePhotoBoothIDSet.remove(id) != nil else { return }
+            favoritePhotoBoothIDs.removeAll { $0 == id }
+        }
     }
 
     func orderedBrands(_ brands: [PhotoBoothBrand], by orderIDs: [PhotoBoothBrand.ID]) -> [PhotoBoothBrand] {

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import ComposableArchitecture
+import os
 import UserNotifications
 
 @Reducer
@@ -42,6 +43,7 @@ struct AppCoordinator {
         var shouldRetryPushNotificationSynchronization: Bool = false
         var hasSynchronizedPushNotification: Bool = false
         var lastSynchronizedPushAgreement: Bool?
+        var isAPNSTokenRegistered: Bool = false
         var pushNotificationEvent = PushNotificationEventFeature.State()
         
         init() {
@@ -67,7 +69,6 @@ struct AppCoordinator {
         case scenePhaseChanged(ScenePhase)
         case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
         case executePendingRouteIfNeeded
-        case didRegisterAPNSToken
         case checkPushNotificationAuthorization
         case checkPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case requestPushNotificationAuthorization
@@ -198,14 +199,13 @@ struct AppCoordinator {
             case .executePendingRouteIfNeeded:
                 return appRouter.executePendingRouteIfNeeded(state: &state)
 
-            case .didRegisterAPNSToken:
-                guard case .signedIn = state.userSessionStatus else { return .none }
-                state.hasSynchronizedPushNotification = false
-                guard state.isSynchronizingPushNotification == false else {
-                    state.shouldRetryPushNotificationSynchronization = true
-                    return .none
-                }
-                return .send(.synchronizePushNotification)
+            case .pushNotificationEvent(.delegate(.didRegisterAPNSToken)):
+                state.isAPNSTokenRegistered = true
+                return synchronizePushNotificationIfReady(&state)
+
+            case .pushNotificationEvent(.delegate(.didReceiveFCMRegistrationToken)):
+                guard state.isAPNSTokenRegistered else { return .none }
+                return synchronizePushNotificationIfReady(&state)
                 
             case .didTapUpdateAlert:
                 guard let appStoreURL = URL(string: "https://apps.apple.com/kr/app/id6757490609") else { return .none }
@@ -300,13 +300,7 @@ struct AppCoordinator {
                 )
 
             case .route(.mainTab(.delegate(.pushNotificationAuthorizationResolved))):
-                guard case .signedIn = state.userSessionStatus else { return .none }
-                state.hasSynchronizedPushNotification = false
-                guard state.isSynchronizingPushNotification == false else {
-                    state.shouldRetryPushNotificationSynchronization = true
-                    return .none
-                }
-                return .send(.synchronizePushNotification)
+                return synchronizePushNotificationIfReady(&state)
 
             case .checkPushNotificationAuthorization:
                 guard case .signedIn = state.userSessionStatus,
@@ -318,19 +312,18 @@ struct AppCoordinator {
 
             case let .checkPushNotificationAuthorizationResponse(.success(status)):
                 if status == .notDetermined {
-                    guard case let .signedIn(user) = state.userSessionStatus,
-                          user.marketingTermAgreed
-                    else { return .none }
                     return .send(.requestPushNotificationAuthorization)
                 }
 
                 let currentAgreement = status.isPushNotificationAgreed
-                guard state.lastSynchronizedPushAgreement != currentAgreement else { return .none }
-                state.hasSynchronizedPushNotification = false
-                return .send(.synchronizePushNotification)
+                guard state.hasSynchronizedPushNotification == false ||
+                      state.lastSynchronizedPushAgreement != currentAgreement
+                else { return .none }
+                return synchronizePushNotificationIfReady(&state)
 
-            case .checkPushNotificationAuthorizationResponse(.failure):
-                return .none
+            case let .checkPushNotificationAuthorizationResponse(.failure(error)):
+                Logger.presentation.error("Push notification authorization check failed: \(error)")
+                return synchronizePushNotificationIfReady(&state)
 
             case .requestPushNotificationAuthorization:
                 return .run { send in
@@ -341,18 +334,15 @@ struct AppCoordinator {
                 }
 
             case .requestPushNotificationAuthorizationResponse(.success):
-                state.hasSynchronizedPushNotification = false
-                guard state.isSynchronizingPushNotification == false else {
-                    state.shouldRetryPushNotificationSynchronization = true
-                    return .none
-                }
-                return .send(.synchronizePushNotification)
+                return synchronizePushNotificationIfReady(&state)
 
-            case .requestPushNotificationAuthorizationResponse(.failure):
-                return .none
+            case let .requestPushNotificationAuthorizationResponse(.failure(error)):
+                Logger.presentation.error("Push notification authorization request failed: \(error)")
+                return synchronizePushNotificationIfReady(&state)
 
             case .synchronizePushNotification:
                 guard case .signedIn = state.userSessionStatus else { return .none }
+                guard state.isAPNSTokenRegistered else { return .none }
                 guard state.isSynchronizingPushNotification == false,
                       state.hasSynchronizedPushNotification == false
                 else { return .none }
@@ -363,12 +353,17 @@ struct AppCoordinator {
 
             case let .synchronizePushNotificationResponse(.success(status)):
                 state.isSynchronizingPushNotification = false
+                let shouldRetry = state.shouldRetryPushNotificationSynchronization
                 state.shouldRetryPushNotificationSynchronization = false
                 state.hasSynchronizedPushNotification = true
                 state.lastSynchronizedPushAgreement = status.isPushNotificationAgreed
-                return .none
+                Logger.presentation.debug("Push notification synchronization succeeded")
+                guard shouldRetry else { return .none }
+                state.hasSynchronizedPushNotification = false
+                return .send(.synchronizePushNotification)
 
-            case .synchronizePushNotificationResponse(.failure):
+            case let .synchronizePushNotificationResponse(.failure(error)):
+                Logger.presentation.error("Push notification synchronization failed: \(error)")
                 state.isSynchronizingPushNotification = false
                 guard state.shouldRetryPushNotificationSynchronization else { return .none }
                 state.shouldRetryPushNotificationSynchronization = false
@@ -432,6 +427,18 @@ private extension AppCoordinator {
     func extractUserID(from status: UserSessionStatus) -> Int? {
         guard case let .signedIn(user) = status else { return nil }
         return user.id
+    }
+
+    func synchronizePushNotificationIfReady(_ state: inout State) -> Effect<Action> {
+        guard case .signedIn = state.userSessionStatus else { return .none }
+        guard state.isAPNSTokenRegistered else { return .none }
+
+        state.hasSynchronizedPushNotification = false
+        guard state.isSynchronizingPushNotification == false else {
+            state.shouldRetryPushNotificationSynchronization = true
+            return .none
+        }
+        return .send(.synchronizePushNotification)
     }
 
     func isMarketingConsentAlertEligible(for user: User) -> Bool {

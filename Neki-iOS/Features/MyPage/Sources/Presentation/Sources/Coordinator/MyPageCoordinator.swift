@@ -52,6 +52,10 @@ struct MyPageCoordinator {
 
             case .root(.notificationButtonTapped):
                 return .send(.delegate(.requestNotificationList))
+
+            case .root(.delegate(.requestDeveloperDiagnostics)):
+                state.path.append(.developerDiagnostics(.init()))
+                return .none
                 
             case .path(.element(id: _, action: .accountPreference(.editProfileButtonTapped))):
                 guard case let .signedIn(user) = state.userSessionStatus else { return .none }
@@ -117,5 +121,6 @@ extension MyPageCoordinator {
         case deviceAuthorizationPreference(DeviceAuthorizationPreferenceFeature)
         case accountPreference(AccountPreferenceFeature)
         case profileEdit(ProfileEditFeature)
+        case developerDiagnostics(DeveloperDiagnosticsFeature)
     }
 }

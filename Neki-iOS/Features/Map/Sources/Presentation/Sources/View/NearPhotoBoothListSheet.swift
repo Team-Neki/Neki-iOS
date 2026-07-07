@@ -192,24 +192,22 @@ private extension NearPhotoBoothListSheet {
     }
     
     var favoritePhotoBoothListSection: some View {
-        let favoriteBooths = displayedFavoriteBooths
-
         Section {
             VStack(alignment: .leading, spacing: 12) {
                 favoriteBoothCountText
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
 
-                if favoriteBooths.isEmpty {
+                if displayedFavoriteBooths.isEmpty {
                     unavailableView("저장한 포토부스가 없어요.")
                 } else {
                     LazyVStack(alignment: .leading, spacing: .zero) {
-                        ForEach(favoriteBooths) { photoBooth in
+                        ForEach(displayedFavoriteBooths) { photoBooth in
                             photoBoothCell(photoBooth)
                                 .transition(Self.FavoriteRemovalEffect.transition)
                         }
                     }
-                    .animation(Self.FavoriteRemovalEffect.animation, value: favoriteBooths.map(\.id))
+                    .animation(Self.FavoriteRemovalEffect.animation, value: displayedFavoriteBoothIDs)
                 }
             }
         }
@@ -358,5 +356,9 @@ private extension NearPhotoBoothListSheet {
         }
 
         return displayedBooths
+    }
+
+    var displayedFavoriteBoothIDs: [PhotoBooth.ID] {
+        displayedFavoriteBooths.map(\.id)
     }
 }

@@ -15,6 +15,9 @@ public struct PushNotificationClient {
     public var requestAuthorization: @Sendable () async throws -> Bool
     public var fetchNotificationList: @Sendable () async throws -> [PushNotificationListItem]
     public var synchronizeDeviceToken: @Sendable () async throws -> UNAuthorizationStatus
+    public var checkAPNSTokenRegistration: @Sendable () -> Bool = { false }
+    public var fetchCurrentAPNSToken: @Sendable () -> String? = { nil }
+    public var fetchCurrentFCMToken: @Sendable () -> String? = { nil }
     public var configureMessaging: @Sendable () -> Void = {}
     public var updateAPNSToken: @Sendable (_ token: Data) async throws -> Void
     public var processReceivedNotification: @Sendable (PushNotificationPayload) -> Void = { _ in }
@@ -30,6 +33,9 @@ extension PushNotificationClient: TestDependencyKey {
         requestAuthorization: { false },
         fetchNotificationList: { [] },
         synchronizeDeviceToken: { .notDetermined },
+        checkAPNSTokenRegistration: { false },
+        fetchCurrentAPNSToken: { nil },
+        fetchCurrentFCMToken: { nil },
         configureMessaging: {},
         updateAPNSToken: { _ in },
         processReceivedNotification: { _ in },

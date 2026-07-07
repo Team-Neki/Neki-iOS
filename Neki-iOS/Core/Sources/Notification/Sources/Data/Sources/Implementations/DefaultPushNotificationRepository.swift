@@ -50,7 +50,7 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
     }
 
     nonisolated func updateAPNSToken(_ token: Data) {
-        Messaging.messaging().setAPNSToken(token, type: .unknown)
+        Messaging.messaging().setAPNSToken(token, type: PushNotificationAPNSTokenEnvironment.currentTokenType())
     }
 
     nonisolated func processReceivedNotification(_ payload: PushNotificationPayload) {
@@ -73,6 +73,16 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
 private enum PushNotificationRepositoryError: Error {
     case missingAPNSToken
     case missingFCMToken
+}
+
+private enum PushNotificationAPNSTokenEnvironment {
+    static func currentTokenType() -> MessagingAPNSTokenType {
+        #if DEBUG
+        return .sandbox
+        #else
+        return .prod
+        #endif
+    }
 }
 
 private enum PushNotificationRepositoryKey: DependencyKey {

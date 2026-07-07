@@ -10,8 +10,10 @@ import ComposableArchitecture
 import Kingfisher
 
 struct NearPhotoBoothListSheet: View {
+    @Environment(\.nekiSheetScrollStateHandler) private var sheetScrollStateHandler
     @Bindable var store: StoreOf<PhotoBoothListFeature>
     @Namespace private var tabNamespace
+    @State private var isVerticalScrollAtTop: Bool = true
     @State private var favoriteButtonOverrides: [PhotoBooth.ID: Bool] = [:]
     @State private var pendingFavoriteRemovalIDs: Set<PhotoBooth.ID> = []
     @State private var pendingFavoriteRemovalBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -19,6 +21,11 @@ struct NearPhotoBoothListSheet: View {
     @State private var delayedFavoriteTasks: [PhotoBooth.ID: Task<Void, Never>] = [:]
 
     private let brandNameFormatter = PhotoBoothNameFormatter()
+
+    private enum Constants {
+        static let verticalScrollCoordinateSpaceName = "NearPhotoBoothListSheet.VerticalScroll"
+        static let scrollTopThreshold: CGFloat = -1
+    }
 
     private enum FavoriteRemovalEffect {
         static let delay: Duration = .milliseconds(260)
@@ -34,6 +41,8 @@ struct NearPhotoBoothListSheet: View {
     
     var body: some View {
         ScrollView(.vertical) {
+            verticalScrollTopReader
+
             photoBoothBrandFilterOptionsSection
 
             VStack(spacing: 12) {
@@ -49,6 +58,10 @@ struct NearPhotoBoothListSheet: View {
                 }
             }
         }
+        .coordinateSpace(name: Constants.verticalScrollCoordinateSpaceName)
+        .onPreferenceChange(NearPhotoBoothListScrollOffsetPreferenceKey.self) { offset in
+            updateVerticalScrollTopState(offset)
+        }
         .onDisappear {
             delayedFavoriteTasks.values.forEach { $0.cancel() }
             delayedFavoriteTasks.removeAll()
@@ -56,6 +69,8 @@ struct NearPhotoBoothListSheet: View {
             pendingFavoriteRemovalBooths.removeAll()
             favoriteRemovalReferenceBooths.removeAll()
             favoriteButtonOverrides.removeAll()
+            isVerticalScrollAtTop = true
+            sheetScrollStateHandler.updateIsAtTop(true)
         }
     }
 }
@@ -64,6 +79,17 @@ struct NearPhotoBoothListSheet: View {
 // MARK: - NearPhotoBoothListSheet + Subviews
 
 private extension NearPhotoBoothListSheet {
+    var verticalScrollTopReader: some View {
+        GeometryReader { proxy in
+            Color.clear
+                .preference(
+                    key: NearPhotoBoothListScrollOffsetPreferenceKey.self,
+                    value: proxy.frame(in: .named(Constants.verticalScrollCoordinateSpaceName)).minY
+                )
+        }
+        .frame(height: .zero)
+    }
+
     var photoBoothBrandFilterOptionsSection: some View {
         Section {
             ScrollView(.horizontal) {
@@ -360,5 +386,26 @@ private extension NearPhotoBoothListSheet {
 
     var displayedFavoriteBoothIDs: [PhotoBooth.ID] {
         displayedFavoriteBooths.map(\.id)
+    }
+
+    func updateVerticalScrollTopState(_ offset: CGFloat) {
+        let isAtTop = offset >= Constants.scrollTopThreshold
+        guard isVerticalScrollAtTop != isAtTop else { return }
+        isVerticalScrollAtTop = isAtTop
+        sheetScrollStateHandler.updateIsAtTop(isAtTop)
+    }
+}
+
+
+// MARK: - NearPhotoBoothListScrollOffsetPreferenceKey
+
+private struct NearPhotoBoothListScrollOffsetPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = .zero
+
+    static func reduce(
+        value: inout CGFloat,
+        nextValue: () -> CGFloat
+    ) {
+        value = nextValue()
     }
 }

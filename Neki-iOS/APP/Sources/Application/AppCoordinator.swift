@@ -204,8 +204,7 @@ struct AppCoordinator {
                 return synchronizePushNotificationIfReady(&state)
 
             case .pushNotificationEvent(.delegate(.didReceiveFCMRegistrationToken)):
-                state.isAPNSTokenRegistered = state.isAPNSTokenRegistered || pushNotificationClient.checkAPNSTokenRegistration()
-                guard state.isAPNSTokenRegistered else { return .none }
+                guard isAPNSTokenRegistered(&state) else { return .none }
                 return synchronizePushNotificationIfReady(&state)
                 
             case .didTapUpdateAlert:
@@ -307,7 +306,7 @@ struct AppCoordinator {
                 guard case .signedIn = state.userSessionStatus,
                       case .mainTab = state.route
                 else { return .none }
-                state.isAPNSTokenRegistered = state.isAPNSTokenRegistered || pushNotificationClient.checkAPNSTokenRegistration()
+                _ = isAPNSTokenRegistered(&state)
                 return .run { send in
                     await send(.checkPushNotificationAuthorizationResponse( Result { try await pushNotificationClient.checkAuthorizationStatus() } ))
                 }
@@ -344,8 +343,7 @@ struct AppCoordinator {
 
             case .synchronizePushNotification:
                 guard case .signedIn = state.userSessionStatus else { return .none }
-                state.isAPNSTokenRegistered = state.isAPNSTokenRegistered || pushNotificationClient.checkAPNSTokenRegistration()
-                guard state.isAPNSTokenRegistered else { return .none }
+                guard isAPNSTokenRegistered(&state) else { return .none }
                 guard state.isSynchronizingPushNotification == false,
                       state.hasSynchronizedPushNotification == false
                 else { return .none }
@@ -434,8 +432,7 @@ private extension AppCoordinator {
 
     func synchronizePushNotificationIfReady(_ state: inout State) -> Effect<Action> {
         guard case .signedIn = state.userSessionStatus else { return .none }
-        state.isAPNSTokenRegistered = state.isAPNSTokenRegistered || pushNotificationClient.checkAPNSTokenRegistration()
-        guard state.isAPNSTokenRegistered else { return .none }
+        guard isAPNSTokenRegistered(&state) else { return .none }
 
         state.hasSynchronizedPushNotification = false
         guard state.isSynchronizingPushNotification == false else {
@@ -443,6 +440,11 @@ private extension AppCoordinator {
             return .none
         }
         return .send(.synchronizePushNotification)
+    }
+
+    func isAPNSTokenRegistered(_ state: inout State) -> Bool {
+        state.isAPNSTokenRegistered = state.isAPNSTokenRegistered || pushNotificationClient.checkAPNSTokenRegistration()
+        return state.isAPNSTokenRegistered
     }
 
     func isMarketingConsentAlertEligible(for user: User) -> Bool {

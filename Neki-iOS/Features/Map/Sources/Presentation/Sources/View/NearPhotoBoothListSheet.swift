@@ -23,13 +23,9 @@ struct NearPhotoBoothListSheet: View {
         static let overrideResetDelay: Duration = .milliseconds(400)
         static let scale: CGFloat = 0.98
 
-        static var animation: Animation {
-            .spring(response: 0.32, dampingFraction: 0.74)
-        }
+        static var animation: Animation { .spring(response: 0.28, dampingFraction: 0.58) }
 
-        static var transition: AnyTransition {
-            .opacity.combined(with: .scale(scale: scale))
-        }
+        static var transition: AnyTransition { .opacity.combined(with: .scale(scale: scale)) }
     }
     
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }

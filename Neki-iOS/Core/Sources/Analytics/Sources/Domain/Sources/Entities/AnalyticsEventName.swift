@@ -34,7 +34,7 @@ public enum AnalyticsEventName: String {
     case boothFavoriteRemove = "booth_favorite_remove"
     case favoriteBoothFilterToggle = "favorite_booth_filter_toggle"
     case favoriteBoothView = "favorite_booth_view"
-    case brandFilterManageView = "brand_filter_manage_view"
+    case brandOrderSave = "brand_order_save"
     case brandFavoriteAdd = "brand_favorite_add"
     case brandFavoriteRemove = "brand_favorite_remove"
     case mapRouteClick = "map_route_click"

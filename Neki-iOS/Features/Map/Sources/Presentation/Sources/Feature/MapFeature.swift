@@ -614,13 +614,7 @@ public struct MapFeature {
                 return .send(.didTapFavorite(photoBooth))
 
             case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
-                let totalBrandCount = state.photoBoothListState.brands.count
-                let selectedBrandCount = state.photoBoothListState.filteredBrands.count
-                let event = MapAnalyticsEvent.brandFilterManageView(pinnedBrandCount: selectedBrandCount, totalBrandCount: totalBrandCount)
-                return .merge(
-                    .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands))),
-                    .run { _ in analytics.logEvent(event: event) }
-                )
+                return .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands)))
 
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 state.isUserTrackingMode = false

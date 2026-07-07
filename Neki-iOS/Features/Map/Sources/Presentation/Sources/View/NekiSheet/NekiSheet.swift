@@ -11,7 +11,8 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
     @Environment(\.sheetConfiguration) private var configuration
     @Binding var selection: NekiSheetDetent
     @State private var translation: CGFloat = .zero
-    @State private var scrollOffset: CGFloat = .zero
+    @State private var isContentScrollAtTop: Bool = true
+    @State private var isDraggingSheet: Bool = false
     @State private var controllerHeight: CGFloat = .zero
     
     let controllers: () -> Controllers
@@ -34,6 +35,10 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
                 VStack(spacing: .zero) {
                     indicator
                     content()
+                        .environment(\.nekiSheetScrollStateHandler, .init { isAtTop in
+                            guard isContentScrollAtTop != isAtTop else { return }
+                            isContentScrollAtTop = isAtTop
+                        })
                 }
                 .background(configuration.backgroundColor)
                 .clipShape(PresentationCornerShape(radius: configuration.cornerRadius, corners: [.topLeft, .topRight]))
@@ -46,30 +51,13 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
             .padding(.bottom, selection == .hidden ? 0 : configuration.bottomInset)
             .frame(height: proxy.size.height, alignment: .bottom)
             .offset(y: max(.zero, layout.dragOffset - (isControllersVisible ? (controllerHeight + defaultSpacing) : .zero)))
-            .gesture(
+            .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in
-                        let isScrollingUp = scrollOffset > .zero
-                        let isDraggingDown = value.translation.height > .zero
-                        
-                        guard isScrollingUp == false || isDraggingDown == true else { return }
-                        translation = value.translation.height
+                        handleDragChanged(value)
                     }
                     .onEnded { value in
-                        let inset = configuration.bottomInset
-                        let predictedHeight = layout.currentHeight - value.translation.height
-                        let interactiveDetents = configuration.detents.filter { $0 != .hidden }
-                        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxy.size.height, inset: inset) }
-                        let closestHeight = interactiveHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
-                        
-                        guard let newDetent = interactiveDetents.first(where: { abs($0.resolve(in: proxy.size.height, inset: inset) - closestHeight) < 1.0 }) else {
-                            return withAnimation(configuration.animation) { translation = .zero }
-                        }
-                        
-                        withAnimation(configuration.animation) {
-                            selection = newDetent
-                            translation = .zero
-                        }
+                        handleDragEnded(value, layout: layout, proxyHeight: proxy.size.height)
                     }
             )
             .allowsHitTesting(selection != .hidden)
@@ -137,6 +125,59 @@ private extension NekiSheet {
             dragOffset: dragOffset
         )
     }
+
+    func shouldHandleSheetDrag(_ value: DragGesture.Value) -> Bool {
+        let horizontalDistance = abs(value.translation.width)
+        let verticalDistance = abs(value.translation.height)
+        guard verticalDistance > horizontalDistance else { return false }
+        guard selection == .large else { return true }
+        return value.translation.height > .zero && isContentScrollAtTop
+    }
+
+    func handleDragChanged(_ value: DragGesture.Value) {
+        guard shouldHandleSheetDrag(value) else {
+            isDraggingSheet = false
+            translation = .zero
+            return
+        }
+
+        isDraggingSheet = true
+        translation = value.translation.height
+    }
+
+    func handleDragEnded(
+        _ value: DragGesture.Value,
+        layout: SheetLayout,
+        proxyHeight: CGFloat
+    ) {
+        guard isDraggingSheet else {
+            translation = .zero
+            return
+        }
+
+        let inset = configuration.bottomInset
+        let predictedHeight = layout.currentHeight - value.translation.height
+        let interactiveDetents = configuration.detents.filter { $0 != .hidden }
+        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxyHeight, inset: inset) }
+        let closestHeight = interactiveHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
+
+        guard let newDetent = interactiveDetents.first(where: { abs($0.resolve(in: proxyHeight, inset: inset) - closestHeight) < 1.0 }) else {
+            return resetDragState()
+        }
+
+        withAnimation(configuration.animation) {
+            selection = newDetent
+            translation = .zero
+            isDraggingSheet = false
+        }
+    }
+
+    func resetDragState() {
+        withAnimation(configuration.animation) {
+            translation = .zero
+            isDraggingSheet = false
+        }
+    }
 }
 
 
@@ -177,6 +218,28 @@ public extension View {
                     }
             }
         )
+    }
+}
+
+
+// MARK: - NekiSheetScrollStateHandler
+
+struct NekiSheetScrollStateHandler {
+    var updateIsAtTop: (Bool) -> Void
+
+    init(updateIsAtTop: @escaping (Bool) -> Void = { _ in }) {
+        self.updateIsAtTop = updateIsAtTop
+    }
+}
+
+private struct NekiSheetScrollStateHandlerKey: EnvironmentKey {
+    static let defaultValue = NekiSheetScrollStateHandler()
+}
+
+extension EnvironmentValues {
+    var nekiSheetScrollStateHandler: NekiSheetScrollStateHandler {
+        get { self[NekiSheetScrollStateHandlerKey.self] }
+        set { self[NekiSheetScrollStateHandlerKey.self] = newValue }
     }
 }
 

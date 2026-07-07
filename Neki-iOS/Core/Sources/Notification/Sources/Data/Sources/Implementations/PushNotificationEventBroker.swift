@@ -114,6 +114,9 @@ extension PushNotificationClient: DependencyKey {
                 )
                 return authorizationStatus
             },
+            checkAPNSTokenRegistration: {
+                Messaging.messaging().apnsToken != nil
+            },
             configureMessaging: {
                 messagingDelegate.configureMessaging()
             },

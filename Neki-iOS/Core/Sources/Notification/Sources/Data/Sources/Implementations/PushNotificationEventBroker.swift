@@ -60,6 +60,8 @@ private final class FirebaseMessagingDelegateProxy: NSObject, MessagingDelegate,
     init(publishEvent: @escaping @Sendable (PushNotificationEvent) async -> Void) {
         self.publishEvent = publishEvent
     }
+    
+    deinit {}
 
     func configureMessaging() {
         Messaging.messaging().delegate = self

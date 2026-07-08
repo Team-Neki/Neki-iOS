@@ -203,12 +203,14 @@ extension AuthClient: DependencyKey {
 
 private extension AuthClient {
     static func mapError(_ error: Error) -> AuthClientError {
+        @Dependency(\.authRepository) var authRepository
+
         if let repositoryError = error as? AuthRepositoryError {
             switch repositoryError {
             case .networkError(let networkError):
                 switch networkError {
                 case .networkFail: return .networkConnectionLost
-                case .unauthorizedError: UserSessionStatus.updateStatus(.signedOut); return .sessionExpired
+                case .unauthorizedError: authRepository.updateSessionStatus(.signedOut); return .sessionExpired
                 default: return .serverError(networkError.localizedDescription)
                 }
             case .unauthorized, .userNotFound:

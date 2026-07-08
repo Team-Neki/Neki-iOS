@@ -120,7 +120,16 @@ public struct DefaultAuthRepository: AuthRepository {
             throw .unauthorized
         }
     }
-    
+
+    public func fetchStoredTokens() -> AuthTokens? {
+        try? tokenStorage.fetch()
+    }
+
+    public func updateSessionStatus(_ status: UserSessionStatus) {
+        guard let data = try? JSONEncoder().encode(status) else { return }
+        UserDefaults.standard.set(data, forKey: AppStorageKey.userSessionStatus)
+    }
+
     public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {
         try await fetchTermDTOs().map { $0.toEntity() }
     }

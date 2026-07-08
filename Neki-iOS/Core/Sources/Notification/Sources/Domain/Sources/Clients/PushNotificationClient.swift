@@ -27,6 +27,53 @@ public struct PushNotificationClient {
     public var publishEvent: @Sendable (PushNotificationEvent) async -> Void = { _ in }
 }
 
+extension PushNotificationClient: DependencyKey {
+    public static let liveValue: PushNotificationClient = {
+        @Dependency(\.pushNotificationRepository) var repository
+
+        return PushNotificationClient(
+            checkAuthorizationStatus: {
+                await repository.checkAuthorizationStatus()
+            },
+            requestAuthorization: {
+                try await repository.requestAuthorization()
+            },
+            fetchNotificationList: {
+                try await repository.fetchNotificationList()
+            },
+            synchronizeDeviceToken: {
+                let deviceToken = try await repository.fetchFCMToken()
+                let authorizationStatus = await repository.checkAuthorizationStatus()
+                try await repository.updateDeviceToken(
+                    deviceToken,
+                    isPushNotificationAgreed: authorizationStatus.isPushNotificationAgreed
+                )
+                return authorizationStatus
+            },
+            checkAPNSTokenRegistration: {
+                repository.checkAPNSTokenRegistration()
+            },
+            fetchCurrentAPNSToken: {
+                repository.fetchCurrentAPNSToken()
+            },
+            fetchCurrentFCMToken: {
+                repository.fetchCurrentFCMToken()
+            },
+            configureMessaging: {
+                repository.configureMessaging()
+            },
+            updateAPNSToken: { token in
+                repository.updateAPNSToken(token)
+            },
+            processReceivedNotification: { payload in
+                repository.processReceivedNotification(payload)
+            },
+            events: { await repository.events() },
+            publishEvent: { await repository.publishEvent($0) }
+        )
+    }()
+}
+
 extension PushNotificationClient: TestDependencyKey {
     public static let testValue = PushNotificationClient(
         checkAuthorizationStatus: { .notDetermined },
@@ -42,6 +89,19 @@ extension PushNotificationClient: TestDependencyKey {
         events: { AsyncStream { $0.finish() } },
         publishEvent: { _ in }
     )
+}
+
+private extension UNAuthorizationStatus {
+    var isPushNotificationAgreed: Bool {
+        switch self {
+        case .authorized, .provisional, .ephemeral:
+            true
+        case .notDetermined, .denied:
+            false
+        @unknown default:
+            false
+        }
+    }
 }
 
 public extension DependencyValues {

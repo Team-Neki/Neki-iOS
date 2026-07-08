@@ -41,6 +41,11 @@ public struct AppDiagnostics: Equatable, Sendable {
         case missing
         case available(value: String)
 
+        static func from(_ token: String?) -> Self {
+            guard let token, token.isEmpty == false else { return .missing }
+            return .available(value: token)
+        }
+
         public var description: String {
             switch self {
             case .missing: return "missing"
@@ -53,6 +58,7 @@ public struct AppDiagnostics: Equatable, Sendable {
 extension AppDiagnostics {
     public init(
         userSessionStatus: UserSessionStatus,
+        authTokens: AuthTokens?,
         bundleIdentifier: String,
         appVersion: String,
         buildNumber: String,
@@ -66,7 +72,7 @@ extension AppDiagnostics {
         fcmTokenStatus: TokenStatus,
         notificationAuthorizationStatus: UNAuthorizationStatus
     ) {
-        self.userSession = Self.userSessionSection(from: userSessionStatus)
+        self.userSession = Self.userSessionSection(from: userSessionStatus, authTokens: authTokens)
         self.app = .init(
             title: "앱",
             rows: [
@@ -96,7 +102,10 @@ extension AppDiagnostics {
         )
     }
 
-    static func userSessionSection(from status: UserSessionStatus) -> Section {
+    static func userSessionSection(
+        from status: UserSessionStatus,
+        authTokens: AuthTokens?
+    ) -> Section {
         switch status {
         case let .signedIn(user):
             return .init(
@@ -111,7 +120,7 @@ extension AppDiagnostics {
                     .init(title: "Required Terms Agreed", value: user.allRequiredTermsAgreed.diagnosticsDescription),
                     .init(title: "Marketing Term Agreed", value: user.marketingTermAgreed.diagnosticsDescription),
                     .init(title: "Push Notification Agreed", value: user.pushNotificationAgreed.diagnosticsDescription)
-                ]
+                ] + authTokenRows(from: authTokens)
             )
 
         case .signedOut:
@@ -119,7 +128,7 @@ extension AppDiagnostics {
                 title: "사용자 세션",
                 rows: [
                     .init(title: "Session Status", value: "signedOut")
-                ]
+                ] + authTokenRows(from: authTokens)
             )
 
         case .expired:
@@ -127,9 +136,25 @@ extension AppDiagnostics {
                 title: "사용자 세션",
                 rows: [
                     .init(title: "Session Status", value: "expired")
-                ]
+                ] + authTokenRows(from: authTokens)
             )
         }
+    }
+
+    static func authTokenRows(from tokens: AuthTokens?) -> [Row] {
+        guard let tokens else {
+            return [
+                .init(title: "Access Token", value: "missing"),
+                .init(title: "Refresh Token", value: "missing")
+            ]
+        }
+
+        return [
+            .init(title: "Access Token", value: tokens.accessToken),
+            .init(title: "Refresh Token", value: tokens.refreshToken),
+            .init(title: "Token Expired At", value: tokens.expiredAt.formatted(date: .numeric, time: .standard)),
+            .init(title: "Token Refresh Needed", value: tokens.refreshNeeded.diagnosticsDescription)
+        ]
     }
 }
 

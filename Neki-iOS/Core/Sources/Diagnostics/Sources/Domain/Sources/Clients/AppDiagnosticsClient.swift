@@ -12,6 +12,22 @@ public struct AppDiagnosticsClient {
     public var fetch: @Sendable () async -> AppDiagnostics = { .empty }
 }
 
+extension AppDiagnosticsClient: DependencyKey {
+    public static let liveValue = Self(
+        fetch: {
+            @Dependency(\.appDiagnosticsRepository) var appDiagnosticsRepository
+            @Dependency(\.authRepository) var authRepository
+            @Dependency(\.pushNotificationRepository) var pushNotificationRepository
+
+            return await appDiagnosticsRepository.fetch(
+                authTokens: authRepository.fetchStoredTokens(),
+                apnsTokenStatus: .from(pushNotificationRepository.fetchCurrentAPNSToken()),
+                fcmTokenStatus: .from(pushNotificationRepository.fetchCurrentFCMToken())
+            )
+        }
+    )
+}
+
 extension AppDiagnosticsClient: TestDependencyKey {
     public static let testValue = Self(
         fetch: { .empty }

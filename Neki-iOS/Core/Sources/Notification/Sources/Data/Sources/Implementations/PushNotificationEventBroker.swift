@@ -6,12 +6,10 @@
 //
 
 import Foundation
-import ComposableArchitecture
 import FirebaseMessaging
 import os
-import UserNotifications
 
-private actor PushNotificationEventBroker {
+final actor PushNotificationEventBroker {
     private var continuations: [UUID: AsyncStream<PushNotificationEvent>.Continuation] = [:]
     private var pendingEvents: [PushNotificationEvent] = []
 
@@ -53,14 +51,13 @@ private actor PushNotificationEventBroker {
         continuations.removeValue(forKey: id)
     }
 }
-
-private final class FirebaseMessagingDelegateProxy: NSObject, MessagingDelegate, @unchecked Sendable {
+final class FirebaseMessagingDelegateProxy: NSObject, MessagingDelegate, @unchecked Sendable {
     private let publishEvent: @Sendable (PushNotificationEvent) async -> Void
 
     init(publishEvent: @escaping @Sendable (PushNotificationEvent) async -> Void) {
         self.publishEvent = publishEvent
     }
-    
+
     deinit {}
 
     func configureMessaging() {
@@ -81,78 +78,5 @@ private final class FirebaseMessagingDelegateProxy: NSObject, MessagingDelegate,
         }
         Logger.data.debug("FCM 등록 토큰 갱신 감지")
         Task { await publishEvent(.fcmRegistrationTokenReceived) }
-    }
-}
-
-
-// MARK: - PushNotificationClient + DependencyKey
-
-extension PushNotificationClient: DependencyKey {
-    public static let liveValue: PushNotificationClient = {
-        @Dependency(\.pushNotificationRepository) var repository
-        let broker = PushNotificationEventBroker()
-        let messagingDelegate = FirebaseMessagingDelegateProxy(
-            publishEvent: { await broker.publish($0) }
-        )
-
-        return PushNotificationClient(
-            checkAuthorizationStatus: {
-                await repository.checkAuthorizationStatus()
-            },
-            requestAuthorization: {
-                try await repository.requestAuthorization()
-            },
-            fetchNotificationList: {
-                try await repository.fetchNotificationList()
-            },
-            synchronizeDeviceToken: {
-                let deviceToken = try await repository.fetchFCMToken()
-                let authorizationStatus = await repository.checkAuthorizationStatus()
-                try await repository.updateDeviceToken(
-                    deviceToken,
-                    isPushNotificationAgreed: authorizationStatus.isPushNotificationAgreed
-                )
-                return authorizationStatus
-            },
-            checkAPNSTokenRegistration: {
-                Messaging.messaging().apnsToken != nil
-            },
-            fetchCurrentAPNSToken: {
-                Messaging.messaging().apnsToken?.hexString
-            },
-            fetchCurrentFCMToken: {
-                Messaging.messaging().fcmToken
-            },
-            configureMessaging: {
-                messagingDelegate.configureMessaging()
-            },
-            updateAPNSToken: { token in
-                repository.updateAPNSToken(token)
-            },
-            processReceivedNotification: { payload in
-                repository.processReceivedNotification(payload)
-            },
-            events: { await broker.events() },
-            publishEvent: { await broker.publish($0) }
-        )
-    }()
-}
-
-private extension UNAuthorizationStatus {
-    var isPushNotificationAgreed: Bool {
-        switch self {
-        case .authorized, .provisional, .ephemeral:
-            true
-        case .notDetermined, .denied:
-            false
-        @unknown default:
-            false
-        }
-    }
-}
-
-private extension Data {
-    var hexString: String {
-        map { String(format: "%02x", $0) }.joined()
     }
 }

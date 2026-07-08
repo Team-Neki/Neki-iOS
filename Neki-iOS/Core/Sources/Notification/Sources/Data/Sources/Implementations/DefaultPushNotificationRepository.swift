@@ -12,10 +12,19 @@ import UserNotifications
 
 final actor DefaultPushNotificationRepository: PushNotificationRepository {
     private let notificationCenter: UNUserNotificationCenter
+    private let eventBroker: PushNotificationEventBroker
+    private let messagingDelegate: FirebaseMessagingDelegateProxy
     @Dependency(\.networkProvider) private var networkProvider
 
-    init(notificationCenter: UNUserNotificationCenter = .current()) {
+    init(
+        notificationCenter: UNUserNotificationCenter = .current(),
+        eventBroker: PushNotificationEventBroker = PushNotificationEventBroker()
+    ) {
         self.notificationCenter = notificationCenter
+        self.eventBroker = eventBroker
+        self.messagingDelegate = FirebaseMessagingDelegateProxy(
+            publishEvent: { await eventBroker.publish($0) }
+        )
     }
 
     func checkAuthorizationStatus() async -> UNAuthorizationStatus {
@@ -49,12 +58,36 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
         }
     }
 
+    nonisolated func checkAPNSTokenRegistration() -> Bool {
+        Messaging.messaging().apnsToken != nil
+    }
+
+    nonisolated func fetchCurrentAPNSToken() -> String? {
+        Messaging.messaging().apnsToken?.hexString
+    }
+
+    nonisolated func fetchCurrentFCMToken() -> String? {
+        Messaging.messaging().fcmToken
+    }
+
+    nonisolated func configureMessaging() {
+        messagingDelegate.configureMessaging()
+    }
+
     nonisolated func updateAPNSToken(_ token: Data) {
         Messaging.messaging().setAPNSToken(token, type: PushNotificationAPNSTokenEnvironment.currentTokenType())
     }
 
     nonisolated func processReceivedNotification(_ payload: PushNotificationPayload) {
         Messaging.messaging().appDidReceiveMessage(payload.userInfo)
+    }
+
+    func events() async -> AsyncStream<PushNotificationEvent> {
+        await eventBroker.events()
+    }
+
+    func publishEvent(_ event: PushNotificationEvent) async {
+        await eventBroker.publish(event)
     }
 
     func updateDeviceToken(
@@ -67,6 +100,12 @@ final actor DefaultPushNotificationRepository: PushNotificationRepository {
         )
         let endpoint = PushNotificationEndpoint.setDeviceToken(dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+    }
+}
+
+private extension Data {
+    var hexString: String {
+        map { String(format: "%02x", $0) }.joined()
     }
 }
 

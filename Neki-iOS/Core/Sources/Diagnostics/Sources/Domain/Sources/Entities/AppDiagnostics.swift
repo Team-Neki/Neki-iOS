@@ -9,18 +9,20 @@ import Foundation
 import UserNotifications
 
 public struct AppDiagnostics: Equatable, Sendable {
+    public let userSession: Section
     public let app: Section
     public let firebase: Section
     public let pushNotification: Section
 
     public static let empty = Self(
+        userSession: .init(title: "사용자 세션", rows: []),
         app: .init(title: "앱", rows: []),
         firebase: .init(title: "Firebase", rows: []),
         pushNotification: .init(title: "푸시 알림", rows: [])
     )
 
     public var sections: [Section] {
-        [app, firebase, pushNotification]
+        [userSession, app, firebase, pushNotification]
     }
 
     public struct Section: Equatable, Identifiable, Sendable {
@@ -50,6 +52,7 @@ public struct AppDiagnostics: Equatable, Sendable {
 
 extension AppDiagnostics {
     public init(
+        userSessionStatus: UserSessionStatus,
         bundleIdentifier: String,
         appVersion: String,
         buildNumber: String,
@@ -63,6 +66,7 @@ extension AppDiagnostics {
         fcmTokenStatus: TokenStatus,
         notificationAuthorizationStatus: UNAuthorizationStatus
     ) {
+        self.userSession = Self.userSessionSection(from: userSessionStatus)
         self.app = .init(
             title: "앱",
             rows: [
@@ -90,6 +94,48 @@ extension AppDiagnostics {
                 .init(title: "OS Notification", value: notificationAuthorizationStatus.diagnosticsDescription)
             ]
         )
+    }
+
+    static func userSessionSection(from status: UserSessionStatus) -> Section {
+        switch status {
+        case let .signedIn(user):
+            return .init(
+                title: "사용자 세션",
+                rows: [
+                    .init(title: "Session Status", value: "signedIn"),
+                    .init(title: "User ID", value: "\(user.id)"),
+                    .init(title: "Nickname", value: user.nickname),
+                    .init(title: "Email", value: user.email ?? "-"),
+                    .init(title: "Provider", value: user.providerType.rawValue),
+                    .init(title: "Profile Image URL", value: user.profileImageURL?.absoluteString ?? "-"),
+                    .init(title: "Required Terms Agreed", value: user.allRequiredTermsAgreed.diagnosticsDescription),
+                    .init(title: "Marketing Term Agreed", value: user.marketingTermAgreed.diagnosticsDescription),
+                    .init(title: "Push Notification Agreed", value: user.pushNotificationAgreed.diagnosticsDescription)
+                ]
+            )
+
+        case .signedOut:
+            return .init(
+                title: "사용자 세션",
+                rows: [
+                    .init(title: "Session Status", value: "signedOut")
+                ]
+            )
+
+        case .expired:
+            return .init(
+                title: "사용자 세션",
+                rows: [
+                    .init(title: "Session Status", value: "expired")
+                ]
+            )
+        }
+    }
+}
+
+private extension Bool {
+    var diagnosticsDescription: String {
+        self ? "true" : "false"
     }
 }
 

@@ -11,7 +11,13 @@ import Photos
 import os
 
 struct DefaultImageDownloadRepository: ImageDownloadRepository {
+    private enum Constants {
+        static let maxConcurrentDownloads = 5
+    }
+
     func downloadImages(urls: [URL]) async throws -> Int {
+        guard urls.isEmpty == false else { return 0 }
+
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else {
             Logger.domain.error("‼️ 갤러리 접근 권한이 없습니다.")
@@ -19,27 +25,40 @@ struct DefaultImageDownloadRepository: ImageDownloadRepository {
         }
 
         return await withTaskGroup(of: Bool.self) { group in
-            for url in urls {
-                group.addTask {
-                    do {
-                        try await imageDownload(url: url)
-                        return true
-                    } catch {
-                        Logger.domain.error("❌ 이미지 다운로드 실패 (\(url)): \(error)")
-                        return false
-                    }
-                }
+            var iterator = urls.makeIterator()
+            let initialTaskCount = min(Constants.maxConcurrentDownloads, urls.count)
+
+            for _ in 0..<initialTaskCount {
+                guard let url = iterator.next() else { break }
+                Self.addDownloadTask(to: &group, url: url)
             }
 
             var successCount = 0
-            for await isSuccess in group {
+            while let isSuccess = await group.next() {
                 if isSuccess { successCount += 1 }
+                guard let url = iterator.next() else { continue }
+                Self.addDownloadTask(to: &group, url: url)
             }
             return successCount
         }
     }
 
-    private func imageDownload(url: URL) async throws {
+    private static func addDownloadTask(
+        to group: inout TaskGroup<Bool>,
+        url: URL
+    ) {
+        group.addTask {
+            do {
+                try await imageDownload(url: url)
+                return true
+            } catch {
+                Logger.domain.error("❌ 이미지 다운로드 실패 (\(url)): \(error)")
+                return false
+            }
+        }
+    }
+
+    private static func imageDownload(url: URL) async throws {
         let (data, _) = try await URLSession.shared.data(from: url)
 
         try await PHPhotoLibrary.shared().performChanges {

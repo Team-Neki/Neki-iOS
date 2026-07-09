@@ -10,7 +10,8 @@ import Foundation
 public enum AnalyticsEventName: String {
     // 공통
     case appOpen = "app_open"
-    case pushNotificationClick = "push_notification_click"
+    case notificationSent = "notification_sent"
+    case notificationClick = "notification_click"
     
     // 아카이빙
     case archivingView = "archiving_view"
@@ -29,14 +30,12 @@ public enum AnalyticsEventName: String {
     case mapReSearch = "map_re_search"
     case mapBrandFilterToggle = "map_brand_filter_toggle"
     case boothSelect = "booth_select"
-    case boothFavorite = "booth_favorite"
     case boothFavoriteAdd = "booth_favorite_add"
     case boothFavoriteRemove = "booth_favorite_remove"
-    case favoriteBoothFilterToggle = "favorite_booth_filter_toggle"
+    case favoriteBoothFilterOn = "favorite_booth_filter_on"
+    case favoriteBoothFilterOff = "favorite_booth_filter_off"
     case favoriteBoothView = "favorite_booth_view"
     case brandOrderSave = "brand_order_save"
-    case brandFavoriteAdd = "brand_favorite_add"
-    case brandFavoriteRemove = "brand_favorite_remove"
     case mapRouteClick = "map_route_click"
     
     // 포즈

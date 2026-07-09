@@ -574,9 +574,10 @@ public struct MapFeature {
                 
             case .didTapFavoriteMarkerFilterButton:
                 state.isFavoriteMarkerFilterEnabled.toggle()
-                let action: MapFilterAction = state.isFavoriteMarkerFilterEnabled ? .select : .deselect
                 let favoriteBoothCount = state.photoBoothListState.favoriteBoothCount
-                let event = MapAnalyticsEvent.favoriteBoothFilterToggle(action: action, favoriteBoothCount: favoriteBoothCount)
+                let event: MapAnalyticsEvent = state.isFavoriteMarkerFilterEnabled
+                    ? .favoriteBoothFilterOn(favoriteBoothCount: favoriteBoothCount)
+                    : .favoriteBoothFilterOff
                 return .merge(
                     .send(.startBackgroundCalculation),
                     .run { _ in analytics.logEvent(event: event) }

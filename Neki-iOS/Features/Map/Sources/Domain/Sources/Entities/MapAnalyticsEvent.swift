@@ -11,14 +11,12 @@ enum MapAnalyticsEvent {
     case mapReSearch(hasFilter: Bool, regionChanged: Bool)
     case mapBrandFilterToggle(action: MapFilterAction, selectedCount: Int, brandName: String)
     case boothSelect(brandName: String, entryPoint: MapEntryPoint)
-    case boothFavorite(action: MapFilterAction, brandName: String)
     case boothFavoriteAdd(boothName: String, brandName: String)
     case boothFavoriteRemove(boothName: String, brandName: String)
-    case favoriteBoothFilterToggle(action: MapFilterAction, favoriteBoothCount: Int)
+    case favoriteBoothFilterOn(favoriteBoothCount: Int)
+    case favoriteBoothFilterOff
     case favoriteBoothView(favoriteBoothCount: Int)
     case brandOrderSave(orderedBrands: [PhotoBoothBrand])
-    case brandFavoriteAdd(brandName: String)
-    case brandFavoriteRemove(brandName: String)
     case mapRouteClick(mapType: DirectionAppType)
 }
 
@@ -31,14 +29,12 @@ extension MapAnalyticsEvent: AnalyticsEvent {
         case .mapReSearch: return .mapReSearch
         case .mapBrandFilterToggle: return .mapBrandFilterToggle
         case .boothSelect: return .boothSelect
-        case .boothFavorite: return .boothFavorite
         case .boothFavoriteAdd: return .boothFavoriteAdd
         case .boothFavoriteRemove: return .boothFavoriteRemove
-        case .favoriteBoothFilterToggle: return .favoriteBoothFilterToggle
+        case .favoriteBoothFilterOn: return .favoriteBoothFilterOn
+        case .favoriteBoothFilterOff: return .favoriteBoothFilterOff
         case .favoriteBoothView: return .favoriteBoothView
         case .brandOrderSave: return .brandOrderSave
-        case .brandFavoriteAdd: return .brandFavoriteAdd
-        case .brandFavoriteRemove: return .brandFavoriteRemove
         case .mapRouteClick: return .mapRouteClick
         }
     }
@@ -51,28 +47,23 @@ extension MapAnalyticsEvent: AnalyticsEvent {
             return [.action: action.rawValue, .selectedCount: selectedCount, .brandName: brandName]
         case let .boothSelect(brandName, entryPoint):
             return [.brandName: brandName, .entryPoint: entryPoint.rawValue]
-        case let .boothFavorite(action, brandName):
-            return [.action: action.rawValue, .brandName: brandName]
         case let .boothFavoriteAdd(boothName, brandName):
             return [.boothName: boothName, .brandName: brandName]
         case let .boothFavoriteRemove(boothName, brandName):
             return [.boothName: boothName, .brandName: brandName]
-        case let .favoriteBoothFilterToggle(action, favoriteBoothCount):
-            return [.action: action.rawValue, .favoriteBoothCount: favoriteBoothCount]
+        case let .favoriteBoothFilterOn(favoriteBoothCount):
+            return [.favoriteBoothCount: favoriteBoothCount]
+        case .favoriteBoothFilterOff:
+            return nil
         case let .favoriteBoothView(favoriteBoothCount):
             return [.favoriteBoothCount: favoriteBoothCount]
         case let .brandOrderSave(orderedBrands):
             let priorityBrandNames = orderedBrands.map(\.name)
             return [
-                .orderedBrandCount: orderedBrands.count,
                 .priorityBrand1: priorityBrandNames.indices.contains(0) ? priorityBrandNames[0] : "",
                 .priorityBrand2: priorityBrandNames.indices.contains(1) ? priorityBrandNames[1] : "",
                 .priorityBrand3: priorityBrandNames.indices.contains(2) ? priorityBrandNames[2] : ""
             ]
-        case let .brandFavoriteAdd(brandName):
-            return [.brandName: brandName]
-        case let .brandFavoriteRemove(brandName):
-            return [.brandName: brandName]
         case let .mapRouteClick(mapType):
             return [.mapType: mapType.rawValue]
         }

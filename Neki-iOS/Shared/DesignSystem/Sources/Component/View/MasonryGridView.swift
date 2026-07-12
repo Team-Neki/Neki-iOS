@@ -33,18 +33,18 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
         self.content = content
 
         guard let estimatedHeight else {
-            var result = Array(repeating: [Item](), count: self.columns)
-            for (index, item) in items.enumerated() {
+            var result = Self.emptyColumns(count: self.columns, itemCount: items.count)
+            items.enumerated().forEach { index, item in
                 result[index % self.columns].append(item)
             }
             self.columnItems = result
             return
         }
 
-        var result = Array(repeating: [Item](), count: self.columns)
+        var result = Self.emptyColumns(count: self.columns, itemCount: items.count)
         var columnHeights = Array(repeating: CGFloat.zero, count: self.columns)
 
-        for item in items {
+        items.forEach { item in
             let columnIndex = columnHeights
                 .enumerated()
                 .min(by: { $0.element < $1.element })?
@@ -82,5 +82,17 @@ public struct MasonryGridView<Item: Identifiable, ItemView: View>: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+}
+
+private extension MasonryGridView {
+    static func emptyColumns(count: Int, itemCount: Int) -> [[Item]] {
+        var columns = Array(repeating: [Item](), count: count)
+        let baseCapacity = itemCount / count
+        let remainingCapacity = itemCount % count
+        columns.indices.forEach {
+            columns[$0].reserveCapacity(baseCapacity + ($0 < remainingCapacity ? 1 : 0))
+        }
+        return columns
     }
 }

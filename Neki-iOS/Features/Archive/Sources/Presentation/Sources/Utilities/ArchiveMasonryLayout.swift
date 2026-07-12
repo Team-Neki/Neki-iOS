@@ -11,7 +11,7 @@ enum ArchiveMasonryLayout {
         columnCount: Int = 2
     ) -> [[ArchivePhotoGridItem]] {
         let columnCount = max(1, columnCount)
-        var columns = Array(repeating: [ArchivePhotoGridItem](), count: columnCount)
+        var columns = emptyColumns(count: columnCount, itemCount: photos.count)
         var columnHeights = Array(repeating: Double.zero, count: columnCount)
 
         photos.forEach { photo in
@@ -30,6 +30,16 @@ enum ArchiveMasonryLayout {
         guard let width = photo.width, let height = photo.height else { return 1 }
         guard width > .zero, height > .zero else { return 1 }
         return Double(height) / Double(width)
+    }
+
+    private static func emptyColumns(count: Int, itemCount: Int) -> [[ArchivePhotoGridItem]] {
+        var columns = Array(repeating: [ArchivePhotoGridItem](), count: count)
+        let baseCapacity = itemCount / count
+        let remainingCapacity = itemCount % count
+        columns.indices.forEach {
+            columns[$0].reserveCapacity(baseCapacity + ($0 < remainingCapacity ? 1 : 0))
+        }
+        return columns
     }
 }
 

@@ -261,11 +261,19 @@ extension DefaultPoseRepository: PoseRepository {
         
         let endpoint = PoseEndpoint.fetchPoseList(page: page, size: pageSize, peopleCount: nil, sortBy: nil)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        let poses = responseDTO.data?.items.compactMap { $0.toEntity() } ?? []
+        let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
         
-        let handled = poses.map { cacheOrUpdate($0, preserved: true) }
-        generalPages[page] = Page(poseIDs: handled.map(\.id), hasNext: hasNext)
+        var handled: [Pose] = []
+        var poseIDs: [PoseID] = []
+        handled.reserveCapacity(items.count)
+        poseIDs.reserveCapacity(items.count)
+        items.forEach {
+            let pose = cacheOrUpdate($0.toEntity(), preserved: true)
+            handled.append(pose)
+            poseIDs.append(pose.id)
+        }
+        generalPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
         return (handled, hasNext)
     }
     
@@ -275,16 +283,21 @@ extension DefaultPoseRepository: PoseRepository {
         
         let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: nil)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        let poses = responseDTO.data?.items.compactMap { $0.toEntity() } ?? []
+        let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
         
-        let handled = poses.map { pose in
-            var pose = pose
+        var handled: [Pose] = []
+        var poseIDs: [PoseID] = []
+        handled.reserveCapacity(items.count)
+        poseIDs.reserveCapacity(items.count)
+        items.forEach {
+            var pose = $0.toEntity()
             pose.isScrapped = true
             updateCachedPose(pose)
-            return pose
+            handled.append(pose)
+            poseIDs.append(pose.id)
         }
-        scrappedPages[page] = Page(poseIDs: handled.map(\.id), hasNext: hasNext)
+        scrappedPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
         return (handled, hasNext)
     }
     

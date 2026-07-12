@@ -9,32 +9,41 @@ import Foundation
 import UserNotifications
 
 public struct AppDiagnostics: Equatable, Sendable {
-    public let userSession: Section
-    public let app: Section
-    public let firebase: Section
-    public let pushNotification: Section
+    public let sections: [Section]
 
     public static let empty = Self(
-        userSession: .init(title: "사용자 세션", rows: []),
-        app: .init(title: "앱", rows: []),
-        firebase: .init(title: "Firebase", rows: []),
-        pushNotification: .init(title: "푸시 알림", rows: [])
+        sections: [
+            .init(title: "사용자 세션", rows: []),
+            .init(title: "앱", rows: []),
+            .init(title: "Firebase", rows: []),
+            .init(title: "푸시 알림", rows: [])
+        ]
     )
 
-    public var sections: [Section] {
-        [userSession, app, firebase, pushNotification]
+    public init(sections: [Section]) {
+        self.sections = sections
     }
 
     public struct Section: Equatable, Identifiable, Sendable {
         public var id: String { title }
         public let title: String
         public let rows: [Row]
+
+        public init(title: String, rows: [Row]) {
+            self.title = title
+            self.rows = rows
+        }
     }
 
     public struct Row: Equatable, Identifiable, Sendable {
         public var id: String { title }
         public let title: String
         public let value: String
+
+        public init(title: String, value: String) {
+            self.title = title
+            self.value = value
+        }
     }
 
     public enum TokenStatus: Equatable, Sendable {
@@ -59,47 +68,27 @@ extension AppDiagnostics {
     public init(
         userSessionStatus: UserSessionStatus,
         authTokens: AuthTokens?,
-        bundleIdentifier: String,
-        appVersion: String,
-        buildNumber: String,
-        distributionChannel: String,
-        firebaseProjectID: String,
-        firebaseApplicationID: String,
-        firebaseSenderID: String,
-        firebaseBundleID: String,
+        appSection: Section,
+        firebaseSection: Section,
         apnsEnvironment: String,
         apnsTokenStatus: TokenStatus,
         fcmTokenStatus: TokenStatus,
         notificationAuthorizationStatus: UNAuthorizationStatus
     ) {
-        self.userSession = Self.userSessionSection(from: userSessionStatus, authTokens: authTokens)
-        self.app = .init(
-            title: "앱",
-            rows: [
-                .init(title: "Bundle ID", value: bundleIdentifier),
-                .init(title: "App Version", value: appVersion),
-                .init(title: "Build Number", value: buildNumber),
-                .init(title: "Distribution", value: distributionChannel)
-            ]
-        )
-        self.firebase = .init(
-            title: "Firebase",
-            rows: [
-                .init(title: "Project ID", value: firebaseProjectID),
-                .init(title: "App ID", value: firebaseApplicationID),
-                .init(title: "Sender ID", value: firebaseSenderID),
-                .init(title: "Bundle ID", value: firebaseBundleID)
-            ]
-        )
-        self.pushNotification = .init(
-            title: "푸시 알림",
-            rows: [
-                .init(title: "APNs Environment", value: apnsEnvironment),
-                .init(title: "APNs Token", value: apnsTokenStatus.description),
-                .init(title: "FCM Token", value: fcmTokenStatus.description),
-                .init(title: "OS Notification", value: notificationAuthorizationStatus.diagnosticsDescription)
-            ]
-        )
+        self.sections = [
+            Self.userSessionSection(from: userSessionStatus, authTokens: authTokens),
+            appSection,
+            firebaseSection,
+            .init(
+                title: "푸시 알림",
+                rows: [
+                    .init(title: "APNs Environment", value: apnsEnvironment),
+                    .init(title: "APNs Token", value: apnsTokenStatus.description),
+                    .init(title: "FCM Token", value: fcmTokenStatus.description),
+                    .init(title: "OS Notification", value: notificationAuthorizationStatus.diagnosticsDescription)
+                ]
+            )
+        ]
     }
 
     static func userSessionSection(

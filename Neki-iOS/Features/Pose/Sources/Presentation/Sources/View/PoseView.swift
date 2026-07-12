@@ -82,7 +82,7 @@ private extension PoseView {
     var masonryView: some View {
         ScrollView {
             MasonryGridView(
-                items: Array(store.filteredPoses),
+                items: store.visiblePoses,
                 columns: 2,
                 estimatedHeight: { item in
                     guard let width = item.width,
@@ -99,7 +99,7 @@ private extension PoseView {
                         store.send(.imageTapped(item))
                     }
                     .onAppear {
-                        guard item == store.filteredPoses.last else { return }
+                        guard item.id == store.lastVisiblePoseID else { return }
                         store.send(.loadMoreItems)
                     }
             }

@@ -43,7 +43,10 @@ struct PoseCoordinator {
                 
                 // MARK: - Navigation Triggers from Root
             case let .root(.delegate(.didTapImage(pose))):
-                state.path.append(.detail(PoseDetailFeature.State(poses: state.root.filteredPoses, selectedID: pose.id)))
+                state.path.append(.detail(PoseDetailFeature.State(
+                    poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
+                    selectedID: pose.id
+                )))
                 return .none
                 
             case let .root(.delegate(.didTapStartRandomPose(option))):
@@ -69,7 +72,7 @@ struct PoseCoordinator {
                 
             case let .routeToDetail(pose):
                 state.path.append(.detail(PoseDetailFeature.State(
-                    poses: state.root.filteredPoses,
+                    poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
                     selectedPose: pose
                 )))
                 return .none

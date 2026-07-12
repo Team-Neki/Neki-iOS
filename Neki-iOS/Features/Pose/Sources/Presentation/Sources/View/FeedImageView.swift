@@ -11,10 +11,14 @@ import os
 
 struct FeedImageView: View {
     
+    @Environment(\.displayScale) private var displayScale
+    @State private var cardWidth: CGFloat = 200
+
     //MARK: - Properties
     
     let item: Pose
     let onTapBookmark: (() -> Void)?
+
     private var imageAspectRatio: CGFloat? {
         guard let width = item.width,
               let height = item.height,
@@ -24,8 +28,14 @@ struct FeedImageView: View {
 
         return CGFloat(width) / CGFloat(height)
     }
+
+    private var imageProcessor: DownsamplingImageProcessor {
+        let targetWidth = cardWidth * displayScale
+        let targetHeight = cardWidth / (imageAspectRatio ?? 0.75) * displayScale
+        return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
+    }
     
-    let gradientColor: LinearGradient = LinearGradient(
+    private static let gradientColor = LinearGradient(
         colors: [
             .black.opacity(0),
             .black
@@ -39,6 +49,8 @@ struct FeedImageView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             KFImage(item.imageURL)
+                .setProcessor(imageProcessor)
+                .cacheOriginalImage()
                 .resizable()
                 .fade(duration: 0.25)
                 .retry(maxCount: 3, interval: .seconds(5))
@@ -50,7 +62,7 @@ struct FeedImageView: View {
                 .aspectRatio(imageAspectRatio, contentMode: .fit)
         }
         .overlay { Color.black.opacity(0.04) }
-        .overlay { gradientColor.opacity(0.2) }
+        .overlay { Self.gradientColor.opacity(0.2) }
         .overlay(alignment: .topTrailing) {
             Button {
                 onTapBookmark?()
@@ -61,5 +73,9 @@ struct FeedImageView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { width in
+            guard width > .zero, abs(cardWidth - width) > 1 else { return }
+            cardWidth = width
+        }
     }
 }

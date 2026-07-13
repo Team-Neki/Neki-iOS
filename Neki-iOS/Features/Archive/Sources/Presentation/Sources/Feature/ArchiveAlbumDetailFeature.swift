@@ -17,7 +17,6 @@ struct ArchiveAlbumDetailFeature {
         var selectionPurpose: PhotoSelectionPurpose?
         
         var photos: IdentifiedArrayOf<PhotoEntity> = []
-        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
         let album: AlbumItem
         var showDropDownMenu: Bool = false
         var selectedIDs: Set<Int> = []
@@ -38,7 +37,6 @@ struct ArchiveAlbumDetailFeature {
         
         init(photos: IdentifiedArrayOf<PhotoEntity> = [], album: AlbumItem) {
             self.photos = photos
-            self.photoColumns = ArchiveMasonryLayout.columns(for: photos)
             self.album = album
             self.newAlbumTitle = album.title
         }
@@ -181,7 +179,6 @@ struct ArchiveAlbumDetailFeature {
                 state.isFetchingPhotos = false
                 state.hasNextPhotos = snapshot.hasNext
                 state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
-                state.photoColumns = ArchiveMasonryLayout.columns(for: snapshot.photos)
                 return .none
             case let .photoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
@@ -263,7 +260,6 @@ struct ArchiveAlbumDetailFeature {
             case .deletePhotosResponse(.success):
                 let idsToDelete = state.selectedIDs
                 state.photos.removeAll { idsToDelete.contains($0.id) }
-                state.photoColumns = ArchiveMasonryLayout.columns(for: state.photos)
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))

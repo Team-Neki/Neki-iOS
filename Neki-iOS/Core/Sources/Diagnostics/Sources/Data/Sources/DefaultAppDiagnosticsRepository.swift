@@ -17,20 +17,13 @@ struct DefaultAppDiagnosticsRepository: AppDiagnosticsRepository {
         fcmTokenStatus: AppDiagnostics.TokenStatus
     ) async -> AppDiagnostics {
         let notificationSettings = await UNUserNotificationCenter.current().notificationSettings()
-        let firebaseOptions = FirebaseApp.app()?.options
         let userSessionStatus = AppDiagnosticsEnvironment.userSessionStatus()
 
         return AppDiagnostics(
             userSessionStatus: userSessionStatus,
             authTokens: authTokens,
-            bundleIdentifier: Bundle.main.bundleIdentifier ?? "-",
-            appVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-",
-            buildNumber: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-",
-            distributionChannel: AppRuntimeEnvironment.distributionChannel.rawValue,
-            firebaseProjectID: firebaseOptions?.projectID ?? "-",
-            firebaseApplicationID: firebaseOptions?.googleAppID ?? "-",
-            firebaseSenderID: firebaseOptions?.gcmSenderID ?? "-",
-            firebaseBundleID: firebaseOptions?.bundleID ?? "-",
+            appSection: AppDiagnosticsEnvironment.appSection,
+            firebaseSection: AppDiagnosticsEnvironment.firebaseSection,
             apnsEnvironment: AppRuntimeEnvironment.apnsEnvironment,
             apnsTokenStatus: apnsTokenStatus,
             fcmTokenStatus: fcmTokenStatus,
@@ -40,6 +33,29 @@ struct DefaultAppDiagnosticsRepository: AppDiagnosticsRepository {
 }
 
 private enum AppDiagnosticsEnvironment {
+    static let appSection = AppDiagnostics.Section(
+        title: "앱",
+        rows: [
+            .init(title: "Bundle ID", value: Bundle.main.bundleIdentifier ?? "-"),
+            .init(title: "App Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "-"),
+            .init(title: "Build Number", value: Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"),
+            .init(title: "Distribution", value: AppRuntimeEnvironment.distributionChannel.rawValue)
+        ]
+    )
+
+    static let firebaseSection = AppDiagnostics.Section(
+        title: "Firebase",
+        rows: {
+            let firebaseOptions = FirebaseApp.app()?.options
+            return [
+                .init(title: "Project ID", value: firebaseOptions?.projectID ?? "-"),
+                .init(title: "App ID", value: firebaseOptions?.googleAppID ?? "-"),
+                .init(title: "Sender ID", value: firebaseOptions?.gcmSenderID ?? "-"),
+                .init(title: "Bundle ID", value: firebaseOptions?.bundleID ?? "-")
+            ]
+        }()
+    )
+
     static func userSessionStatus() -> UserSessionStatus {
         guard let data = UserDefaults.standard.data(forKey: AppStorageKey.userSessionStatus),
               let status = try? JSONDecoder().decode(UserSessionStatus.self, from: data)

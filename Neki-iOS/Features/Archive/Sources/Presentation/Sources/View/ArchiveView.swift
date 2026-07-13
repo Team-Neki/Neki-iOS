@@ -258,21 +258,17 @@ private extension ArchiveView {
                     .padding(.top, 70)
             } else {
                 MasonryGridView(
-                    columnItems: store.photoColumns
-                ) { gridItem in
-                    if let item = store.photos[id: gridItem.id] {
-                        ArchiveImageCard(
-                            item: item,
-                            onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                        )
-                            .onTapGesture {
-                                store.send(.imageTapped(item))
-                            }
-                            .onAppear {
-                                guard item.id == lastPhotoID else { return }
-                                store.send(.loadMorePhotos)
-                            }
-                    }
+                    items: Array(store.photos),
+                    estimatedHeight: \.masonryEstimatedHeight
+                ) { item in
+                    ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
+                        .onTapGesture {
+                            store.send(.imageTapped(item))
+                        }
+                        .onAppear {
+                            guard item.id == lastPhotoID else { return }
+                            store.send(.loadMorePhotos)
+                        }
                 }
                 .padding(.bottom, 76)
                 .nekiImageMaximumDisplayHeight(maximumDisplayHeight)

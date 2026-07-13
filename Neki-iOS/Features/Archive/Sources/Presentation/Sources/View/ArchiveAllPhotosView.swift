@@ -133,22 +133,21 @@ private extension ArchiveAllPhotosView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
                     MasonryGridView(
-                        columnItems: store.photoColumns
-                    ) { gridItem in
-                        if let item = store.photos[id: gridItem.id] {
-                            ArchiveImageCard(
-                                item: item,
-                                isSelectionMode: store.isSelectionMode,
-                                isSelected: store.selectedIDs.contains(item.id),
-                                onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                            )
-                            .onTapGesture {
-                                store.send(.imageTapped(item))
-                            }
-                            .onAppear {
-                                guard item.id == lastPhotoID else { return }
-                                store.send(.loadMorePhotos)
-                            }
+                        items: store.visiblePhotos,
+                        estimatedHeight: \.masonryEstimatedHeight
+                    ) { item in
+                        ArchiveImageCard(
+                            item: item,
+                            isSelectionMode: store.isSelectionMode,
+                            isSelected: store.selectedIDs.contains(item.id),
+                            onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                        )
+                        .onTapGesture {
+                            store.send(.imageTapped(item))
+                        }
+                        .onAppear {
+                            guard item.id == lastPhotoID else { return }
+                            store.send(.loadMorePhotos)
                         }
                     }
                     

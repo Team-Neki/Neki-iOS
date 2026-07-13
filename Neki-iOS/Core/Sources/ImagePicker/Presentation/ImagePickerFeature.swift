@@ -13,6 +13,14 @@ import ImageIO
 @Reducer
 public struct ImagePickerFeature {
     public init() {}
+
+    private enum Constants {
+        static let maxConcurrentImageConversions = 3
+    }
+
+    private enum CancelID: Hashable {
+        case imageConversion
+    }
     
     @ObservableState
     public struct State {
@@ -61,13 +69,17 @@ public struct ImagePickerFeature {
                 
             case let .pickerItemsChanged(items):
                 state.pickerItems = items
-                guard items.isEmpty == false else { return .none }
+                guard items.isEmpty == false else {
+                    state.isLoading = false
+                    return .cancel(id: CancelID.imageConversion)
+                }
                 state.isLoading = true
                 
                 return .run { send in
                     let entities = await Self.convert(items: items)
                     await send(.imageConverted(entities))
                 }
+                .cancellable(id: CancelID.imageConversion, cancelInFlight: true)
                 
             case let .imageConverted(newEntities):
                 let remaining = state.remainingCount
@@ -122,28 +134,48 @@ public struct ImagePickerFeature {
     // MARK: - Private Methods
     
     private static func convert(items: [PhotosPickerItem]) async -> [ImageUploadEntity] {
-        await withTaskGroup(of: ImageUploadEntity?.self) { group in
-            for item in items {
-                group.addTask {
-                    guard let data = try? await item.loadTransferable(type: Data.self) else { return nil }
-                    let dimensions = extractDimensions(from: data)
-                    let format = detectFormat(from: data)
-                    
-                    return ImageUploadEntity(
-                        data: data,
-                        format: format,
-                        width: dimensions?.width,
-                        height: dimensions?.height,
-                        size: data.count
-                    )
-                }
+        guard items.isEmpty == false else { return [] }
+        return await withTaskGroup(of: (Int, ImageUploadEntity?).self) { group in
+            var iterator = items.enumerated().makeIterator()
+            let initialTaskCount = min(Constants.maxConcurrentImageConversions, items.count)
+            
+            for _ in 0..<initialTaskCount {
+                guard let (index, item) = iterator.next() else { break }
+                addConversionTask(to: &group, item: item, index: index)
             }
-            var results: [ImageUploadEntity] = []
-            for await result in group {
-                guard let result else { continue }
-                results.append(result)
+            
+            var results = Array<ImageUploadEntity?>(repeating: nil, count: items.count)
+            while let (index, entity) = await group.next() {
+                results[index] = entity
+                guard let (nextIndex, nextItem) = iterator.next() else { continue }
+                addConversionTask(to: &group, item: nextItem, index: nextIndex)
             }
-            return results
+            return results.compactMap(\.self)
+        }
+    }
+
+    private static func addConversionTask(
+        to group: inout TaskGroup<(Int, ImageUploadEntity?)>,
+        item: PhotosPickerItem,
+        index: Int
+    ) {
+        group.addTask {
+            guard Task.isCancelled == false else { return (index, nil) }
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return (index, nil) }
+            guard Task.isCancelled == false else { return (index, nil) }
+            let dimensions = extractDimensions(from: data)
+            let format = detectFormat(from: data)
+            
+            return (
+                index,
+                ImageUploadEntity(
+                    data: data,
+                    format: format,
+                    width: dimensions?.width,
+                    height: dimensions?.height,
+                    size: data.count
+                )
+            )
         }
     }
     

@@ -15,7 +15,6 @@ struct ArchiveFeature {
     @ObservableState
     struct State {
         var photos: IdentifiedArrayOf<PhotoEntity> = []
-        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
         var albums: IdentifiedArrayOf<AlbumItem> = []
         
         var previewAlbums: IdentifiedArrayOf<AlbumItem> {
@@ -101,7 +100,6 @@ struct ArchiveFeature {
                 
             case .clearData:
                 state.photos.removeAll()
-                state.photoColumns = [[], []]
                 state.albums.removeAll()
                 return .run { _ in try await archiveClient.clearCache() }
                 
@@ -207,7 +205,6 @@ struct ArchiveFeature {
                 state.isFetchingPhotos = false
                 state.hasNextPhotos = snapshot.hasNext
                 state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
-                state.photoColumns = ArchiveMasonryLayout.columns(for: snapshot.photos)
                 return .none
                 
             case let .photoListResponse(.failure(error)):

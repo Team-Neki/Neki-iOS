@@ -369,15 +369,15 @@ public struct MapFeature {
                 
             case let .processNewChunk(chunk, isFirstBatch):
                 let mapBooths = IdentifiedArray(uniqueElements: chunk)
-                let favoriteBooths = state.photoBoothListState.favoriteBooths
-                let activeFilters = state.photoBoothListState.filteredBrands
+                let favoriteBooths = isFirstBatch ? state.photoBoothListState.favoriteBooths : []
+                let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let currentBounds = state.currentBounds
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
                 return .run { send in
                     let visibleMapBooths = Self.visibleMapPhotoBooths(
                         mapBooths: mapBooths,
                         favoriteBooths: favoriteBooths,
-                        activeFilters: activeFilters,
+                        activeBrandIDs: activeBrandIDs,
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
@@ -498,14 +498,14 @@ public struct MapFeature {
             case .refreshVisibleMapPhotoBooths:
                 let mapBooths = state.photoBooths
                 let favoriteBooths = state.photoBoothListState.favoriteBooths
-                let activeFilters = state.photoBoothListState.filteredBrands
+                let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let currentBounds = state.currentBounds
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
                 return .run { send in
                     let visibleMapBooths = Self.visibleMapPhotoBooths(
                         mapBooths: mapBooths,
                         favoriteBooths: favoriteBooths,
-                        activeFilters: activeFilters,
+                        activeBrandIDs: activeBrandIDs,
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
@@ -521,7 +521,7 @@ public struct MapFeature {
                 let mapBooths = state.photoBooths
                 let listBooths = state.photoBoothListState.photoBooths
                 let favoriteBooths = state.photoBoothListState.favoriteBooths
-                let activeFilters = state.photoBoothListState.filteredBrands
+                let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
                 let currentBounds = state.currentBounds
                 return .run { send in
@@ -531,12 +531,12 @@ public struct MapFeature {
                     visibleMapBooths = Self.visibleMapPhotoBooths(
                         mapBooths: mapBooths,
                         favoriteBooths: favoriteBooths,
-                        activeFilters: activeFilters,
+                        activeBrandIDs: activeBrandIDs,
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
-                    visibleListBooths = activeFilters.isEmpty ? listBooths : listBooths.filter { activeFilters.contains($0.brand) }
-                    visibleFavoriteBooths = activeFilters.isEmpty ? favoriteBooths : favoriteBooths.filter { activeFilters.contains($0.brand) }
+                    visibleListBooths = Self.visibleListPhotoBooths(listBooths, activeBrandIDs: activeBrandIDs)
+                    visibleFavoriteBooths = Self.visibleFavoritePhotoBooths(favoriteBooths, activeBrandIDs: activeBrandIDs)
                     await send(.didFinishBackgroundCalculation(map: visibleMapBooths, list: visibleListBooths, favoriteList: visibleFavoriteBooths))
                 }
                 .cancellable(id: CancelID.calculation, cancelInFlight: true)
@@ -649,7 +649,7 @@ private extension MapFeature {
                 favoriteBooths.remove(id: id)
                 continue
             }
-            guard var photoBooth = localPhotoBooth(id: id, state: state) else { continue }
+            guard var photoBooth = self.photoBooth(id: id, state: state) else { continue }
             photoBooth.isFavorite = true
             if favoriteBooths[id: id] != nil { favoriteBooths[id: id] = photoBooth }
             else { favoriteBooths.insert(photoBooth, at: .zero) }
@@ -658,7 +658,7 @@ private extension MapFeature {
         return favoriteBooths
     }
 
-    func localPhotoBooth(id: PhotoBooth.ID, state: State) -> PhotoBooth? {
+    func photoBooth(id: PhotoBooth.ID, state: State) -> PhotoBooth? {
         let selectedBooth = state.selectedBooth?.id == id ? state.selectedBooth : nil
         return selectedBooth ??
             state.photoBooths[id: id] ??
@@ -672,30 +672,68 @@ private extension MapFeature {
     static func visibleMapPhotoBooths(
         mapBooths: IdentifiedArrayOf<PhotoBooth>,
         favoriteBooths: IdentifiedArrayOf<PhotoBooth>,
-        activeFilters: Set<PhotoBoothBrand>,
+        activeBrandIDs: Set<PhotoBoothBrand.ID>,
         currentBounds: GeographicBoundingBox?,
         isFavoriteMarkerFilterEnabled: Bool
     ) -> IdentifiedArrayOf<PhotoBooth> {
-        var visibleBooths = IdentifiedArrayOf<PhotoBooth>()
+        var visibleBooths: [PhotoBooth] = []
+        var visibleIndexByID: [PhotoBooth.ID: Int] = [:]
+        let estimatedCapacity = isFavoriteMarkerFilterEnabled ? favoriteBooths.count : mapBooths.count + favoriteBooths.count
+        visibleBooths.reserveCapacity(estimatedCapacity)
+        visibleIndexByID.reserveCapacity(estimatedCapacity)
 
         if isFavoriteMarkerFilterEnabled == false {
             for photoBooth in mapBooths {
-                guard activeFilters.isEmpty || activeFilters.contains(photoBooth.brand) else { continue }
+                guard isActiveBrand(photoBooth.brand, activeBrandIDs: activeBrandIDs) else { continue }
+                visibleIndexByID[photoBooth.id] = visibleBooths.count
                 visibleBooths.append(photoBooth)
             }
         }
 
-        guard let currentBounds else { return visibleBooths }
+        guard let currentBounds else { return IdentifiedArray(uniqueElements: visibleBooths) }
 
         for photoBooth in favoriteBooths {
             guard photoBooth.isFavorite else { continue }
             guard currentBounds.contains(photoBooth.coordinate) else { continue }
-            guard activeFilters.isEmpty || activeFilters.contains(photoBooth.brand) else { continue }
-            if visibleBooths[id: photoBooth.id] != nil { visibleBooths[id: photoBooth.id] = photoBooth }
-            else { visibleBooths.append(photoBooth) }
+            guard isActiveBrand(photoBooth.brand, activeBrandIDs: activeBrandIDs) else { continue }
+
+            if let index = visibleIndexByID[photoBooth.id] {
+                visibleBooths[index] = photoBooth
+            } else {
+                visibleIndexByID[photoBooth.id] = visibleBooths.count
+                visibleBooths.append(photoBooth)
+            }
         }
 
-        return visibleBooths
+        return IdentifiedArray(uniqueElements: visibleBooths)
+    }
+
+    static func visibleListPhotoBooths(
+        _ photoBooths: IdentifiedArrayOf<PhotoBooth>,
+        activeBrandIDs: Set<PhotoBoothBrand.ID>
+    ) -> IdentifiedArrayOf<PhotoBooth> {
+        guard activeBrandIDs.isEmpty == false else { return photoBooths }
+        return photoBooths.filter { activeBrandIDs.contains($0.brand.id) }
+    }
+
+    static func visibleFavoritePhotoBooths(
+        _ photoBooths: IdentifiedArrayOf<PhotoBooth>,
+        activeBrandIDs: Set<PhotoBoothBrand.ID>
+    ) -> IdentifiedArrayOf<PhotoBooth> {
+        guard activeBrandIDs.isEmpty == false else { return photoBooths.filter(\.isFavorite) }
+        return photoBooths.filter { $0.isFavorite && activeBrandIDs.contains($0.brand.id) }
+    }
+
+    static func activeBrandIDs(from brands: Set<PhotoBoothBrand>) -> Set<PhotoBoothBrand.ID> {
+        guard brands.isEmpty == false else { return [] }
+        var activeBrandIDs = Set<PhotoBoothBrand.ID>()
+        activeBrandIDs.reserveCapacity(brands.count)
+        brands.forEach { activeBrandIDs.insert($0.id) }
+        return activeBrandIDs
+    }
+
+    static func isActiveBrand(_ brand: PhotoBoothBrand, activeBrandIDs: Set<PhotoBoothBrand.ID>) -> Bool {
+        activeBrandIDs.isEmpty || activeBrandIDs.contains(brand.id)
     }
 
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {
@@ -712,7 +750,7 @@ private extension MapFeature {
     
     func updatePhotoBoothFavoriteState(_ state: inout State, photoBooth: PhotoBooth, isFavorite: Bool) {
         let id = photoBooth.id
-        var updatedPhotoBooth = localPhotoBooth(id: id, state: state) ?? photoBooth
+        var updatedPhotoBooth = self.photoBooth(id: id, state: state) ?? photoBooth
         updatedPhotoBooth.isFavorite = isFavorite
 
         if state.selectedBooth?.id == id {

@@ -213,7 +213,12 @@ extension NaverMapRepresentable {
         }
         
         private func loadMarkerImage(for booth: PhotoBooth, marker: NMFMarker, isSelected: Bool) {
-            let cacheKey = createCacheKey(brandID: booth.brand.id, isSelected: isSelected, isFavorite: booth.isFavorite)
+            let cacheKey = createCacheKey(
+                brandID: booth.brand.id,
+                imageURL: booth.brand.imageURL,
+                isSelected: isSelected,
+                isFavorite: booth.isFavorite
+            )
 
             if let cachedOverlay = overlayImageCache.object(forKey: cacheKey as NSString) {
                 return applyOverlay(to: marker, overlay: cachedOverlay, expectedID: booth.id)
@@ -332,8 +337,8 @@ extension NaverMapRepresentable {
             applyOverlay(to: marker, overlay: targetOverlay, expectedID: expectedID)
         }
 
-        func createCacheKey(brandID: BrandID, isSelected: Bool, isFavorite: Bool) -> String {
-            "brand_\(brandID)_selected_\(isSelected)_favorite_\(isFavorite)"
+        func createCacheKey(brandID: BrandID, imageURL: URL?, isSelected: Bool, isFavorite: Bool) -> String {
+            "brand_\(brandID)_url_\(imageURL?.absoluteString ?? "nil")_selected_\(isSelected)_favorite_\(isFavorite)"
         }
     }
     
@@ -418,7 +423,11 @@ extension NaverMapRepresentable {
     
     final class BoothClusterMarkerUpdater: NMCDefaultClusterMarkerUpdater {
         private weak var mapView: NMFMapView?
-        private var clusterImageCache: [String: NMFOverlayImage] = [:]
+        private let clusterImageCache: NSCache<NSString, NMFOverlayImage> = {
+            let cache = NSCache<NSString, NMFOverlayImage>()
+            cache.countLimit = 10
+            return cache
+        }()
         
         init(mapView: NMFMapView) {
             self.mapView = mapView
@@ -441,12 +450,12 @@ extension NaverMapRepresentable {
             }
             
             let overlayImage: NMFOverlayImage
-            if let cached = clusterImageCache[cacheKey] {
+            if let cached = clusterImageCache.object(forKey: cacheKey as NSString) {
                 overlayImage = cached
             } else {
                 let rendered = ClusterMarkerRenderer.render(text)
                 let overlay = NMFOverlayImage(image: rendered)
-                clusterImageCache[cacheKey] = overlay
+                clusterImageCache.setObject(overlay, forKey: cacheKey as NSString)
                 overlayImage = overlay
             }
             

@@ -97,7 +97,6 @@ private extension PoseView {
                 ) { item in
                     FeedImageView(
                         item: item,
-                        maximumDisplayHeight: proxy.size.height,
                         onTapBookmark: { store.send(.onTapBookmark(item)) }
                     )
                     .onTapGesture {
@@ -111,6 +110,7 @@ private extension PoseView {
                 .padding(.horizontal, 20)
                 .padding(.top, 54)
                 .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(proxy.size.height)
             }
             .scrollIndicators(.never)
             .id(store.isSelectedScrap ? "Scrapped" : "General")

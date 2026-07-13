@@ -162,7 +162,6 @@ private extension ArchiveFavoriteAlbumView {
                             item: item,
                             isSelectionMode: store.isSelectionMode,
                             isSelected: store.selectedIDs.contains(item.id),
-                            maximumDisplayHeight: proxy.size.height,
                             onTapFavorite: { store.send(.onTapFavorite(item: item)) }
                         )
                         .onTapGesture {
@@ -177,6 +176,7 @@ private extension ArchiveFavoriteAlbumView {
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
                 .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(proxy.size.height)
             }
             .scrollIndicators(.never)
         }

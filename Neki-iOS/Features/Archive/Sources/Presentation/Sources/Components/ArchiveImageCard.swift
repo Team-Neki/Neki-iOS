@@ -11,12 +11,12 @@ import os
 
 struct ArchiveImageCard: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.nekiImageMaximumDisplayHeight) private var maximumDisplayHeight
     @State private var cardWidth: CGFloat = 200
     
     let item: PhotoEntity
     let isSelectionMode: Bool
     let isSelected: Bool
-    let maximumDisplayHeight: CGFloat
     let onTapFavorite: (() -> Void)
     
     private static let gradientColor = LinearGradient(
@@ -52,13 +52,11 @@ struct ArchiveImageCard: View {
         item: PhotoEntity,
         isSelectionMode: Bool = false,
         isSelected: Bool = false,
-        maximumDisplayHeight: CGFloat = .infinity,
         onTapFavorite: @escaping () -> Void
     ) {
         self.item = item
         self.isSelectionMode = isSelectionMode
         self.isSelected = isSelected
-        self.maximumDisplayHeight = maximumDisplayHeight
         self.onTapFavorite = onTapFavorite
     }
     

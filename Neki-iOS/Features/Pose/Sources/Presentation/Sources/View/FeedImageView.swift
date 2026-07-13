@@ -12,12 +12,12 @@ import os
 struct FeedImageView: View {
     
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.nekiImageMaximumDisplayHeight) private var maximumDisplayHeight
     @State private var cardWidth: CGFloat = 200
 
     //MARK: - Properties
     
     let item: Pose
-    let maximumDisplayHeight: CGFloat
     let onTapBookmark: (() -> Void)?
 
     private var imageAspectRatio: CGFloat? {

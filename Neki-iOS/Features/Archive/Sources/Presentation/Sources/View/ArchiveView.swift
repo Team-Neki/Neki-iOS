@@ -263,7 +263,6 @@ private extension ArchiveView {
                     if let item = store.photos[id: gridItem.id] {
                         ArchiveImageCard(
                             item: item,
-                            maximumDisplayHeight: maximumDisplayHeight,
                             onTapFavorite: { store.send(.onTapFavorite(item: item)) }
                         )
                             .onTapGesture {
@@ -276,6 +275,7 @@ private extension ArchiveView {
                     }
                 }
                 .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(maximumDisplayHeight)
             }
             
             if store.isFetchingPhotos && !store.photos.isEmpty {

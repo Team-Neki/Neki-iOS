@@ -4,6 +4,23 @@
 import SwiftUI
 import Kingfisher
 
+private struct NekiImageMaximumDisplayHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat = .infinity
+}
+
+extension EnvironmentValues {
+    var nekiImageMaximumDisplayHeight: CGFloat {
+        get { self[NekiImageMaximumDisplayHeightKey.self] }
+        set { self[NekiImageMaximumDisplayHeightKey.self] = newValue }
+    }
+}
+
+extension View {
+    func nekiImageMaximumDisplayHeight(_ height: CGFloat) -> some View {
+        environment(\.nekiImageMaximumDisplayHeight, height)
+    }
+}
+
 enum NekiImageDownsampling {
     static func processor(
         displayWidth: CGFloat,

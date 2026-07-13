@@ -13,6 +13,7 @@ struct ArchiveView: View {
     
     @State var addAlbumSheetPresented: Bool = false
     @State var showScrollToTopButton: Bool = false
+    @State private var maximumDisplayHeight: CGFloat = .infinity
     
     @Bindable var store: StoreOf<ArchiveFeature>
     
@@ -96,6 +97,10 @@ struct ArchiveView: View {
         }
         .transaction { transaction in
             transaction.disablesAnimations = true
+        }
+        .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+            guard height > .zero, maximumDisplayHeight != height else { return }
+            maximumDisplayHeight = height
         }
         .sheet(isPresented: $addAlbumSheetPresented) {
             ArchiveAlbumInputSheet(
@@ -266,6 +271,7 @@ private extension ArchiveView {
                         }
                 }
                 .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(maximumDisplayHeight)
             }
             
             if store.isFetchingPhotos && !store.photos.isEmpty {

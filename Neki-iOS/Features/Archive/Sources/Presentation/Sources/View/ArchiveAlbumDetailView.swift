@@ -242,42 +242,45 @@ private extension ArchiveAlbumDetailView {
     var masonryView: some View {
         let lastPhotoID = store.photos.last?.id
 
-        ScrollView {
-            MasonryGridView(
-                items: Array(store.photos),
-                estimatedHeight: \.masonryEstimatedHeight
-            ) { item in
-                ArchiveImageCard(
-                    item: item,
-                    isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id),
-                    onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                )
-                .onTapGesture {
-                    store.send(.imageTapped(item))
-                }
-                .onAppear {
-                    guard item.id == lastPhotoID else { return }
-                    store.send(.loadMorePhotos)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 76)
-        }
-        .scrollIndicators(.never)
-        .simultaneousGesture(
-            DragGesture()
-                .onChanged { value in
-                    let currentPoint = value.translation.height
-                    let diff = currentPoint - lastDragPoint
-                    withAnimation(.smooth) {
-                        isFilterBarVisible = diff < 0 ? false : true
+        GeometryReader { proxy in
+            ScrollView {
+                MasonryGridView(
+                    items: Array(store.photos),
+                    estimatedHeight: \.masonryEstimatedHeight
+                ) { item in
+                    ArchiveImageCard(
+                        item: item,
+                        isSelectionMode: store.isSelectionMode,
+                        isSelected: store.selectedIDs.contains(item.id),
+                        onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                    )
+                    .onTapGesture {
+                        store.send(.imageTapped(item))
                     }
-                    if store.showDropDownMenu { store.send(.closeDropDownMenu) }
-                    lastDragPoint = currentPoint
+                    .onAppear {
+                        guard item.id == lastPhotoID else { return }
+                        store.send(.loadMorePhotos)
+                    }
                 }
-                .onEnded { _ in lastDragPoint = 0 }
-        )
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(proxy.size.height)
+            }
+            .scrollIndicators(.never)
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        let currentPoint = value.translation.height
+                        let diff = currentPoint - lastDragPoint
+                        withAnimation(.smooth) {
+                            isFilterBarVisible = diff < 0 ? false : true
+                        }
+                        if store.showDropDownMenu { store.send(.closeDropDownMenu) }
+                        lastDragPoint = currentPoint
+                    }
+                    .onEnded { _ in lastDragPoint = 0 }
+            )
+        }
     }
 }

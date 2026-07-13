@@ -152,29 +152,32 @@ private extension ArchiveFavoriteAlbumView {
     var masonryView: some View {
         let lastPhotoID = store.photos.last?.id
 
-        ScrollView {
-            MasonryGridView(
-                items: Array(store.photos),
-                estimatedHeight: \.masonryEstimatedHeight
-            ) { item in
-                ArchiveImageCard(
-                    item: item,
-                    isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id),
-                    onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                )
-                .onTapGesture {
-                    store.send(.imageTapped(item))
+        GeometryReader { proxy in
+            ScrollView {
+                MasonryGridView(
+                    items: Array(store.photos),
+                    estimatedHeight: \.masonryEstimatedHeight
+                ) { item in
+                    ArchiveImageCard(
+                        item: item,
+                        isSelectionMode: store.isSelectionMode,
+                        isSelected: store.selectedIDs.contains(item.id),
+                        onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                    )
+                    .onTapGesture {
+                        store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        guard item.id == lastPhotoID else { return }
+                        store.send(.loadMorePhotos)
+                    }
                 }
-                .onAppear {
-                    guard item.id == lastPhotoID else { return }
-                    store.send(.loadMorePhotos)
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(proxy.size.height)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 76)
+            .scrollIndicators(.never)
         }
-        .scrollIndicators(.never)
     }
 }

@@ -11,6 +11,7 @@ import os
 
 struct ArchiveImageCard: View {
     @Environment(\.displayScale) private var displayScale
+    @Environment(\.nekiImageMaximumDisplayHeight) private var maximumDisplayHeight
     @State private var cardWidth: CGFloat = 200
     
     let item: PhotoEntity
@@ -35,9 +36,14 @@ struct ArchiveImageCard: View {
     }
 
     private var imageProcessor: DownsamplingImageProcessor {
-        let targetWidth = cardWidth * displayScale
-        let targetHeight = min(800, cardWidth / (imageAspectRatio ?? 0.5)) * displayScale
-        return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
+        NekiImageDownsampling.processor(
+            displayWidth: cardWidth,
+            displayScale: displayScale,
+            maximumDisplayHeight: maximumDisplayHeight,
+            originalWidth: item.width,
+            aspectRatio: imageAspectRatio,
+            fallbackAspectRatio: 0.5
+        )
     }
     
     //MARK: - Init

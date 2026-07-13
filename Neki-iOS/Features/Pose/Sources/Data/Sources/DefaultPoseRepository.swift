@@ -33,10 +33,6 @@ private struct PoseEntityCache {
         return pose
     }
 
-    func ids(for peopleCount: PeopleCountOption) -> Set<PoseID> {
-        poseIDsByPeopleCount[peopleCount] ?? []
-    }
-
     func contains(_ id: PoseID) -> Bool {
         posesByID[id] != nil
     }
@@ -53,6 +49,7 @@ private struct PoseEntityCache {
         return poses
     }
 
+    @discardableResult
     mutating func insertOrUpdate(_ pose: Pose, preservingScrap: Bool) -> Pose {
         guard let cachedPose = posesByID[pose.id] else {
             insert(pose)
@@ -66,6 +63,28 @@ private struct PoseEntityCache {
         }
         insert(handled)
         return handled
+    }
+
+    mutating func randomValue(for peopleCount: PeopleCountOption, excluding excludedIDs: Set<PoseID>) -> Pose? {
+        guard let ids = poseIDsByPeopleCount[peopleCount], ids.isEmpty == false else { return nil }
+
+        var fallbackID: PoseID?
+        var fallbackCount: Int = .zero
+        var validID: PoseID?
+        var validCount: Int = .zero
+
+        ids.forEach {
+            guard posesByID[$0] != nil else { return }
+            fallbackCount += 1
+            if Int.random(in: 0..<fallbackCount) == .zero { fallbackID = $0 }
+            guard excludedIDs.contains($0) == false else { return }
+            validCount += 1
+            if Int.random(in: 0..<validCount) == .zero { validID = $0 }
+        }
+
+        if let validID { return value(for: validID) }
+        guard let fallbackID else { return nil }
+        return value(for: fallbackID)
     }
 
     mutating func trim(protectedIDs: Set<PoseID>) -> Set<PoseID> {
@@ -148,6 +167,7 @@ private extension DefaultPoseRepository {
     /// - Parameters:
     ///   - newPose: 네트워크에서 가져온 새 포즈 데이터
     ///   - preserved: `true`일 경우 로컬의 상태(스크랩 여부 등)를 유지하고, `false`일 경우 새 데이터로 덮어씁니다.
+    @discardableResult
     func cacheOrUpdate(_ newPose: Pose, preserved: Bool = false, trimAfterInsert: Bool = true) -> Pose {
         let handled = cache.insertOrUpdate(newPose, preservingScrap: preserved)
         if trimAfterInsert { trimPoseCacheIfNeeded() }
@@ -238,24 +258,8 @@ private extension DefaultPoseRepository {
             Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
             guard cache.isEmpty == false else { throw error }
             
-            let countMatchedIDs = cache.ids(for: peopleCount)
-            var validCachedPoses: [Pose] = []
-            validCachedPoses.reserveCapacity(countMatchedIDs.count)
-            countMatchedIDs.forEach {
-                guard excludedIDs.contains($0) == false,
-                      let pose = cache.value(for: $0)
-                else { return }
-                validCachedPoses.append(pose)
-            }
-            
-            if let randomFallbackPose = validCachedPoses.randomElement() {
-                return randomFallbackPose
-            } else {
-                guard let fallbackID = countMatchedIDs.randomElement(),
-                      let fallback = cache.value(for: fallbackID)
-                else { throw error }
-                return fallback
-            }
+            guard let fallback = cache.randomValue(for: peopleCount, excluding: excludedIDs) else { throw error }
+            return fallback
             
         }
     }

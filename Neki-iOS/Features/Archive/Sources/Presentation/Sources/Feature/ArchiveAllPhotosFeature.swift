@@ -19,8 +19,7 @@ struct ArchiveAllPhotosFeature {
         @Presents var albumSelection: AlbumSelectionFeature.State?
         
         var photos: IdentifiedArrayOf<PhotoEntity> = []
-        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
-        var photoLayoutKey: ArchiveMasonryLayout.CacheKey?
+        var visiblePhotos: [PhotoEntity] = []
         var lastVisiblePhotoID: Int?
         var selectedIDs: Set<Int> = []
         var selectedSortedTime: String = "최신순"
@@ -87,7 +86,7 @@ struct ArchiveAllPhotosFeature {
             case let .onTapFavorite(item):
                 let newStatus = !item.isFavorite
                 state.photos[id: item.id]?.isFavorite = newStatus
-                if state.isSelectedFavorite { state.updatePhotoColumns() }
+                state.updateVisiblePhoto(id: item.id)
                 return .run { [id = item.id, isFavorite = newStatus] send in
                     do {
                         try await archiveClient.toggleFavorite(photoID: id, request: isFavorite)
@@ -100,7 +99,7 @@ struct ArchiveAllPhotosFeature {
             case .toggleFavoriteResponse(_, .success): return .none
             case let .toggleFavoriteResponse(photoID, .failure):
                 state.photos[id: photoID]?.isFavorite.toggle()
-                if state.isSelectedFavorite { state.updatePhotoColumns() }
+                state.updateVisiblePhoto(id: photoID)
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownloadButton:
@@ -128,7 +127,7 @@ struct ArchiveAllPhotosFeature {
             case let .deletePhotosLocally(ids):
                 let deletedIDs = Set(ids)
                 state.photos.removeAll { deletedIDs.contains($0.id) }
-                state.updatePhotoColumns()
+                state.updateVisiblePhotos()
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
@@ -137,8 +136,7 @@ struct ArchiveAllPhotosFeature {
                 if state.selectedSortedTime == "최신순" { return .none }
                 state.selectedSortedTime = "최신순"
                 state.photos.removeAll()
-                state.photoColumns = [[], []]
-                state.photoLayoutKey = nil
+                state.visiblePhotos.removeAll()
                 state.lastVisiblePhotoID = nil
                 state.isFetchingPhotos = false
                 return .concatenate(
@@ -150,8 +148,7 @@ struct ArchiveAllPhotosFeature {
                 if state.selectedSortedTime == "오래된순" { return .none }
                 state.selectedSortedTime = "오래된순"
                 state.photos.removeAll()
-                state.photoColumns = [[], []]
-                state.photoLayoutKey = nil
+                state.visiblePhotos.removeAll()
                 state.lastVisiblePhotoID = nil
                 state.isFetchingPhotos = false
                 return .concatenate(
@@ -161,7 +158,7 @@ struct ArchiveAllPhotosFeature {
                 
             case .onTapFavoriteButton:
                 state.isSelectedFavorite.toggle()
-                state.updatePhotoColumns()
+                state.updateVisiblePhotos()
                 return .none
                 
             case .fetchPhotos:
@@ -179,7 +176,7 @@ struct ArchiveAllPhotosFeature {
                 state.isFetchingPhotos = false
                 state.hasNextPhotos = snapshot.hasNext
                 state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
-                state.updatePhotoColumns()
+                state.updateVisiblePhotos()
                 return .none
                 
             case let .photoListResponse(.failure(error)):
@@ -246,15 +243,19 @@ struct ArchiveAllPhotosFeature {
 }
 
 private extension ArchiveAllPhotosFeature.State {
-    mutating func updatePhotoColumns() {
-        let visiblePhotos = isSelectedFavorite ? photos.filter(\.isFavorite) : Array(photos)
-        let layout = ArchiveMasonryLayout.columns(
-            for: visiblePhotos,
-            cachedKey: photoLayoutKey,
-            cachedColumns: photoColumns
-        )
-        photoColumns = layout.columns
-        photoLayoutKey = layout.key
+    mutating func updateVisiblePhotos() {
+        visiblePhotos = isSelectedFavorite ? photos.filter(\.isFavorite) : Array(photos)
         lastVisiblePhotoID = visiblePhotos.last?.id
+    }
+
+    mutating func updateVisiblePhoto(id: PhotoEntity.ID) {
+        guard isSelectedFavorite == false else {
+            updateVisiblePhotos()
+            return
+        }
+        guard let photo = photos[id: id],
+              let index = visiblePhotos.firstIndex(where: { $0.id == id })
+        else { return }
+        visiblePhotos[index] = photo
     }
 }

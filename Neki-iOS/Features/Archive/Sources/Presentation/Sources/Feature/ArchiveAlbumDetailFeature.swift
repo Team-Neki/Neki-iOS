@@ -17,8 +17,6 @@ struct ArchiveAlbumDetailFeature {
         var selectionPurpose: PhotoSelectionPurpose?
         
         var photos: IdentifiedArrayOf<PhotoEntity> = []
-        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
-        var photoLayoutKey: ArchiveMasonryLayout.CacheKey?
         let album: AlbumItem
         var showDropDownMenu: Bool = false
         var selectedIDs: Set<Int> = []
@@ -39,9 +37,6 @@ struct ArchiveAlbumDetailFeature {
         
         init(photos: IdentifiedArrayOf<PhotoEntity> = [], album: AlbumItem) {
             self.photos = photos
-            let layout = ArchiveMasonryLayout.columns(for: photos, cachedKey: nil, cachedColumns: [[], []])
-            self.photoColumns = layout.columns
-            self.photoLayoutKey = layout.key
             self.album = album
             self.newAlbumTitle = album.title
         }
@@ -184,7 +179,6 @@ struct ArchiveAlbumDetailFeature {
                 state.isFetchingPhotos = false
                 state.hasNextPhotos = snapshot.hasNext
                 state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
-                state.updatePhotoColumns()
                 return .none
             case let .photoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
@@ -266,7 +260,6 @@ struct ArchiveAlbumDetailFeature {
             case .deletePhotosResponse(.success):
                 let idsToDelete = state.selectedIDs
                 state.photos.removeAll { idsToDelete.contains($0.id) }
-                state.updatePhotoColumns()
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
@@ -319,17 +312,5 @@ struct ArchiveAlbumDetailFeature {
         }
         .ifLet(\.$albumSelection, action: \.albumSelection) { AlbumSelectionFeature() }
         .ifLet(\.$photoImport, action: \.photoImport) { PhotoImportFeature() }
-    }
-}
-
-private extension ArchiveAlbumDetailFeature.State {
-    mutating func updatePhotoColumns() {
-        let layout = ArchiveMasonryLayout.columns(
-            for: photos,
-            cachedKey: photoLayoutKey,
-            cachedColumns: photoColumns
-        )
-        photoColumns = layout.columns
-        photoLayoutKey = layout.key
     }
 }

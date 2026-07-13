@@ -31,7 +31,7 @@ struct FeedImageView: View {
 
     private var imageProcessor: DownsamplingImageProcessor {
         let targetWidth = cardWidth * displayScale
-        let targetHeight = cardWidth / (imageAspectRatio ?? 0.75) * displayScale
+        let targetHeight = min(800, cardWidth / (imageAspectRatio ?? 0.75)) * displayScale
         return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
     }
     

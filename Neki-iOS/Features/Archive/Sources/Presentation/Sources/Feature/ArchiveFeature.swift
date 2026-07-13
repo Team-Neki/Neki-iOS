@@ -16,6 +16,7 @@ struct ArchiveFeature {
     struct State {
         var photos: IdentifiedArrayOf<PhotoEntity> = []
         var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
+        var photoLayoutKey: ArchiveMasonryLayout.CacheKey?
         var albums: IdentifiedArrayOf<AlbumItem> = []
         
         var previewAlbums: IdentifiedArrayOf<AlbumItem> {
@@ -102,6 +103,7 @@ struct ArchiveFeature {
             case .clearData:
                 state.photos.removeAll()
                 state.photoColumns = [[], []]
+                state.photoLayoutKey = nil
                 state.albums.removeAll()
                 return .run { _ in try await archiveClient.clearCache() }
                 
@@ -207,7 +209,7 @@ struct ArchiveFeature {
                 state.isFetchingPhotos = false
                 state.hasNextPhotos = snapshot.hasNext
                 state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
-                state.photoColumns = ArchiveMasonryLayout.columns(for: snapshot.photos)
+                state.updatePhotoColumns()
                 return .none
                 
             case let .photoListResponse(.failure(error)):
@@ -306,5 +308,17 @@ struct ArchiveFeature {
         .ifLet(\.$selectUploadAlbum, action: \.selectUploadAlbum) {
             SelectUploadAlbumFeature()
         }
+    }
+}
+
+private extension ArchiveFeature.State {
+    mutating func updatePhotoColumns() {
+        let layout = ArchiveMasonryLayout.columns(
+            for: photos,
+            cachedKey: photoLayoutKey,
+            cachedColumns: photoColumns
+        )
+        photoColumns = layout.columns
+        photoLayoutKey = layout.key
     }
 }

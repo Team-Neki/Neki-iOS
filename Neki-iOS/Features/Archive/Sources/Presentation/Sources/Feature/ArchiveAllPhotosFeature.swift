@@ -20,6 +20,7 @@ struct ArchiveAllPhotosFeature {
         
         var photos: IdentifiedArrayOf<PhotoEntity> = []
         var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
+        var photoLayoutKey: ArchiveMasonryLayout.CacheKey?
         var lastVisiblePhotoID: Int?
         var selectedIDs: Set<Int> = []
         var selectedSortedTime: String = "최신순"
@@ -137,6 +138,7 @@ struct ArchiveAllPhotosFeature {
                 state.selectedSortedTime = "최신순"
                 state.photos.removeAll()
                 state.photoColumns = [[], []]
+                state.photoLayoutKey = nil
                 state.lastVisiblePhotoID = nil
                 state.isFetchingPhotos = false
                 return .concatenate(
@@ -149,6 +151,7 @@ struct ArchiveAllPhotosFeature {
                 state.selectedSortedTime = "오래된순"
                 state.photos.removeAll()
                 state.photoColumns = [[], []]
+                state.photoLayoutKey = nil
                 state.lastVisiblePhotoID = nil
                 state.isFetchingPhotos = false
                 return .concatenate(
@@ -245,7 +248,13 @@ struct ArchiveAllPhotosFeature {
 private extension ArchiveAllPhotosFeature.State {
     mutating func updatePhotoColumns() {
         let visiblePhotos = isSelectedFavorite ? photos.filter(\.isFavorite) : Array(photos)
-        photoColumns = ArchiveMasonryLayout.columns(for: visiblePhotos)
+        let layout = ArchiveMasonryLayout.columns(
+            for: visiblePhotos,
+            cachedKey: photoLayoutKey,
+            cachedColumns: photoColumns
+        )
+        photoColumns = layout.columns
+        photoLayoutKey = layout.key
         lastVisiblePhotoID = visiblePhotos.last?.id
     }
 }

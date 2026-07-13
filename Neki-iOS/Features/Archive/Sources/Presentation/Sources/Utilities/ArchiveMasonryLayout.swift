@@ -6,21 +6,47 @@
 //
 
 enum ArchiveMasonryLayout {
+    struct CacheKey: Equatable, Sendable {
+        let columnCount: Int
+        let items: [Item]
+
+        init(photos: some Collection<PhotoEntity>, columnCount: Int) {
+            self.columnCount = max(1, columnCount)
+            self.items = photos.map {
+                Item(id: $0.id, estimatedHeight: ArchiveMasonryLayout.estimatedHeight(for: $0))
+            }
+        }
+    }
+
     static func columns(
         for photos: some Collection<PhotoEntity>,
         columnCount: Int = 2
     ) -> [[ArchivePhotoGridItem]] {
-        let columnCount = max(1, columnCount)
-        var columns = emptyColumns(count: columnCount, itemCount: photos.count)
-        var columnHeights = Array(repeating: Double.zero, count: columnCount)
+        let key = CacheKey(photos: photos, columnCount: columnCount)
+        return columns(for: key)
+    }
 
-        photos.forEach { photo in
+    static func columns(
+        for photos: some Collection<PhotoEntity>,
+        columnCount: Int = 2,
+        cachedKey: CacheKey?,
+        cachedColumns: [[ArchivePhotoGridItem]]
+    ) -> (columns: [[ArchivePhotoGridItem]], key: CacheKey) {
+        let key = CacheKey(photos: photos, columnCount: columnCount)
+        guard cachedKey != key else { return (cachedColumns, key) }
+        return (columns(for: key), key)
+    }
+
+    private static func columns(for key: CacheKey) -> [[ArchivePhotoGridItem]] {
+        var columns: [[ArchivePhotoGridItem]] = MasonryColumnBuilder.emptyColumns(count: key.columnCount, itemCount: key.items.count)
+        var columnHeights = Array(repeating: Double.zero, count: key.columnCount)
+
+        key.items.forEach { item in
             let columnIndex = columnHeights
                 .enumerated()
                 .min(by: { $0.element < $1.element })?
                 .offset ?? .zero
-            let item = ArchivePhotoGridItem(id: photo.id, estimatedHeight: estimatedHeight(for: photo))
-            columns[columnIndex].append(item)
+            columns[columnIndex].append(.init(id: item.id, estimatedHeight: item.estimatedHeight))
             columnHeights[columnIndex] += item.estimatedHeight
         }
         return columns
@@ -32,14 +58,12 @@ enum ArchiveMasonryLayout {
         return Double(height) / Double(width)
     }
 
-    private static func emptyColumns(count: Int, itemCount: Int) -> [[ArchivePhotoGridItem]] {
-        var columns = Array(repeating: [ArchivePhotoGridItem](), count: count)
-        let baseCapacity = itemCount / count
-        let remainingCapacity = itemCount % count
-        columns.indices.forEach {
-            columns[$0].reserveCapacity(baseCapacity + ($0 < remainingCapacity ? 1 : 0))
-        }
-        return columns
+}
+
+extension ArchiveMasonryLayout.CacheKey {
+    struct Item: Equatable, Sendable {
+        let id: Int
+        let estimatedHeight: Double
     }
 }
 

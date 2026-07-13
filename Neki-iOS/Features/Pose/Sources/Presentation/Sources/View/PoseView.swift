@@ -80,21 +80,26 @@ struct PoseView: View {
 private extension PoseView {
     @ViewBuilder
     var masonryView: some View {
-        ScrollView {
-            MasonryGridView(
-                items: store.visiblePoses,
-                columns: 2,
-                estimatedHeight: { item in
-                    guard let width = item.width,
-                          let height = item.height,
-                          width > 0,
-                          height > 0
-                    else { return nil }
+        GeometryReader { proxy in
+            ScrollView {
+                MasonryGridView(
+                    items: store.visiblePoses,
+                    columns: 2,
+                    estimatedHeight: { item in
+                        guard let width = item.width,
+                              let height = item.height,
+                              width > 0,
+                              height > 0
+                        else { return nil }
 
-                    return CGFloat(height) / CGFloat(width)
-                }
-            ) { item in
-                FeedImageView(item: item, onTapBookmark: { store.send(.onTapBookmark(item)) })
+                        return CGFloat(height) / CGFloat(width)
+                    }
+                ) { item in
+                    FeedImageView(
+                        item: item,
+                        maximumDisplayHeight: proxy.size.height,
+                        onTapBookmark: { store.send(.onTapBookmark(item)) }
+                    )
                     .onTapGesture {
                         store.send(.imageTapped(item))
                     }
@@ -102,30 +107,31 @@ private extension PoseView {
                         guard item.id == store.lastVisiblePoseID else { return }
                         store.send(.loadMoreItems)
                     }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 54)
+                .padding(.bottom, 76)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 54)
-            .padding(.bottom, 76)
-        }
-        .scrollIndicators(.never)
-        .id(store.isSelectedScrap ? "Scrapped" : "General")
-        .refreshable { await store.send(.onRefresh).finish() }
-        .simultaneousGesture(
-            DragGesture()
-                .onChanged { value in
-                    let currentPoint = value.translation.height
-                    let diff = currentPoint - lastDragPoint
-                    
-                    withAnimation(.smooth) {
-                        isFilterBarVisible = diff < 0 ? false : true
+            .scrollIndicators(.never)
+            .id(store.isSelectedScrap ? "Scrapped" : "General")
+            .refreshable { await store.send(.onRefresh).finish() }
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        let currentPoint = value.translation.height
+                        let diff = currentPoint - lastDragPoint
+
+                        withAnimation(.smooth) {
+                            isFilterBarVisible = diff < 0 ? false : true
+                        }
+
+                        lastDragPoint = currentPoint
                     }
-                    
-                    lastDragPoint = currentPoint
-                }
-                .onEnded {_ in
-                    lastDragPoint = 0
-                }
-        )
+                    .onEnded {_ in
+                        lastDragPoint = 0
+                    }
+            )
+        }
     }
     
     @ViewBuilder

@@ -129,56 +129,59 @@ private extension ArchiveAllPhotosView {
     var masonryView: some View {
         let lastPhotoID = store.lastVisiblePhotoID
 
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                MasonryGridView(
-                    columnItems: store.photoColumns
-                ) { gridItem in
-                    if let item = store.photos[id: gridItem.id] {
-                        ArchiveImageCard(
-                            item: item,
-                            isSelectionMode: store.isSelectionMode,
-                            isSelected: store.selectedIDs.contains(item.id),
-                            onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                        )
-                        .onTapGesture {
-                            store.send(.imageTapped(item))
-                        }
-                        .onAppear {
-                            guard item.id == lastPhotoID else { return }
-                            store.send(.loadMorePhotos)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    MasonryGridView(
+                        columnItems: store.photoColumns
+                    ) { gridItem in
+                        if let item = store.photos[id: gridItem.id] {
+                            ArchiveImageCard(
+                                item: item,
+                                isSelectionMode: store.isSelectionMode,
+                                isSelected: store.selectedIDs.contains(item.id),
+                                maximumDisplayHeight: proxy.size.height,
+                                onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                            )
+                            .onTapGesture {
+                                store.send(.imageTapped(item))
+                            }
+                            .onAppear {
+                                guard item.id == lastPhotoID else { return }
+                                store.send(.loadMorePhotos)
+                            }
                         }
                     }
+                    
+                    if store.isFetchingPhotos && !store.photos.isEmpty {
+                        ProgressView()
+                            .padding(.vertical, 20)
+                    }
                 }
-                
-                if store.isFetchingPhotos && !store.photos.isEmpty {
-                    ProgressView()
-                        .padding(.vertical, 20)
-                }
+                .padding(.horizontal, 20)
+                .padding(.top, store.isSelectionMode ? 8 : 54)
+                .padding(.bottom, 76)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, store.isSelectionMode ? 8 : 54)
-            .padding(.bottom, 76)
-        }
-        .scrollIndicators(.never)
-        .simultaneousGesture(
-            DragGesture()
-                .onChanged { value in
-                    let currentPoint = value.translation.height
-                    let diff = currentPoint - lastDragPoint
-                    
-                    withAnimation(.smooth) {
-                        isFilterBarVisible = diff < 0 ? false : true
+            .scrollIndicators(.never)
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        let currentPoint = value.translation.height
+                        let diff = currentPoint - lastDragPoint
+
+                        withAnimation(.smooth) {
+                            isFilterBarVisible = diff < 0 ? false : true
+                        }
+
+                        if showDropDownMenu { showDropDownMenu = false }
+
+                        lastDragPoint = currentPoint
                     }
-                    
-                    if showDropDownMenu { showDropDownMenu = false }
-                    
-                    lastDragPoint = currentPoint
-                }
-                .onEnded {_ in
-                    lastDragPoint = 0
-                }
-        )
+                    .onEnded {_ in
+                        lastDragPoint = 0
+                    }
+            )
+        }
     }
     
     @ViewBuilder

@@ -17,6 +17,7 @@ struct FeedImageView: View {
     //MARK: - Properties
     
     let item: Pose
+    let maximumDisplayHeight: CGFloat
     let onTapBookmark: (() -> Void)?
 
     private var imageAspectRatio: CGFloat? {
@@ -30,14 +31,14 @@ struct FeedImageView: View {
     }
 
     private var imageProcessor: DownsamplingImageProcessor {
-        let targetWidth = targetImagePixelWidth(fallbackWidth: cardWidth * displayScale)
-        let targetHeight = targetWidth / (imageAspectRatio ?? 0.75)
-        return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
-    }
-
-    private func targetImagePixelWidth(fallbackWidth: CGFloat) -> CGFloat {
-        guard let originalWidth = item.width, originalWidth > .zero else { return fallbackWidth }
-        return min(fallbackWidth, CGFloat(originalWidth))
+        NekiImageDownsampling.processor(
+            displayWidth: cardWidth,
+            displayScale: displayScale,
+            maximumDisplayHeight: maximumDisplayHeight,
+            originalWidth: item.width,
+            aspectRatio: imageAspectRatio,
+            fallbackAspectRatio: 0.75
+        )
     }
     
     private static let gradientColor = LinearGradient(

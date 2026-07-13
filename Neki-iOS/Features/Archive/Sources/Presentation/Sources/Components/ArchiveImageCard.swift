@@ -16,6 +16,7 @@ struct ArchiveImageCard: View {
     let item: PhotoEntity
     let isSelectionMode: Bool
     let isSelected: Bool
+    let maximumDisplayHeight: CGFloat
     let onTapFavorite: (() -> Void)
     
     private static let gradientColor = LinearGradient(
@@ -35,14 +36,14 @@ struct ArchiveImageCard: View {
     }
 
     private var imageProcessor: DownsamplingImageProcessor {
-        let targetWidth = targetImagePixelWidth(fallbackWidth: cardWidth * displayScale)
-        let targetHeight = targetWidth / (imageAspectRatio ?? 0.5)
-        return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
-    }
-
-    private func targetImagePixelWidth(fallbackWidth: CGFloat) -> CGFloat {
-        guard let originalWidth = item.width, originalWidth > .zero else { return fallbackWidth }
-        return min(fallbackWidth, CGFloat(originalWidth))
+        NekiImageDownsampling.processor(
+            displayWidth: cardWidth,
+            displayScale: displayScale,
+            maximumDisplayHeight: maximumDisplayHeight,
+            originalWidth: item.width,
+            aspectRatio: imageAspectRatio,
+            fallbackAspectRatio: 0.5
+        )
     }
     
     //MARK: - Init
@@ -51,11 +52,13 @@ struct ArchiveImageCard: View {
         item: PhotoEntity,
         isSelectionMode: Bool = false,
         isSelected: Bool = false,
+        maximumDisplayHeight: CGFloat = .infinity,
         onTapFavorite: @escaping () -> Void
     ) {
         self.item = item
         self.isSelectionMode = isSelectionMode
         self.isSelected = isSelected
+        self.maximumDisplayHeight = maximumDisplayHeight
         self.onTapFavorite = onTapFavorite
     }
     

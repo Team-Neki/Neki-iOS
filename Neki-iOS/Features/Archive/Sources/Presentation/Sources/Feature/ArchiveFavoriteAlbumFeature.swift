@@ -15,7 +15,6 @@ struct ArchiveFavoriteAlbumFeature {
         @Presents var albumSelection: AlbumSelectionFeature.State?
         
         var photos: IdentifiedArrayOf<PhotoEntity> = []
-        var photoColumns: [[ArchivePhotoGridItem]] = [[], []]
         let album: AlbumItem
         var showDropDownMenu: Bool = false
         var selectedIDs: Set<Int> = []
@@ -147,7 +146,6 @@ struct ArchiveFavoriteAlbumFeature {
                 state.isFetchingPhotos = false
                 state.hasNextPhotos = snapshot.hasNext
                 state.photos = IdentifiedArray(uniqueElements: snapshot.photos)
-                state.photoColumns = ArchiveMasonryLayout.columns(for: snapshot.photos)
                 return .none
                 
             case let .favoritePhotoListResponse(.failure(error)):
@@ -241,7 +239,6 @@ struct ArchiveFavoriteAlbumFeature {
             case .deletePhotosResponse(.success):
                 let idsToRemove = state.selectedIDs
                 state.photos.removeAll { idsToRemove.contains($0.id) }
-                state.photoColumns = ArchiveMasonryLayout.columns(for: state.photos)
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))

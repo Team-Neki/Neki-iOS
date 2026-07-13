@@ -368,7 +368,7 @@ public struct MapFeature {
                 return .send(.processNewChunk(chunk, isFirstBatch: isFirstBatch))
                 
             case let .processNewChunk(chunk, isFirstBatch):
-                let mapBooths = IdentifiedArray(uniqueElements: chunk)
+                let mapBooths = mapBoothsPreservingFavoriteState(from: chunk, state: state)
                 let favoriteBooths = isFirstBatch ? state.photoBoothListState.favoriteBooths : []
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let currentBounds = state.currentBounds
@@ -385,10 +385,14 @@ public struct MapFeature {
                 }
                 
             case let .appendProcessedChunk(map, isFirstBatch):
+                var mergedMap: [PhotoBooth] = []
+                mergedMap.reserveCapacity(map.count)
+                map.forEach { mergedMap.append(photoBoothPreservingFavoriteState($0, state: state)) }
+
                 if isFirstBatch {
-                    state.visiblePhotoBooths = IdentifiedArray(uniqueElements: map)
+                    state.visiblePhotoBooths = IdentifiedArray(uniqueElements: mergedMap)
                 } else {
-                    map.forEach { photoBooth in
+                    mergedMap.forEach { photoBooth in
                         if state.visiblePhotoBooths[id: photoBooth.id] != nil { state.visiblePhotoBooths[id: photoBooth.id] = photoBooth }
                         else { state.visiblePhotoBooths.append(photoBooth) }
                     }
@@ -667,6 +671,32 @@ private extension MapFeature {
             state.photoBoothListState.visibleBooths[id: id] ??
             state.photoBoothListState.favoriteBooths[id: id] ??
             state.photoBoothListState.visibleFavoriteBooths[id: id]
+    }
+
+    func currentFavoriteState(for id: PhotoBooth.ID, state: State) -> Bool? {
+        if let pendingFavoriteState = state.pendingFavoriteUpdates[id] { return pendingFavoriteState }
+        if state.selectedBooth?.id == id { return state.selectedBooth?.isFavorite }
+        if let visiblePhotoBooth = state.visiblePhotoBooths[id: id] { return visiblePhotoBooth.isFavorite }
+        if let listPhotoBooth = state.photoBoothListState.photoBooths[id: id] { return listPhotoBooth.isFavorite }
+        if let visibleListPhotoBooth = state.photoBoothListState.visibleBooths[id: id] { return visibleListPhotoBooth.isFavorite }
+        if let favoritePhotoBooth = state.photoBoothListState.favoriteBooths[id: id] { return favoritePhotoBooth.isFavorite }
+        if let visibleFavoritePhotoBooth = state.photoBoothListState.visibleFavoriteBooths[id: id] { return visibleFavoritePhotoBooth.isFavorite }
+        if let photoBooth = state.photoBooths[id: id] { return photoBooth.isFavorite }
+        return nil
+    }
+
+    func photoBoothPreservingFavoriteState(_ photoBooth: PhotoBooth, state: State) -> PhotoBooth {
+        guard let isFavorite = currentFavoriteState(for: photoBooth.id, state: state) else { return photoBooth }
+        var updatedPhotoBooth = photoBooth
+        updatedPhotoBooth.isFavorite = isFavorite
+        return updatedPhotoBooth
+    }
+
+    func mapBoothsPreservingFavoriteState(from chunk: [PhotoBooth], state: State) -> IdentifiedArrayOf<PhotoBooth> {
+        var photoBooths: [PhotoBooth] = []
+        photoBooths.reserveCapacity(chunk.count)
+        chunk.forEach { photoBooths.append(photoBoothPreservingFavoriteState($0, state: state)) }
+        return IdentifiedArray(uniqueElements: photoBooths)
     }
 
     static func visibleMapPhotoBooths(

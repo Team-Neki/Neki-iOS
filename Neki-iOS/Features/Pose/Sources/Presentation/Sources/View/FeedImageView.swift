@@ -30,9 +30,14 @@ struct FeedImageView: View {
     }
 
     private var imageProcessor: DownsamplingImageProcessor {
-        let targetWidth = cardWidth * displayScale
-        let targetHeight = min(800, cardWidth / (imageAspectRatio ?? 0.75)) * displayScale
+        let targetWidth = targetImagePixelWidth(fallbackWidth: cardWidth * displayScale)
+        let targetHeight = targetWidth / (imageAspectRatio ?? 0.75)
         return DownsamplingImageProcessor(size: CGSize(width: targetWidth, height: targetHeight))
+    }
+
+    private func targetImagePixelWidth(fallbackWidth: CGFloat) -> CGFloat {
+        guard let originalWidth = item.width, originalWidth > .zero else { return fallbackWidth }
+        return min(fallbackWidth, CGFloat(originalWidth))
     }
     
     private static let gradientColor = LinearGradient(

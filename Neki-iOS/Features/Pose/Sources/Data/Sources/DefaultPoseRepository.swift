@@ -37,6 +37,10 @@ private struct PoseEntityCache {
         poseIDsByPeopleCount[peopleCount] ?? []
     }
 
+    func contains(_ id: PoseID) -> Bool {
+        posesByID[id] != nil
+    }
+
     mutating func values(for ids: [PoseID]) -> [Pose]? {
         var poses: [Pose] = []
         poses.reserveCapacity(ids.count)
@@ -144,9 +148,9 @@ private extension DefaultPoseRepository {
     /// - Parameters:
     ///   - newPose: 네트워크에서 가져온 새 포즈 데이터
     ///   - preserved: `true`일 경우 로컬의 상태(스크랩 여부 등)를 유지하고, `false`일 경우 새 데이터로 덮어씁니다.
-    func cacheOrUpdate(_ newPose: Pose, preserved: Bool = false) -> Pose {
+    func cacheOrUpdate(_ newPose: Pose, preserved: Bool = false, trimAfterInsert: Bool = true) -> Pose {
         let handled = cache.insertOrUpdate(newPose, preservingScrap: preserved)
-        trimPoseCacheIfNeeded()
+        if trimAfterInsert { trimPoseCacheIfNeeded() }
         return handled
     }
     
@@ -164,7 +168,7 @@ private extension DefaultPoseRepository {
     }
 
     func appendRandomPoseToHistory(_ pose: Pose) -> Pose {
-        let handled = cacheOrUpdate(pose, preserved: true)
+        let handled = cacheOrUpdate(pose, preserved: true, trimAfterInsert: false)
 
         if let currentIndex = currentRandomPoseIndex,
            currentIndex < randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex) { randomPoseHistoryIDs.removeSubrange(randomPoseHistoryIDs.index(after: currentIndex)..<randomPoseHistoryIDs.endIndex) }
@@ -172,6 +176,7 @@ private extension DefaultPoseRepository {
         randomPoseHistoryIDs.append(handled.id)
         trimRandomPoseHistoryIfNeeded()
         currentRandomPoseIndex = randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex)
+        trimPoseCacheIfNeeded()
         return handled
     }
     
@@ -279,35 +284,70 @@ private extension DefaultPoseRepository {
     }
 
     func trimPoseCacheIfNeeded() {
+        removeStaleReferences()
         let removedIDs = cache.trim(protectedIDs: protectedPoseIDs())
         guard removedIDs.isEmpty == false else { return }
-        removeEvictedIDsFromPages(removedIDs)
+        removeEvictedReferences(removedIDs)
     }
 
     func protectedPoseIDs() -> Set<PoseID> {
         var protectedIDs = Set<PoseID>()
-        protectedIDs.formUnion(scrapTasks.keys)
-        protectedIDs.formUnion(randomPoseHistoryIDs)
-        protectedIDs.formUnion(committedRandomPoseIDs.values)
-        generalPages.values.forEach { protectedIDs.formUnion($0.poseIDs) }
-        scrappedPages.values.forEach { protectedIDs.formUnion($0.poseIDs) }
+        scrapTasks.keys.forEach { if cache.contains($0) { protectedIDs.insert($0) } }
+        randomPoseHistoryIDs.forEach { if cache.contains($0) { protectedIDs.insert($0) } }
+        committedRandomPoseIDs.values.forEach { if cache.contains($0) { protectedIDs.insert($0) } }
         return protectedIDs
     }
 
-    func removeEvictedIDsFromPages(_ removedIDs: Set<PoseID>) {
+    func removeStaleReferences() {
+        removePagesContainingMissingCachedPose()
+        removeStaleRandomPoseReferences()
+    }
+
+    func removePagesContainingMissingCachedPose() {
         for (pageID, page) in generalPages {
-            let remainingIDs = page.poseIDs.filter { removedIDs.contains($0) == false }
-            guard remainingIDs.count != page.poseIDs.count else { continue }
-            if remainingIDs.isEmpty { generalPages[pageID] = nil }
-            else { generalPages[pageID] = Page(poseIDs: remainingIDs, hasNext: page.hasNext) }
+            guard page.poseIDs.contains(where: { cache.contains($0) == false }) else { continue }
+            generalPages[pageID] = nil
         }
 
         for (pageID, page) in scrappedPages {
-            let remainingIDs = page.poseIDs.filter { removedIDs.contains($0) == false }
-            guard remainingIDs.count != page.poseIDs.count else { continue }
-            if remainingIDs.isEmpty { scrappedPages[pageID] = nil }
-            else { scrappedPages[pageID] = Page(poseIDs: remainingIDs, hasNext: page.hasNext) }
+            guard page.poseIDs.contains(where: { cache.contains($0) == false }) else { continue }
+            scrappedPages[pageID] = nil
         }
+    }
+
+    func removeStaleRandomPoseReferences() {
+        let currentPoseID = currentRandomPoseIndex.flatMap { randomPoseHistoryIDs.indices.contains($0) ? randomPoseHistoryIDs[$0] : nil }
+        randomPoseHistoryIDs = randomPoseHistoryIDs.filter { cache.contains($0) }
+
+        if let currentPoseID, let currentIndex = randomPoseHistoryIDs.firstIndex(of: currentPoseID) {
+            currentRandomPoseIndex = currentIndex
+        } else {
+            currentRandomPoseIndex = randomPoseHistoryIDs.indices.last
+        }
+
+        committedRandomPoseIDs = committedRandomPoseIDs.filter { cache.contains($0.value) }
+    }
+
+    func removeEvictedReferences(_ removedIDs: Set<PoseID>) {
+        for (pageID, page) in generalPages {
+            guard page.poseIDs.contains(where: { removedIDs.contains($0) }) else { continue }
+            generalPages[pageID] = nil
+        }
+
+        for (pageID, page) in scrappedPages {
+            guard page.poseIDs.contains(where: { removedIDs.contains($0) }) else { continue }
+            scrappedPages[pageID] = nil
+        }
+
+        let currentPoseID = currentRandomPoseIndex.flatMap { randomPoseHistoryIDs.indices.contains($0) ? randomPoseHistoryIDs[$0] : nil }
+        randomPoseHistoryIDs = randomPoseHistoryIDs.filter { removedIDs.contains($0) == false }
+
+        if let currentPoseID, let currentIndex = randomPoseHistoryIDs.firstIndex(of: currentPoseID) {
+            currentRandomPoseIndex = currentIndex
+        } else {
+            currentRandomPoseIndex = randomPoseHistoryIDs.indices.last
+        }
+        committedRandomPoseIDs = committedRandomPoseIDs.filter { removedIDs.contains($0.value) == false }
     }
 
     func trimGeneralPagesIfNeeded() {
@@ -412,7 +452,7 @@ extension DefaultPoseRepository: PoseRepository {
         handled.reserveCapacity(items.count)
         poseIDs.reserveCapacity(items.count)
         items.forEach {
-            let pose = cacheOrUpdate($0.toEntity(), preserved: true)
+            let pose = cacheOrUpdate($0.toEntity(), preserved: true, trimAfterInsert: false)
             handled.append(pose)
             poseIDs.append(pose.id)
         }
@@ -437,7 +477,7 @@ extension DefaultPoseRepository: PoseRepository {
         items.forEach {
             var pose = $0.toEntity()
             pose.isScrapped = true
-            updateCachedPose(pose)
+            cacheOrUpdate(pose, trimAfterInsert: false)
             handled.append(pose)
             poseIDs.append(pose.id)
         }

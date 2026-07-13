@@ -15,9 +15,96 @@ private struct Page {
     let hasNext: Bool
 }
 
+private struct PoseEntityCache {
+    private var posesByID: [PoseID: Pose] = [:]
+    private var poseIDsByPeopleCount: [PeopleCountOption: Set<PoseID>] = [:]
+    private var accessOrder: [PoseID] = []
+    private let maxCount: Int
+
+    var isEmpty: Bool { posesByID.isEmpty }
+
+    init(maxCount: Int) {
+        self.maxCount = max(1, maxCount)
+    }
+
+    mutating func value(for id: PoseID) -> Pose? {
+        guard let pose = posesByID[id] else { return nil }
+        markAccessed(id)
+        return pose
+    }
+
+    func ids(for peopleCount: PeopleCountOption) -> Set<PoseID> {
+        poseIDsByPeopleCount[peopleCount] ?? []
+    }
+
+    func contains(_ id: PoseID) -> Bool {
+        posesByID[id] != nil
+    }
+
+    mutating func values(for ids: [PoseID]) -> [Pose]? {
+        var poses: [Pose] = []
+        poses.reserveCapacity(ids.count)
+
+        for id in ids {
+            guard let pose = value(for: id) else { return nil }
+            poses.append(pose)
+        }
+
+        return poses
+    }
+
+    mutating func insertOrUpdate(_ pose: Pose, preservingScrap: Bool) -> Pose {
+        guard let cachedPose = posesByID[pose.id] else {
+            insert(pose)
+            return pose
+        }
+
+        var handled = pose
+        if preservingScrap { handled.isScrapped = cachedPose.isScrapped }
+        if cachedPose.peopleCountOption != handled.peopleCountOption {
+            removeID(handled.id, from: cachedPose.peopleCountOption)
+        }
+        insert(handled)
+        return handled
+    }
+
+    mutating func trim(protectedIDs: Set<PoseID>) -> Set<PoseID> {
+        var removedIDs = Set<PoseID>()
+
+        while posesByID.count > maxCount {
+            guard let removableID = accessOrder.first(where: { protectedIDs.contains($0) == false }) else { break }
+            remove(removableID)
+            removedIDs.insert(removableID)
+        }
+
+        return removedIDs
+    }
+
+    private mutating func insert(_ pose: Pose) {
+        posesByID[pose.id] = pose
+        poseIDsByPeopleCount[pose.peopleCountOption, default: []].insert(pose.id)
+        markAccessed(pose.id)
+    }
+
+    private mutating func remove(_ id: PoseID) {
+        guard let pose = posesByID.removeValue(forKey: id) else { return }
+        removeID(id, from: pose.peopleCountOption)
+        accessOrder.removeAll { $0 == id }
+    }
+
+    private mutating func removeID(_ id: PoseID, from peopleCount: PeopleCountOption) {
+        poseIDsByPeopleCount[peopleCount]?.remove(id)
+        if poseIDsByPeopleCount[peopleCount]?.isEmpty == true { poseIDsByPeopleCount[peopleCount] = nil }
+    }
+
+    private mutating func markAccessed(_ id: PoseID) {
+        accessOrder.removeAll { $0 == id }
+        accessOrder.append(id)
+    }
+}
+
 public final actor DefaultPoseRepository {
-    private var cache: [PoseID: Pose] = [:]
-    private var cachedPoseIDsByPeopleCount: [PeopleCountOption: Set<PoseID>] = [:]
+    private var cache = PoseEntityCache(maxCount: 300)
     private var generalPages: [PageID: Page] = [:]
     private var scrappedPages: [PageID: Page] = [:]
     private var activeRandomPosePeopleCount: PeopleCountOption = .solo
@@ -31,6 +118,8 @@ public final actor DefaultPoseRepository {
     private var scrapTasks: [PoseID: Task<Void, Error>] = [:]
     
     private let maxRetryCount: Int = 3
+    private let maxCachedPagesPerScope: Int = 5
+    private let maxRandomHistoryCount: Int = 50
     
     @Dependency(\.networkProvider) private var networkProvider
     
@@ -52,28 +141,17 @@ private extension DefaultPoseRepository {
     }
     
     func cachedPose(id: PoseID) -> Pose? {
-        cache[id]
+        cache.value(for: id)
     }
     
     /// 캐시 정책을 적용하여 데이터를 병합합니다.
     /// - Parameters:
     ///   - newPose: 네트워크에서 가져온 새 포즈 데이터
     ///   - preserved: `true`일 경우 로컬의 상태(스크랩 여부 등)를 유지하고, `false`일 경우 새 데이터로 덮어씁니다.
-    func cacheOrUpdate(_ newPose: Pose, preserved: Bool = false) -> Pose {
-        guard let cachedPose = cache[newPose.id] else {
-            updateCachedPose(newPose)
-            return newPose
-        }
-        
-        guard preserved else {
-            updateCachedPose(newPose, replacing: cachedPose)
-            return newPose
-        }
-        
-        var merged = newPose
-        merged.isScrapped = cachedPose.isScrapped
-        updateCachedPose(merged, replacing: cachedPose)
-        return merged
+    func cacheOrUpdate(_ newPose: Pose, preserved: Bool = false, trimAfterInsert: Bool = true) -> Pose {
+        let handled = cache.insertOrUpdate(newPose, preservingScrap: preserved)
+        if trimAfterInsert { trimPoseCacheIfNeeded() }
+        return handled
     }
     
     func startRandomPosePrefetchIfNeeded() {
@@ -90,13 +168,15 @@ private extension DefaultPoseRepository {
     }
 
     func appendRandomPoseToHistory(_ pose: Pose) -> Pose {
-        let handled = cacheOrUpdate(pose, preserved: true)
+        let handled = cacheOrUpdate(pose, preserved: true, trimAfterInsert: false)
 
         if let currentIndex = currentRandomPoseIndex,
            currentIndex < randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex) { randomPoseHistoryIDs.removeSubrange(randomPoseHistoryIDs.index(after: currentIndex)..<randomPoseHistoryIDs.endIndex) }
 
         randomPoseHistoryIDs.append(handled.id)
+        trimRandomPoseHistoryIfNeeded()
         currentRandomPoseIndex = randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex)
+        trimPoseCacheIfNeeded()
         return handled
     }
     
@@ -156,19 +236,23 @@ private extension DefaultPoseRepository {
             }
         } catch {
             Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
-            let cachedPoses = cache
-            guard cachedPoses.isEmpty == false else { throw error }
+            guard cache.isEmpty == false else { throw error }
             
-            let countMatchedIDs = cachedPoseIDsByPeopleCount[peopleCount] ?? []
-            let validCachedPoses = countMatchedIDs.lazy
-                .filter { excludedIDs.contains($0) == false }
-                .compactMap { cachedPoses[$0] }
+            let countMatchedIDs = cache.ids(for: peopleCount)
+            var validCachedPoses: [Pose] = []
+            validCachedPoses.reserveCapacity(countMatchedIDs.count)
+            countMatchedIDs.forEach {
+                guard excludedIDs.contains($0) == false,
+                      let pose = cache.value(for: $0)
+                else { return }
+                validCachedPoses.append(pose)
+            }
             
             if let randomFallbackPose = validCachedPoses.randomElement() {
                 return randomFallbackPose
             } else {
                 guard let fallbackID = countMatchedIDs.randomElement(),
-                      let fallback = cachedPoses[fallbackID]
+                      let fallback = cache.value(for: fallbackID)
                 else { throw error }
                 return fallback
             }
@@ -194,16 +278,115 @@ private extension DefaultPoseRepository {
         currentRandomPoseIndex = nil
     }
 
-    func updateCachedPose(_ pose: Pose, replacing oldPose: Pose? = nil) {
-        if let oldPose, oldPose.peopleCountOption != pose.peopleCountOption { removeCachedPoseID(pose.id, from: oldPose.peopleCountOption) }
-        cache[pose.id] = pose
-        cachedPoseIDsByPeopleCount[pose.peopleCountOption, default: []].insert(pose.id)
+    func updateCachedPose(_ pose: Pose) {
+        cache.insertOrUpdate(pose, preservingScrap: false)
+        trimPoseCacheIfNeeded()
     }
 
-    func removeCachedPoseID(_ poseID: PoseID, from peopleCount: PeopleCountOption?) {
-        guard let peopleCount else { return }
-        cachedPoseIDsByPeopleCount[peopleCount]?.remove(poseID)
-        if cachedPoseIDsByPeopleCount[peopleCount]?.isEmpty == true { cachedPoseIDsByPeopleCount[peopleCount] = nil }
+    func trimPoseCacheIfNeeded() {
+        removeStaleReferences()
+        let removedIDs = cache.trim(protectedIDs: protectedPoseIDs())
+        guard removedIDs.isEmpty == false else { return }
+        removeEvictedReferences(removedIDs)
+    }
+
+    func protectedPoseIDs() -> Set<PoseID> {
+        var protectedIDs = Set<PoseID>()
+        scrapTasks.keys.forEach { if cache.contains($0) { protectedIDs.insert($0) } }
+        randomPoseHistoryIDs.forEach { if cache.contains($0) { protectedIDs.insert($0) } }
+        committedRandomPoseIDs.values.forEach { if cache.contains($0) { protectedIDs.insert($0) } }
+        return protectedIDs
+    }
+
+    func removeStaleReferences() {
+        removePagesContainingMissingCachedPose()
+        removeStaleRandomPoseReferences()
+    }
+
+    func removePagesContainingMissingCachedPose() {
+        for (pageID, page) in generalPages {
+            guard page.poseIDs.contains(where: { cache.contains($0) == false }) else { continue }
+            generalPages[pageID] = nil
+        }
+
+        for (pageID, page) in scrappedPages {
+            guard page.poseIDs.contains(where: { cache.contains($0) == false }) else { continue }
+            scrappedPages[pageID] = nil
+        }
+    }
+
+    func removeStaleRandomPoseReferences() {
+        let currentPoseID = currentRandomPoseIndex.flatMap { randomPoseHistoryIDs.indices.contains($0) ? randomPoseHistoryIDs[$0] : nil }
+        randomPoseHistoryIDs = randomPoseHistoryIDs.filter { cache.contains($0) }
+
+        if let currentPoseID, let currentIndex = randomPoseHistoryIDs.firstIndex(of: currentPoseID) {
+            currentRandomPoseIndex = currentIndex
+        } else {
+            currentRandomPoseIndex = randomPoseHistoryIDs.indices.last
+        }
+
+        committedRandomPoseIDs = committedRandomPoseIDs.filter { cache.contains($0.value) }
+    }
+
+    func removeEvictedReferences(_ removedIDs: Set<PoseID>) {
+        for (pageID, page) in generalPages {
+            guard page.poseIDs.contains(where: { removedIDs.contains($0) }) else { continue }
+            generalPages[pageID] = nil
+        }
+
+        for (pageID, page) in scrappedPages {
+            guard page.poseIDs.contains(where: { removedIDs.contains($0) }) else { continue }
+            scrappedPages[pageID] = nil
+        }
+
+        let currentPoseID = currentRandomPoseIndex.flatMap { randomPoseHistoryIDs.indices.contains($0) ? randomPoseHistoryIDs[$0] : nil }
+        randomPoseHistoryIDs = randomPoseHistoryIDs.filter { removedIDs.contains($0) == false }
+
+        if let currentPoseID, let currentIndex = randomPoseHistoryIDs.firstIndex(of: currentPoseID) {
+            currentRandomPoseIndex = currentIndex
+        } else {
+            currentRandomPoseIndex = randomPoseHistoryIDs.indices.last
+        }
+        committedRandomPoseIDs = committedRandomPoseIDs.filter { removedIDs.contains($0.value) == false }
+    }
+
+    func trimGeneralPagesIfNeeded() {
+        guard generalPages.count > maxCachedPagesPerScope else { return }
+        let removablePageIDs = generalPages.keys.sorted().prefix(generalPages.count - maxCachedPagesPerScope)
+        removablePageIDs.forEach { generalPages[$0] = nil }
+        trimPoseCacheIfNeeded()
+    }
+
+    func trimScrappedPagesIfNeeded() {
+        guard scrappedPages.count > maxCachedPagesPerScope else { return }
+        let removablePageIDs = scrappedPages.keys.sorted().prefix(scrappedPages.count - maxCachedPagesPerScope)
+        removablePageIDs.forEach { scrappedPages[$0] = nil }
+        trimPoseCacheIfNeeded()
+    }
+
+    func trimRandomPoseHistoryIfNeeded() {
+        guard randomPoseHistoryIDs.count > maxRandomHistoryCount,
+              let currentIndex = currentRandomPoseIndex
+        else { return }
+
+        let overflowCount = randomPoseHistoryIDs.count - maxRandomHistoryCount
+        let removableCount = min(overflowCount, currentIndex)
+        guard removableCount > .zero else { return }
+        randomPoseHistoryIDs.removeFirst(removableCount)
+        currentRandomPoseIndex = currentIndex - removableCount
+        trimCommittedRandomPoseIDs()
+    }
+
+    func trimCommittedRandomPoseIDs() {
+        let minimumSequence = max(.zero, randomPoseCommitSequence - maxRandomHistoryCount)
+        committedRandomPoseIDs = committedRandomPoseIDs.filter { $0.key >= minimumSequence }
+    }
+
+    func cachedPageResponse(_ page: Page?) -> (poses: [Pose], hasNext: Bool)? {
+        guard let page,
+              let poses = cache.values(for: page.poseIDs)
+        else { return nil }
+        return (poses, page.hasNext)
     }
 
     func initializeRandomPoseHistory(peopleCount: PeopleCountOption) async throws -> Pose {
@@ -257,7 +440,7 @@ private extension DefaultPoseRepository {
 extension DefaultPoseRepository: PoseRepository {
     public func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
         if refresh { generalPages.removeAll() }
-        else if let cachedPage = generalPages[page] { return (cachedPage.poseIDs.compactMap { cache[$0] }, cachedPage.hasNext) }
+        else if let cachedResponse = cachedPageResponse(generalPages[page]) { return cachedResponse }
         
         let endpoint = PoseEndpoint.fetchPoseList(page: page, size: pageSize, peopleCount: nil, sortBy: nil)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
@@ -269,17 +452,18 @@ extension DefaultPoseRepository: PoseRepository {
         handled.reserveCapacity(items.count)
         poseIDs.reserveCapacity(items.count)
         items.forEach {
-            let pose = cacheOrUpdate($0.toEntity(), preserved: true)
+            let pose = cacheOrUpdate($0.toEntity(), preserved: true, trimAfterInsert: false)
             handled.append(pose)
             poseIDs.append(pose.id)
         }
         generalPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
+        trimGeneralPagesIfNeeded()
         return (handled, hasNext)
     }
     
     public func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
         if refresh { scrappedPages.removeAll() }
-        else if let cachedPage = scrappedPages[page] { return (cachedPage.poseIDs.compactMap { cache[$0] }, cachedPage.hasNext) }
+        else if let cachedResponse = cachedPageResponse(scrappedPages[page]) { return cachedResponse }
         
         let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: nil)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
@@ -293,11 +477,12 @@ extension DefaultPoseRepository: PoseRepository {
         items.forEach {
             var pose = $0.toEntity()
             pose.isScrapped = true
-            updateCachedPose(pose)
+            cacheOrUpdate(pose, trimAfterInsert: false)
             handled.append(pose)
             poseIDs.append(pose.id)
         }
         scrappedPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
+        trimScrappedPagesIfNeeded()
         return (handled, hasNext)
     }
     
@@ -310,7 +495,7 @@ extension DefaultPoseRepository: PoseRepository {
     }
     
     public func scrapPose(poseID: PoseID) async throws {
-        guard var pose = cache[poseID] else { return }
+        guard var pose = cachedPose(id: poseID) else { return }
         scrapTasks[pose.id]?.cancel()
         
         let originalState = pose.isScrapped
@@ -329,7 +514,7 @@ extension DefaultPoseRepository: PoseRepository {
             } catch {
                 if error is CancellationError { return }
                 scrapTasks[pose.id] = nil
-                if var rolledBack = cache[poseID] {
+                if var rolledBack = cachedPose(id: poseID) {
                     rolledBack.isScrapped = originalState
                     updateCachedPose(rolledBack)
                 }
@@ -410,6 +595,7 @@ extension DefaultPoseRepository: PoseRepository {
             let handled = appendRandomPoseToHistory(uniquePose)
             committedRandomPoseIDs[nextSequence] = handled.id
             randomPoseCommitSequence = nextSequence
+            trimCommittedRandomPoseIDs()
             startRandomPosePrefetchIfNeeded()
 
             guard nextSequence != sequence else { return handled }

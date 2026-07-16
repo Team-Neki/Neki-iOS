@@ -8,7 +8,7 @@
 import SwiftUI
 import CoreGraphics
 
-fileprivate enum MarkerLayout {
+private enum MarkerLayout {
     static let normalBgRadius: CGFloat = 16.2
     static let normalImageSize: CGFloat = 50.0
     static let normalImageRadius: CGFloat = 15.0
@@ -35,14 +35,14 @@ fileprivate enum MarkerLayout {
     static let gradientColors: [UIColor] = [.darkGray, .black]
 }
 
-struct MarkerImageRenderer {
+enum MarkerImageRenderer {
     static func render(
         brandImage: UIImage?,
         isSelected: Bool,
         isFavorite: Bool,
         displayScale: CGFloat
     ) -> UIImage {
-        let displayScale = max(displayScale, 1)
+        let displayScale = displayScale.isFinite && displayScale > .zero ? displayScale : 1
         let imageSize = isSelected ? MarkerLayout.selectedImageSize : MarkerLayout.normalImageSize
         let padding = isSelected ? MarkerLayout.selectedPadding : MarkerLayout.normalPadding
         let imageRadius = isSelected ? MarkerLayout.selectedImageRadius : MarkerLayout.normalImageRadius
@@ -153,11 +153,11 @@ struct MarkerImageRenderer {
             cgContext.clip()
             
             if let image = brandImage {
-                let sourceSize = pixelSize(of: image)
+                let sourceSize = orientedPixelSize(of: image)
+                let physicalPixel = 1 / displayScale
                 let drawRect = aspectFillRect(
                     sourceSize: sourceSize,
-                    targetRect: imageRect,
-                    scale: displayScale
+                    targetRect: imageRect.insetBy(dx: -physicalPixel, dy: -physicalPixel)
                 )
                 image.draw(in: drawRect)
             } else {
@@ -180,11 +180,10 @@ struct MarkerImageRenderer {
     }
 }
 
-
 // MARK: - MarkerImageRenderer + Image Geometry
 
 private extension MarkerImageRenderer {
-    static func pixelSize(of image: UIImage) -> CGSize {
+    static func orientedPixelSize(of image: UIImage) -> CGSize {
         guard let cgImage = image.cgImage else {
             return CGSize(
                 width: image.size.width * image.scale,
@@ -202,20 +201,17 @@ private extension MarkerImageRenderer {
 
     static func aspectFillRect(
         sourceSize: CGSize,
-        targetRect: CGRect,
-        scale: CGFloat
+        targetRect: CGRect
     ) -> CGRect {
         guard sourceSize.width > .zero, sourceSize.height > .zero else { return targetRect }
-        let bleed = 1 / scale
-        let fillRect = targetRect.insetBy(dx: -bleed, dy: -bleed)
-        let aspectRatio = max(fillRect.width / sourceSize.width, fillRect.height / sourceSize.height)
+        let aspectRatio = max(targetRect.width / sourceSize.width, targetRect.height / sourceSize.height)
         let drawnSize = CGSize(
             width: sourceSize.width * aspectRatio,
             height: sourceSize.height * aspectRatio
         )
         return CGRect(
-            x: fillRect.midX - drawnSize.width / 2,
-            y: fillRect.midY - drawnSize.height / 2,
+            x: targetRect.midX - drawnSize.width / 2,
+            y: targetRect.midY - drawnSize.height / 2,
             width: drawnSize.width,
             height: drawnSize.height
         )

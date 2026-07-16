@@ -39,11 +39,13 @@ fileprivate enum Constants {
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
+    @Environment(\.displayScale) private var displayScale
+
     @Bindable var store: StoreOf<MapFeature>
     let isLocationAuthorized: Bool
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
+        Coordinator(parent: self, displayScale: displayScale)
     }
     
     func makeUIView(context: Context) -> NMFNaverMapView {
@@ -151,6 +153,7 @@ extension NaverMapRepresentable {
         var isMapLoaded: Bool = false
         
         let parent: NaverMapRepresentable
+        private let displayScale: CGFloat
         private var lastFavoriteMarkerViewportUpdateTime: TimeInterval = .zero
         
         private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
@@ -161,19 +164,39 @@ extension NaverMapRepresentable {
         }()
         private let defaultBrandImage: UIImage = UIImage(resource: .imgDefaultBrandOriginal)
         private lazy var defaultNormalOverlay: NMFOverlayImage = {
-            let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: false, isFavorite: false)
+            let image = MarkerImageRenderer.render(
+                brandImage: defaultBrandImage,
+                isSelected: false,
+                isFavorite: false,
+                displayScale: displayScale
+            )
             return NMFOverlayImage(image: image)
         }()
         private lazy var defaultSelectedOverlay: NMFOverlayImage = {
-            let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: true, isFavorite: false)
+            let image = MarkerImageRenderer.render(
+                brandImage: defaultBrandImage,
+                isSelected: true,
+                isFavorite: false,
+                displayScale: displayScale
+            )
             return NMFOverlayImage(image: image)
         }()
         private lazy var defaultFavoriteNormalOverlay: NMFOverlayImage = {
-            let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: false, isFavorite: true)
+            let image = MarkerImageRenderer.render(
+                brandImage: defaultBrandImage,
+                isSelected: false,
+                isFavorite: true,
+                displayScale: displayScale
+            )
             return NMFOverlayImage(image: image)
         }()
         private lazy var defaultFavoriteSelectedOverlay: NMFOverlayImage = {
-            let image = MarkerImageRenderer.render(brandImage: defaultBrandImage, isSelected: true, isFavorite: true)
+            let image = MarkerImageRenderer.render(
+                brandImage: defaultBrandImage,
+                isSelected: true,
+                isFavorite: true,
+                displayScale: displayScale
+            )
             return NMFOverlayImage(image: image)
         }()
         private var currentKeyByID: [BoothID: BoothClusteringKey] = [:]
@@ -183,7 +206,10 @@ extension NaverMapRepresentable {
         private var clusterer: NMCClusterer<BoothClusteringKey>?
         private let leafUpdater = BoothLeafMarkerUpdater()
         
-        init(parent: NaverMapRepresentable) { self.parent = parent }
+        init(parent: NaverMapRepresentable, displayScale: CGFloat) {
+            self.parent = parent
+            self.displayScale = displayScale
+        }
         
         private func setupClusterer(mapView: NMFMapView) {
             let builder = NMCComplexBuilder<BoothClusteringKey>()
@@ -234,10 +260,16 @@ extension NaverMapRepresentable {
                 do {
                     let result = try await KingfisherManager.shared.retrieveImage(with: resource)
                     guard Task.isCancelled == false else { return }
+                    let displayScale = self.displayScale
                     
                     let renderedOverlay: NMFOverlayImage? = await Task.detached(priority: .userInitiated) {
                         guard Task.isCancelled == false else { return nil }
-                        let finalImage = MarkerImageRenderer.render(brandImage: result.image, isSelected: isSelected, isFavorite: booth.isFavorite)
+                        let finalImage = MarkerImageRenderer.render(
+                            brandImage: result.image,
+                            isSelected: isSelected,
+                            isFavorite: booth.isFavorite,
+                            displayScale: displayScale
+                        )
                         return NMFOverlayImage(image: finalImage)
                     }.value
                     

@@ -9,18 +9,21 @@ import Foundation
 import os
 
 struct MonomansionStrategy: QRCodeParsingStrategy {
+    private let session: URLSessionProtocol
+
     var strategyType: ParsingStrategyType { .htmlCrawling }
-    
-    func canHandle(host: String) -> Bool { QRCodeBrand.monoMansion.hostKeywords.contains { host.lowercased().contains($0.lowercased()) } }
-    
-    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
+    var supportedHosts: [String] { ["qr.mono-mansion.com"] }
+
+    init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("모노맨션 파싱 시도: \(url.absoluteString)")
         
         let request = URLRequest(url: url)
         let htmlData: Data
         
         do {
-            (htmlData, _) = try await URLSession.shared.data(for: request)
+            (htmlData, _) = try await session.data(for: request, delegate: nil)
         } catch {
             Logger.network.error("모노맨션 HTML 요청 실패: \(error.localizedDescription)")
             if let urlError = error as? URLError,
@@ -57,7 +60,7 @@ struct MonomansionStrategy: QRCodeParsingStrategy {
         }
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: imageURL)
+            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse,
                (200..<300).contains(httpResponse.statusCode) == false {

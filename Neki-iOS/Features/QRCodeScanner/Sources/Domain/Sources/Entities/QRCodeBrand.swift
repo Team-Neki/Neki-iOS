@@ -7,9 +7,6 @@
 
 import Foundation
 
-
-// MARK: - PhotoBoothBrand + URLHosts
-
 public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case life4cut
     case photoism
@@ -19,19 +16,6 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case planBStudio
     case harufilm
     case auraPic
-    
-    var hostKeywords: [String] {
-        switch self {
-        case .life4cut: ["life4cut.net", "api.life4cut.net", "life-4cut.net"]
-        case .photoism: ["seobuk.kr"]
-        case .photogray: ["aprd.io", "pgshort.aprd.io"]
-        case .photosignature: ["photoqr3.kr", "photosignature-viewer.web.app"]
-        case .monoMansion: ["qr.mono-mansion.com"]
-        case .planBStudio: []
-        case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"]
-        case .auraPic: ["pos.aurapic.co.kr", "aurapic.co.kr"]
-        }
-    }
     
     public var description: String {
         switch self {

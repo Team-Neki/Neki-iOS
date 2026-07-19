@@ -9,11 +9,14 @@ import Foundation
 import os
 
 struct HaruFilmStrategy: QRCodeParsingStrategy {
+    private let session: URLSessionProtocol
+
     var strategyType: ParsingStrategyType { .native }
-    
-    func canHandle(host: String) -> Bool { QRCodeBrand.harufilm.hostKeywords.contains { host.contains($0) } }
-    
-    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
+    var supportedHosts: [String] { ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"] }
+
+    init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("하루필름 파싱 시도: \(url.absoluteString)")
         
         guard let host = url.host() else {
@@ -35,7 +38,7 @@ struct HaruFilmStrategy: QRCodeParsingStrategy {
         }
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: imageURL)
+            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse,
                !(200..<300).contains(httpResponse.statusCode) {

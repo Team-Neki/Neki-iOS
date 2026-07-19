@@ -9,11 +9,14 @@ import Foundation
 import os
 
 struct PhotograyStrategy: QRCodeParsingStrategy {
+    private let session: URLSessionProtocol
+
     var strategyType: ParsingStrategyType { .htmlCrawling }
-    
-    func canHandle(host: String) -> Bool { QRCodeBrand.photogray.hostKeywords.contains { host.contains($0) } }
-    
-    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
+    var supportedHosts: [String] { ["aprd.io"] }
+
+    init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토그레이 파싱 시도: \(url.absoluteString)")
         
         let request = URLRequest(url: url)
@@ -21,7 +24,7 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
         // 1. 리다이렉트 URL 획득 시도
         let response: URLResponse
         do {
-            (_, response) = try await URLSession.shared.data(for: request)
+            (_, response) = try await session.data(for: request, delegate: nil)
         } catch {
             Logger.network.error("초기 네트워크 접속 실패: \(error.localizedDescription)")
             if let urlError = error as? URLError, [.notConnectedToInternet, .networkConnectionLost].contains(urlError.code) {
@@ -65,7 +68,7 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
         
         // 5. 다운로드
         do {
-            let (imageData, imageResponse) = try await URLSession.shared.data(from: imageURL)
+            let (imageData, imageResponse) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
             
             if let httpResponse = imageResponse as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.network.warning("이미지 리소스 접근 실패(만료됨). 웹뷰 폴백.")

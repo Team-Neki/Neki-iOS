@@ -12,9 +12,10 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
     private let session: URLSessionProtocol
 
     var strategyType: ParsingStrategyType { .htmlCrawling }
-    var supportedHosts: [String] { ["aprd.io"] }
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.photogray.hostKeywords.contains { host.contains($0) } }
 
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토그레이 파싱 시도: \(url.absoluteString)")

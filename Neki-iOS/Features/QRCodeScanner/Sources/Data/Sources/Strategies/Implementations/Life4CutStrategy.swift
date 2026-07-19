@@ -12,9 +12,10 @@ struct Life4CutStrategy: QRCodeParsingStrategy {
     private let session: URLSessionProtocol
 
     var strategyType: ParsingStrategyType { .htmlCrawling }
-    var supportedHosts: [String] { ["life4cut.net", "life-4cut.net"] }
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.life4cut.hostKeywords.contains { host.lowercased().contains($0.lowercased()) } }
 
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("인생네컷 파싱 시도: \(url.absoluteString)")

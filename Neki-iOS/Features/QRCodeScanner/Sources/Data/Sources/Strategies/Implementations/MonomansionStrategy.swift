@@ -12,9 +12,10 @@ struct MonomansionStrategy: QRCodeParsingStrategy {
     private let session: URLSessionProtocol
 
     var strategyType: ParsingStrategyType { .htmlCrawling }
-    var supportedHosts: [String] { ["qr.mono-mansion.com"] }
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.monoMansion.hostKeywords.contains { host.lowercased().contains($0.lowercased()) } }
 
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("모노맨션 파싱 시도: \(url.absoluteString)")

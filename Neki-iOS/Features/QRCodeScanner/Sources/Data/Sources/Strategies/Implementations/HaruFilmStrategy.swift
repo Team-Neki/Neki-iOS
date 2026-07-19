@@ -12,9 +12,10 @@ struct HaruFilmStrategy: QRCodeParsingStrategy {
     private let session: URLSessionProtocol
 
     var strategyType: ParsingStrategyType { .native }
-    var supportedHosts: [String] { ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"] }
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.harufilm.hostKeywords.contains { host.contains($0) } }
 
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("하루필름 파싱 시도: \(url.absoluteString)")

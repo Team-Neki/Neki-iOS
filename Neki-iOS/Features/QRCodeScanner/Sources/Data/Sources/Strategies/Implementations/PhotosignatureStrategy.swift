@@ -12,9 +12,10 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
     private let session: URLSessionProtocol
 
     var strategyType: ParsingStrategyType { .native }
-    var supportedHosts: [String] { ["photoqr3.kr", "photosignature-viewer.web.app"] }
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.photosignature.hostKeywords.contains { host.contains($0) } }
 
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토시그니처 파싱 시도: \(url.absoluteString)")

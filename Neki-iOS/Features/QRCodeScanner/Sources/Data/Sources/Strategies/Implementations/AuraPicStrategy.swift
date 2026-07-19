@@ -19,9 +19,10 @@ struct AuraPicStrategy: QRCodeParsingStrategy {
     private let session: URLSessionProtocol
 
     var strategyType: ParsingStrategyType { .native }
-    var supportedHosts: [String] { ["aurapic.co.kr"] }
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.auraPic.hostKeywords.contains { host.lowercased().contains($0.lowercased()) } }
 
     func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("아우라픽 파싱 시도: \(url.absoluteString)")

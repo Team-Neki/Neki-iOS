@@ -8,7 +8,7 @@
 import Foundation
 
 
-// MARK: - PhotoBoothBrand + URLHosts
+// MARK: - QRCodeBrand + URL Hosts
 
 public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case life4cut
@@ -18,7 +18,8 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case monoMansion
     case planBStudio
     case harufilm
-    
+    case auraPic
+
     var hostKeywords: [String] {
         switch self {
         case .life4cut: ["life4cut.net", "api.life4cut.net", "life-4cut.net"]
@@ -28,6 +29,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .monoMansion: ["qr.mono-mansion.com"]
         case .planBStudio: []
         case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"]
+        case .auraPic: ["pos.aurapic.co.kr", "aurapic.co.kr"]
         }
     }
     
@@ -40,6 +42,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .monoMansion: return "모노맨션"
         case .planBStudio: return "플랜비스튜디오"
         case .harufilm: return "하루필름"
+        case .auraPic: return "아우라픽"
         }
     }
 }

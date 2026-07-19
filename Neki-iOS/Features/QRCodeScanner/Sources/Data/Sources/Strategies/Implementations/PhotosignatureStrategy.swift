@@ -9,11 +9,15 @@ import Foundation
 import os
 
 struct PhotoSignatureStrategy: QRCodeParsingStrategy {
+    private let session: URLSessionProtocol
+
     var strategyType: ParsingStrategyType { .native }
-    
+
+    init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
     func canHandle(host: String) -> Bool { QRCodeBrand.photosignature.hostKeywords.contains { host.contains($0) } }
-    
-    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
+
+    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("포토시그니처 파싱 시도: \(url.absoluteString)")
         
         if url.host() == "photosignature-viewer.web.app" {
@@ -36,7 +40,7 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
         }
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: imageURL)
+            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.domain.notice("이미지 다운로드 에러. 웹뷰 폴백.")
@@ -67,7 +71,7 @@ private extension PhotoSignatureStrategy {
         }
         
         do {
-            let (data, response) = try await URLSession.shared.data(from: imageURL)
+            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse,
                (200..<300).contains(httpResponse.statusCode) == false {

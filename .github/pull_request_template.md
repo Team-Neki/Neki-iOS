@@ -33,3 +33,7 @@
 
 ## 📟 관련 이슈
 - Resolved: #이슈번호
+
+
+---
+@coderabbitai pause

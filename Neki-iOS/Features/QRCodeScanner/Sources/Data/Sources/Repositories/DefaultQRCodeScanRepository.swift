@@ -11,6 +11,7 @@ import os
 
 struct DefaultQRCodeScanRepository: QRCodeScanRepository {
     private let strategies: [QRCodeParsingStrategy] = [
+        AuraPicStrategy(),
         HaruFilmStrategy(),
         PhotograyStrategy(),
         PhotoSignatureStrategy(),

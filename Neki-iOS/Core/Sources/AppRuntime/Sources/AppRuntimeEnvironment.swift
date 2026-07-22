@@ -14,6 +14,10 @@ public enum AppRuntimeDistributionChannel: String, Sendable {
 }
 
 public enum AppRuntimeEnvironment {
+    private enum InfoKey {
+        static let runtimeEnvironment = "NEKI_RUNTIME_ENVIRONMENT"
+    }
+
     public static var distributionChannel: AppRuntimeDistributionChannel {
         #if DEBUG
         return .debug
@@ -27,7 +31,8 @@ public enum AppRuntimeEnvironment {
         #if DEBUG
         return true
         #else
-        return distributionChannel == .testFlight || Bundle.main.bundleIdentifier?.contains("Neki-dev") == true
+        let runtimeEnvironment = Bundle.main.object(forInfoDictionaryKey: InfoKey.runtimeEnvironment) as? String
+        return distributionChannel == .testFlight || runtimeEnvironment == "development"
         #endif
     }
 

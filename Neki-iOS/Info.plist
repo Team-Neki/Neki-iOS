@@ -2,12 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>FirebaseAppDelegateProxyEnabled</key>
-	<false/>
-	<key>CFBundleIdentifier</key>
-	<string></string>
-	<key>QR_WEBHOOK_URL</key>
-	<string>$(QR_WEBHOOK_URL)</string>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
 	<key>CFBundleURLTypes</key>
@@ -31,6 +25,8 @@
 			</array>
 		</dict>
 	</array>
+	<key>FirebaseAppDelegateProxyEnabled</key>
+	<false/>
 	<key>KAKAO_LOGIN_NATIVE_APP_KEY</key>
 	<string>$(KAKAO_LOGIN_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>
@@ -43,12 +39,6 @@
 	</array>
 	<key>NMFNcpKeyId</key>
 	<string>$(NAVER_MAPS_CLIENT_ID)</string>
-	<key>NSCameraUsageDescription</key>
-	<string>$(CAMERA_USAGE_DESCRIPTION)</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>$(LOCATION_USAGE_DESCRIPTION)</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>$(PHOTO_LIBRARY_USAGE_DESCRIPTION)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>
@@ -69,6 +59,8 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>QR_WEBHOOK_URL</key>
+	<string>$(QR_WEBHOOK_URL)</string>
 	<key>TEMPORARY_ACCESS_TOKEN</key>
 	<string>$(TEMPORARY_ACCESS_TOKEN)</string>
 	<key>UIAppFonts</key>

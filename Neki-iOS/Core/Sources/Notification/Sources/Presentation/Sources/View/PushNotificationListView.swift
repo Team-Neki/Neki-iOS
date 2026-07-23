@@ -53,20 +53,14 @@ private extension PushNotificationListView {
 
     var notificationList: some View {
         ScrollView {
-            TimelineView(
-                PushNotificationSentTimeTimelineSchedule(
-                    sentTimes: store.notifications.compactMap(\.sentTime)
-                )
-            ) { context in
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("새로운 알림")
-                        .nekiFont(.body16SemiBold)
-                        .foregroundStyle(.gray600)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("새로운 알림")
+                    .nekiFont(.body16SemiBold)
+                    .foregroundStyle(.gray600)
 
-                    LazyVStack(spacing: 32) {
-                        ForEach(store.notifications) { notification in
-                            notificationCell(notification, relativeTo: context.date)
-                        }
+                LazyVStack(spacing: 32) {
+                    ForEach(store.notifications) { notification in
+                        notificationCell(notification)
                     }
                 }
             }
@@ -75,7 +69,7 @@ private extension PushNotificationListView {
         }
     }
 
-    func notificationCell(_ notification: PushNotificationListItem, relativeTo referenceDate: Date) -> some View {
+    func notificationCell(_ notification: PushNotificationListItem) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 12) {
                 Text(notification.title)
@@ -84,11 +78,7 @@ private extension PushNotificationListView {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let sentTime = notification.sentTime {
-                    Text(sentTime.relativeValue(to: referenceDate).displayText)
-                        .nekiFont(.caption12Medium)
-                        .foregroundStyle(.gray300)
-                        .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false)
+                    PushNotificationSentTimeLabel(sentTime: sentTime)
                 }
             }
 
@@ -99,6 +89,20 @@ private extension PushNotificationListView {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.white)
+    }
+}
+
+private struct PushNotificationSentTimeLabel: View {
+    let sentTime: PushNotificationSentTime
+
+    var body: some View {
+        TimelineView(PushNotificationSentTimeTimelineSchedule(sentTime: sentTime)) { context in
+            Text(sentTime.relativeValue(to: context.date).displayText)
+                .nekiFont(.caption12Medium)
+                .foregroundStyle(.gray300)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+        }
     }
 }
 

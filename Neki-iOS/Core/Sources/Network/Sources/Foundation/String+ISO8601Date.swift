@@ -13,7 +13,7 @@ extension String {
             return date
         }
 
-        if let date = ISO8601DateFormatters.fractionalWithoutTimeZone.date(from: self) {
+        if let date = ISO8601DateFormatters.fractionalWithoutTimeZoneInKST.date(from: self) {
             return date
         }
 
@@ -21,7 +21,7 @@ extension String {
             return date
         }
 
-        return ISO8601DateFormatters.defaultWithoutTimeZone.date(from: self)
+        return ISO8601DateFormatters.defaultWithoutTimeZoneInKST.date(from: self)
     }
 }
 
@@ -32,13 +32,14 @@ private enum ISO8601DateFormatters {
         return formatter
     }()
 
-    static let fractionalWithoutTimeZone: ISO8601DateFormatter = {
+    static let fractionalWithoutTimeZoneInKST: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [
             .withYear, .withMonth, .withDay,
             .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime,
             .withFractionalSeconds
         ]
+        formatter.timeZone = TimeZone(identifier: "Asia/Seoul")
         return formatter
     }()
 
@@ -48,12 +49,13 @@ private enum ISO8601DateFormatters {
         return formatter
     }()
 
-    static let defaultWithoutTimeZone: ISO8601DateFormatter = {
+    static let defaultWithoutTimeZoneInKST: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [
             .withYear, .withMonth, .withDay,
             .withTime, .withDashSeparatorInDate, .withColonSeparatorInTime
         ]
+        formatter.timeZone = TimeZone(identifier: "Asia/Seoul")
         return formatter
     }()
 }

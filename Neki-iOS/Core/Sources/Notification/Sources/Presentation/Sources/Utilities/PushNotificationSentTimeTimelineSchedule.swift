@@ -8,37 +8,16 @@
 import SwiftUI
 
 struct PushNotificationSentTimeTimelineSchedule: TimelineSchedule {
+    typealias Entries = UnfoldFirstSequence<Date>
+
     let sentTimes: [PushNotificationSentTime]
 
     func entries(from startDate: Date, mode _: TimelineScheduleMode) -> Entries {
-        Entries(sentTimes: sentTimes, currentDate: startDate)
-    }
-}
-
-extension PushNotificationSentTimeTimelineSchedule {
-    struct Entries: Sequence, IteratorProtocol {
-        let sentTimes: [PushNotificationSentTime]
-        var currentDate: Date
-        private var isInitialEntry = true
-
-        init(sentTimes: [PushNotificationSentTime], currentDate: Date) {
-            self.sentTimes = sentTimes
-            self.currentDate = currentDate
-        }
-
-        mutating func next() -> Date? {
-            guard isInitialEntry == false else {
-                isInitialEntry = false
-                return currentDate
-            }
-
-            guard let nextUpdateDate = sentTimes.lazy
-                .map({ $0.nextRelativeValueUpdateDate(after: currentDate) })
+        let sentTimes = sentTimes
+        sequence(first: startDate) { currentDate in
+            sentTimes.lazy
+                .map { $0.nextRelativeValueUpdateDate(after: currentDate) }
                 .min()
-            else { return nil }
-
-            currentDate = nextUpdateDate
-            return nextUpdateDate
         }
     }
 }

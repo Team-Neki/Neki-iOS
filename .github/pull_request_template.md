@@ -36,4 +36,4 @@
 
 
 ---
-@coderabbitai pause
+@coderabbitai ignore

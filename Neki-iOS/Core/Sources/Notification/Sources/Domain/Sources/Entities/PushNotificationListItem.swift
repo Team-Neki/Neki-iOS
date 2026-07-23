@@ -12,7 +12,7 @@ public struct PushNotificationListItem: Identifiable, Equatable, Sendable {
     public let type: String
     public let title: String
     public let body: String
-    public let receivedAt: Date?
+    public let sentTime: PushNotificationSentTime?
     public let link: String?
     public let isRead: Bool
 
@@ -21,7 +21,7 @@ public struct PushNotificationListItem: Identifiable, Equatable, Sendable {
         type: String,
         title: String,
         body: String,
-        receivedAt: Date? = nil,
+        sentAt: Date? = nil,
         link: String? = nil,
         isRead: Bool = false
     ) {
@@ -29,7 +29,7 @@ public struct PushNotificationListItem: Identifiable, Equatable, Sendable {
         self.type = type
         self.title = title
         self.body = body
-        self.receivedAt = receivedAt
+        self.sentTime = sentAt.map { PushNotificationSentTime(value: $0) }
         self.link = link
         self.isRead = isRead
     }

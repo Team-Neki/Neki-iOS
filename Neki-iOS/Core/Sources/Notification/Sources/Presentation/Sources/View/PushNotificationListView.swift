@@ -12,17 +12,14 @@ struct PushNotificationListView: View {
     let store: StoreOf<PushNotificationListFeature>
 
     var body: some View {
-        NavigationStack {
-            content
+        content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.gray25)
             .nekiToolbar {
-                NekiToolBar.close { store.send(.closeButtonTapped) }
+                NekiToolBar.back { store.send(.closeButtonTapped) }
             } center: {
                 NekiToolBar.textCenter("알림")
             }
-        }
-        .onAppear { store.send(.onAppear) }
+            .onAppear { store.send(.onAppear) }
     }
 }
 
@@ -56,21 +53,44 @@ private extension PushNotificationListView {
 
     var notificationList: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(store.notifications) { notification in
-                    notificationCell(notification)
+            TimelineView(
+                PushNotificationSentTimeTimelineSchedule(
+                    sentTimes: store.notifications.compactMap(\.sentTime)
+                )
+            ) { context in
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("새로운 알림")
+                        .nekiFont(.body16SemiBold)
+                        .foregroundStyle(.gray600)
+
+                    LazyVStack(spacing: 32) {
+                        ForEach(store.notifications) { notification in
+                            notificationCell(notification, relativeTo: context.date)
+                        }
+                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
         }
     }
 
-    func notificationCell(_ notification: PushNotificationListItem) -> some View {
+    func notificationCell(_ notification: PushNotificationListItem, relativeTo referenceDate: Date) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(notification.title)
-                .nekiFont(.body16SemiBold)
-                .foregroundStyle(.gray900)
+            HStack(alignment: .top, spacing: 12) {
+                Text(notification.title)
+                    .nekiFont(.body16SemiBold)
+                    .foregroundStyle(.gray800)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let sentTime = notification.sentTime {
+                    Text(sentTime.relativeValue(to: referenceDate).displayText)
+                        .nekiFont(.caption12Medium)
+                        .foregroundStyle(.gray300)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
 
             Text(notification.body)
                 .nekiFont(.body14Medium)
@@ -78,14 +98,12 @@ private extension PushNotificationListView {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
         .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 
 #Preview {
-    PushNotificationListView(
+    PushNotificationListCoordinatorView(
         store: Store(initialState: PushNotificationListFeature.State()) {
             PushNotificationListFeature()
         }

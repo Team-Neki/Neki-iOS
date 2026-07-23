@@ -21,7 +21,7 @@ struct PushNotificationDTO: Codable {
             type: type,
             title: title,
             body: body,
-            receivedAt: createdAt.toISO8601DateOrNil(),
+            sentAt: createdAt.toISO8601DateOrNil(),
             link: link
         )
     }

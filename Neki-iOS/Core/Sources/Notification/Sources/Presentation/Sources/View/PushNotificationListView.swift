@@ -14,7 +14,6 @@ struct PushNotificationListView: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.gray25)
             .nekiToolbar {
                 NekiToolBar.close { store.send(.closeButtonTapped) }
             } center: {
@@ -54,13 +53,19 @@ private extension PushNotificationListView {
 
     var notificationList: some View {
         ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(store.notifications) { notification in
-                    notificationCell(notification)
+            VStack(alignment: .leading, spacing: 16) {
+                Text("새로운 알림")
+                    .nekiFont(.body16SemiBold)
+                    .foregroundStyle(.gray600)
+
+                LazyVStack(spacing: 32) {
+                    ForEach(store.notifications) { notification in
+                        notificationCell(notification)
+                    }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 20)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
         }
     }
 
@@ -68,7 +73,7 @@ private extension PushNotificationListView {
         VStack(alignment: .leading, spacing: 6) {
             Text(notification.title)
                 .nekiFont(.body16SemiBold)
-                .foregroundStyle(.gray900)
+                .foregroundStyle(.gray800)
 
             Text(notification.body)
                 .nekiFont(.body14Medium)
@@ -76,9 +81,7 @@ private extension PushNotificationListView {
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
         .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
 

@@ -14,7 +14,7 @@ struct PushNotificationSentTimeTimelineSchedule: TimelineSchedule {
 
     func entries(from startDate: Date, mode _: TimelineScheduleMode) -> Entries {
         let sentTimes = sentTimes
-        sequence(first: startDate) { currentDate in
+        return sequence(first: startDate) { currentDate in
             sentTimes.lazy
                 .map { $0.nextRelativeValueUpdateDate(after: currentDate) }
                 .min()

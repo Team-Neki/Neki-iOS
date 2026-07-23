@@ -53,14 +53,20 @@ private extension PushNotificationListView {
 
     var notificationList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("새로운 알림")
-                    .nekiFont(.body16SemiBold)
-                    .foregroundStyle(.gray600)
+            TimelineView(
+                PushNotificationSentTimeTimelineSchedule(
+                    sentTimes: store.notifications.compactMap(\.sentTime)
+                )
+            ) { context in
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("새로운 알림")
+                        .nekiFont(.body16SemiBold)
+                        .foregroundStyle(.gray600)
 
-                LazyVStack(spacing: 32) {
-                    ForEach(store.notifications) { notification in
-                        notificationCell(notification)
+                    LazyVStack(spacing: 32) {
+                        ForEach(store.notifications) { notification in
+                            notificationCell(notification, relativeTo: context.date)
+                        }
                     }
                 }
             }
@@ -69,7 +75,7 @@ private extension PushNotificationListView {
         }
     }
 
-    func notificationCell(_ notification: PushNotificationListItem) -> some View {
+    func notificationCell(_ notification: PushNotificationListItem, relativeTo referenceDate: Date) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: 12) {
                 Text(notification.title)
@@ -78,7 +84,7 @@ private extension PushNotificationListView {
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 if let sentTime = notification.sentTime {
-                    Text(sentTime.relativeValue().displayText)
+                    Text(sentTime.relativeValue(to: referenceDate).displayText)
                         .nekiFont(.caption12Medium)
                         .foregroundStyle(.gray300)
                         .lineLimit(1)

@@ -40,4 +40,33 @@ public struct PushNotificationSentTime: Equatable, Sendable {
         guard elapsedTime >= TimeInterval.year else { return .months(Int(elapsedTime / TimeInterval.month)) }
         return .years(Int(elapsedTime / TimeInterval.year))
     }
+
+    public func nextRelativeValueUpdateDate(after referenceDate: Date) -> Date {
+        let elapsedTime = max(referenceDate.timeIntervalSince(value), .zero)
+
+        switch relativeValue(to: referenceDate) {
+        case .justNow:
+            return value.addingTimeInterval(TimeInterval.minute)
+        case .minutes:
+            return nextBoundaryDate(elapsedTime: elapsedTime, unit: TimeInterval.minute)
+        case .hours:
+            return nextBoundaryDate(elapsedTime: elapsedTime, unit: TimeInterval.hour)
+        case .days:
+            return nextBoundaryDate(elapsedTime: elapsedTime, unit: TimeInterval.day)
+        case .months:
+            return min(
+                nextBoundaryDate(elapsedTime: elapsedTime, unit: TimeInterval.month),
+                value.addingTimeInterval(TimeInterval.year)
+            )
+        case .years:
+            return nextBoundaryDate(elapsedTime: elapsedTime, unit: TimeInterval.year)
+        }
+    }
+}
+
+private extension PushNotificationSentTime {
+    func nextBoundaryDate(elapsedTime: Foundation.TimeInterval, unit: Foundation.TimeInterval) -> Date {
+        let completedUnits = floor(elapsedTime / unit)
+        return value.addingTimeInterval((completedUnits + 1) * unit)
+    }
 }

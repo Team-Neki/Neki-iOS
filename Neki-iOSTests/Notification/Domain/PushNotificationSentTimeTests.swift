@@ -24,6 +24,27 @@ struct PushNotificationSentTimeTests {
         #expect(makeSentTime(secondsAgo: 31_535_999, from: referenceDate).relativeValue(to: referenceDate) == .months(12))
         #expect(makeSentTime(secondsAgo: 31_536_000, from: referenceDate).relativeValue(to: referenceDate) == .years(1))
     }
+
+    @Test("현재 표시 단위가 변경되는 다음 경계 시각을 계산한다")
+    func nextRelativeValueUpdateDate_returnsNextDisplayBoundary() {
+        let sentDate = Date(timeIntervalSince1970: 100_000)
+
+        #expect(
+            PushNotificationSentTime(value: sentDate)
+                .nextRelativeValueUpdateDate(after: sentDate.addingTimeInterval(70))
+            == sentDate.addingTimeInterval(120)
+        )
+        #expect(
+            PushNotificationSentTime(value: sentDate)
+                .nextRelativeValueUpdateDate(after: sentDate.addingTimeInterval(3_700))
+            == sentDate.addingTimeInterval(7_200)
+        )
+        #expect(
+            PushNotificationSentTime(value: sentDate)
+                .nextRelativeValueUpdateDate(after: sentDate.addingTimeInterval(31_104_000))
+            == sentDate.addingTimeInterval(31_536_000)
+        )
+    }
 }
 
 private extension PushNotificationSentTimeTests {

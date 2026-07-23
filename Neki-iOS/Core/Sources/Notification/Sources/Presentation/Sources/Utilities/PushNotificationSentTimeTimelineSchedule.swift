@@ -21,6 +21,11 @@ extension PushNotificationSentTimeTimelineSchedule {
         var currentDate: Date
         private var isInitialEntry = true
 
+        init(sentTimes: [PushNotificationSentTime], currentDate: Date) {
+            self.sentTimes = sentTimes
+            self.currentDate = currentDate
+        }
+
         mutating func next() -> Date? {
             guard isInitialEntry == false else {
                 isInitialEntry = false

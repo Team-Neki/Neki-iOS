@@ -10,14 +10,11 @@ import SwiftUI
 struct PushNotificationSentTimeTimelineSchedule: TimelineSchedule {
     typealias Entries = UnfoldFirstSequence<Date>
 
-    let sentTimes: [PushNotificationSentTime]
+    let sentTime: PushNotificationSentTime
 
     func entries(from startDate: Date, mode _: TimelineScheduleMode) -> Entries {
-        let sentTimes = sentTimes
-        return sequence(first: startDate) { currentDate in
-            sentTimes.lazy
-                .map { $0.nextRelativeValueUpdateDate(after: currentDate) }
-                .min()
+        sequence(first: startDate) { [sentTime] currentDate in
+            sentTime.nextRelativeValueUpdateDate(after: currentDate)
         }
     }
 }

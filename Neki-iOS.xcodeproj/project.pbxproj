@@ -568,7 +568,7 @@
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Neki;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_NEKI_RUNTIME_ENVIRONMENT = production;
+				INFOPLIST_KEY_NEKI_RUNTIME_ENVIRONMENT = development;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";

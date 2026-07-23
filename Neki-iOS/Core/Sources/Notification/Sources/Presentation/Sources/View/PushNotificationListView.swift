@@ -71,9 +71,20 @@ private extension PushNotificationListView {
 
     func notificationCell(_ notification: PushNotificationListItem) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(notification.title)
-                .nekiFont(.body16SemiBold)
-                .foregroundStyle(.gray800)
+            HStack(alignment: .top, spacing: 12) {
+                Text(notification.title)
+                    .nekiFont(.body16SemiBold)
+                    .foregroundStyle(.gray800)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if let sentTime = notification.sentTime {
+                    Text(sentTime.relativeValue().displayText)
+                        .nekiFont(.caption12Medium)
+                        .foregroundStyle(.gray300)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+            }
 
             Text(notification.body)
                 .nekiFont(.body14Medium)

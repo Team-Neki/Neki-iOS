@@ -15,7 +15,7 @@ struct PushNotificationListView: View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .nekiToolbar {
-                NekiToolBar.close { store.send(.closeButtonTapped) }
+                NekiToolBar.back { store.send(.closeButtonTapped) }
             } center: {
                 NekiToolBar.textCenter("알림")
             }

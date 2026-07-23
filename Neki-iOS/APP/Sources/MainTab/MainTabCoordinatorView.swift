@@ -81,7 +81,7 @@ struct MainTabCoordinatorView: View {
             QRCodeScannerView(store: qrStore)
         }
         .fullScreenCover(item: $store.scope(state: \.destination?.notificationList, action: \.destination.notificationList)) { notificationStore in
-            PushNotificationListView(store: notificationStore)
+            PushNotificationListCoordinatorView(store: notificationStore)
         }
         .photosPicker(
             isPresented: $store.isPhotoPickerPresented.sending(\.setPhotosPickerPresented),

@@ -12,8 +12,7 @@ struct PushNotificationListView: View {
     let store: StoreOf<PushNotificationListFeature>
 
     var body: some View {
-        NavigationStack {
-            content
+        content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(.gray25)
             .nekiToolbar {
@@ -21,8 +20,7 @@ struct PushNotificationListView: View {
             } center: {
                 NekiToolBar.textCenter("알림")
             }
-        }
-        .onAppear { store.send(.onAppear) }
+            .onAppear { store.send(.onAppear) }
     }
 }
 
@@ -85,7 +83,7 @@ private extension PushNotificationListView {
 }
 
 #Preview {
-    PushNotificationListView(
+    PushNotificationListCoordinatorView(
         store: Store(initialState: PushNotificationListFeature.State()) {
             PushNotificationListFeature()
         }

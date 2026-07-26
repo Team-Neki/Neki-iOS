@@ -77,7 +77,7 @@ extension MyPageFeature {
     }
     
     enum SectionCellItem: String, Identifiable {
-        case deviceAuthorization = "권한 설정하기"
+        case deviceAuthorization = "권한 및 알림 설정하기"
         case support = "Neki에 문의하기"
         case termsOfService = "이용약관"
         case privacyPolicy = "개인정보 처리방침"

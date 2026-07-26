@@ -75,19 +75,15 @@ private extension PushNotificationListView {
                 Text(notification.title)
                     .nekiFont(.body16SemiBold)
                     .foregroundStyle(.gray800)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Text(notification.body)
                     .nekiFont(.body14Medium)
                     .foregroundStyle(.gray500)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .lineLimit(2)
+            .multilineTextAlignment(.leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             if let sentTime = notification.sentTime {
                 PushNotificationSentTimeLabel(sentTime: sentTime)

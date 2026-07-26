@@ -19,6 +19,7 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
             AuraPicStrategy(session: session),
             HaruFilmStrategy(session: session),
             PhotograyStrategy(session: session),
+            PhotoSignatureCodeStrategy(session: session),
             PhotoSignatureStrategy(session: session),
             Life4CutStrategy(session: session),
             MonomansionStrategy(session: session),

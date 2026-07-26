@@ -54,6 +54,10 @@ struct PhotoSignatureCodeStrategy: QRCodeParsingStrategy {
 }
 
 private extension PhotoSignatureCodeStrategy {
+    static let sessionIDAllowedCharacters = CharacterSet(
+        charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+    )
+
     func sessionID(from url: URL) -> String? {
         let pathComponents = url.pathComponents.filter { $0 != "/" }
 
@@ -61,6 +65,11 @@ private extension PhotoSignatureCodeStrategy {
               pathComponents[0].lowercased() == "v"
         else { return nil }
 
-        return pathComponents[1]
+        let candidate = pathComponents[1]
+        guard candidate.isEmpty == false,
+              candidate.unicodeScalars.allSatisfy({ Self.sessionIDAllowedCharacters.contains($0) })
+        else { return nil }
+
+        return candidate
     }
 }

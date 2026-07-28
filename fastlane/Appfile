@@ -1,4 +1,12 @@
-app_identifier(ENV['APP_IDENTIFIER']) # The bundle identifier of your app
+require File.expand_path(
+  "deployment_configuration",
+  FastlaneCore::FastlaneFolder.path
+)
 
-itc_team_id(ENV['FASTLANE_ITC_TEAM_ID']) # App Store Connect Team ID
-team_id(ENV['TEAM_ID']) # Developer Portal Team ID
+# 실행 시 선택한 배포 환경의 고정 식별자를 공통 설정에서 가져옵니다.
+configuration = DeploymentConfiguration.fetch(
+  ENV.fetch("DEPLOYMENT_TARGET", "production")
+)
+
+app_identifier(configuration.fetch(:app_identifier))
+team_id(DeploymentConfiguration::TEAM_ID)

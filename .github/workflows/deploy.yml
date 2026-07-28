@@ -269,14 +269,34 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           OPERATION: ${{ inputs.operation }}
           APP_VERSION: ${{ inputs.app_version }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
         run: |
-          if [ "${{ job.status }}" != "success" ]; then
-            STATUS="❌ [Neki-iOS] $OPERATION 실패"
+          if [ "$JOB_STATUS" = "success" ]; then
+            TITLE="✅ iOS Delivery 성공"
+            COLOR=5763719
           else
-            STATUS="✅ [Neki-iOS] $OPERATION 성공 (Version: $APP_VERSION)"
+            TITLE="❌ iOS Delivery 실패"
+            COLOR=15548997
           fi
 
-          PAYLOAD=$(jq -n --arg content "$STATUS (${{ github.repository }})" '{content: $content}')
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg operation "$OPERATION" \
+            --arg version "$APP_VERSION" \
+            --arg repository "$REPOSITORY" \
+            --argjson color "$COLOR" \
+            '{
+              embeds: [{
+                title: $title,
+                color: $color,
+                fields: [
+                  {name: "Operation", value: $operation, inline: true},
+                  {name: "Version", value: $version, inline: true},
+                  {name: "Repository", value: $repository, inline: false}
+                ]
+              }]
+            }')
           curl --fail-with-body --silent --show-error \
             -H "Content-Type: application/json" \
             -X POST \

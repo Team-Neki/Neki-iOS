@@ -1,0 +1,75 @@
+name: Activate App Version Policy
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 버전 정책을 적용할 서버 환경
+        required: true
+        type: choice
+        options:
+          - development
+          - production
+      app_version:
+        description: 서버에 반영할 버전(MAJOR.MINOR.PATCH)
+        required: true
+        type: string
+      update_policy:
+        description: 업데이트 정책
+        required: true
+        type: choice
+        options:
+          - recommended
+          - required
+      production_release_confirmed:
+        description: 상용 버전의 App Store 공개 확인
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version-policy-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    runs-on: macos-latest
+    timeout-minutes: 10
+    environment:
+      name: ${{ inputs.target }}
+
+    steps:
+      # 상용 사용자가 설치할 수 없는 버전을 강제로 요구하지 않도록 공개 여부를 명시적으로 확인합니다.
+      - name: Validate version policy request
+        env:
+          DEPLOYMENT_TARGET: ${{ inputs.target }}
+          APP_VERSION: ${{ inputs.app_version }}
+          PRODUCTION_RELEASE_CONFIRMED: ${{ inputs.production_release_confirmed }}
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+        run: |
+          if [[ ! "$APP_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::app_version must follow MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          if [[ "$DEPLOYMENT_TARGET" == "production" &&
+                "$PRODUCTION_RELEASE_CONFIRMED" != "true" ]]; then
+            echo "::error::Confirm that the production version is available on the App Store"
+            exit 1
+          fi
+
+          if [ -z "$APP_VERSION_API_ADDRESS" ]; then
+            echo "::error::Missing required GitHub Actions secret: APP_VERSION_API_ADDRESS"
+            exit 1
+          fi
+
+      # 기존 최소 버전을 조회한 뒤 정책에 맞게 갱신하고 재조회 결과까지 검증합니다.
+      - name: Update and verify version policy
+        env:
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+          APP_VERSION: ${{ inputs.app_version }}
+          UPDATE_POLICY: ${{ inputs.update_policy }}
+        run: scripts/ci/update_app_version.sh

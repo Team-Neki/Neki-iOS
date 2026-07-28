@@ -1,41 +1,32 @@
-name: iOS Deployment
+name: iOS Delivery
 
 on:
   workflow_dispatch:
     inputs:
-      target:
-        description: 배포할 앱 환경
+      operation:
+        description: 실행할 작업
         required: true
         type: choice
         options:
-          - development
-          - production
-      marketing_version:
-        description: 배포 버전(MAJOR.MINOR.PATCH)
+          - VALIDATE_STAGING
+          - VALIDATE_PRODUCTION
+          - STAGING
+          - STAGING_RECOMMENDED
+          - STAGING_REQUIRED
+          - PRODUCTION_TESTFLIGHT
+          - PRODUCTION_REVIEW
+          - PRODUCTION_ACTIVATE_RECOMMENDED
+          - PRODUCTION_ACTIVATE_REQUIRED
+      app_version:
+        description: 대상 앱 버전(MAJOR.MINOR.PATCH)
         required: true
         type: string
-      destination:
-        description: 배포 목적
-        required: true
-        type: choice
-        options:
-          - testflight
-          - app_store_review
-      update_policy:
-        description: 개발 서버 업데이트 정책(production은 none만 허용)
-        required: true
-        default: none
-        type: choice
-        options:
-          - none
-          - recommended
-          - required
       release_notes:
-        description: TestFlight 테스트 내용 또는 App Store 업데이트 내용
+        description: 배포 작업의 TestFlight 또는 App Store 변경사항
         required: false
         type: string
-      validation_only:
-        description: Archive와 업로드 없이 CI/CD 설정만 검증
+      production_release_confirmed:
+        description: 상용 버전의 App Store 공개 확인
         required: true
         default: false
         type: boolean
@@ -44,111 +35,167 @@ permissions:
   contents: read
 
 concurrency:
-  group: deploy-${{ inputs.target }}
+  group: ios-delivery
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    runs-on: macos-latest
+  delivery:
+    runs-on: ${{ startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') && 'ubuntu-latest' || 'macos-latest' }}
     timeout-minutes: 90
     environment:
-      name: ${{ inputs.target }}
+      name: ${{ contains(inputs.operation, 'STAGING') && 'development' || 'production' }}
 
     steps:
-      # 선택한 버전과 배포 정책 조합이 실제 배포 전에 유효한지 확인합니다.
-      - name: Validate deployment request
+      # 하나의 작업명으로 배포 환경, 목적지와 업데이트 정책을 결정합니다.
+      - name: Resolve delivery operation
         env:
-          DEPLOYMENT_TARGET: ${{ inputs.target }}
-          MARKETING_VERSION: ${{ inputs.marketing_version }}
-          DISTRIBUTION_DESTINATION: ${{ inputs.destination }}
-          UPDATE_POLICY: ${{ inputs.update_policy }}
+          OPERATION: ${{ inputs.operation }}
+          APP_VERSION: ${{ inputs.app_version }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
-          VALIDATION_ONLY: ${{ inputs.validation_only }}
+          PRODUCTION_RELEASE_CONFIRMED: ${{ inputs.production_release_confirmed }}
           BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
           FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
           MATCH_GITHUB_APP_ID: ${{ vars.MATCH_GITHUB_APP_ID }}
           MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
         run: |
-          if [[ ! "$MARKETING_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo "::error::marketing_version must follow MAJOR.MINOR.PATCH"
+          case "$OPERATION" in
+            VALIDATE_STAGING)
+              DELIVERY_MODE="validate"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            VALIDATE_PRODUCTION)
+              DELIVERY_MODE="validate"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            STAGING)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            STAGING_RECOMMENDED)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="recommended"
+              ;;
+            STAGING_REQUIRED)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="required"
+              ;;
+            PRODUCTION_TESTFLIGHT)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            PRODUCTION_REVIEW)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="app_store_review"
+              UPDATE_POLICY="none"
+              ;;
+            PRODUCTION_ACTIVATE_RECOMMENDED)
+              DELIVERY_MODE="activate"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="none"
+              UPDATE_POLICY="recommended"
+              ;;
+            PRODUCTION_ACTIVATE_REQUIRED)
+              DELIVERY_MODE="activate"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="none"
+              UPDATE_POLICY="required"
+              ;;
+            *)
+              echo "::error::Unsupported delivery operation: $OPERATION"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$APP_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::app_version must follow MAJOR.MINOR.PATCH"
             exit 1
           fi
 
-          if [[ "$DISTRIBUTION_DESTINATION" == "app_store_review" &&
-                "$DEPLOYMENT_TARGET" != "production" ]]; then
-            echo "::error::Only the production app can be submitted for App Store review"
+          if [[ "$DELIVERY_MODE" == "deploy" && -z "$RELEASE_NOTES" ]]; then
+            echo "::error::release_notes is required for TestFlight and App Store delivery"
             exit 1
           fi
 
-          if [[ "$VALIDATION_ONLY" != "true" &&
-                "$DISTRIBUTION_DESTINATION" == "app_store_review" &&
-                -z "$RELEASE_NOTES" ]]; then
-            echo "::error::release_notes is required for App Store review submission"
+          if [[ "$DELIVERY_MODE" == "activate" &&
+                "$PRODUCTION_RELEASE_CONFIRMED" != "true" ]]; then
+            echo "::error::Confirm that the production version is available on the App Store"
             exit 1
           fi
 
-          if [[ "$DEPLOYMENT_TARGET" == "production" &&
-                "$UPDATE_POLICY" != "none" ]]; then
-            echo "::error::Production version policy must be activated after App Store release"
-            exit 1
+          required_names=()
+          if [ "$DELIVERY_MODE" != "activate" ]; then
+            required_names+=(
+              BUILD_XCCONFIG
+              FIREBASE_PLIST
+              MATCH_GITHUB_APP_ID
+              MATCH_GITHUB_APP_PRIVATE_KEY
+              ASC_KEY_ID
+              ASC_ISSUER_ID
+              ASC_KEY_CONTENT
+              MATCH_PASSWORD
+            )
           fi
-
-          required_names=(
-            BUILD_XCCONFIG
-            FIREBASE_PLIST
-            MATCH_GITHUB_APP_ID
-            MATCH_GITHUB_APP_PRIVATE_KEY
-            ASC_KEY_ID
-            ASC_ISSUER_ID
-            ASC_KEY_CONTENT
-            MATCH_PASSWORD
-          )
-
-          if [[ "$VALIDATION_ONLY" != "true" &&
-                "$DEPLOYMENT_TARGET" == "development" &&
-                "$UPDATE_POLICY" != "none" ]]; then
+          if [ "$UPDATE_POLICY" != "none" ]; then
             required_names+=(APP_VERSION_API_ADDRESS)
           fi
 
           for name in "${required_names[@]}"; do
             if [ -z "${!name}" ]; then
-              echo "::error::Missing required GitHub Actions secret: $name"
+              echo "::error::Missing required GitHub Actions setting: $name"
               exit 1
             fi
           done
 
-      # 선택한 환경에 대응하는 Scheme과 리소스 경로를 후속 단계에 공유합니다.
-      - name: Select deployment configuration
-        env:
-          DEPLOYMENT_TARGET: ${{ inputs.target }}
-        run: |
           if [ "$DEPLOYMENT_TARGET" = "development" ]; then
-            echo "BUILD_SCHEME=Neki-iOS.Dev" >> "$GITHUB_ENV"
-            echo "XCCONFIG_PATH=Neki-iOS/APP/Sources/Resources/Debug.xcconfig" >> "$GITHUB_ENV"
-            echo "FIREBASE_PATH=Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist" >> "$GITHUB_ENV"
+            BUILD_SCHEME="Neki-iOS.Dev"
+            XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Debug.xcconfig"
+            FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
           else
-            echo "BUILD_SCHEME=Neki-iOS" >> "$GITHUB_ENV"
-            echo "XCCONFIG_PATH=Neki-iOS/APP/Sources/Resources/Release.xcconfig" >> "$GITHUB_ENV"
-            echo "FIREBASE_PATH=Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist" >> "$GITHUB_ENV"
+            BUILD_SCHEME="Neki-iOS"
+            XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Release.xcconfig"
+            FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist"
           fi
 
-      # 요청한 브랜치의 정확한 소스를 격리된 Runner에 준비합니다.
+          {
+            echo "DELIVERY_MODE=$DELIVERY_MODE"
+            echo "DEPLOYMENT_TARGET=$DEPLOYMENT_TARGET"
+            echo "DISTRIBUTION_DESTINATION=$DISTRIBUTION_DESTINATION"
+            echo "UPDATE_POLICY=$UPDATE_POLICY"
+            echo "BUILD_SCHEME=$BUILD_SCHEME"
+            echo "XCCONFIG_PATH=$XCCONFIG_PATH"
+            echo "FIREBASE_PATH=$FIREBASE_PATH"
+          } >> "$GITHUB_ENV"
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 프로젝트가 검증된 Xcode 버전을 명시해 Runner 이미지 변경의 영향을 제한합니다.
+      # 아래 준비 단계는 연결 검증과 실제 배포가 같은 환경을 사용하도록 공유합니다.
       - name: Select Xcode
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '26.2'
 
-      # 저장소에서 제외된 환경별 xcconfig와 Firebase 설정을 Secret에서 복원합니다.
       - name: Restore environment resources
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         env:
           BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
           FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
@@ -161,18 +208,18 @@ jobs:
           printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH"
           plutil -lint "$FIREBASE_PATH"
 
-      # 신뢰하는 SPM Macro와 Plugin이 비대화형 CI에서 확인 대화상자를 띄우지 않게 합니다.
       - name: Disable Macro Validation
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         run: |
           defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
           defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
-      # 패키지 해석 실패를 아카이브 실패와 분리해 원인을 명확하게 표시합니다.
       - name: Resolve SPM Dependencies
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
 
-      # Match 저장소에만 읽기 권한이 있는 단기 GitHub App 토큰을 발급합니다.
       - name: Create GitHub App token for Match
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         id: match-app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -182,67 +229,51 @@ jobs:
           repositories: Neki-fastlane-match-repo
           permission-contents: read
 
-      # Gemfile.lock에 고정된 Fastlane 도구 체인을 설치합니다.
       - name: Setup Ruby and Install Gems
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.3.12'
           bundler-cache: true
 
-      # 환경별 서명, 버저닝, Archive, TestFlight 또는 심사 제출을 수행합니다.
-      - name: Run Fastlane deployment
-        id: deployment
+      - name: Validate or deploy app
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        id: app-delivery
         env:
-          DEPLOYMENT_TARGET: ${{ inputs.target }}
-          MARKETING_VERSION: ${{ inputs.marketing_version }}
-          DISTRIBUTION_DESTINATION: ${{ inputs.destination }}
+          MARKETING_VERSION: ${{ inputs.app_version }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          VALIDATION_ONLY: ${{ inputs.validation_only }}
         run: |
-          if [ "$VALIDATION_ONLY" = "true" ]; then
+          if [ "$DELIVERY_MODE" = "validate" ]; then
             bundle exec fastlane ios validate_deployment
           else
             bundle exec fastlane ios deploy
           fi
 
-      # 개발기는 TestFlight 배포 직후 선택한 개발 서버 업데이트 정책을 반영할 수 있습니다.
-      - name: Update development version policy
+      - name: Update and verify version policy
+        if: ${{ contains(inputs.operation, 'RECOMMENDED') || contains(inputs.operation, 'REQUIRED') }}
         id: version-policy
-        if: ${{ !inputs.validation_only && inputs.target == 'development' && inputs.update_policy != 'none' }}
         env:
           APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
-          APP_VERSION: ${{ inputs.marketing_version }}
-          UPDATE_POLICY: ${{ inputs.update_policy }}
+          APP_VERSION: ${{ inputs.app_version }}
         run: scripts/ci/update_app_version.sh
 
-      # 배포와 개발 서버 후처리 결과를 구분하며 알림 실패가 배포 결과를 변경하지 않게 합니다.
       - name: Send Discord notification
         if: always()
         continue-on-error: true
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          DEPLOYMENT_TARGET: ${{ inputs.target }}
-          MARKETING_VERSION: ${{ inputs.marketing_version }}
-          DISTRIBUTION_DESTINATION: ${{ inputs.destination }}
-          VALIDATION_ONLY: ${{ inputs.validation_only }}
+          OPERATION: ${{ inputs.operation }}
+          APP_VERSION: ${{ inputs.app_version }}
         run: |
-          if [ "${{ steps.deployment.outcome }}" != "success" ]; then
-            if [ "$VALIDATION_ONLY" = "true" ]; then
-              STATUS="❌ [Neki-iOS] $DEPLOYMENT_TARGET CI/CD 설정 검증 실패"
-            else
-              STATUS="❌ [Neki-iOS] $DEPLOYMENT_TARGET $DISTRIBUTION_DESTINATION 배포 실패"
-            fi
-          elif [ "$VALIDATION_ONLY" = "true" ]; then
-            STATUS="✅ [Neki-iOS] $DEPLOYMENT_TARGET CI/CD 설정 검증 성공"
-          elif [ "${{ steps.version-policy.outcome }}" == "failure" ]; then
-            STATUS="⚠️ [Neki-iOS] $DEPLOYMENT_TARGET 배포 성공, 버전 정책 갱신 실패"
+          if [ "${{ job.status }}" != "success" ]; then
+            STATUS="❌ [Neki-iOS] $OPERATION 실패"
           else
-            STATUS="✅ [Neki-iOS] $DEPLOYMENT_TARGET $DISTRIBUTION_DESTINATION 배포 성공 (Version: $MARKETING_VERSION)"
+            STATUS="✅ [Neki-iOS] $OPERATION 성공 (Version: $APP_VERSION)"
           fi
 
           PAYLOAD=$(jq -n --arg content "$STATUS (${{ github.repository }})" '{content: $content}')

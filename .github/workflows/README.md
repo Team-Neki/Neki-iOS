@@ -50,7 +50,7 @@ Repository Settings의 Environments에 `development`와 `production`을 생성�
 
 | Variable | Purpose |
 | --- | --- |
-| `MATCH_GITHUB_APP_ID` | Match 저장소 읽기용 GitHub App ID |
+| `MATCH_GITHUB_CLIENT_ID` | Match 저장소 읽기용 GitHub App Client ID |
 
 App Store Connect API Key는 현재 Team에 속하고 두 앱에 접근할 수 있어야 합니다. Key를 교체하면 `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT`를 같은 Key 세트로 함께 갱신합니다.
 
@@ -68,24 +68,24 @@ GitHub App은 `Team-Neki/Neki-fastlane-match-repo`에만 설치하고 Repository
 
 버전 정책 스크립트는 기존 설정을 GET으로 조회하고, 버전 역행 여부를 확인한 다음 PATCH를 수행합니다. 이후 다시 GET을 수행해 반영 결과가 요청과 일치하는지 검증합니다.
 
-## Delivery workflow
+## 배포 및 버전 관리 Workflow
 
-Actions의 `iOS Delivery` 한 곳에서 실행할 `operation`을 선택합니다. 대상 환경, 배포 목적지와 업데이트 정책은 작업명에서 자동 결정됩니다.
+Actions의 `Neki-iOS 배포 및 버전 관리`에서 실행할 작업을 선택합니다. 대상 환경, 배포 목적지와 업데이트 정책은 작업명에서 자동 결정됩니다.
 
-| Operation | Result |
+| 작업 종류 | 실행 결과 |
 | --- | --- |
-| `VALIDATE_STAGING` | 개발기 인증·서명·App Store Connect 연결 검증 |
-| `VALIDATE_PRODUCTION` | 상용기 인증·서명·App Store Connect 연결 검증 |
-| `STAGING` | 개발기 TestFlight 업로드 |
-| `STAGING_RECOMMENDED` | 개발기 TestFlight 업로드 후 권장 업데이트 적용 |
-| `STAGING_REQUIRED` | 개발기 TestFlight 업로드 후 강제 업데이트 적용 |
-| `PRODUCTION_TESTFLIGHT` | 상용기 TestFlight 업로드 |
-| `PRODUCTION_REVIEW` | 상용기 App Store 심사 제출 |
-| `PRODUCTION_ACTIVATE_RECOMMENDED` | 공개된 상용 버전을 권장 업데이트로 활성화 |
-| `PRODUCTION_ACTIVATE_REQUIRED` | 공개된 상용 버전을 강제 업데이트로 활성화 |
+| `개발기 연결 검증` | 개발기 인증·서명·App Store Connect 연결 검증 |
+| `상용기 연결 검증` | 상용기 인증·서명·App Store Connect 연결 검증 |
+| `개발기 TestFlight 업로드` | 개발기 TestFlight 업로드 |
+| `개발기 TestFlight + 권장 업데이트` | 업로드 후 개발 서버에 권장 업데이트 적용 |
+| `개발기 TestFlight + 강제 업데이트` | 업로드 후 개발 서버에 강제 업데이트 적용 |
+| `상용기 TestFlight 업로드` | 상용기 TestFlight 업로드 |
+| `상용기 App Store 심사 제출` | 상용기 App Store 심사 제출 |
+| `상용기 권장 업데이트 활성화` | 공개된 상용 버전을 권장 업데이트로 활성화 |
+| `상용기 강제 업데이트 활성화` | 공개된 상용 버전을 강제 업데이트로 활성화 |
 
 모든 작업은 `app_version`을 입력합니다. TestFlight 또는 심사 제출 작업에는 `release_notes`도 필수입니다. 상용 버전 활성화 작업은 App Store 공개를 확인한 뒤 `production_release_confirmed`를 활성화해야 합니다.
 
-`VALIDATE_*` 작업은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
+`개발기 연결 검증`과 `상용기 연결 검증`은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
 
 PR 본문이나 release 브랜치 머지를 배포 트리거로 사용하지 않습니다. 코드 검토·병합과 외부 배포를 분리하여 오기입이나 의도하지 않은 재실행이 실제 배포로 이어지는 것을 방지합니다.

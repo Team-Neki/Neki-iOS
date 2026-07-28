@@ -1,4 +1,4 @@
-name: iOS Delivery
+name: Neki-iOS 배포 및 버전 관리
 
 on:
   workflow_dispatch:
@@ -8,15 +8,15 @@ on:
         required: true
         type: choice
         options:
-          - VALIDATE_STAGING
-          - VALIDATE_PRODUCTION
-          - STAGING
-          - STAGING_RECOMMENDED
-          - STAGING_REQUIRED
-          - PRODUCTION_TESTFLIGHT
-          - PRODUCTION_REVIEW
-          - PRODUCTION_ACTIVATE_RECOMMENDED
-          - PRODUCTION_ACTIVATE_REQUIRED
+          - 개발기 연결 검증
+          - 상용기 연결 검증
+          - 개발기 TestFlight 업로드
+          - 개발기 TestFlight + 권장 업데이트
+          - 개발기 TestFlight + 강제 업데이트
+          - 상용기 TestFlight 업로드
+          - 상용기 App Store 심사 제출
+          - 상용기 권장 업데이트 활성화
+          - 상용기 강제 업데이트 활성화
       app_version:
         description: 대상 앱 버전(MAJOR.MINOR.PATCH)
         required: true
@@ -40,10 +40,10 @@ concurrency:
 
 jobs:
   delivery:
-    runs-on: ${{ startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') && 'ubuntu-latest' || 'macos-latest' }}
+    runs-on: ${{ contains(inputs.operation, '업데이트 활성화') && 'ubuntu-latest' || 'macos-latest' }}
     timeout-minutes: 90
     environment:
-      name: ${{ contains(inputs.operation, 'STAGING') && 'development' || 'production' }}
+      name: ${{ startsWith(inputs.operation, '개발기') && 'development' || 'production' }}
 
     steps:
       # 하나의 작업명으로 배포 환경, 목적지와 업데이트 정책을 결정합니다.
@@ -56,7 +56,7 @@ jobs:
           BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
           FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
           APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
-          MATCH_GITHUB_APP_ID: ${{ vars.MATCH_GITHUB_APP_ID }}
+          MATCH_GITHUB_CLIENT_ID: ${{ vars.MATCH_GITHUB_CLIENT_ID }}
           MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -64,55 +64,55 @@ jobs:
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
         run: |
           case "$OPERATION" in
-            VALIDATE_STAGING)
+            "개발기 연결 검증")
               DELIVERY_MODE="validate"
               DEPLOYMENT_TARGET="development"
               DISTRIBUTION_DESTINATION="testflight"
               UPDATE_POLICY="none"
               ;;
-            VALIDATE_PRODUCTION)
+            "상용기 연결 검증")
               DELIVERY_MODE="validate"
               DEPLOYMENT_TARGET="production"
               DISTRIBUTION_DESTINATION="testflight"
               UPDATE_POLICY="none"
               ;;
-            STAGING)
+            "개발기 TestFlight 업로드")
               DELIVERY_MODE="deploy"
               DEPLOYMENT_TARGET="development"
               DISTRIBUTION_DESTINATION="testflight"
               UPDATE_POLICY="none"
               ;;
-            STAGING_RECOMMENDED)
+            "개발기 TestFlight + 권장 업데이트")
               DELIVERY_MODE="deploy"
               DEPLOYMENT_TARGET="development"
               DISTRIBUTION_DESTINATION="testflight"
               UPDATE_POLICY="recommended"
               ;;
-            STAGING_REQUIRED)
+            "개발기 TestFlight + 강제 업데이트")
               DELIVERY_MODE="deploy"
               DEPLOYMENT_TARGET="development"
               DISTRIBUTION_DESTINATION="testflight"
               UPDATE_POLICY="required"
               ;;
-            PRODUCTION_TESTFLIGHT)
+            "상용기 TestFlight 업로드")
               DELIVERY_MODE="deploy"
               DEPLOYMENT_TARGET="production"
               DISTRIBUTION_DESTINATION="testflight"
               UPDATE_POLICY="none"
               ;;
-            PRODUCTION_REVIEW)
+            "상용기 App Store 심사 제출")
               DELIVERY_MODE="deploy"
               DEPLOYMENT_TARGET="production"
               DISTRIBUTION_DESTINATION="app_store_review"
               UPDATE_POLICY="none"
               ;;
-            PRODUCTION_ACTIVATE_RECOMMENDED)
+            "상용기 권장 업데이트 활성화")
               DELIVERY_MODE="activate"
               DEPLOYMENT_TARGET="production"
               DISTRIBUTION_DESTINATION="none"
               UPDATE_POLICY="recommended"
               ;;
-            PRODUCTION_ACTIVATE_REQUIRED)
+            "상용기 강제 업데이트 활성화")
               DELIVERY_MODE="activate"
               DEPLOYMENT_TARGET="production"
               DISTRIBUTION_DESTINATION="none"
@@ -145,7 +145,7 @@ jobs:
             required_names+=(
               BUILD_XCCONFIG
               FIREBASE_PLIST
-              MATCH_GITHUB_APP_ID
+              MATCH_GITHUB_CLIENT_ID
               MATCH_GITHUB_APP_PRIVATE_KEY
               ASC_KEY_ID
               ASC_ISSUER_ID
@@ -185,19 +185,19 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
 
       # 아래 준비 단계는 연결 검증과 실제 배포가 같은 환경을 사용하도록 공유합니다.
       - name: Select Xcode
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
           xcode-version: '26.2'
 
       - name: Restore environment resources
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         env:
           BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
           FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
@@ -211,35 +211,35 @@ jobs:
           plutil -lint "$FIREBASE_PATH"
 
       - name: Disable Macro Validation
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         run: |
           defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
           defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
       - name: Resolve SPM Dependencies
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
 
       - name: Create GitHub App token for Match
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         id: match-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
-          app-id: ${{ vars.MATCH_GITHUB_APP_ID }}
+          client-id: ${{ vars.MATCH_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
           owner: Team-Neki
           repositories: Neki-fastlane-match-repo
           permission-contents: read
 
       - name: Setup Ruby and Install Gems
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
         with:
           ruby-version: '3.3.12'
           bundler-cache: true
 
       - name: Validate or deploy app
-        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        if: ${{ !contains(inputs.operation, '업데이트 활성화') }}
         id: app-delivery
         env:
           MARKETING_VERSION: ${{ inputs.app_version }}
@@ -257,7 +257,7 @@ jobs:
           fi
 
       - name: Update and verify version policy
-        if: ${{ contains(inputs.operation, 'RECOMMENDED') || contains(inputs.operation, 'REQUIRED') }}
+        if: ${{ contains(inputs.operation, '권장 업데이트') || contains(inputs.operation, '강제 업데이트') }}
         id: version-policy
         env:
           APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
@@ -272,13 +272,12 @@ jobs:
           OPERATION: ${{ inputs.operation }}
           APP_VERSION: ${{ inputs.app_version }}
           JOB_STATUS: ${{ job.status }}
-          REPOSITORY: ${{ github.repository }}
         run: |
           if [ "$JOB_STATUS" = "success" ]; then
-            TITLE="✅ iOS Delivery 성공"
+            TITLE="✅ 우리 Neki-iOS 정상영업 합니다."
             COLOR=5763719
           else
-            TITLE="❌ iOS Delivery 실패"
+            TITLE="❌ 지금까지 Neki-iOS를 사랑해주셔서 감사합니다."
             COLOR=15548997
           fi
 
@@ -286,16 +285,14 @@ jobs:
             --arg title "$TITLE" \
             --arg operation "$OPERATION" \
             --arg version "$APP_VERSION" \
-            --arg repository "$REPOSITORY" \
             --argjson color "$COLOR" \
             '{
               embeds: [{
                 title: $title,
                 color: $color,
                 fields: [
-                  {name: "Operation", value: $operation, inline: true},
-                  {name: "Version", value: $version, inline: true},
-                  {name: "Repository", value: $repository, inline: false}
+                  {name: "작업 종류", value: $operation, inline: true},
+                  {name: "대상 버전", value: $version, inline: true}
                 ]
               }]
             }')

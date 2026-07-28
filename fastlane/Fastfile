@@ -1,55 +1,161 @@
+require "base64"
+require File.expand_path(
+  "deployment_configuration",
+  FastlaneCore::FastlaneFolder.path
+)
+
 default_platform(:ios)
 
-platform :ios do
-  desc "Release build and upload to App Store Connect"
-  lane :release do
+def require_environment_variables!(names)
+  missing_names = names.select { |name| ENV[name].to_s.strip.empty? }
+  return if missing_names.empty?
 
-    # 1. CI 환경 설정
+  UI.user_error!("Missing required environment variables: #{missing_names.join(', ')}")
+end
+
+def export_github_environment(name, value)
+  environment_file_path = ENV["GITHUB_ENV"]
+  return if environment_file_path.to_s.empty?
+
+  File.open(environment_file_path, "a") { |file| file.puts("#{name}=#{value}") }
+end
+
+def require_semantic_version!(version)
+  return if version.match?(/\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\z/)
+
+  UI.user_error!("MARKETING_VERSION must follow MAJOR.MINOR.PATCH: #{version}")
+end
+
+platform :ios do
+  desc "Build and distribute the selected Neki app"
+  lane :deploy do
+    require_environment_variables!(
+      %w[
+        DEPLOYMENT_TARGET
+        MARKETING_VERSION
+        DISTRIBUTION_DESTINATION
+        ASC_KEY_ID
+        ASC_ISSUER_ID
+        ASC_KEY_CONTENT
+        MATCH_GITHUB_TOKEN
+        MATCH_PASSWORD
+      ]
+    )
+
+    deployment_target = ENV.fetch("DEPLOYMENT_TARGET")
+    marketing_version = ENV.fetch("MARKETING_VERSION")
+    distribution_destination = ENV.fetch("DISTRIBUTION_DESTINATION")
+    release_notes = ENV.fetch("RELEASE_NOTES", "").strip
+    configuration = DeploymentConfiguration.fetch(deployment_target)
+
+    require_semantic_version!(marketing_version)
+    unless %w[testflight app_store_review].include?(distribution_destination)
+      UI.user_error!("Unsupported distribution destination: #{distribution_destination}")
+    end
+    if distribution_destination == "app_store_review" && deployment_target != "production"
+      UI.user_error!("Only the production app can be submitted for App Store review")
+    end
+    if distribution_destination == "app_store_review" && release_notes.empty?
+      UI.user_error!("RELEASE_NOTES is required for App Store review submission")
+    end
+    if release_notes.length > 4_000
+      UI.user_error!("RELEASE_NOTES must not exceed 4,000 characters")
+    end
+
+    # CI 전용 임시 Keychain을 사용해 Runner의 서명 자산을 격리합니다.
     setup_ci
 
-    # 2. App Store Connect API 연결
-    app_store_connect_api_key(
+    # App Store Connect 원격 조회와 업로드는 동일한 API Key 세트를 사용합니다.
+    api_key = app_store_connect_api_key(
       key_id: ENV["ASC_KEY_ID"],
       issuer_id: ENV["ASC_ISSUER_ID"],
       key_content: ENV["ASC_KEY_CONTENT"],
       is_key_content_base64: true
     )
 
-    # 3. 배포용 인증서 및 프로파일 동기화
+    match_git_basic_authorization = Base64.strict_encode64(
+      "x-access-token:#{ENV.fetch('MATCH_GITHUB_TOKEN')}"
+    )
+
+    # 선택한 앱과 Share Extension에 필요한 App Store 서명 자산만 읽습니다.
     match(
       type: "appstore",
-      readonly: true
+      readonly: true,
+      git_basic_authorization: match_git_basic_authorization,
+      app_identifier: [
+        configuration.fetch(:app_identifier),
+        configuration.fetch(:share_extension_app_identifier)
+      ]
     )
 
-    # 4. 버전별 빌드 번호 자동 관리 로직
-    # 현재 Xcode 프로젝트에 설정된 버전(예: 1.2.0)을 가져옵니다.
-    current_version = get_version_number(target: "Neki-iOS")
-
-    # 해당 버전에서 TestFlight에 올라간 가장 높은 빌드 번호를 확인합니다.
-    # 만약 새 버전이라 데이터가 없다면 0을 반환합니다.
+    # 원격 TestFlight 상태를 기준으로 현재 버전에서 충돌하지 않는 빌드 번호를 계산합니다.
     latest_build = latest_testflight_build_number(
-      version: current_version,
+      api_key: api_key,
+      app_identifier: configuration.fetch(:app_identifier),
+      version: marketing_version,
       initial_build_number: 0
     )
+    build_number = latest_build + 1
 
-    # 확인된 번호에 +1을 해서 로컬 프로젝트에 적용합니다.
-    increment_build_number(
-      build_number: latest_build + 1
+    # 입력 버전과 원격 기준 빌드 번호를 모든 Target에 동일하게 주입합니다.
+    ipa_path = build_app(
+      project: DeploymentConfiguration::PROJECT,
+      scheme: configuration.fetch(:scheme),
+      configuration: configuration.fetch(:build_configuration),
+      export_method: "app-store",
+      export_team_id: DeploymentConfiguration::TEAM_ID,
+      xcargs: [
+        "MARKETING_VERSION=#{marketing_version}",
+        "CURRENT_PROJECT_VERSION=#{build_number}"
+      ].join(" ")
     )
 
-    # 5. 앱 빌드 및 아카이브
-    build_app(
-      scheme: "Neki-iOS",
-      configuration: "Release",
-      export_method: "app-store"
+    archived_version = get_ipa_info_plist_value(
+      ipa: ipa_path,
+      key: "CFBundleShortVersionString"
     )
+    archived_build_number = get_ipa_info_plist_value(
+      ipa: ipa_path,
+      key: "CFBundleVersion"
+    )
+    unless archived_version == marketing_version && archived_build_number == build_number.to_s
+      UI.user_error!(
+        "Archive version mismatch: " \
+        "expected #{marketing_version}(#{build_number}), " \
+        "got #{archived_version}(#{archived_build_number})"
+      )
+    end
 
-    # 6. TestFlight 업로드
-    upload_to_app_store(
-      skip_metadata: true,
-      skip_screenshots: true,
-      submit_for_review: false,
-      run_precheck_before_submit: false
-    )
+    if distribution_destination == "testflight"
+      # 내부 테스트에 필요한 변경사항을 TestFlight 빌드에 함께 기록합니다.
+      upload_to_testflight(
+        api_key: api_key,
+        app_identifier: configuration.fetch(:app_identifier),
+        ipa: ipa_path,
+        changelog: release_notes,
+        distribute_external: false,
+        notify_external_testers: false
+      )
+    else
+      # 한국어 릴리즈 노트를 반영하고 수동 출시 방식으로 심사를 제출합니다.
+      upload_to_app_store(
+        api_key: api_key,
+        app_identifier: configuration.fetch(:app_identifier),
+        ipa: ipa_path,
+        app_version: marketing_version,
+        release_notes: { "ko" => release_notes },
+        skip_screenshots: true,
+        submit_for_review: true,
+        automatic_release: false,
+        run_precheck_before_submit: true,
+        submission_information: {
+          export_compliance_uses_encryption: false
+        },
+        force: true
+      )
+    end
+
+    export_github_environment("APP_VERSION", marketing_version)
+    export_github_environment("BUILD_NUMBER", build_number)
   end
 end

@@ -27,6 +27,69 @@ def require_semantic_version!(version)
 end
 
 platform :ios do
+  private_lane :prepare_distribution do |options|
+    configuration = options.fetch(:configuration)
+
+    # CI 전용 임시 Keychain을 사용해 Runner의 서명 자산을 격리합니다.
+    setup_ci
+
+    # App Store Connect 원격 조회와 업로드는 동일한 API Key 세트를 사용합니다.
+    api_key = app_store_connect_api_key(
+      key_id: ENV["ASC_KEY_ID"],
+      issuer_id: ENV["ASC_ISSUER_ID"],
+      key_content: ENV["ASC_KEY_CONTENT"],
+      is_key_content_base64: true
+    )
+
+    match_git_basic_authorization = Base64.strict_encode64(
+      "x-access-token:#{ENV.fetch('MATCH_GITHUB_TOKEN')}"
+    )
+
+    # 선택한 앱과 Share Extension에 필요한 App Store 서명 자산만 읽습니다.
+    match(
+      type: "appstore",
+      readonly: true,
+      git_basic_authorization: match_git_basic_authorization,
+      app_identifier: [
+        configuration.fetch(:app_identifier),
+        configuration.fetch(:share_extension_app_identifier)
+      ]
+    )
+
+    api_key
+  end
+
+  desc "Validate distribution credentials without building or uploading"
+  lane :validate_deployment do
+    require_environment_variables!(
+      %w[
+        DEPLOYMENT_TARGET
+        MARKETING_VERSION
+        ASC_KEY_ID
+        ASC_ISSUER_ID
+        ASC_KEY_CONTENT
+        MATCH_GITHUB_TOKEN
+        MATCH_PASSWORD
+      ]
+    )
+
+    deployment_target = ENV.fetch("DEPLOYMENT_TARGET")
+    marketing_version = ENV.fetch("MARKETING_VERSION")
+    configuration = DeploymentConfiguration.fetch(deployment_target)
+
+    require_semantic_version!(marketing_version)
+    api_key = prepare_distribution(configuration: configuration)
+
+    latest_testflight_build_number(
+      api_key: api_key,
+      app_identifier: configuration.fetch(:app_identifier),
+      version: marketing_version,
+      initial_build_number: 0
+    )
+
+    UI.success("Deployment validation completed without building or uploading")
+  end
+
   desc "Build and distribute the selected Neki app"
   lane :deploy do
     require_environment_variables!(
@@ -62,31 +125,7 @@ platform :ios do
       UI.user_error!("RELEASE_NOTES must not exceed 4,000 characters")
     end
 
-    # CI 전용 임시 Keychain을 사용해 Runner의 서명 자산을 격리합니다.
-    setup_ci
-
-    # App Store Connect 원격 조회와 업로드는 동일한 API Key 세트를 사용합니다.
-    api_key = app_store_connect_api_key(
-      key_id: ENV["ASC_KEY_ID"],
-      issuer_id: ENV["ASC_ISSUER_ID"],
-      key_content: ENV["ASC_KEY_CONTENT"],
-      is_key_content_base64: true
-    )
-
-    match_git_basic_authorization = Base64.strict_encode64(
-      "x-access-token:#{ENV.fetch('MATCH_GITHUB_TOKEN')}"
-    )
-
-    # 선택한 앱과 Share Extension에 필요한 App Store 서명 자산만 읽습니다.
-    match(
-      type: "appstore",
-      readonly: true,
-      git_basic_authorization: match_git_basic_authorization,
-      app_identifier: [
-        configuration.fetch(:app_identifier),
-        configuration.fetch(:share_extension_app_identifier)
-      ]
-    )
+    api_key = prepare_distribution(configuration: configuration)
 
     # 원격 TestFlight 상태를 기준으로 현재 버전에서 충돌하지 않는 빌드 번호를 계산합니다.
     latest_build = latest_testflight_build_number(

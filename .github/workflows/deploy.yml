@@ -34,6 +34,11 @@ on:
         description: TestFlight 테스트 내용 또는 App Store 업데이트 내용
         required: false
         type: string
+      validation_only:
+        description: Archive와 업로드 없이 CI/CD 설정만 검증
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -58,6 +63,7 @@ jobs:
           DISTRIBUTION_DESTINATION: ${{ inputs.destination }}
           UPDATE_POLICY: ${{ inputs.update_policy }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
+          VALIDATION_ONLY: ${{ inputs.validation_only }}
           BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
           FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
           MATCH_GITHUB_APP_ID: ${{ vars.MATCH_GITHUB_APP_ID }}
@@ -79,7 +85,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "$DISTRIBUTION_DESTINATION" == "app_store_review" &&
+          if [[ "$VALIDATION_ONLY" != "true" &&
+                "$DISTRIBUTION_DESTINATION" == "app_store_review" &&
                 -z "$RELEASE_NOTES" ]]; then
             echo "::error::release_notes is required for App Store review submission"
             exit 1
@@ -102,7 +109,8 @@ jobs:
             MATCH_PASSWORD
           )
 
-          if [[ "$DEPLOYMENT_TARGET" == "development" &&
+          if [[ "$VALIDATION_ONLY" != "true" &&
+                "$DEPLOYMENT_TARGET" == "development" &&
                 "$UPDATE_POLICY" != "none" ]]; then
             required_names+=(APP_VERSION_API_ADDRESS)
           fi
@@ -194,12 +202,18 @@ jobs:
           ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
           MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-        run: bundle exec fastlane ios deploy
+          VALIDATION_ONLY: ${{ inputs.validation_only }}
+        run: |
+          if [ "$VALIDATION_ONLY" = "true" ]; then
+            bundle exec fastlane ios validate_deployment
+          else
+            bundle exec fastlane ios deploy
+          fi
 
       # 개발기는 TestFlight 배포 직후 선택한 개발 서버 업데이트 정책을 반영할 수 있습니다.
       - name: Update development version policy
         id: version-policy
-        if: ${{ inputs.target == 'development' && inputs.update_policy != 'none' }}
+        if: ${{ !inputs.validation_only && inputs.target == 'development' && inputs.update_policy != 'none' }}
         env:
           APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
           APP_VERSION: ${{ inputs.marketing_version }}
@@ -215,9 +229,16 @@ jobs:
           DEPLOYMENT_TARGET: ${{ inputs.target }}
           MARKETING_VERSION: ${{ inputs.marketing_version }}
           DISTRIBUTION_DESTINATION: ${{ inputs.destination }}
+          VALIDATION_ONLY: ${{ inputs.validation_only }}
         run: |
           if [ "${{ steps.deployment.outcome }}" != "success" ]; then
-            STATUS="❌ [Neki-iOS] $DEPLOYMENT_TARGET $DISTRIBUTION_DESTINATION 배포 실패"
+            if [ "$VALIDATION_ONLY" = "true" ]; then
+              STATUS="❌ [Neki-iOS] $DEPLOYMENT_TARGET CI/CD 설정 검증 실패"
+            else
+              STATUS="❌ [Neki-iOS] $DEPLOYMENT_TARGET $DISTRIBUTION_DESTINATION 배포 실패"
+            fi
+          elif [ "$VALIDATION_ONLY" = "true" ]; then
+            STATUS="✅ [Neki-iOS] $DEPLOYMENT_TARGET CI/CD 설정 검증 성공"
           elif [ "${{ steps.version-policy.outcome }}" == "failure" ]; then
             STATUS="⚠️ [Neki-iOS] $DEPLOYMENT_TARGET 배포 성공, 버전 정책 갱신 실패"
           else

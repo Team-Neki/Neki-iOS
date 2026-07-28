@@ -187,6 +187,7 @@ platform :ios do
         submit_for_review: true,
         automatic_release: false,
         run_precheck_before_submit: true,
+        precheck_include_in_app_purchases: false,
         submission_information: {
           export_compliance_uses_encryption: false
         },

@@ -1,0 +1,306 @@
+name: iOS Delivery
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: 실행할 작업
+        required: true
+        type: choice
+        options:
+          - VALIDATE_STAGING
+          - VALIDATE_PRODUCTION
+          - STAGING
+          - STAGING_RECOMMENDED
+          - STAGING_REQUIRED
+          - PRODUCTION_TESTFLIGHT
+          - PRODUCTION_REVIEW
+          - PRODUCTION_ACTIVATE_RECOMMENDED
+          - PRODUCTION_ACTIVATE_REQUIRED
+      app_version:
+        description: 대상 앱 버전(MAJOR.MINOR.PATCH)
+        required: true
+        type: string
+      release_notes:
+        description: 배포 작업의 TestFlight 또는 App Store 변경사항
+        required: false
+        type: string
+      production_release_confirmed:
+        description: 상용 버전의 App Store 공개 확인
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-delivery
+  cancel-in-progress: false
+
+jobs:
+  delivery:
+    runs-on: ${{ startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') && 'ubuntu-latest' || 'macos-latest' }}
+    timeout-minutes: 90
+    environment:
+      name: ${{ contains(inputs.operation, 'STAGING') && 'development' || 'production' }}
+
+    steps:
+      # 하나의 작업명으로 배포 환경, 목적지와 업데이트 정책을 결정합니다.
+      - name: Resolve delivery operation
+        env:
+          OPERATION: ${{ inputs.operation }}
+          APP_VERSION: ${{ inputs.app_version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          PRODUCTION_RELEASE_CONFIRMED: ${{ inputs.production_release_confirmed }}
+          BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
+          FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+          MATCH_GITHUB_APP_ID: ${{ vars.MATCH_GITHUB_APP_ID }}
+          MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          case "$OPERATION" in
+            VALIDATE_STAGING)
+              DELIVERY_MODE="validate"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            VALIDATE_PRODUCTION)
+              DELIVERY_MODE="validate"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            STAGING)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            STAGING_RECOMMENDED)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="recommended"
+              ;;
+            STAGING_REQUIRED)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="development"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="required"
+              ;;
+            PRODUCTION_TESTFLIGHT)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="testflight"
+              UPDATE_POLICY="none"
+              ;;
+            PRODUCTION_REVIEW)
+              DELIVERY_MODE="deploy"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="app_store_review"
+              UPDATE_POLICY="none"
+              ;;
+            PRODUCTION_ACTIVATE_RECOMMENDED)
+              DELIVERY_MODE="activate"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="none"
+              UPDATE_POLICY="recommended"
+              ;;
+            PRODUCTION_ACTIVATE_REQUIRED)
+              DELIVERY_MODE="activate"
+              DEPLOYMENT_TARGET="production"
+              DISTRIBUTION_DESTINATION="none"
+              UPDATE_POLICY="required"
+              ;;
+            *)
+              echo "::error::Unsupported delivery operation: $OPERATION"
+              exit 1
+              ;;
+          esac
+
+          if [[ ! "$APP_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "::error::app_version must follow MAJOR.MINOR.PATCH"
+            exit 1
+          fi
+
+          if [[ "$DELIVERY_MODE" == "deploy" && -z "$RELEASE_NOTES" ]]; then
+            echo "::error::release_notes is required for TestFlight and App Store delivery"
+            exit 1
+          fi
+
+          if [[ "$DELIVERY_MODE" == "activate" &&
+                "$PRODUCTION_RELEASE_CONFIRMED" != "true" ]]; then
+            echo "::error::Confirm that the production version is available on the App Store"
+            exit 1
+          fi
+
+          required_names=()
+          if [ "$DELIVERY_MODE" != "activate" ]; then
+            required_names+=(
+              BUILD_XCCONFIG
+              FIREBASE_PLIST
+              MATCH_GITHUB_APP_ID
+              MATCH_GITHUB_APP_PRIVATE_KEY
+              ASC_KEY_ID
+              ASC_ISSUER_ID
+              ASC_KEY_CONTENT
+              MATCH_PASSWORD
+            )
+          fi
+          if [ "$UPDATE_POLICY" != "none" ]; then
+            required_names+=(APP_VERSION_API_ADDRESS)
+          fi
+
+          for name in "${required_names[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required GitHub Actions setting: $name"
+              exit 1
+            fi
+          done
+
+          if [ "$DEPLOYMENT_TARGET" = "development" ]; then
+            BUILD_SCHEME="Neki-iOS.Dev"
+            XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Debug.xcconfig"
+            FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
+          else
+            BUILD_SCHEME="Neki-iOS"
+            XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Release.xcconfig"
+            FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist"
+          fi
+
+          {
+            echo "DELIVERY_MODE=$DELIVERY_MODE"
+            echo "DEPLOYMENT_TARGET=$DEPLOYMENT_TARGET"
+            echo "DISTRIBUTION_DESTINATION=$DISTRIBUTION_DESTINATION"
+            echo "UPDATE_POLICY=$UPDATE_POLICY"
+            echo "BUILD_SCHEME=$BUILD_SCHEME"
+            echo "XCCONFIG_PATH=$XCCONFIG_PATH"
+            echo "FIREBASE_PATH=$FIREBASE_PATH"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      # 아래 준비 단계는 연결 검증과 실제 배포가 같은 환경을 사용하도록 공유합니다.
+      - name: Select Xcode
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: '26.2'
+
+      - name: Restore environment resources
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        env:
+          BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
+          FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
+        run: |
+          mkdir -p "$(dirname "$XCCONFIG_PATH")"
+          printf '%s' "$BUILD_XCCONFIG" | base64 --decode > "$XCCONFIG_PATH"
+          test -s "$XCCONFIG_PATH"
+
+          mkdir -p "$(dirname "$FIREBASE_PATH")"
+          printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH"
+          plutil -lint "$FIREBASE_PATH"
+
+      - name: Disable Macro Validation
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        run: |
+          defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+          defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
+
+      - name: Resolve SPM Dependencies
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
+
+      - name: Create GitHub App token for Match
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        id: match-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.MATCH_GITHUB_APP_ID }}
+          private-key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+          owner: Team-Neki
+          repositories: Neki-fastlane-match-repo
+          permission-contents: read
+
+      - name: Setup Ruby and Install Gems
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
+        with:
+          ruby-version: '3.3.12'
+          bundler-cache: true
+
+      - name: Validate or deploy app
+        if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
+        id: app-delivery
+        env:
+          MARKETING_VERSION: ${{ inputs.app_version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          if [ "$DELIVERY_MODE" = "validate" ]; then
+            bundle exec fastlane ios validate_deployment
+          else
+            bundle exec fastlane ios deploy
+          fi
+
+      - name: Update and verify version policy
+        if: ${{ contains(inputs.operation, 'RECOMMENDED') || contains(inputs.operation, 'REQUIRED') }}
+        id: version-policy
+        env:
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+          APP_VERSION: ${{ inputs.app_version }}
+        run: scripts/ci/update_app_version.sh
+
+      - name: Send Discord notification
+        if: always()
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          OPERATION: ${{ inputs.operation }}
+          APP_VERSION: ${{ inputs.app_version }}
+          JOB_STATUS: ${{ job.status }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$JOB_STATUS" = "success" ]; then
+            TITLE="✅ iOS Delivery 성공"
+            COLOR=5763719
+          else
+            TITLE="❌ iOS Delivery 실패"
+            COLOR=15548997
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg operation "$OPERATION" \
+            --arg version "$APP_VERSION" \
+            --arg repository "$REPOSITORY" \
+            --argjson color "$COLOR" \
+            '{
+              embeds: [{
+                title: $title,
+                color: $color,
+                fields: [
+                  {name: "Operation", value: $operation, inline: true},
+                  {name: "Version", value: $version, inline: true},
+                  {name: "Repository", value: $repository, inline: false}
+                ]
+              }]
+            }')
+          curl --fail-with-body --silent --show-error \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "$PAYLOAD" \
+            "$DISCORD_WEBHOOK_URL"

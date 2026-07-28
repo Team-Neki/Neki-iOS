@@ -68,32 +68,24 @@ GitHub App은 `Team-Neki/Neki-fastlane-match-repo`에만 설치하고 Repository
 
 버전 정책 스크립트는 기존 설정을 GET으로 조회하고, 버전 역행 여부를 확인한 다음 PATCH를 수행합니다. 이후 다시 GET을 수행해 반영 결과가 요청과 일치하는지 검증합니다.
 
-## Deployment workflow
+## Delivery workflow
 
-Actions의 `iOS Deployment`를 수동 실행하고 다음 값을 입력합니다.
+Actions의 `iOS Delivery` 한 곳에서 실행할 `operation`을 선택합니다. 대상 환경, 배포 목적지와 업데이트 정책은 작업명에서 자동 결정됩니다.
 
-| Input | Description |
+| Operation | Result |
 | --- | --- |
-| `target` | `development` 또는 `production` |
-| `marketing_version` | 배포할 `MAJOR.MINOR.PATCH` 버전 |
-| `destination` | `testflight` 또는 `app_store_review` |
-| `update_policy` | 개발 서버에 적용할 `none`, `recommended`, `required` |
-| `release_notes` | TestFlight 테스트 내용 또는 App Store 업데이트 내용 |
-| `validation_only` | Archive·업로드·버전 API 변경 없이 CI/CD 설정만 검증 |
+| `VALIDATE_STAGING` | 개발기 인증·서명·App Store Connect 연결 검증 |
+| `VALIDATE_PRODUCTION` | 상용기 인증·서명·App Store Connect 연결 검증 |
+| `STAGING` | 개발기 TestFlight 업로드 |
+| `STAGING_RECOMMENDED` | 개발기 TestFlight 업로드 후 권장 업데이트 적용 |
+| `STAGING_REQUIRED` | 개발기 TestFlight 업로드 후 강제 업데이트 적용 |
+| `PRODUCTION_TESTFLIGHT` | 상용기 TestFlight 업로드 |
+| `PRODUCTION_REVIEW` | 상용기 App Store 심사 제출 |
+| `PRODUCTION_ACTIVATE_RECOMMENDED` | 공개된 상용 버전을 권장 업데이트로 활성화 |
+| `PRODUCTION_ACTIVATE_REQUIRED` | 공개된 상용 버전을 강제 업데이트로 활성화 |
 
-`validation_only`을 활성화하면 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 인증과 TestFlight 조회, Match readonly 동기화까지만 수행합니다. Archive 생성, TestFlight·App Store 업로드, 버전 정책 PATCH는 실행하지 않습니다. 이 검증은 실제 Archive와 업로드 성공까지 보장하지 않으므로 최초 배포 전 사전 점검 용도로 사용합니다.
+모든 작업은 `app_version`을 입력합니다. TestFlight 또는 심사 제출 작업에는 `release_notes`도 필수입니다. 상용 버전 활성화 작업은 App Store 공개를 확인한 뒤 `production_release_confirmed`를 활성화해야 합니다.
 
-개발기는 TestFlight 업로드만 허용합니다. 선택한 경우 업로드 성공 후 개발 서버의 버전 정책을 갱신합니다.
+`VALIDATE_*` 작업은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
 
-상용기는 TestFlight 업로드와 App Store 심사 제출을 지원합니다. 심사 제출 시 한국어 릴리즈 노트를 반영하며 자동 출시는 사용하지 않습니다. 상용 서버의 버전 정책은 TestFlight 업로드 또는 심사 제출 시점에 변경하지 않습니다.
-
-## Production version activation
-
-상용 버전이 App Store에서 실제로 공개된 것을 확인한 후 `Activate App Version Policy`를 실행합니다.
-
-1. `target`을 `production`으로 선택합니다.
-2. 공개된 `app_version`을 입력합니다.
-3. `recommended` 또는 `required`를 선택합니다.
-4. `production_release_confirmed`를 활성화합니다.
-
-이 단계를 분리하여 아직 설치할 수 없는 심사 중 버전으로 사용자를 업데이트시키는 문제를 방지합니다.
+PR 본문이나 release 브랜치 머지를 배포 트리거로 사용하지 않습니다. 코드 검토·병합과 외부 배포를 분리하여 오기입이나 의도하지 않은 재실행이 실제 배포로 이어지는 것을 방지합니다.

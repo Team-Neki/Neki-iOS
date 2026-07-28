@@ -1,12 +1,17 @@
-git_url("git@github.com:YAPP-Github/Neki-fastlane-match-repo.git")
-git_branch('release')
+require File.expand_path(
+  "deployment_configuration",
+  FastlaneCore::FastlaneFolder.path
+)
+
+# 인증 자산은 앱 레포지토리와 분리된 전용 저장소에서 읽습니다.
+git_url("https://github.com/Team-Neki/Neki-fastlane-match-repo.git")
+git_branch("team-P85DW78LYM")
 
 storage_mode("git")
 type("appstore")
 
-app_identifier([ENV["APP_IDENTIFIER"], ENV["SHARE_EXTENSION_APP_IDENTIFIER"]])
-username(ENV['APPLE_ID'])
-team_id(ENV['TEAM_ID'])
+# 앱 식별자는 선택한 배포 환경에 따라 Fastfile에서 명시합니다.
+team_id(DeploymentConfiguration::TEAM_ID)
 
 # For all available options run `fastlane match --help`
 # Remove the # in the beginning of the line to enable the other options

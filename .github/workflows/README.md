@@ -42,15 +42,10 @@ Repository Settings의 Environments에 `development`와 `production`을 생성�
 | `ASC_KEY_ID` | App Store Connect API Key ID |
 | `ASC_ISSUER_ID` | App Store Connect API Issuer ID |
 | `ASC_KEY_CONTENT` | Base64로 인코딩한 App Store Connect API private key |
+| `MATCH_GITHUB_CLIENT_ID` | Match 저장소 읽기용 GitHub App Client ID |
 | `MATCH_GITHUB_APP_PRIVATE_KEY` | Match 저장소 읽기용 GitHub App private key |
 | `MATCH_PASSWORD` | Match 저장소 암호화 비밀번호 |
 | `DISCORD_WEBHOOK_URL` | 배포 결과 알림 Webhook |
-
-다음 값은 Repository Variable로 관리합니다.
-
-| Variable | Purpose |
-| --- | --- |
-| `MATCH_GITHUB_CLIENT_ID` | Match 저장소 읽기용 GitHub App Client ID |
 
 App Store Connect API Key는 현재 Team에 속하고 두 앱에 접근할 수 있어야 합니다. Key를 교체하면 `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_CONTENT`를 같은 Key 세트로 함께 갱신합니다.
 

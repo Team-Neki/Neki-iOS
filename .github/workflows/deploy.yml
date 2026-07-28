@@ -56,7 +56,7 @@ jobs:
           BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
           FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
           APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
-          MATCH_GITHUB_CLIENT_ID: ${{ vars.MATCH_GITHUB_CLIENT_ID }}
+          MATCH_GITHUB_CLIENT_ID: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
           MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -225,7 +225,7 @@ jobs:
         id: match-app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
-          client-id: ${{ vars.MATCH_GITHUB_CLIENT_ID }}
+          client-id: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
           private-key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
           owner: Team-Neki
           repositories: Neki-fastlane-match-repo

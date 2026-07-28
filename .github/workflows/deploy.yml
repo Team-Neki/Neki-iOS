@@ -185,12 +185,14 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       # 아래 준비 단계는 연결 검증과 실제 배포가 같은 환경을 사용하도록 공유합니다.
       - name: Select Xcode
         if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
-        uses: maxim-lobanov/setup-xcode@v1
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
         with:
           xcode-version: '26.2'
 
@@ -221,7 +223,7 @@ jobs:
       - name: Create GitHub App token for Match
         if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
         id: match-app-token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
         with:
           app-id: ${{ vars.MATCH_GITHUB_APP_ID }}
           private-key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
@@ -231,7 +233,7 @@ jobs:
 
       - name: Setup Ruby and Install Gems
         if: ${{ !startsWith(inputs.operation, 'PRODUCTION_ACTIVATE_') }}
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
         with:
           ruby-version: '3.3.12'
           bundler-cache: true

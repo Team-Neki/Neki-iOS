@@ -1,0 +1,6 @@
+[tools]
+ruby = "3.3.12"
+
+[env]
+BUNDLE_DISABLE_SHARED_GEMS = "true"
+BUNDLE_PATH = ".bundle/vendor"

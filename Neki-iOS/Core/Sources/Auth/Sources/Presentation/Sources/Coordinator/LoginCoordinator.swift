@@ -24,7 +24,12 @@ public struct LoginCoordinator {
         
         case delegate(Delegate)
         public enum Delegate {
-            case moveToMainTab(User)
+            case moveToMainTab(
+                User,
+                shouldPresentMarketingConsentAlert: Bool,
+                didCompleteTermsAgreement: Bool,
+                marketingConsentStatus: MarketingConsentManagementStatus?
+            )
         }
     }
     
@@ -36,7 +41,12 @@ public struct LoginCoordinator {
                 // MARK: - Login Flow
             case let .root(.loginResponse(.success(user))):
                 if user.allRequiredTermsAgreed {
-                    return .send(.delegate(.moveToMainTab(user)))
+                    return .send(.delegate(.moveToMainTab(
+                        user,
+                        shouldPresentMarketingConsentAlert: false,
+                        didCompleteTermsAgreement: false,
+                        marketingConsentStatus: nil
+                    )))
                 } else {
                     state.pendingUser = user
                     state.path.append(.termsAgreement(.init()))
@@ -48,16 +58,20 @@ public struct LoginCoordinator {
                 return .none
                 
                 // MARK: - Onboarding Flow
-            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding))):
-                guard var user = state.pendingUser else {
+            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user, marketingConsentStatus)))):
+                guard state.pendingUser != nil else {
                     Logger.presentation.error("온보딩 과정 중 중단됨.")
                     return .none
                 }
                 
-                user.allRequiredTermsAgreed = true
                 state.pendingUser = nil
                 state.path.pop(from: id)
-                return .send(.delegate(.moveToMainTab(user)))
+                return .send(.delegate(.moveToMainTab(
+                    user,
+                    shouldPresentMarketingConsentAlert: marketingConsentStatus == nil && user.marketingTermAgreed == false,
+                    didCompleteTermsAgreement: true,
+                    marketingConsentStatus: marketingConsentStatus
+                )))
                 
             default:
                 return .none

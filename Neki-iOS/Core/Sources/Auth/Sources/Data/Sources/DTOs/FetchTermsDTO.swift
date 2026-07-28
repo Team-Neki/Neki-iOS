@@ -25,5 +25,13 @@ struct TermDTO: Decodable {
         case termInformationURL = "url"
     }
     
-    func toEntity() -> Term { Term(id: id, title: title, isRequired: isRequired, termInformationURL: termInformationURL) }
+    func toEntity() -> Term {
+        Term(
+            id: id,
+            termType: termType,
+            title: title,
+            isRequired: isRequired,
+            termInformationURL: termInformationURL
+        )
+    }
 }

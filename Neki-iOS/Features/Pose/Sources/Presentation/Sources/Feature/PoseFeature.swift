@@ -20,11 +20,8 @@ struct PoseFeature {
         // Data
         var generalPoses: IdentifiedArrayOf<Pose> = []
         var scrappedPoses: IdentifiedArrayOf<Pose> = []
-        var filteredPoses: IdentifiedArrayOf<Pose> {
-            let targetPoses = isSelectedScrap ? scrappedPoses : generalPoses
-            guard let countOption = selectedCountFilterOption else { return targetPoses }
-            return targetPoses.filter { $0.peopleCountOption == countOption }
-        }
+        var visiblePoses: [Pose] = []
+        var lastVisiblePoseID: PoseID?
         
         // Pagination & Filter
         var generalPage: Int = .zero
@@ -62,6 +59,7 @@ struct PoseFeature {
         case onTapBookmark(Pose)
         case onRefresh
         case qrScanButtonTapped
+        case notificationButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
@@ -74,6 +72,7 @@ struct PoseFeature {
             case didTapImage(Pose)
             case didTapStartRandomPose(PeopleCountOption)
             case qrScanButtonTapped
+            case requestNotificationList
         }
         
         // Binding Action
@@ -119,6 +118,7 @@ struct PoseFeature {
                 let isDeselecting = state.selectedCountFilterOption == option
                 state.selectedCountFilterOption = isDeselecting ? nil : option
                 state.isSelectedScrap = false
+                refreshVisiblePoses(&state)
                 guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return .none }
                 let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
                 return .run { _ in analytics.logEvent(event: event) }
@@ -126,6 +126,7 @@ struct PoseFeature {
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()
                 state.selectedCountFilterOption = nil
+                refreshVisiblePoses(&state)
                 
                 let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmarkFilter) }
                 let fetchEffect: Effect<Action>
@@ -159,6 +160,9 @@ struct PoseFeature {
                 
             case .qrScanButtonTapped:
                 return .send(.delegate(.qrScanButtonTapped))
+
+            case .notificationButtonTapped:
+                return .send(.delegate(.requestNotificationList))
                 
             case let .onTapBookmark(pose):
                 var updatedPose = pose
@@ -182,6 +186,7 @@ struct PoseFeature {
                 } else {
                     state.scrappedPoses.remove(id: pose.id)
                 }
+                refreshVisiblePoses(&state)
                 return .none
                 
             case let .fetchListResponse(isScrapResult, .success((poses, hasNext))):
@@ -198,6 +203,7 @@ struct PoseFeature {
                     else { state.generalPoses.append(contentsOf: poses) }
                     if hasNext { state.generalPage += 1 }
                 }
+                refreshVisiblePoses(&state)
                 return .none
                 
             case let .fetchListResponse(isScrapResult, .failure(error)):
@@ -260,4 +266,22 @@ private extension PoseFeature {
     }
     
     func extractPeopleCount(from option: PeopleCountOption?) -> Int? { option?.rawValue }
+
+    func refreshVisiblePoses(_ state: inout State) {
+        let targetPoses = state.isSelectedScrap ? state.scrappedPoses : state.generalPoses
+        guard let countOption = state.selectedCountFilterOption else {
+            state.visiblePoses = Array(targetPoses)
+            state.lastVisiblePoseID = state.visiblePoses.last?.id
+            return
+        }
+
+        var visiblePoses: [Pose] = []
+        visiblePoses.reserveCapacity(targetPoses.count)
+        targetPoses.forEach {
+            guard $0.peopleCountOption == countOption else { return }
+            visiblePoses.append($0)
+        }
+        state.visiblePoses = visiblePoses
+        state.lastVisiblePoseID = visiblePoses.last?.id
+    }
 }

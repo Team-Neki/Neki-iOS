@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum PhotoSelectionPurpose {
+public enum PhotoSelectionPurpose: Equatable {
     case duplicate
     case move
     case upload

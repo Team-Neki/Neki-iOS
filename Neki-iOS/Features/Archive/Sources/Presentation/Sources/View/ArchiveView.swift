@@ -13,6 +13,7 @@ struct ArchiveView: View {
     
     @State var addAlbumSheetPresented: Bool = false
     @State var showScrollToTopButton: Bool = false
+    @State private var maximumDisplayHeight: CGFloat = .infinity
     
     @Bindable var store: StoreOf<ArchiveFeature>
     
@@ -62,9 +63,9 @@ struct ArchiveView: View {
                         }
                     }
                     .onPreferenceChange(ScrollOffsetKey.self) { value in
-                        withAnimation {
-                            showScrollToTopButton = value < -20
-                        }
+                        let shouldShowButton = value < -20
+                        guard showScrollToTopButton != shouldShowButton else { return }
+                        withAnimation { showScrollToTopButton = shouldShowButton }
                     }
                 }
             }
@@ -96,6 +97,10 @@ struct ArchiveView: View {
         }
         .transaction { transaction in
             transaction.disablesAnimations = true
+        }
+        .onGeometryChange(for: CGFloat.self, of: \.size.height) { height in
+            guard height > .zero, maximumDisplayHeight != height else { return }
+            maximumDisplayHeight = height
         }
         .sheet(isPresented: $addAlbumSheetPresented) {
             ArchiveAlbumInputSheet(
@@ -150,11 +155,11 @@ private extension ArchiveView {
                     showDismiss: false
                 )
                 
-                //                Button {
-                //                    // TODO: - 알림 이벤트
-                //                } label: {
-                //                    Image(.iconBellFill)
-                //                }
+                Button {
+                    store.send(.notificationButtonTapped)
+                } label: {
+                    Image(.iconBellFill)
+                }
             }
         }
         .frame(height: 54)
@@ -224,7 +229,9 @@ private extension ArchiveView {
     }
     
     var recentPhotoSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let lastPhotoID = store.photos.last?.id
+
+        return VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Text("최근 사진")
                     .nekiFont(.title20Bold)
@@ -252,19 +259,19 @@ private extension ArchiveView {
             } else {
                 MasonryGridView(
                     items: Array(store.photos),
-                    columns: 2
+                    estimatedHeight: \.masonryEstimatedHeight
                 ) { item in
                     ArchiveImageCard(item: item, onTapFavorite: { store.send(.onTapFavorite(item: item)) })
                         .onTapGesture {
                             store.send(.imageTapped(item))
                         }
                         .onAppear {
-                            if item == store.photos.last {
-                                store.send(.loadMorePhotos)
-                            }
+                            guard item.id == lastPhotoID else { return }
+                            store.send(.loadMorePhotos)
                         }
                 }
                 .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(maximumDisplayHeight)
             }
             
             if store.isFetchingPhotos && !store.photos.isEmpty {

@@ -12,6 +12,7 @@ import ComposableArchitecture
 public struct PoseClient {
     public var fetchPoseList: @Sendable (_ page: Int, _ pageSize: Int, _ refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool)
     public var fetchScrappedPoseList: @Sendable (_ page: Int, _ pageSize: Int, _ refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool)
+    public var fetchPoseDetail: @Sendable (_ id: PoseID) async throws -> Pose
     public var scrapPose: @Sendable (_ poseID: Int) async throws -> Void
     public var initializeRandomPose: @Sendable (_ peopleCount: PeopleCountOption) async throws -> Pose
     public var startRandomPoseSuggestion: @Sendable (_ direction: RandomPosePagingDirection) async throws -> Pose
@@ -29,6 +30,8 @@ extension PoseClient: DependencyKey {
             try await poseRepository.fetchPoseList(page: page, pageSize: pageSize, refresh: refresh)
         } fetchScrappedPoseList: { page, pageSize, refresh in
             try await poseRepository.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refresh)
+        } fetchPoseDetail: { id in
+            try await poseRepository.fetchPoseDetail(id: id)
         } scrapPose: { poseID in
             try await poseRepository.scrapPose(poseID: poseID)
         } initializeRandomPose: { peopleCount in

@@ -8,7 +8,7 @@
 import SwiftUI
 import CoreGraphics
 
-fileprivate enum MarkerLayout {
+private enum MarkerLayout {
     static let normalBgRadius: CGFloat = 16.2
     static let normalImageSize: CGFloat = 50.0
     static let normalImageRadius: CGFloat = 15.0
@@ -18,6 +18,11 @@ fileprivate enum MarkerLayout {
     static let selectedImageSize: CGFloat = 60.0
     static let selectedImageRadius: CGFloat = 18.0
     static let selectedPadding: CGFloat = 6.0
+    
+    static let normalFavoriteBadgeSize: CGFloat = 30
+    static let selectedFavoriteBadgeSize: CGFloat = 36
+    static let normalFavoriteBadgeOffset = CGSize(width: -4, height: 4)
+    static let selectedFavoriteBadgeOffset = CGSize.zero
     
     static let tailWidth: CGFloat = 12.0
     static let tailHeight: CGFloat = 10.0
@@ -30,44 +35,58 @@ fileprivate enum MarkerLayout {
     static let gradientColors: [UIColor] = [.darkGray, .black]
 }
 
-struct MarkerImageRenderer {
-    
+enum MarkerImageRenderer {
     static func render(
         brandImage: UIImage?,
-        isSelected: Bool
+        isSelected: Bool,
+        isFavorite: Bool,
+        displayScale: CGFloat
     ) -> UIImage {
+        let displayScale = displayScale.isFinite && displayScale > .zero ? displayScale : 1
         let imageSize = isSelected ? MarkerLayout.selectedImageSize : MarkerLayout.normalImageSize
         let padding = isSelected ? MarkerLayout.selectedPadding : MarkerLayout.normalPadding
         let imageRadius = isSelected ? MarkerLayout.selectedImageRadius : MarkerLayout.normalImageRadius
         let bgRadius = isSelected ? MarkerLayout.selectedBgRadius : MarkerLayout.normalBgRadius
+        let favoriteBadgeSize = isSelected ? MarkerLayout.selectedFavoriteBadgeSize : MarkerLayout.normalFavoriteBadgeSize
+        let favoriteBadgeOffset = isSelected ? MarkerLayout.selectedFavoriteBadgeOffset : MarkerLayout.normalFavoriteBadgeOffset
         let tailSize = CGSize(width: MarkerLayout.tailWidth, height: MarkerLayout.tailHeight)
         let bodySize = imageSize + (padding * 2)
-        
-        let totalWidth = bodySize
+
+        let badgeOverflow = isFavorite ? favoriteBadgeSize / 2 : .zero
+        let totalWidth = bodySize + badgeOverflow
         let totalHeight = bodySize + tailSize.height - 1
         
         let shadowMargin = MarkerLayout.shadowRadius * 4
         let canvasSize = CGSize(
             width: totalWidth + shadowMargin * 2,
-            height: totalHeight + shadowMargin * 2
+            height: totalHeight + badgeOverflow + shadowMargin * 2
         )
         
-        let renderer = UIGraphicsImageRenderer(size: canvasSize)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = displayScale
+        format.opaque = false
+        let renderer = UIGraphicsImageRenderer(size: canvasSize, format: format)
         
         return renderer.image { context in
             let cgContext = context.cgContext
-            let drawOffsetX = shadowMargin
-            let drawOffsetY = MarkerLayout.shadowRadius
-            let bodyRect = CGRect(
-                x: drawOffsetX,
-                y: drawOffsetY,
-                width: bodySize,
-                height: bodySize
+            let drawOffsetX = shadowMargin + badgeOverflow / 2
+            let drawOffsetY = MarkerLayout.shadowRadius + badgeOverflow
+            let bodyRect = pixelAligned(
+                CGRect(
+                    x: drawOffsetX,
+                    y: drawOffsetY,
+                    width: bodySize,
+                    height: bodySize
+                ),
+                scale: displayScale
             )
             
-            let tailOrigin = CGPoint(
-                x: drawOffsetX + bodySize / 2 - tailSize.width / 2,
-                y: drawOffsetY + bodySize - 1
+            let tailOrigin = pixelAligned(
+                CGPoint(
+                    x: bodyRect.midX - tailSize.width / 2,
+                    y: bodyRect.maxY - 1
+                ),
+                scale: displayScale
             )
             
             let tailPath = UIBezierPath()
@@ -117,11 +136,14 @@ struct MarkerImageRenderer {
             tailFillColor.setFill()
             tailPath.fill()
             cgContext.restoreGState()
-            let imageRect = CGRect(
-                x: bodyRect.minX + padding,
-                y: bodyRect.minY + padding,
-                width: imageSize,
-                height: imageSize
+            let imageRect = pixelAligned(
+                CGRect(
+                    x: bodyRect.minX + padding,
+                    y: bodyRect.minY + padding,
+                    width: imageSize,
+                    height: imageSize
+                ),
+                scale: displayScale
             )
             
             let imagePath = UIBezierPath(roundedRect: imageRect, cornerRadius: imageRadius)
@@ -131,17 +153,88 @@ struct MarkerImageRenderer {
             cgContext.clip()
             
             if let image = brandImage {
-                let aspectRatio = max(imageRect.width / image.size.width, imageRect.height / image.size.height)
-                let drawnSize = CGSize(width: image.size.width * aspectRatio, height: image.size.height * aspectRatio)
-                let offsetX = (drawnSize.width - imageRect.width) / 2
-                let offsetY = (drawnSize.height - imageRect.height) / 2
-                let drawRect = CGRect(x: imageRect.minX - offsetX, y: imageRect.minY - offsetY, width: drawnSize.width, height: drawnSize.height)
+                let sourceSize = orientedPixelSize(of: image)
+                let physicalPixel = 1 / displayScale
+                let drawRect = aspectFillRect(
+                    sourceSize: sourceSize,
+                    targetRect: imageRect.insetBy(dx: -physicalPixel, dy: -physicalPixel)
+                )
                 image.draw(in: drawRect)
             } else {
                 UIColor.systemGray5.setFill()
                 UIRectFill(imageRect)
             }
             cgContext.restoreGState()
+
+            guard isFavorite else { return }
+
+            let badgeImage = UIImage(resource: .iconFavoriteBooth)
+            let badgeRect = CGRect(
+                x: imageRect.maxX - favoriteBadgeSize / 2 + favoriteBadgeOffset.width,
+                y: imageRect.minY - favoriteBadgeSize / 2 + favoriteBadgeOffset.height,
+                width: favoriteBadgeSize,
+                height: favoriteBadgeSize
+            )
+            badgeImage.draw(in: badgeRect)
         }
+    }
+}
+
+// MARK: - MarkerImageRenderer + Image Geometry
+
+private extension MarkerImageRenderer {
+    static func orientedPixelSize(of image: UIImage) -> CGSize {
+        guard let cgImage = image.cgImage else {
+            return CGSize(
+                width: image.size.width * image.scale,
+                height: image.size.height * image.scale
+            )
+        }
+
+        switch image.imageOrientation {
+        case .left, .leftMirrored, .right, .rightMirrored:
+            return CGSize(width: cgImage.height, height: cgImage.width)
+        default:
+            return CGSize(width: cgImage.width, height: cgImage.height)
+        }
+    }
+
+    static func aspectFillRect(
+        sourceSize: CGSize,
+        targetRect: CGRect
+    ) -> CGRect {
+        guard sourceSize.width > .zero, sourceSize.height > .zero else { return targetRect }
+        let aspectRatio = max(targetRect.width / sourceSize.width, targetRect.height / sourceSize.height)
+        let drawnSize = CGSize(
+            width: sourceSize.width * aspectRatio,
+            height: sourceSize.height * aspectRatio
+        )
+        return CGRect(
+            x: targetRect.midX - drawnSize.width / 2,
+            y: targetRect.midY - drawnSize.height / 2,
+            width: drawnSize.width,
+            height: drawnSize.height
+        )
+    }
+
+    static func pixelAligned(_ point: CGPoint, scale: CGFloat) -> CGPoint {
+        CGPoint(
+            x: (point.x * scale).rounded() / scale,
+            y: (point.y * scale).rounded() / scale
+        )
+    }
+
+    static func pixelAligned(_ rect: CGRect, scale: CGFloat) -> CGRect {
+        let origin = pixelAligned(rect.origin, scale: scale)
+        let maxPoint = pixelAligned(
+            CGPoint(x: rect.maxX, y: rect.maxY),
+            scale: scale
+        )
+        return CGRect(
+            x: origin.x,
+            y: origin.y,
+            width: maxPoint.x - origin.x,
+            height: maxPoint.y - origin.y
+        )
     }
 }

@@ -150,30 +150,34 @@ private extension ArchiveFavoriteAlbumView {
     
     @ViewBuilder
     var masonryView: some View {
-        ScrollView {
-            MasonryGridView(
-                items: Array(store.photos),
-                columns: 2
-            ) { item in
-                ArchiveImageCard(
-                    item: item,
-                    isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id),
-                    onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                )
-                .onTapGesture {
-                    store.send(.imageTapped(item))
-                }
-                .onAppear {
-                    if item == store.photos.last {
+        let lastPhotoID = store.photos.last?.id
+
+        GeometryReader { proxy in
+            ScrollView {
+                MasonryGridView(
+                    items: Array(store.photos),
+                    estimatedHeight: \.masonryEstimatedHeight
+                ) { item in
+                    ArchiveImageCard(
+                        item: item,
+                        isSelectionMode: store.isSelectionMode,
+                        isSelected: store.selectedIDs.contains(item.id),
+                        onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                    )
+                    .onTapGesture {
+                        store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        guard item.id == lastPhotoID else { return }
                         store.send(.loadMorePhotos)
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(proxy.size.height)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 76)
+            .scrollIndicators(.never)
         }
-        .scrollIndicators(.never)
     }
 }

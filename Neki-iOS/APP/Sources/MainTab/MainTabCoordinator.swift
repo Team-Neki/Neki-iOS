@@ -8,6 +8,7 @@
 import SwiftUI
 import ComposableArchitecture
 import AVFoundation
+import UserNotifications
 // import Pose
 // import Archive
 
@@ -36,6 +37,14 @@ struct MainTabCoordinator {
         var isTabbarHidden: Bool = false
         var toast: NekiToastItem? = nil
         var isPermissionAlertPresented: Bool = false
+        var isPushNotificationPermissionAlertPresented: Bool = false
+        var shouldPresentMarketingConsentAlert: Bool
+        var isMarketingConsentAlertPresented: Bool = false
+        var isUpdatingMarketingConsent: Bool = false
+
+        init(shouldPresentMarketingConsentAlert: Bool = false) {
+            self.shouldPresentMarketingConsentAlert = shouldPresentMarketingConsentAlert
+        }
         
         var user: User {
             get {
@@ -72,7 +81,16 @@ struct MainTabCoordinator {
         case setPhotosPickerPresented(Bool)
         case presentPermissionAlert
         case dismissPermissionAlert
+        case requestNotificationList
+        case pushNotificationListAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
+        case dismissPushNotificationPermissionAlert
         case openAppSettings
+        case dismissMarketingConsentAlert
+        case updateMarketingConsent(Bool)
+        case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
+        case requestPushNotificationAuthorizationIfNeeded
+        case pushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
+        case route(AppRouteRequest)
         
         case onAppear
         case tabChanged(NekiTab)
@@ -81,12 +99,16 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
+            case pushNotificationAuthorizationResolved
         }
     }
     
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.openURL) private var openURL
     @Dependency(\.analyticsClient) private var analyticsClient
+    @Dependency(\.authClient) private var authClient
+    @Dependency(\.pushNotificationClient) private var pushNotificationClient
+    @Dependency(\.date.now) private var now
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -102,6 +124,12 @@ struct MainTabCoordinator {
             case .binding: return .none
                 
             case .onAppear:
+                if state.selectedTab == .archive,
+                   state.shouldPresentMarketingConsentAlert {
+                    state.shouldPresentMarketingConsentAlert = false
+                    state.isMarketingConsentAlertPresented = true
+                    recordMarketingConsentAlertPresentation(for: state.user)
+                }
                 return .send(.tabChanged(state.selectedTab))
                 
             case let .tabChanged(tab):
@@ -164,19 +192,115 @@ struct MainTabCoordinator {
             case .dismissPermissionAlert:
                 state.isPermissionAlertPresented = false
                 return .none
+
+            case .requestNotificationList:
+                return .run { send in
+                    await send(.pushNotificationListAuthorizationResponse(Result {
+                        let status = try await pushNotificationClient.checkAuthorizationStatus()
+                        let resolvedStatus: UNAuthorizationStatus
+                        if status == .notDetermined {
+                            _ = try await pushNotificationClient.requestAuthorization()
+                            resolvedStatus = try await pushNotificationClient.checkAuthorizationStatus()
+                        } else {
+                            resolvedStatus = status
+                        }
+                        if resolvedStatus.canPresentNotificationList {
+                            _ = try? await pushNotificationClient.synchronizeDeviceToken()
+                        }
+                        return resolvedStatus
+                    }))
+                }
+
+            case let .pushNotificationListAuthorizationResponse(.success(status)):
+                guard status.canPresentNotificationList else {
+                    state.isPushNotificationPermissionAlertPresented = true
+                    return .none
+                }
+                state.destination = .notificationList(.init())
+                return .none
+
+            case .pushNotificationListAuthorizationResponse(.failure):
+                state.isPushNotificationPermissionAlertPresented = true
+                return .none
+
+            case .dismissPushNotificationPermissionAlert:
+                state.isPushNotificationPermissionAlertPresented = false
+                return .none
                 
             case .openAppSettings:
                 state.isPermissionAlertPresented = false
+                state.isPushNotificationPermissionAlertPresented = false
                 return .run { _ in
                     guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
                     await openURL(url)
                 }
+
+            case .dismissMarketingConsentAlert:
+                guard state.isUpdatingMarketingConsent == false else { return .none }
+                state.isMarketingConsentAlertPresented = false
+                recordMarketingConsentManaged(
+                    for: state.user,
+                    status: .unconfirmed
+                )
+                return .none
+
+            case let .updateMarketingConsent(isAgreed):
+                guard state.isUpdatingMarketingConsent == false else { return .none }
+                state.isUpdatingMarketingConsent = true
+                return .run { send in
+                    await send(.marketingConsentUpdateResponse(
+                        isAgreed,
+                        Result { try await authClient.updateMarketingConsent(isAgreed) }
+                    ))
+                }
+
+            case let .marketingConsentUpdateResponse(isAgreed, .success):
+                state.isUpdatingMarketingConsent = false
+                state.isMarketingConsentAlertPresented = false
+                state.user.marketingTermAgreed = isAgreed
+                recordMarketingConsentManaged(
+                    for: state.user,
+                    status: isAgreed ? .approved : .rejected
+                )
+                return .send(.requestPushNotificationAuthorizationIfNeeded)
+
+            case .marketingConsentUpdateResponse(_, .failure):
+                state.isUpdatingMarketingConsent = false
+                return .none
+
+            case .requestPushNotificationAuthorizationIfNeeded:
+                return .run { send in
+                    await send(.pushNotificationAuthorizationResponse(Result {
+                        let status = try await pushNotificationClient.checkAuthorizationStatus()
+                        guard status == .notDetermined else { return status }
+                        _ = try await pushNotificationClient.requestAuthorization()
+                        return try await pushNotificationClient.checkAuthorizationStatus()
+                    }))
+                }
+
+            case .pushNotificationAuthorizationResponse(.success):
+                return .send(.delegate(.pushNotificationAuthorizationResolved))
+
+            case .pushNotificationAuthorizationResponse(.failure):
+                return .none
+
+            case let .route(request):
+                return route(state: &state, to: request)
                 
             case .archive(.delegate(.requestQRScan)), .pose(.delegate(.requestQRScan)):
                 state.destination = nil
                 return .send(.onTapQRScan)
+
+            case .archive(.delegate(.requestNotificationList)),
+                 .pose(.delegate(.requestNotificationList)),
+                 .myPage(.delegate(.requestNotificationList)):
+                return .send(.requestNotificationList)
                 
             case let .archive(.delegate(.showToast(item))):
+                state.toast = item
+                return .none
+                
+            case let .map(.delegate(.showToast(item))):
                 state.toast = item
                 return .none
                 
@@ -230,13 +354,92 @@ struct MainTabCoordinator {
     }
 }
 
+private extension MainTabCoordinator {
+    func recordMarketingConsentAlertPresentation(for user: User) {
+        let countKey = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
+        UserDefaults.standard.set(
+            UserDefaults.standard.integer(forKey: countKey) + 1,
+            forKey: countKey
+        )
+        recordMarketingConsentManaged(for: user, status: .unconfirmed)
+    }
+
+    func recordMarketingConsentManaged(
+        for user: User,
+        status: MarketingConsentManagementStatus
+    ) {
+        UserDefaults.standard.set(
+            now,
+            forKey: AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
+        )
+        UserDefaults.standard.set(
+            status.rawValue,
+            forKey: AppStorageKey.marketingConsentManagementStatus(userID: user.id)
+        )
+    }
+
+    func route(
+        state: inout MainTabCoordinator.State,
+        to request: AppRouteRequest
+    ) -> Effect<MainTabCoordinator.Action> {
+        state.destination = nil
+
+        switch request {
+        case .archive:
+            state.selectedTab = .archive
+            state.archive.path.removeAll()
+            return .none
+
+        case .archivePhoto(_):
+            state.selectedTab = .archive
+            state.archive.path.removeAll()
+            return .none
+
+        case .pose:
+            state.selectedTab = .pose
+            state.pose.path.removeAll()
+            return .none
+
+        case .map, .mapBrand(_), .mapBooth(_):
+            state.selectedTab = .map
+            state.map.path.removeAll()
+            return .none
+
+        case .myPage:
+            state.selectedTab = .myPage
+            state.myPage.path.removeAll()
+            return .none
+
+        case .notificationList:
+            state.destination = .notificationList(.init())
+            return .none
+
+        case let .shareExtension(appGroupID):
+            state.selectedTab = .archive
+            state.archive.path.removeAll()
+            return .send(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))
+        }
+    }
+}
+
 extension MainTabCoordinator {
     @Reducer
     enum Destination {
         case uploadSelection
         case qrScan(QRCodeScanFeature)
+        case notificationList(PushNotificationListFeature)
     }
     enum PendingPresentation {
         case gallery
+    }
+}
+
+private extension UNAuthorizationStatus {
+    var canPresentNotificationList: Bool {
+        switch self {
+        case .authorized, .provisional, .ephemeral: true
+        case .notDetermined, .denied: false
+        @unknown default: false
+        }
     }
 }

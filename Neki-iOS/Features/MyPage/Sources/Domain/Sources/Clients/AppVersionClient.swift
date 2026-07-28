@@ -15,6 +15,7 @@ struct AppVersionClient {
     
     var checkVersion: @Sendable () async throws -> VersionResult
     var currentVersion: @Sendable () -> AppVersion = { .init(major: .zero, minor: .zero, revision: .zero) }
+    var isDeveloperDiagnosticsAvailable: @Sendable () -> Bool = { false }
 }
 
 extension AppVersionClient: DependencyKey {
@@ -35,6 +36,8 @@ extension AppVersionClient: DependencyKey {
             return (currentVersion, latestVersion, .upToDate)
         } currentVersion: {
             return fetchLocalVersion()
+        } isDeveloperDiagnosticsAvailable: {
+            AppRuntimeEnvironment.isDeveloperDiagnosticsAvailable
         }
     }()
 }

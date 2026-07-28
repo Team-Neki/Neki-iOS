@@ -29,7 +29,12 @@ struct MyPageCoordinatorView: View {
                 ProfileEditView(store: store)
                     .navigationBarBackButtonHidden()
 
+            case let .developerDiagnostics(store):
+                DeveloperDiagnosticsView(store: store)
+                    .navigationBarBackButtonHidden()
+
             }
         }
+        .nekiToast(item: $store.toastItem)
     }
 }

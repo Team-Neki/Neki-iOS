@@ -11,12 +11,37 @@ import os
 
 struct FeedImageView: View {
     
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.nekiImageMaximumDisplayHeight) private var maximumDisplayHeight
+    @State private var cardWidth: CGFloat = 200
+
     //MARK: - Properties
     
     let item: Pose
     let onTapBookmark: (() -> Void)?
+
+    private var imageAspectRatio: CGFloat? {
+        guard let width = item.width,
+              let height = item.height,
+              width > 0,
+              height > 0
+        else { return nil }
+
+        return CGFloat(width) / CGFloat(height)
+    }
+
+    private var imageProcessor: DownsamplingImageProcessor {
+        NekiImageDownsampling.processor(
+            displayWidth: cardWidth,
+            displayScale: displayScale,
+            maximumDisplayHeight: maximumDisplayHeight,
+            originalWidth: item.width,
+            aspectRatio: imageAspectRatio,
+            fallbackAspectRatio: 0.75
+        )
+    }
     
-    let gradientColor: LinearGradient = LinearGradient(
+    private static let gradientColor = LinearGradient(
         colors: [
             .black.opacity(0),
             .black
@@ -30,6 +55,8 @@ struct FeedImageView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             KFImage(item.imageURL)
+                .setProcessor(imageProcessor)
+                .cacheOriginalImage()
                 .resizable()
                 .fade(duration: 0.25)
                 .retry(maxCount: 3, interval: .seconds(5))
@@ -38,10 +65,10 @@ struct FeedImageView: View {
                     Logger.presentation.error("실패한 이미지 id: \(item.id)")
                 }
                 .cancelOnDisappear(true)
-                .aspectRatio(contentMode: .fit)
+                .aspectRatio(imageAspectRatio, contentMode: .fit)
         }
         .overlay { Color.black.opacity(0.04) }
-        .overlay { gradientColor.opacity(0.2) }
+        .overlay { Self.gradientColor.opacity(0.2) }
         .overlay(alignment: .topTrailing) {
             Button {
                 onTapBookmark?()
@@ -52,5 +79,9 @@ struct FeedImageView: View {
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .clipped()
+        .onGeometryChange(for: CGFloat.self, of: \.size.width) { width in
+            guard width > .zero, abs(cardWidth - width) > 1 else { return }
+            cardWidth = width
+        }
     }
 }

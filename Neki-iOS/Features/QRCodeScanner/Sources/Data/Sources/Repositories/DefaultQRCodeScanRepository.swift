@@ -10,22 +10,29 @@ import Dependencies
 import os
 
 struct DefaultQRCodeScanRepository: QRCodeScanRepository {
-    private let strategies: [QRCodeParsingStrategy] = [
-        HaruFilmStrategy(),
-        PhotograyStrategy(),
-        PhotoSignatureStrategy(),
-        Life4CutStrategy(),
-        PhotoismStrategy()
-    ]
+    private let strategies: [QRCodeParsingStrategy]
     
     @Dependency(\.networkProvider) private var networkProvider
+
+    init(session: URLSessionProtocol = URLSession.shared) {
+        strategies = [
+            AuraPicStrategy(session: session),
+            HaruFilmStrategy(session: session),
+            PhotograyStrategy(session: session),
+            PhotoSignatureCodeStrategy(session: session),
+            PhotoSignatureStrategy(session: session),
+            Life4CutStrategy(session: session),
+            MonomansionStrategy(session: session),
+            PhotoismStrategy()
+        ]
+    }
     
     func parse(_ url: URL, user: User) async throws(QRParseError) -> ParsedQRResult {
         guard let host = url.host() else { throw .invalidURL }
         
         for strategy in strategies {
             guard strategy.canHandle(host: host) else { continue }
-            return try await strategy.parse(url, networkProvider: networkProvider)
+            return try await strategy.parse(url)
         }
         
         Task.detached(priority: .background) {

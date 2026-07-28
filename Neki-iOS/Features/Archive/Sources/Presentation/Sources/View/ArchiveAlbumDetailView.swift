@@ -22,7 +22,7 @@ struct ArchiveAlbumDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
                 
-                if store.filteredAlbumPhotos.isEmpty && store.album.count == 0 {
+                if store.photos.isEmpty && store.album.count == 0 {
                     ArchiveEmptyView(description: "아직 등록된 사진이 없어요\n새로운 사진을 등록하고 앨범에 추가해보세요!")
                         .padding(.bottom, 54)
                 } else {
@@ -240,43 +240,47 @@ private extension ArchiveAlbumDetailView {
     
     @ViewBuilder
     var masonryView: some View {
-        ScrollView {
-            MasonryGridView(
-                items: Array(store.filteredAlbumPhotos),
-                columns: 2
-            ) { item in
-                ArchiveImageCard(
-                    item: item,
-                    isSelectionMode: store.isSelectionMode,
-                    isSelected: store.selectedIDs.contains(item.id),
-                    onTapFavorite: { store.send(.onTapFavorite(item: item)) }
-                )
-                .onTapGesture {
-                    store.send(.imageTapped(item))
-                }
-                .onAppear {
-                    if item == store.filteredAlbumPhotos.last {
+        let lastPhotoID = store.photos.last?.id
+
+        GeometryReader { proxy in
+            ScrollView {
+                MasonryGridView(
+                    items: Array(store.photos),
+                    estimatedHeight: \.masonryEstimatedHeight
+                ) { item in
+                    ArchiveImageCard(
+                        item: item,
+                        isSelectionMode: store.isSelectionMode,
+                        isSelected: store.selectedIDs.contains(item.id),
+                        onTapFavorite: { store.send(.onTapFavorite(item: item)) }
+                    )
+                    .onTapGesture {
+                        store.send(.imageTapped(item))
+                    }
+                    .onAppear {
+                        guard item.id == lastPhotoID else { return }
                         store.send(.loadMorePhotos)
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 76)
+                .nekiImageMaximumDisplayHeight(proxy.size.height)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 76)
-        }
-        .scrollIndicators(.never)
-        .simultaneousGesture(
-            DragGesture()
-                .onChanged { value in
-                    let currentPoint = value.translation.height
-                    let diff = currentPoint - lastDragPoint
-                    withAnimation(.smooth) {
-                        isFilterBarVisible = diff < 0 ? false : true
+            .scrollIndicators(.never)
+            .simultaneousGesture(
+                DragGesture()
+                    .onChanged { value in
+                        let currentPoint = value.translation.height
+                        let diff = currentPoint - lastDragPoint
+                        withAnimation(.smooth) {
+                            isFilterBarVisible = diff < 0 ? false : true
+                        }
+                        if store.showDropDownMenu { store.send(.closeDropDownMenu) }
+                        lastDragPoint = currentPoint
                     }
-                    if store.showDropDownMenu { store.send(.closeDropDownMenu) }
-                    lastDragPoint = currentPoint
-                }
-                .onEnded { _ in lastDragPoint = 0 }
-        )
+                    .onEnded { _ in lastDragPoint = 0 }
+            )
+        }
     }
 }

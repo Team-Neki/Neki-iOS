@@ -19,6 +19,7 @@
 		6C0C1ACB2F6FD2E30037F650 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */; };
 		6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */; };
 		6C0C1ACF2F6FD2E30037F650 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */; };
+		6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */; };
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 /* End PBXBuildFile section */
 
@@ -84,9 +85,7 @@
 		6C499D3A2F05594E006BE1DB /* Exceptions for "Neki-iOS" folder in "Neki-iOS" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				APP/Sources/Resources/FirebaseConfig/Debug/.gitkeep,
 				"APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist",
-				APP/Sources/Resources/FirebaseConfig/Release/.gitkeep,
 				"APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist",
 				Info.plist,
 			);
@@ -145,6 +144,7 @@
 				592F2C5E2F0508FE00802BB7 /* ComposableArchitecture in Frameworks */,
 				5970335C2F2482E1000B8194 /* KakaoSDKCertCore in Frameworks */,
 				6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */,
+				6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */,
 				597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */,
 				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 				597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */,
@@ -265,6 +265,7 @@
 				6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */,
 				6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */,
 				6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */,
+				6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -354,15 +355,18 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist",
+				"$(SRCROOT)/Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist",
 			);
 			name = "Copy Firebase Plist";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/GoogleService-Info.plist",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# 1. 환경(Debug/Release) 변수 가져오기\nENVIRONMENT=\"${CONFIGURATION}\"\n\n# 2. 올려주신 폴더 구조에 맞춘 정확한 원본 파일 경로\n# (에러 로그를 기반으로 Neki-iOS 하위의 APP 폴더를 가리키도록 설정했습니다)\nSRC_PLIST_PATH=\"${SRCROOT}/Neki-iOS/APP/Sources/Resources/FirebaseConfig/${ENVIRONMENT}/GoogleService-Info.plist\"\n\n# 3. 앱이 빌드되어 완성될 목적지 경로\nDEST_PLIST_PATH=\"${BUILT_PRODUCTS_DIR}/${PRODUCT_NAME}.app/GoogleService-Info.plist\"\n\n# 4. 파일 복사 실행\necho \"Copying ${ENVIRONMENT} Firebase plist...\"\ncp -r \"${SRC_PLIST_PATH}\" \"${DEST_PLIST_PATH}\"\n";
+			shellScript = "set -eu\n\ncase \"${CONFIGURATION}\" in\n  Debug|Staging)\n    FIREBASE_ENVIRONMENT=\"Debug\"\n    ;;\n  Release)\n    FIREBASE_ENVIRONMENT=\"Release\"\n    ;;\n  *)\n    echo \"error: Unsupported Firebase configuration: ${CONFIGURATION}\"\n    exit 1\n    ;;\nesac\n\nSOURCE_PLIST=\"${SRCROOT}/Neki-iOS/APP/Sources/Resources/FirebaseConfig/${FIREBASE_ENVIRONMENT}/GoogleService-Info.plist\"\nDESTINATION_PLIST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/GoogleService-Info.plist\"\n\nif [ ! -f \"${SOURCE_PLIST}\" ]; then\n  echo \"error: Firebase plist not found: ${SOURCE_PLIST}\"\n  exit 1\nfi\n\necho \"Copying ${FIREBASE_ENVIRONMENT} Firebase plist for ${CONFIGURATION}...\"\n/bin/cp \"${SOURCE_PLIST}\" \"${DESTINATION_PLIST}\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -418,10 +422,12 @@
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = P85DW78LYM;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = NekiShareExtension/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = NekiShareExtension;
+				INFOPLIST_KEY_NEKI_APP_GROUP_ID = "group.com.OneTen.Neki-iOS-dev";
+				INFOPLIST_KEY_NEKI_URL_SCHEME = "neki-dev";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -429,11 +435,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-dev.Share-Extension";
+				MARKETING_VERSION = 1.2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS-dev.Share-Extension";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = dev_neki_share_extension;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = neki_dev_share_development;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -457,10 +463,12 @@
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = P85DW78LYM;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = NekiShareExtension/Resources/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = NekiShareExtension;
+				INFOPLIST_KEY_NEKI_APP_GROUP_ID = "group.com.OneTen.Neki-iOS";
+				INFOPLIST_KEY_NEKI_URL_SCHEME = neki;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -468,11 +476,11 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS.Share-Extension";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "match AppStore com.OneTen.Neki-iOS.Share-Extension";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = neki_release_share_distribution;
 				SKIP_INSTALL = YES;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
@@ -481,6 +489,184 @@
 				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
+		};
+		599234E0300DFA7C00C15771 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Debug.xcconfig;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = P85DW78LYM;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Staging;
+		};
+		599234E1300DFA7C00C15771 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Debug.xcconfig;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon_Dev;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = "Neki-iOS/Neki-iOS-Staging.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = P85DW78LYM;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Neki-iOS/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = Neki;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NEKI_RUNTIME_ENVIRONMENT = development;
+				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_UIUserInterfaceStyle = Light;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS-dev";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = neki_dev_distribution;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = nonisolated;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Staging;
+		};
+		599234E2300DFA7C00C15771 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 6C4998DF2EF7EF62006BE1DB /* Neki-iOS */;
+			baseConfigurationReferenceRelativePath = APP/Sources/Resources/Debug.xcconfig;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = P85DW78LYM;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOSTests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Neki-iOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Neki-iOS";
+			};
+			name = Staging;
+		};
+		599234E3300DFA7C00C15771 /* Staging */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = "NekiShareExtension/NekiShareExtension-Staging.entitlements";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Distribution";
+				CODE_SIGN_STYLE = Manual;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = P85DW78LYM;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NekiShareExtension/Resources/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NekiShareExtension;
+				INFOPLIST_KEY_NEKI_APP_GROUP_ID = "group.com.OneTen.Neki-iOS-dev";
+				INFOPLIST_KEY_NEKI_URL_SCHEME = "neki-dev";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS-dev.Share-Extension";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = neki_dev_share_distribution;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Staging;
 		};
 		6C3B4B822F65C44C008449C1 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -491,7 +677,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 586LZSS32L;
+				DEVELOPMENT_TEAM = P85DW78LYM;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MARKETING_VERSION = 1.0;
@@ -521,7 +707,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 586LZSS32L;
+				DEVELOPMENT_TEAM = P85DW78LYM;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MARKETING_VERSION = 1.0;
@@ -579,7 +765,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = 586LZSS32L;
+				DEVELOPMENT_TEAM = P85DW78LYM;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -645,7 +831,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = 586LZSS32L;
+				DEVELOPMENT_TEAM = P85DW78LYM;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -680,12 +866,13 @@
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = P85DW78LYM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
-				INFOPLIST_KEY_CFBundleDisplayName = "Neki-Dev";
+				INFOPLIST_KEY_CFBundleDisplayName = Neki;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NEKI_RUNTIME_ENVIRONMENT = development;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
@@ -700,11 +887,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-dev";
+				MARKETING_VERSION = 1.2.2;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS-dev";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = dev_neki;
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = neki_dev_development;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -732,12 +919,13 @@
 				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
-				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 586LZSS32L;
+				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = P85DW78LYM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Neki-iOS/Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = Neki;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NEKI_RUNTIME_ENVIRONMENT = production;
 				INFOPLIST_KEY_NSCameraUsageDescription = "$(CAMERA_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "$(LOCATION_USAGE_DESCRIPTION)";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "$(PHOTO_LIBRARY_USAGE_DESCRIPTION)";
@@ -752,11 +940,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
+				MARKETING_VERSION = 1.2.2;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.OneTen.Neki-iOS";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "match AppStore com.OneTen.Neki-iOS";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = neki_release_distribution;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
@@ -779,36 +967,40 @@
 			buildConfigurations = (
 				59235C5B2F64245A00198051 /* Debug */,
 				59235C5C2F64245A00198051 /* Release */,
+				599234E3300DFA7C00C15771 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		6C3B4B842F65C44C008449C1 /* Build configuration list for PBXNativeTarget "Neki-iOSTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6C3B4B822F65C44C008449C1 /* Debug */,
 				6C3B4B832F65C44C008449C1 /* Release */,
+				599234E2300DFA7C00C15771 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		6C4998D82EF7EF62006BE1DB /* Build configuration list for PBXProject "Neki-iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6C4998FC2EF7EF64006BE1DB /* Debug */,
 				6C4998FD2EF7EF64006BE1DB /* Release */,
+				599234E0300DFA7C00C15771 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 		6C4998FE2EF7EF64006BE1DB /* Build configuration list for PBXNativeTarget "Neki-iOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				6C4998FF2EF7EF64006BE1DB /* Debug */,
 				6C4999002EF7EF64006BE1DB /* Release */,
+				599234E1300DFA7C00C15771 /* Staging */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
+			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
 
@@ -918,6 +1110,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseInstallations;
+		};
+		6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
 		};
 		6C4D99E42F365E1700E93BF0 /* Lottie */ = {
 			isa = XCSwiftPackageProductDependency;

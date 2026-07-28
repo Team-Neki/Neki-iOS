@@ -91,7 +91,7 @@ struct RandomPoseCarouselFeature {
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }))
                 }
-                .cancellable(id: CancelID.poseRequest, cancelInFlight: true)
+                .cancellable(id: CancelID.poseRequest)
                 
             case .tapRight:
                 state.slideDirection = .next
@@ -100,7 +100,7 @@ struct RandomPoseCarouselFeature {
                 return .run { send in
                     await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
                 }
-                .cancellable(id: CancelID.poseRequest, cancelInFlight: true)
+                .cancellable(id: CancelID.poseRequest)
                 
                 // MARK: - Scrap Logic (Optimistic)
             case .onTapScrap:

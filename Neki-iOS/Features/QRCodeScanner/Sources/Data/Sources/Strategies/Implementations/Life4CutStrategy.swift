@@ -9,18 +9,22 @@ import Foundation
 import os
 
 struct Life4CutStrategy: QRCodeParsingStrategy {
+    private let session: URLSessionProtocol
+
     var strategyType: ParsingStrategyType { .htmlCrawling }
-    
-    func canHandle(host: String) -> Bool { QRCodeBrand.life4cut.hostKeywords.contains(where: { host.lowercased().contains($0.lowercased()) }) }
-    
-    func parse(_ url: URL, networkProvider: any NetworkProvider) async throws(QRParseError) -> ParsedQRResult {
+
+    init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
+
+    func canHandle(host: String) -> Bool { QRCodeBrand.life4cut.hostKeywords.contains { host.lowercased().contains($0.lowercased()) } }
+
+    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
         Logger.data.debug("인생네컷 파싱 시도: \(url.absoluteString)")
         
         let request = URLRequest(url: url)
         
         let response: URLResponse
         do {
-            (_, response) = try await URLSession.shared.data(for: request)
+            (_, response) = try await session.data(for: request, delegate: nil)
         } catch {
             Logger.network.error("초기 연결 실패: \(error.localizedDescription)")
             throw .networkError(.networkFail)
@@ -47,7 +51,7 @@ struct Life4CutStrategy: QRCodeParsingStrategy {
         imageRequest.setValue("https://download.life4cut.net", forHTTPHeaderField: "Referer")
         
         do {
-            let (data, response) = try await URLSession.shared.data(for: imageRequest)
+            let (data, response) = try await session.data(for: imageRequest, delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.network.warning("S3 다운로드 실패 (코드: \(httpResponse.statusCode). 다운로드 기간 만료.")

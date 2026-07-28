@@ -36,6 +36,22 @@ struct MapCoordinator {
         Reduce { state, action in
             /// 화면전환과 관련된 액션 case만 사용하고 나머지는 default를 이용해 무시
             switch action {
+            case let .root(.delegate(.showToast(item))):
+                return .send(.delegate(.showToast(item)))
+
+            case let .root(.delegate(.routeToBrandReorder(brands))):
+                state.path.append(.brandReorder(PhotoBoothBrandReorderFeature.State(brands: brands)))
+                return .none
+
+            case let .path(.element(_, action: .brandReorder(.delegate(.saveCompleted(brands))))):
+                state.root.photoBoothListState.brands = brands
+                state.path.removeLast()
+                return .send(.root(.startBackgroundCalculation))
+
+            case .path(.element(_, action: .brandReorder(.delegate(.dismiss)))):
+                state.path.removeLast()
+                return .none
+                
             default:
                 return .none
             }
@@ -47,5 +63,6 @@ struct MapCoordinator {
 extension MapCoordinator {
     @Reducer
     enum Path {
+        case brandReorder(PhotoBoothBrandReorderFeature)
     }
 }

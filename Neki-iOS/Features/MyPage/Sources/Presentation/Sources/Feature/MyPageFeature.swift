@@ -14,6 +14,7 @@ struct MyPageFeature {
     struct State {
         @Shared(.appStorage(AppStorageKey.userSessionStatus)) var userSessionStatus: UserSessionStatus = .signedOut
         var appVersion: AppVersion = AppVersion(major: 0, minor: 0, revision: 0)
+        var developerDiagnosticsTapCount: Int = .zero
         
         var user: User {
             guard case let .signedIn(user) = userSessionStatus else { return .dummy }
@@ -25,6 +26,12 @@ struct MyPageFeature {
         case onAppear
         case cellTapped(SectionCellItem)
         case profileTapped
+        case notificationButtonTapped
+        case delegate(Delegate)
+
+        enum Delegate {
+            case requestDeveloperDiagnostics
+        }
     }
     
     @Dependency(\.appVersionClient) private var appVersionClient
@@ -36,6 +43,13 @@ struct MyPageFeature {
             case .onAppear:
                 state.appVersion = appVersionClient.currentVersion()
                 return .none
+
+            case .cellTapped(.version):
+                guard appVersionClient.isDeveloperDiagnosticsAvailable() else { return .none }
+                state.developerDiagnosticsTapCount += 1
+                guard state.developerDiagnosticsTapCount >= 7 else { return .none }
+                state.developerDiagnosticsTapCount = .zero
+                return .send(.delegate(.requestDeveloperDiagnostics))
                 
             default:
                 return .none
@@ -63,7 +77,7 @@ extension MyPageFeature {
     }
     
     enum SectionCellItem: String, Identifiable {
-        case deviceAuthorization = "권한 설정하기"
+        case deviceAuthorization = "권한 및 알림 설정하기"
         case support = "Neki에 문의하기"
         case termsOfService = "이용약관"
         case privacyPolicy = "개인정보 처리방침"

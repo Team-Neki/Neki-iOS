@@ -55,6 +55,10 @@ public final actor DefaultNetworkProvider: NetworkProvider {
             }
             
             return
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw NetworkError.unknownError(error)
         }
@@ -106,6 +110,10 @@ private extension DefaultNetworkProvider {
             let (data, response) = try await session.data(for: request, delegate: nil)
             responseLog(data: data, response: response)
             return (data, response)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         } catch {
             throw NetworkError.unknownError(error)
         }
@@ -175,15 +183,14 @@ private extension DefaultNetworkProvider {
         try await performTokenRefresh()
     }
     
-    func handleSessionExpired() {
-        UserSessionStatus.updateStatus(.expired)
+    func clearStoredTokenAfterRefreshFailure() {
         try? tokenStorage.delete()
-        Logger.network.error("❌ Session Expired.")
+        Logger.network.error("❌ Token refresh failed. Stored token was removed.")
     }
     
     func retryWithTokenRefresh<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
         guard endpoint.authorizationType != .reissue, retryCount > .zero else {
-            handleSessionExpired()
+            clearStoredTokenAfterRefreshFailure()
             throw NetworkError.unauthorizedError
         }
         
@@ -191,7 +198,7 @@ private extension DefaultNetworkProvider {
             try await performTokenRefresh()
             return try await performRequest(endpoint: endpoint, retryCount: retryCount - 1)
         } catch {
-            handleSessionExpired()
+            clearStoredTokenAfterRefreshFailure()
             throw error
         }
     }

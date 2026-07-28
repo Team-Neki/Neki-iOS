@@ -7,7 +7,6 @@
 
 import SwiftUI
 import ComposableArchitecture
-import Kingfisher
 
 @Reducer
 struct ArchivePhotoDetailFeature {
@@ -16,13 +15,13 @@ struct ArchivePhotoDetailFeature {
         @Presents var imageTransform: ImageTransformFeature.State?
         @Presents var albumSelection: AlbumSelectionFeature.State?
         
-        var photos: IdentifiedArrayOf<ArchiveImageItem>
+        var photos: IdentifiedArrayOf<PhotoEntity>
         var currentItemID: Int
         let folderId: Int?
         
-        var currentItem: ArchiveImageItem? { photos[id: currentItemID] }
+        var currentItem: PhotoEntity? { photos[id: currentItemID] }
         var formattedDate: String {
-            return currentItem?.date.toDotFormatString() ?? ""
+            return currentItem?.createdAt.toDotFormatString() ?? ""
         }
         
         var isLoading: Bool = false
@@ -65,7 +64,7 @@ struct ArchivePhotoDetailFeature {
         case closeDropDownMenu
         
         case onTapShareToInstagramStory
-        case instagramImageFetchResponse(Result<UIImage, Error>)
+        case instagramShareResponse(Result<Bool, Error>)
         
         case delegate(Delegate)
         enum Delegate {
@@ -77,6 +76,7 @@ struct ArchivePhotoDetailFeature {
     @Dependency(\.archiveClient) var archiveClient
     @Dependency(\.imageDownloadClient) var imageDownloadClient
     @Dependency(\.analyticsClient) var analyticsClient
+    @Dependency(\.archiveMediaClient) var archiveMediaClient
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -141,14 +141,8 @@ struct ArchivePhotoDetailFeature {
                 guard let url = state.currentItem?.imageURL else { return .none }
                 return .run { send in
                     do {
-                        let image = try await withCheckedThrowingContinuation { continuation in
-                            KingfisherManager.shared.retrieveImage(with: url, options: [.cacheOriginalImage]) { result in
-                                switch result {
-                                case .success(let value): continuation.resume(returning: value.image)
-                                case .failure(let error): continuation.resume(throwing: error)
-                                }
-                            }
-                        }
+                        let imageData = try await archiveMediaClient.fetchOriginalImageData(url: url)
+                        guard let image = UIImage(data: imageData) else { throw ArchivePhotoDetailError.imageDecodingFailed }
                         await send(.imageFetchResponse(.success(image)))
                     } catch {
                         await send(.imageFetchResponse(.failure(error)))
@@ -252,40 +246,18 @@ struct ArchivePhotoDetailFeature {
                 state.isLoading = true
                 
                 return .run { send in
-                    do {
-                        let image = try await withCheckedThrowingContinuation { continuation in
-                            KingfisherManager.shared.retrieveImage(with: url, options: [.cacheOriginalImage]) { result in
-                                switch result {
-                                case .success(let value): continuation.resume(returning: value.image)
-                                case .failure(let error): continuation.resume(throwing: error)
-                                }
-                            }
-                        }
-                        await send(.instagramImageFetchResponse(.success(image)))
-                    } catch {
-                        await send(.instagramImageFetchResponse(.failure(error)))
-                    }
+                    await send(.instagramShareResponse(Result {
+                        let imageData = try await archiveMediaClient.fetchOriginalImageData(url: url)
+                        return try await archiveMediaClient.shareInstagramStory(imageData: imageData)
+                    }))
                 }
                 
-            case let .instagramImageFetchResponse(.success(image)):
+            case let .instagramShareResponse(.success(isShared)):
                 state.isLoading = false
-                return .run { send in
-                    let isShared = await MainActor.run { () -> Bool in
-                        guard let urlScheme = URL(string: "instagram-stories://share?source_application=Neki") else { return false }
-                        if UIApplication.shared.canOpenURL(urlScheme) {
-                            if let imageData = image.pngData() {
-                                let pasteboardItems: [[String: Any]] = [["com.instagram.sharedSticker.backgroundImage": imageData]]
-                                UIPasteboard.general.setItems(pasteboardItems, options: [UIPasteboard.OptionsKey.expirationDate: Date().addingTimeInterval(60 * 5)])
-                                UIApplication.shared.open(urlScheme, options: [:], completionHandler: nil)
-                                return true
-                            }
-                        }
-                        return false
-                    }
-                    if !isShared { await send(.delegate(.showToast(NekiToastItem("인스타그램 앱이 설치되어 있지 않아요", style: .error)))) }
-                }
+                guard isShared == false else { return .none }
+                return .send(.delegate(.showToast(NekiToastItem("인스타그램 앱이 설치되어 있지 않아요", style: .error))))
                 
-            case .instagramImageFetchResponse(.failure):
+            case .instagramShareResponse(.failure):
                 state.isLoading = false
                 return .send(.delegate(.showToast(NekiToastItem("이미지를 불러오지 못했어요", style: .error))))
                 
@@ -296,4 +268,8 @@ struct ArchivePhotoDetailFeature {
         .ifLet(\.$imageTransform, action: \.imageTransform) { ImageTransformFeature() }
         .ifLet(\.$albumSelection, action: \.albumSelection) { AlbumSelectionFeature() }
     }
+}
+
+private enum ArchivePhotoDetailError: Error {
+    case imageDecodingFailed
 }

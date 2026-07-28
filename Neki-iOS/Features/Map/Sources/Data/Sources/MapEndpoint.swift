@@ -10,7 +10,10 @@ import Foundation
 enum MapEndpoint {
     case polygon(dto: FetchPhotoBoothsDTO.Request)
     case point(dto: FetchNearbyPhotoBoothsDTO.Request)
+    case updateFavorite(id: Int, dto: TogglePhotoBoothFavoriteDTO)
+    case fetchFavorites
     case fetchBrands
+    case updateBrandOrder(dto: UpdatePhotoBoothBrandOrderDTO.Request)
 }
 
 
@@ -21,7 +24,7 @@ extension MapEndpoint: Endpoint {
     
     var contentType: HTTPContentType {
         switch self {
-        case .polygon, .point, .fetchBrands: return .json
+        case .polygon, .point, .updateFavorite, .fetchFavorites, .fetchBrands, .updateBrandOrder: return .json
         }
     }
     
@@ -29,14 +32,19 @@ extension MapEndpoint: Endpoint {
         switch self {
         case .polygon: return "/photo-booths/polygon"
         case .point: return "/photo-booths/point"
+        case let .updateFavorite(id, _): return "/photo-booths/\(id)/favorite"
+        case .fetchFavorites: return "/photo-booths/favorite"
         case .fetchBrands: return "/photo-booths/brand"
+        case .updateBrandOrder: return "/photo-booths/brand/order"
         }
     }
     
     var method: HTTPMethodType {
         switch self {
         case .polygon, .point: return .post
-        case .fetchBrands: return .get
+        case .updateFavorite: return .patch
+        case .fetchFavorites, .fetchBrands: return .get
+        case .updateBrandOrder: return .put
         }
     }
     
@@ -44,7 +52,9 @@ extension MapEndpoint: Endpoint {
         switch self {
         case let .polygon(dto): return dto
         case let .point(dto): return dto
-        case .fetchBrands: return nil
+        case let .updateFavorite(_, dto): return dto
+        case .fetchFavorites, .fetchBrands: return nil
+        case let .updateBrandOrder(dto): return dto
         }
     }
 }

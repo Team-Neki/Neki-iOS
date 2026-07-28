@@ -12,6 +12,10 @@ public enum AnalyticsParameterKey: String {
     case userId = "user_id"
     case platform = "platform"
     case appVersion = "app_version"
+    case notificationType = "notification_type"
+    case targetType = "target_type"
+    case messageTone = "message_tone"
+    case hasVariable = "has_variable"
     
     // 아카이빙
     case method = "method"
@@ -25,6 +29,11 @@ public enum AnalyticsParameterKey: String {
     case action = "action"
     case selectedCount = "selected_count"
     case brandName = "brand_name"
+    case boothName = "booth_name"
+    case favoriteBoothCount = "favorite_booth_count"
+    case priorityBrand1 = "priority_brand_1"
+    case priorityBrand2 = "priority_brand_2"
+    case priorityBrand3 = "priority_brand_3"
     case entryPoint = "entry_point"
     case mapType = "map_type"
     

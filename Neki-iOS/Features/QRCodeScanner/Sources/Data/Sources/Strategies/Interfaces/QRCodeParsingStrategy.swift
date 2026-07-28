@@ -11,5 +11,5 @@ protocol QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { get }
     
     func canHandle(host: String) -> Bool
-    func parse(_ url: URL, networkProvider: NetworkProvider) async throws(QRParseError) -> ParsedQRResult
+    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult
 }

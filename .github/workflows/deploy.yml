@@ -164,6 +164,22 @@ jobs:
             fi
           done
 
+          case "$DEPLOYMENT_TARGET" in
+            "development")
+              TARGET_APP_NAME="Neki-dev"
+              ;;
+            "production")
+              TARGET_APP_NAME="Neki-iOS"
+              ;;
+            "both")
+              TARGET_APP_NAME="Neki-iOS & Dev"
+              ;;
+            *)
+              echo "::error::Unsupported deployment target: $DEPLOYMENT_TARGET"
+              exit 1
+              ;;
+          esac
+
           if [ "$DEPLOYMENT_TARGET" = "development" ]; then
             BUILD_SCHEME="Neki-iOS.Dev"
             XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Debug.xcconfig"
@@ -182,6 +198,7 @@ jobs:
             echo "BUILD_SCHEME=$BUILD_SCHEME"
             echo "XCCONFIG_PATH=$XCCONFIG_PATH"
             echo "FIREBASE_PATH=$FIREBASE_PATH"
+            echo "TARGET_APP_NAME=$TARGET_APP_NAME"
           } >> "$GITHUB_ENV"
 
       - name: Checkout repository
@@ -272,6 +289,7 @@ jobs:
           OPERATION: ${{ inputs.operation }}
           APP_VERSION: ${{ inputs.app_version }}
           JOB_STATUS: ${{ job.status }}
+          TARGET_APP_NAME: ${{ env.TARGET_APP_NAME }}
         run: |
           if [ "$JOB_STATUS" = "success" ]; then
             TITLE="✅ 우리 Neki-iOS 정상영업 합니다."
@@ -281,9 +299,12 @@ jobs:
             COLOR=15548997
           fi
 
+          TARGET_APP_NAME="${TARGET_APP_NAME:-확인 불가}"
+
           PAYLOAD=$(jq -n \
             --arg title "$TITLE" \
             --arg operation "$OPERATION" \
+            --arg app "$TARGET_APP_NAME" \
             --arg version "$APP_VERSION" \
             --argjson color "$COLOR" \
             '{
@@ -292,6 +313,7 @@ jobs:
                 color: $color,
                 fields: [
                   {name: "작업 종류", value: $operation, inline: true},
+                  {name: "대상 앱", value: $app, inline: true},
                   {name: "대상 버전", value: $version, inline: true}
                 ]
               }]

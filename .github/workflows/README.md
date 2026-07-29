@@ -67,6 +67,8 @@ GitHub App은 `Team-Neki/Neki-fastlane-match-repo`에만 설치하고 Repository
 
 Actions의 `Neki-iOS 배포 및 버전 관리`에서 실행할 작업을 선택합니다. 대상 환경, 배포 목적지와 업데이트 정책은 작업명에서 자동 결정됩니다.
 
+Discord 결과 메시지의 대상 앱은 개발기를 `Neki-dev`, 상용기를 `Neki-iOS`로 표시합니다. 향후 두 앱을 함께 처리하는 작업은 `Neki-iOS & Dev`로 표시합니다.
+
 | 작업 종류 | 실행 결과 |
 | --- | --- |
 | `개발기 연결 검증` | 개발기 인증·서명·App Store Connect 연결 검증 |

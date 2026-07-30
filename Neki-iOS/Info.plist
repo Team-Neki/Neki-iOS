@@ -27,6 +27,10 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
+	<key>FacebookAppID</key>
+	<string>1581306157023704</string>
+	<key>FacebookClientToken</key>
+	<string>7283d0be910e8efe54f36fa44cffa2c3</string>
 	<key>KAKAO_LOGIN_NATIVE_APP_KEY</key>
 	<string>$(KAKAO_LOGIN_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>

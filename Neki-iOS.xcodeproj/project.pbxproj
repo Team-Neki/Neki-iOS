@@ -21,6 +21,7 @@
 		6C0C1ACF2F6FD2E30037F650 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */; };
 		6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */; };
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
+		6CA30401301A000100000001 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = 6CA30403301A000100000001 /* FacebookCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -145,6 +146,7 @@
 				5970335C2F2482E1000B8194 /* KakaoSDKCertCore in Frameworks */,
 				6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */,
 				6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */,
+				6CA30401301A000100000001 /* FacebookCore in Frameworks */,
 				597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */,
 				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 				597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */,
@@ -266,6 +268,7 @@
 				6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */,
 				6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */,
 				6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */,
+				6CA30403301A000100000001 /* FacebookCore */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -309,6 +312,7 @@
 				597033562F2482E1000B8194 /* XCRemoteSwiftPackageReference "kakao-ios-sdk" */,
 				6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				6CA30402301A000100000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6C4998DE2EF7EF62006BE1DB /* Products */;
@@ -1053,6 +1057,14 @@
 				minimumVersion = 4.6.0;
 			};
 		};
+		6CA30402301A000100000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/facebook/facebook-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 18.1.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1120,6 +1132,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */;
 			productName = Lottie;
+		};
+		6CA30403301A000100000001 /* FacebookCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6CA30402301A000100000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
+			productName = FacebookCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

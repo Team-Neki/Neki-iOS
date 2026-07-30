@@ -44,6 +44,7 @@ struct AppCoordinator {
         var hasSynchronizedPushNotification: Bool = false
         var lastSynchronizedPushAgreement: Bool?
         var isAPNSTokenRegistered: Bool = false
+        var attribution = AttributionFeature.State()
         var pushNotificationEvent = PushNotificationEventFeature.State()
         
         init() {
@@ -75,6 +76,7 @@ struct AppCoordinator {
         case requestPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case synchronizePushNotification
         case synchronizePushNotificationResponse(Result<UNAuthorizationStatus, Error>)
+        case attribution(AttributionFeature.Action)
         case pushNotificationEvent(PushNotificationEventFeature.Action)
         
         // Binding Actions
@@ -96,9 +98,9 @@ struct AppCoordinator {
     var body: some ReducerOf<Self> {
         BindingReducer()
 
-        Scope(state: \.pushNotificationEvent, action: \.pushNotificationEvent) {
-            PushNotificationEventFeature()
-        }
+        Scope(state: \.attribution, action: \.attribution) { AttributionFeature() }
+
+        Scope(state: \.pushNotificationEvent, action: \.pushNotificationEvent) { PushNotificationEventFeature() }
         
         Scope(state: \.route, action: \.route) { Route() }
         
@@ -135,6 +137,7 @@ struct AppCoordinator {
                     await send(.splashSequenceCompleted(finalStatus, finalVersionResult))
                 }
                 return .merge(
+                    .send(.attribution(.appLaunched)),
                     .send(.pushNotificationEvent(.task)),
                     launchEffect
                 )

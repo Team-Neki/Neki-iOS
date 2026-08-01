@@ -223,6 +223,23 @@ jobs:
           printf '%s' "$BUILD_XCCONFIG" | base64 --decode > "$XCCONFIG_PATH"
           test -s "$XCCONFIG_PATH"
 
+          AMPLITUDE_API_KEY_VALUE="$(
+            awk -F= '
+              /^[[:space:]]*AMPLITUDE_API_KEY[[:space:]]*=/ {
+                value = $0
+                sub(/^[^=]*=[[:space:]]*/, "", value)
+                sub(/^[[:space:]"]*/, "", value)
+                sub(/[[:space:]"]*$/, "", value)
+                print value
+                exit
+              }
+            ' "$XCCONFIG_PATH"
+          )"
+          if [ -z "$AMPLITUDE_API_KEY_VALUE" ] || [[ "$AMPLITUDE_API_KEY_VALUE" == *'$('* ]]; then
+            echo "::error::AMPLITUDE_API_KEY is missing or unresolved in $XCCONFIG_PATH"
+            exit 1
+          fi
+
           mkdir -p "$(dirname "$FIREBASE_PATH")"
           printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH"
           plutil -lint "$FIREBASE_PATH"

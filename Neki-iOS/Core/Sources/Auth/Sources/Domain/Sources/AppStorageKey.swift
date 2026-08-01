@@ -22,9 +22,6 @@ public struct AppStorageKey {
         "MarketingConsentManagementStatus_\(userID)"
     }
 
-    public static func requiredTermsAgreementPolicyVersion(userID: Int) -> String {
-        "RequiredTermsAgreementPolicyVersion_\(userID)"
-    }
 }
 
 public enum MarketingConsentManagementStatus: String {

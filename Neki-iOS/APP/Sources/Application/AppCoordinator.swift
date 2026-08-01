@@ -15,7 +15,6 @@ struct AppCoordinator {
     enum Constants {
         static let versionCheckInterval: TimeInterval = 60 *  60 * 24 // 1일
         static let marketingConsentAlertRevisitInterval: TimeInterval = 60 * 60 * 24 * 7 // 7일
-        static let requiredTermsAgreementPolicyVersion: String = "2026-06-push-notification"
     }
     
     @ObservableState
@@ -267,7 +266,6 @@ struct AppCoordinator {
                 marketingConsentStatus
             )))):
                 if didCompleteTermsAgreement {
-                    markRequiredTermsAgreementPolicyCompleted(for: user)
                     if let marketingConsentStatus {
                         markMarketingConsentManaged(
                             for: user,
@@ -288,7 +286,6 @@ struct AppCoordinator {
                 )
 
             case let .route(.termsAgreement(.didFinishOnboarding(user, marketingConsentStatus))):
-                markRequiredTermsAgreementPolicyCompleted(for: user)
                 if let marketingConsentStatus {
                     markMarketingConsentManaged(
                         for: user,
@@ -423,7 +420,6 @@ private extension AppCoordinator {
             state: &state,
             sessionStatus: sessionStatus,
             shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert,
-            shouldPresentRequiredTermsAgreement: { shouldPresentRequiredTermsAgreement(for: $0) },
             isMarketingConsentAlertEligible: { isMarketingConsentAlertEligible(for: $0) }
         )
     }
@@ -467,17 +463,6 @@ private extension AppCoordinator {
         }
 
         return now.timeIntervalSince(lastManagedAt) >= Constants.marketingConsentAlertRevisitInterval
-    }
-
-    func shouldPresentRequiredTermsAgreement(for user: User) -> Bool {
-        guard user.allRequiredTermsAgreed else { return false }
-        let key = AppStorageKey.requiredTermsAgreementPolicyVersion(userID: user.id)
-        return UserDefaults.standard.string(forKey: key) != Constants.requiredTermsAgreementPolicyVersion
-    }
-
-    func markRequiredTermsAgreementPolicyCompleted(for user: User) {
-        let key = AppStorageKey.requiredTermsAgreementPolicyVersion(userID: user.id)
-        UserDefaults.standard.set(Constants.requiredTermsAgreementPolicyVersion, forKey: key)
     }
 
     func markMarketingConsentManaged(

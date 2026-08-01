@@ -412,11 +412,7 @@ public struct MapFeature {
                 state.pendingFavoriteUpdates[photoBooth.id] = requestedValue
                 updatePhotoBoothFavoriteState(&state, photoBooth: photoBooth, isFavorite: requestedValue)
 
-                let event: MapAnalyticsEvent = requestedValue
-                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name)
-                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name)
                 let stateEffect: Effect<Action> = .send(.startBackgroundCalculation)
-                let analyticsEffect: Effect<Action> = .run { _ in analytics.logEvent(event: event) }
                 let cancelFavoriteFetchEffect: Effect<Action> = .cancel(id: CancelID.favoriteFetch)
                 let requestEffect: Effect<Action> = .run { [id = photoBooth.id, requestedValue] send in
                     await send(.updatePhotoBoothFavoriteResponse(
@@ -427,7 +423,7 @@ public struct MapFeature {
                 }
                 .cancellable(id: CancelID.favorite(photoBooth.id), cancelInFlight: true)
                 
-                return .merge(stateEffect, analyticsEffect, cancelFavoriteFetchEffect, requestEffect)
+                return .merge(stateEffect, cancelFavoriteFetchEffect, requestEffect)
 
             case let .updatePhotoBoothFavoriteResponse(photoBooth, requestedValue, .success):
                 state.pendingFavoriteUpdates[photoBooth.id] = nil
@@ -435,9 +431,13 @@ public struct MapFeature {
                 let message = requestedValue
                     ? "저장한 포토부스에 추가했어요!"
                     : "저장한 포토부스에서 삭제했어요!"
+                let event: MapAnalyticsEvent = requestedValue
+                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name)
+                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name)
                 return .merge(
                     .send(.startBackgroundCalculation),
-                    .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
+                    .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
+                    .run { _ in analytics.logEvent(event: event) }
                 )
 
             case let .updatePhotoBoothFavoriteResponse(photoBooth, requestedValue, .failure(error)):

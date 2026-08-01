@@ -44,6 +44,7 @@ struct ArchivePhotoDetailFeature {
         case cancelMemoEditing
         case doneMemoEditing
         case clearAllMemoEditing
+        case memoUpdateResponse(Result<Void, Error>)
         
         case onTapTransform
         case imageFetchResponse(Result<UIImage, Error>)
@@ -128,9 +129,16 @@ struct ArchivePhotoDetailFeature {
                 state.isMemoExpanded = false
                 
                 return .run { send in
-                    try? await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
-                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate)
+                    await send(.memoUpdateResponse(Result {
+                        try await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
+                    }))
                 }
+
+            case .memoUpdateResponse(.success):
+                return .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate) }
+
+            case .memoUpdateResponse(.failure):
+                return .none
                 
             case .clearAllMemoEditing:
                 state.editingMemoText = ""

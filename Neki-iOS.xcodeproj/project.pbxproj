@@ -22,6 +22,7 @@
 		6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */; };
 		6C4D99E52F365E1700E93BF0 /* Lottie in Frameworks */ = {isa = PBXBuildFile; productRef = 6C4D99E42F365E1700E93BF0 /* Lottie */; };
 		6CA30401301A000100000001 /* FacebookCore in Frameworks */ = {isa = PBXBuildFile; productRef = 6CA30403301A000100000001 /* FacebookCore */; };
+		6CA30901301B000100000001 /* AmplitudeSwift in Frameworks */ = {isa = PBXBuildFile; productRef = 6CA30903301B000100000001 /* AmplitudeSwift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -147,6 +148,7 @@
 				6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */,
 				6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */,
 				6CA30401301A000100000001 /* FacebookCore in Frameworks */,
+				6CA30901301B000100000001 /* AmplitudeSwift in Frameworks */,
 				597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */,
 				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 				597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */,
@@ -269,6 +271,7 @@
 				6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */,
 				6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */,
 				6CA30403301A000100000001 /* FacebookCore */,
+				6CA30903301B000100000001 /* AmplitudeSwift */,
 			);
 			productName = "Neki-iOS";
 			productReference = 6C4998DD2EF7EF62006BE1DB /* Neki-iOS.app */;
@@ -313,6 +316,7 @@
 				6C4D99E32F365E1700E93BF0 /* XCRemoteSwiftPackageReference "lottie-ios" */,
 				6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				6CA30402301A000100000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */,
+				6CA30902301B000100000001 /* XCRemoteSwiftPackageReference "Amplitude-Swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 6C4998DE2EF7EF62006BE1DB /* Products */;
@@ -1065,6 +1069,14 @@
 				minimumVersion = 18.1.0;
 			};
 		};
+		6CA30902301B000100000001 /* XCRemoteSwiftPackageReference "Amplitude-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/amplitude/Amplitude-Swift";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.18.6;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1137,6 +1149,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 6CA30402301A000100000001 /* XCRemoteSwiftPackageReference "facebook-ios-sdk" */;
 			productName = FacebookCore;
+		};
+		6CA30903301B000100000001 /* AmplitudeSwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6CA30902301B000100000001 /* XCRemoteSwiftPackageReference "Amplitude-Swift" */;
+			productName = AmplitudeSwift;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

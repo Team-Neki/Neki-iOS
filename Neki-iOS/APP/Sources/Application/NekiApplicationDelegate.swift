@@ -12,6 +12,7 @@ import os
 import UserNotifications
 
 final class NekiApplicationDelegate: NSObject, UIApplicationDelegate {
+    @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
 
     private let pushNotificationDelegate = PushNotificationDelegate()
@@ -23,6 +24,13 @@ final class NekiApplicationDelegate: NSObject, UIApplicationDelegate {
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseApp.configure()
+        Task {
+            do {
+                try await analyticsClient.initialize()
+            } catch {
+                Logger.data.error("분석 도구 초기화 실패: \(error)")
+            }
+        }
         pushNotificationClient.configureMessaging()
         UNUserNotificationCenter.current().delegate = pushNotificationDelegate
         application.registerForRemoteNotifications()

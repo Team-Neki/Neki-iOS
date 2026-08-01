@@ -182,11 +182,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                                 } catch is CancellationError {
                                     throw CancellationError()
                                 } catch {
-                                    guard let stalePhotoBooths = staleFallbackByTile[tile] else {
-                                        Logger.data.error("POI fetch failed for tile: \(tile), error: \(error)")
-                                        return nil
-                                    }
-                                    Logger.data.error("POI refresh failed. Serving stale tile: \(tile), error: \(error)")
+                                    guard let stalePhotoBooths = staleFallbackByTile[tile] else { return nil }
                                     return stalePhotoBooths
                                 }
                             }

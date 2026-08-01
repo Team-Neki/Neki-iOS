@@ -58,12 +58,18 @@ private enum TileSystem {
 
 public final actor DefaultPhotoBoothRepository {
     typealias BrandID = String
+
+    private struct TileFetchRequest {
+        let task: Task<[PhotoBooth], Error>
+        var waiterIDs: Set<UUID>
+        var didCacheResult: Bool = false
+    }
     
     @Dependency(\.networkProvider) private var networkProvider
     
     private let tileCache: PhotoBoothTileCache
     private let cacheFreshnessPolicy: any PhotoBoothCacheFreshnessPolicy
-    private var tileFetchTasks: [MapTile: Task<[PhotoBooth], Error>] = [:]
+    private var tileFetchRequests: [MapTile: TileFetchRequest] = [:]
     private var favoritePhotoBoothIDs: [PhotoBooth.ID] = []
     private var favoritePhotoBoothIDSet: Set<PhotoBooth.ID> = []
     private var favoritePhotoBoothsByID: [PhotoBooth.ID: PhotoBooth] = [:]
@@ -72,7 +78,8 @@ public final actor DefaultPhotoBoothRepository {
     private var brandMap: [BrandID: PhotoBoothBrand]?
     private var brandCachedAt: Date?
     private var brandOrderIDs: [PhotoBoothBrand.ID] = []
-    private var brandFetchTask: Task<([BrandID: PhotoBoothBrand], [PhotoBoothBrand.ID]), Error>?
+    private var brandOrderMutationRevision: UInt = .zero
+    private var brandFetchTask: Task<[BrandID: PhotoBoothBrand], Error>?
     
     public init() {
         let configuration = PhotoBoothCacheConfiguration.standard
@@ -93,31 +100,30 @@ public final actor DefaultPhotoBoothRepository {
         
         if let existingTask = brandFetchTask {
             do {
-                let (map, orderIDs) = try await existingTask.value
-                updateCachedBrands(map, orderIDs: orderIDs, cachedAt: .now)
-                return map
+                return try await existingTask.value
             } catch {
                 if let brandMap { return brandMap }
                 throw error
             }
         }
         
-        let task = Task<([BrandID: PhotoBoothBrand], [PhotoBoothBrand.ID]), Error> {
+        let orderMutationRevision = brandOrderMutationRevision
+        let task = Task<[BrandID: PhotoBoothBrand], Error> {
             let endpoint = MapEndpoint.fetchBrands
             let responseDTO: BaseResponseDTO<FetchPhotoBrandsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let brandList = responseDTO.data else { throw NetworkError.responseDecodingError }
             let brandEntities = brandList.map { $0.toEntity() }
-            return (
-                Dictionary(uniqueKeysWithValues: brandEntities.map { ($0.name, $0) }),
-                brandEntities.map(\.id)
-            )
+            let map = Dictionary(uniqueKeysWithValues: brandEntities.map { ($0.name, $0) })
+            let orderIDs = brandEntities.map(\.id)
+            let latestOrderIDs = orderMutationRevision == brandOrderMutationRevision ? orderIDs : nil
+            updateCachedBrands(map, orderIDs: latestOrderIDs, cachedAt: .now)
+            return map
         }
         
         brandFetchTask = task
         
         do {
-            let (map, orderIDs) = try await task.value
-            updateCachedBrands(map, orderIDs: orderIDs, cachedAt: .now)
+            let map = try await task.value
             brandFetchTask = nil
             return map
         } catch {
@@ -166,24 +172,28 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                     try Task.checkCancellation()
                     let staleFallbackByTile = stalePhotoBoothsByTile
                     
-                    try await withThrowingTaskGroup(of: (MapTile, [PhotoBooth]).self) { group in
+                    try await withThrowingTaskGroup(of: [PhotoBooth]?.self) { group in
                         for tile in tilesToFetch {
                             group.addTask {
                                 do {
                                     let photoBooths = try await self.fetchPhotoBooths(for: tile, brands: brands)
                                     try Task.checkCancellation()
-                                    return (tile, photoBooths)
+                                    return photoBooths
                                 } catch is CancellationError {
                                     throw CancellationError()
                                 } catch {
-                                    guard let stalePhotoBooths = staleFallbackByTile[tile] else { throw error }
+                                    guard let stalePhotoBooths = staleFallbackByTile[tile] else {
+                                        Logger.data.error("POI fetch failed for tile: \(tile), error: \(error)")
+                                        return nil
+                                    }
                                     Logger.data.error("POI refresh failed. Serving stale tile: \(tile), error: \(error)")
-                                    return (tile, stalePhotoBooths)
+                                    return stalePhotoBooths
                                 }
                             }
                         }
                         
-                        for try await (_, photoBooths) in group {
+                        for try await result in group {
+                            guard let photoBooths = result else { continue }
                             continuation.yield(self.photoBoothsApplyingFavoriteState(photoBooths))
                         }
                     }
@@ -253,6 +263,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let dto = UpdatePhotoBoothBrandOrderDTO.Request(brandIDs: orderedIDs)
         let endpoint = MapEndpoint.updateBrandOrder(dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
+        brandOrderMutationRevision &+= 1
         brandOrderIDs = orderedIDs
         return brands
     }
@@ -265,11 +276,8 @@ private extension DefaultPhotoBoothRepository {
     func photoBoothsApplyingFavoriteState(_ photoBooths: [PhotoBooth]) -> [PhotoBooth] {
         photoBooths.map { photoBooth in
             var updatedPhotoBooth = photoBooth
-            if hasLoadedFavoritePhotoBoothSnapshot {
-                updatedPhotoBooth.isFavorite = favoritePhotoBoothIDSet.contains(photoBooth.id)
-            } else if favoritePhotoBoothIDSet.contains(photoBooth.id) {
-                updatedPhotoBooth.isFavorite = true
-            }
+            let isFavorite = favoritePhotoBoothIDSet.contains(photoBooth.id)
+            if hasLoadedFavoritePhotoBoothSnapshot || isFavorite { updatedPhotoBooth.isFavorite = isFavorite }
             return updatedPhotoBooth
         }
     }
@@ -301,9 +309,40 @@ private extension DefaultPhotoBoothRepository {
         for tile: MapTile,
         brands: [BrandID: PhotoBoothBrand]
     ) async throws -> [PhotoBooth] {
-        if let existingTask = tileFetchTasks[tile] { return try await existingTask.value }
+        try Task.checkCancellation()
+        if case let .fresh(snapshot) = tileCache.lookup(tile: tile, now: .now) { return snapshot.photoBooths }
 
-        let task = Task<[PhotoBooth], Error> { [networkProvider] in
+        let waiterID = UUID()
+        let task: Task<[PhotoBooth], Error>
+        if var request = tileFetchRequests[tile] {
+            request.waiterIDs.insert(waiterID)
+            tileFetchRequests[tile] = request
+            task = request.task
+        } else {
+            task = makeTileFetchTask(tile: tile, brands: brands)
+            tileFetchRequests[tile] = TileFetchRequest(task: task, waiterIDs: [waiterID])
+        }
+
+        return try await withTaskCancellationHandler {
+            do {
+                let photoBooths = try await task.value
+                try Task.checkCancellation()
+                finishWaitingForTile(tile: tile, waiterID: waiterID, photoBooths: photoBooths)
+                return photoBooths
+            } catch {
+                finishWaitingForTile(tile: tile, waiterID: waiterID)
+                throw error
+            }
+        } onCancel: {
+            Task { await self.cancelWaitingForTile(tile: tile, waiterID: waiterID) }
+        }
+    }
+
+    func makeTileFetchTask(
+        tile: MapTile,
+        brands: [BrandID: PhotoBoothBrand]
+    ) -> Task<[PhotoBooth], Error> {
+        Task { [networkProvider] in
             try Task.checkCancellation()
             let tileBounds = TileSystem.getBoundingBox(for: tile)
             let requestDTO = FetchPhotoBoothsDTO.Request(bounds: tileBounds)
@@ -318,31 +357,43 @@ private extension DefaultPhotoBoothRepository {
                 return dto.toEntity(brand: brand)
             }
         }
+    }
 
-        tileFetchTasks[tile] = task
-        do {
-            let photoBooths = try await task.value
-            tileFetchTasks[tile] = nil
+    func finishWaitingForTile(
+        tile: MapTile,
+        waiterID: UUID,
+        photoBooths: [PhotoBooth]? = nil
+    ) {
+        guard var request = tileFetchRequests[tile], request.waiterIDs.remove(waiterID) != nil else { return }
+        if let photoBooths, request.didCacheResult == false {
             tileCache.insert(
                 photoBooths,
                 for: tile,
                 metadata: PhotoBoothCacheMetadata(cachedAt: .now, validationToken: nil)
             )
-            return photoBooths
-        } catch {
-            tileFetchTasks[tile] = nil
-            throw error
+            request.didCacheResult = true
         }
+        tileFetchRequests[tile] = request.waiterIDs.isEmpty ? nil : request
+    }
+
+    func cancelWaitingForTile(tile: MapTile, waiterID: UUID) {
+        guard var request = tileFetchRequests[tile], request.waiterIDs.remove(waiterID) != nil else { return }
+        guard request.waiterIDs.isEmpty else {
+            tileFetchRequests[tile] = request
+            return
+        }
+        request.task.cancel()
+        tileFetchRequests[tile] = nil
     }
 
     func updateCachedBrands(
         _ brands: [BrandID: PhotoBoothBrand],
-        orderIDs: [PhotoBoothBrand.ID],
+        orderIDs: [PhotoBoothBrand.ID]?,
         cachedAt: Date
     ) {
         if let brandMap, brandMap != brands { tileCache.removeAll() }
         brandMap = brands
-        brandOrderIDs = orderIDs
+        if let orderIDs { brandOrderIDs = orderIDs }
         brandCachedAt = cachedAt
     }
 

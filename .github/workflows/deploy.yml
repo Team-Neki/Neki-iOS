@@ -22,7 +22,7 @@ on:
         required: true
         type: string
       release_notes:
-        description: 배포 작업의 TestFlight 또는 App Store 변경사항
+        description: TestFlight 선택 입력, App Store 심사 제출 시 필수인 변경사항
         required: false
         type: string
       production_release_confirmed:
@@ -129,8 +129,8 @@ jobs:
             exit 1
           fi
 
-          if [[ "$DELIVERY_MODE" == "deploy" && -z "$RELEASE_NOTES" ]]; then
-            echo "::error::release_notes is required for TestFlight and App Store delivery"
+          if [[ "$DISTRIBUTION_DESTINATION" == "app_store_review" && -z "$RELEASE_NOTES" ]]; then
+            echo "::error::release_notes is required for App Store review submission"
             exit 1
           fi
 

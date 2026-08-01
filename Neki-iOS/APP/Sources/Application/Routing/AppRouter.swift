@@ -37,14 +37,10 @@ struct AppRouter {
                 return .none
             }
 
-            state.route = .mainTab(.init(
-                shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
-                    || isMarketingConsentAlertEligible(user)
-            ))
-            return .merge(
-                .send(.checkPushNotificationAuthorization),
-                executePendingRouteIfNeeded(state: &state)
-            )
+            let shouldPresentConsentAlert = shouldPresentMarketingConsentAlert || isMarketingConsentAlertEligible(user)
+            state.route = .mainTab(.init(shouldPresentMarketingConsentAlert: shouldPresentConsentAlert))
+            let authorizationEffect: Effect<AppCoordinator.Action> = shouldPresentConsentAlert ? .none : .send(.checkPushNotificationAuthorization)
+            return .merge(authorizationEffect, executePendingRouteIfNeeded(state: &state))
 
         case .signedOut, .expired:
             if state.hasSeenOnboarding {

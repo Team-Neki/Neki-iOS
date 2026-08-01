@@ -303,9 +303,8 @@ struct AppCoordinator {
                 return synchronizePushNotificationIfReady(&state)
 
             case .checkPushNotificationAuthorization:
-                guard case .signedIn = state.userSessionStatus,
-                      case .mainTab = state.route
-                else { return .none }
+                guard case .signedIn = state.userSessionStatus, case let .mainTab(mainTabState) = state.route else { return .none }
+                guard mainTabState.shouldPresentMarketingConsentAlert == false, mainTabState.isMarketingConsentAlertPresented == false else { return .none }
                 _ = isAPNSTokenRegistered(&state)
                 return .run { send in
                     await send(.checkPushNotificationAuthorizationResponse( Result { try await pushNotificationClient.checkAuthorizationStatus() } ))
@@ -457,10 +456,7 @@ private extension AppCoordinator {
         guard UserDefaults.standard.integer(forKey: countKey) < 2 else { return false }
 
         let managedAtKey = AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
-        guard let lastManagedAt = UserDefaults.standard.object(forKey: managedAtKey) as? Date else {
-            UserDefaults.standard.set(now, forKey: managedAtKey)
-            return false
-        }
+        guard let lastManagedAt = UserDefaults.standard.object(forKey: managedAtKey) as? Date else { return true }
 
         return now.timeIntervalSince(lastManagedAt) >= Constants.marketingConsentAlertRevisitInterval
     }

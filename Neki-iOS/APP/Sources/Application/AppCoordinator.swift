@@ -252,8 +252,7 @@ struct AppCoordinator {
                 
                 return .merge(
                     configureEffect,
-                    navigationEffect,
-                    .send(.checkPushNotificationAuthorization)
+                    navigationEffect
                 )
                 
             case .route(.onboarding(.delegate(.didFinishOnboarding))):

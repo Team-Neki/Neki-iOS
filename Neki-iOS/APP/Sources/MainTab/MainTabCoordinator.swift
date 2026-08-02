@@ -88,8 +88,6 @@ struct MainTabCoordinator {
         case dismissMarketingConsentAlert
         case updateMarketingConsent(Bool)
         case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
-        case requestPushNotificationAuthorizationIfNeeded
-        case pushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case route(AppRouteRequest)
         
         case onAppear
@@ -99,7 +97,6 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
-            case pushNotificationAuthorizationResolved
         }
     }
     
@@ -262,26 +259,10 @@ struct MainTabCoordinator {
                     for: state.user,
                     status: isAgreed ? .approved : .rejected
                 )
-                return .send(.requestPushNotificationAuthorizationIfNeeded)
+                return .none
 
             case .marketingConsentUpdateResponse(_, .failure):
                 state.isUpdatingMarketingConsent = false
-                return .none
-
-            case .requestPushNotificationAuthorizationIfNeeded:
-                return .run { send in
-                    await send(.pushNotificationAuthorizationResponse(Result {
-                        let status = try await pushNotificationClient.checkAuthorizationStatus()
-                        guard status == .notDetermined else { return status }
-                        _ = try await pushNotificationClient.requestAuthorization()
-                        return try await pushNotificationClient.checkAuthorizationStatus()
-                    }))
-                }
-
-            case .pushNotificationAuthorizationResponse(.success):
-                return .send(.delegate(.pushNotificationAuthorizationResolved))
-
-            case .pushNotificationAuthorizationResponse(.failure):
                 return .none
 
             case let .route(request):

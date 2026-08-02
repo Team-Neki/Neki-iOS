@@ -71,8 +71,6 @@ struct AppCoordinator {
         case executePendingRouteIfNeeded
         case checkPushNotificationAuthorization
         case checkPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
-        case requestPushNotificationAuthorization
-        case requestPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case synchronizePushNotification
         case synchronizePushNotificationResponse(Result<UNAuthorizationStatus, Error>)
         case attribution(AttributionFeature.Action)
@@ -83,6 +81,10 @@ struct AppCoordinator {
         
         // Child Actions
         case route(Route.Action)
+    }
+
+    private enum CancelID: Hashable {
+        case pushNotificationAuthorizationCheck
     }
     
     @Dependency(\.authClient) private var authClient
@@ -299,22 +301,21 @@ struct AppCoordinator {
                     shouldPresentMarketingConsentAlert: false
                 )
 
-            case .route(.mainTab(.delegate(.pushNotificationAuthorizationResolved))):
-                return synchronizePushNotificationIfReady(&state)
-
             case .checkPushNotificationAuthorization:
-                guard case .signedIn = state.userSessionStatus, case let .mainTab(mainTabState) = state.route else { return .none }
-                guard mainTabState.shouldPresentMarketingConsentAlert == false, mainTabState.isMarketingConsentAlertPresented == false else { return .none }
+                guard case .signedIn = state.userSessionStatus, case .mainTab = state.route else { return .none }
                 _ = isAPNSTokenRegistered(&state)
                 return .run { send in
-                    await send(.checkPushNotificationAuthorizationResponse( Result { try await pushNotificationClient.checkAuthorizationStatus() } ))
+                    do {
+                        let status = try await pushNotificationClient.checkAuthorizationStatus()
+                        try Task.checkCancellation()
+                        await send(.checkPushNotificationAuthorizationResponse(.success(status)))
+                    } catch is CancellationError { return } catch {
+                        await send(.checkPushNotificationAuthorizationResponse(.failure(error)))
+                    }
                 }
+                .cancellable(id: CancelID.pushNotificationAuthorizationCheck, cancelInFlight: true)
 
             case let .checkPushNotificationAuthorizationResponse(.success(status)):
-                if status == .notDetermined {
-                    return .send(.requestPushNotificationAuthorization)
-                }
-
                 let currentAgreement = status.isPushNotificationAgreed
                 guard state.hasSynchronizedPushNotification == false ||
                       state.lastSynchronizedPushAgreement != currentAgreement
@@ -323,21 +324,6 @@ struct AppCoordinator {
 
             case let .checkPushNotificationAuthorizationResponse(.failure(error)):
                 Logger.presentation.error("Push notification authorization check failed: \(error)")
-                return synchronizePushNotificationIfReady(&state)
-
-            case .requestPushNotificationAuthorization:
-                return .run { send in
-                    await send(.requestPushNotificationAuthorizationResponse(Result {
-                        _ = try await pushNotificationClient.requestAuthorization()
-                        return try await pushNotificationClient.checkAuthorizationStatus()
-                    }))
-                }
-
-            case .requestPushNotificationAuthorizationResponse(.success):
-                return synchronizePushNotificationIfReady(&state)
-
-            case let .requestPushNotificationAuthorizationResponse(.failure(error)):
-                Logger.presentation.error("Push notification authorization request failed: \(error)")
                 return synchronizePushNotificationIfReady(&state)
 
             case .synchronizePushNotification:

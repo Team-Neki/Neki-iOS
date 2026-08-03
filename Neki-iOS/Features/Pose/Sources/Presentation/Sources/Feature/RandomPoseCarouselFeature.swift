@@ -80,7 +80,7 @@ struct RandomPoseCarouselFeature {
                 let currentSwipeCount = state.totalSwipeCount
                 return .merge(
                     .run { _ in
-                        await analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionEnd(totalSwipeCount: currentSwipeCount))
+                        await analytics.logEvent(PoseAnalyticsEvent.randomPoseSuggestionEnd(totalSwipeCount: currentSwipeCount))
                     },
                     .run { send in
                         await send(.flushResources)

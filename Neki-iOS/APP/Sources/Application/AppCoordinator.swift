@@ -238,7 +238,7 @@ struct AppCoordinator {
                     guard case .mainTab = state.route else {
                         return configureAnalyticsSession(state: &state, status: newStatus)
                     }
-                    return setAnalyticsSessionEffect(for: newStatus)
+                    return setAnalyticsSessionEffect(state: &state, for: newStatus)
 
                 case .signedOut, .expired:
                     state.hasSynchronizedPushNotification = false

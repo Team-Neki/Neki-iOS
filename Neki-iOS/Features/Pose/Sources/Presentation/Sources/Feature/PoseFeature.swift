@@ -121,14 +121,14 @@ struct PoseFeature {
                 refreshVisiblePoses(&state)
                 guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return .none }
                 let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
-                return .run { _ in await analytics.logEvent(event: event) }
+                return .run { _ in await analytics.logEvent(event) }
                 
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()
                 state.selectedCountFilterOption = nil
                 refreshVisiblePoses(&state)
                 
-                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(event: PoseAnalyticsEvent.poseBookmarkFilter) }
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmarkFilter) }
                 let fetchEffect: Effect<Action>
                 
                 if state.isSelectedScrap {
@@ -151,7 +151,7 @@ struct PoseFeature {
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
                 return .merge(
-                    .run { _ in await analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionStart) },
+                    .run { _ in await analytics.logEvent(PoseAnalyticsEvent.randomPoseSuggestionStart) },
                     .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
                 )
                 

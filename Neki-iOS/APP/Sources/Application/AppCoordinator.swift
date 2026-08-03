@@ -262,6 +262,7 @@ struct AppCoordinator {
                 
             case let .route(.auth(.delegate(.moveToMainTab(
                 user,
+                registrationStatus,
                 shouldPresentMarketingConsentAlert,
                 didCompleteTermsAgreement,
                 marketingConsentStatus
@@ -276,8 +277,12 @@ struct AppCoordinator {
                 }
                 state.$userSessionStatus.withLock { $0 = .signedIn(user) }
                 let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
+                let registrationEffect: Effect<Action> = registrationStatus == .newlyRegistered
+                    ? .send(.attribution(.completeRegistration))
+                    : .none
                 return .merge(
                     configureEffect,
+                    registrationEffect,
                     navigateToNextScreen(
                         state: &state,
                         sessionStatus: .signedIn(user),

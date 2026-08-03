@@ -24,8 +24,8 @@ public enum ProfileImageUpdateAction: Sendable, Equatable {
 
 @DependencyClient
 public struct AuthClient {
-    public var loginWithApple: @Sendable (_ idToken: Data) async throws -> User
-    public var loginWithKakao: @Sendable () async throws -> User
+    public var loginWithApple: @Sendable (_ idToken: Data) async throws -> AuthLoginResult
+    public var loginWithKakao: @Sendable () async throws -> AuthLoginResult
     public var autoLogin: @Sendable () async throws -> User
     public var fetchUser: @Sendable () async throws -> User
     public var fetchTerms: @Sendable () async throws -> [Term]
@@ -44,27 +44,27 @@ extension AuthClient: DependencyKey {
         @Dependency(\.imageUploadRepository) var imageUploadRepository
         
         @discardableResult
-        @Sendable func loginWithApple(idToken: Data) async throws -> User {
+        @Sendable func loginWithApple(idToken: Data) async throws -> AuthLoginResult {
             guard let idTokenString = String(data: idToken, encoding: .utf8) else {
                 throw AuthClientError.invalidClientToken
             }
             
             do {
-                _ = try await authRepository.login(idToken: idTokenString, provider: .apple)
+                let loginResult = try await authRepository.login(idToken: idTokenString, provider: .apple)
                 let user = try await authRepository.fetchUser()
-                return user
+                return AuthLoginResult(user: user, registrationStatus: loginResult.registrationStatus)
             } catch {
                 throw AuthClient.mapError(error)
             }
         }
         
         @discardableResult
-        @Sendable func loginWithKakao() async throws -> User {
+        @Sendable func loginWithKakao() async throws -> AuthLoginResult {
             do {
                 let idToken = try await kakaoSDKHelper.login()
-                _ = try await authRepository.login(idToken: idToken, provider: .kakao)
+                let loginResult = try await authRepository.login(idToken: idToken, provider: .kakao)
                 let user = try await authRepository.fetchUser()
-                return user
+                return AuthLoginResult(user: user, registrationStatus: loginResult.registrationStatus)
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
             } catch let error as AuthClientError {

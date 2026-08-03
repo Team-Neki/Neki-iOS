@@ -24,7 +24,7 @@ public struct LoginFeature {
         case handleKakaoOpenURL(URL)
         
         // Delegate Actions
-        case loginResponse(Result<User, Error>)
+        case loginResponse(Result<AuthLoginResult, Error>)
     }
     
     @Dependency(\.authClient) private var authClient

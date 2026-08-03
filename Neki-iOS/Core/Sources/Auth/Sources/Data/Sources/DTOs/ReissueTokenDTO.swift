@@ -11,6 +11,11 @@ enum ReissueTokenDTO {
     struct Request: Encodable {
         let refreshToken: String
     }
-    
-    typealias Response = TokenPair
+
+    struct Response: Decodable, TokenContainer {
+        let accessToken: String
+        let refreshToken: String
+
+        func toEntity() -> AuthTokens { .init(accessToken: accessToken, refreshToken: refreshToken) }
+    }
 }

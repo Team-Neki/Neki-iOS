@@ -27,14 +27,14 @@ extension PushNotificationAnalyticsEvent: AnalyticsEvent {
         }
     }
 
-    var parameters: [AnalyticsParameterKey: Any]? {
+    var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
         case let .notificationSent(notificationType, targetType, messageTone, hasVariable):
             return [
-                .notificationType: notificationType,
-                .targetType: targetType,
-                .messageTone: messageTone,
-                .hasVariable: hasVariable
+                .notificationType: .string(notificationType),
+                .targetType: .string(targetType),
+                .messageTone: .string(messageTone),
+                .hasVariable: .boolean(hasVariable)
             ]
         case let .notificationClick(payload):
             return payload.analyticsParameters
@@ -43,19 +43,19 @@ extension PushNotificationAnalyticsEvent: AnalyticsEvent {
 }
 
 private extension PushNotificationPayload {
-    var analyticsParameters: [AnalyticsParameterKey: Any]? {
-        var parameters: [AnalyticsParameterKey: Any] = [:]
+    var analyticsParameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
+        var parameters: [AnalyticsParameterKey: AnalyticsParameterValue] = [:]
 
         if let notificationType = values["notification_type"] {
-            parameters[.notificationType] = notificationType
+            parameters[.notificationType] = .string(notificationType)
         }
 
         if let messageTone = values["message_tone"] {
-            parameters[.messageTone] = messageTone
+            parameters[.messageTone] = .string(messageTone)
         }
 
         if let hasVariable = boolValue(for: "has_variable") {
-            parameters[.hasVariable] = hasVariable
+            parameters[.hasVariable] = .boolean(hasVariable)
         }
 
         return parameters.isEmpty ? nil : parameters

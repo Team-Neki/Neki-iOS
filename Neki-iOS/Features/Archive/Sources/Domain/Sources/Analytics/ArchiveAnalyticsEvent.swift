@@ -27,20 +27,20 @@ public enum ArchiveAnalyticsEvent: AnalyticsEvent {
         }
     }
     
-    public var parameters: [AnalyticsParameterKey: Any]? {
+    public var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
         case let .photoUpload(method, count):
             let methodString = (method == .qr) ? "qr" : "gallery"
-            return [.method: methodString, .count: count]
+            return [.method: .string(methodString), .count: .integer(count)]
             
         case let .albumAddFromDetail(albumCount):
-            return [.albumCount: albumCount]
+            return [.albumCount: .integer(albumCount)]
             
         case let .albumAddFromMulti(photoCount, albumCount):
-            return [.photoCount: photoCount, .albumCount: albumCount]
+            return [.photoCount: .integer(photoCount), .albumCount: .integer(albumCount)]
             
         case let .photoAddToAlbum(photoCount, albumCount):
-            return [.photoCount: photoCount, .albumCount: albumCount]
+            return [.photoCount: .integer(photoCount), .albumCount: .integer(albumCount)]
             
         default:
             return nil

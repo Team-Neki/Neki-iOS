@@ -9,5 +9,5 @@ import Foundation
 
 public protocol AnalyticsEvent: Sendable {
     var name: AnalyticsEventName { get }
-    var parameters: [AnalyticsParameterKey: Any]? { get }
+    var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? { get }
 }

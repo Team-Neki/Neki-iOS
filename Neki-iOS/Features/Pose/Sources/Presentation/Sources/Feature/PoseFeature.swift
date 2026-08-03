@@ -121,14 +121,14 @@ struct PoseFeature {
                 refreshVisiblePoses(&state)
                 guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return .none }
                 let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
-                return .run { _ in analytics.logEvent(event: event) }
+                return .run { _ in await analytics.logEvent(event: event) }
                 
             case .onTapScrapMode:
                 state.isSelectedScrap.toggle()
                 state.selectedCountFilterOption = nil
                 refreshVisiblePoses(&state)
                 
-                let trackingEffect: Effect<Action> = .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.poseBookmarkFilter) }
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(event: PoseAnalyticsEvent.poseBookmarkFilter) }
                 let fetchEffect: Effect<Action>
                 
                 if state.isSelectedScrap {
@@ -151,7 +151,7 @@ struct PoseFeature {
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
                 return .merge(
-                    .run { _ in analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionStart) },
+                    .run { _ in await analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionStart) },
                     .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
                 )
                 
@@ -214,7 +214,7 @@ struct PoseFeature {
                 return .none
                 
             case .bookmarkResponse(_, .success):
-                return .run { _ in analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
             case let .bookmarkResponse(pose, .failure(error)):
                 if error is CancellationError { return .none }

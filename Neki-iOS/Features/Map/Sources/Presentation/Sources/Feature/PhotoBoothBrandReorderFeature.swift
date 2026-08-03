@@ -65,7 +65,7 @@ public struct PhotoBoothBrandReorderFeature {
                 state.brands = orderedBrands
                 return .merge(
                     .send(.delegate(.saveCompleted(orderedBrands))),
-                    .run { _ in analytics.logEvent(event: MapAnalyticsEvent.brandOrderSave(orderedBrands: Array(orderedBrands))) }
+                    .run { _ in await analytics.logEvent(event: MapAnalyticsEvent.brandOrderSave(orderedBrands: Array(orderedBrands))) }
                 )
 
             case .saveResponse(.failure):

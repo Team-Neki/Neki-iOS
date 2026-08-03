@@ -78,11 +78,15 @@ struct RandomPoseCarouselFeature {
                 
             case .onTapClose:
                 let currentSwipeCount = state.totalSwipeCount
-                return .run { send in
-                    analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionEnd(totalSwipeCount: currentSwipeCount))
-                    await send(.flushResources)
-                    await dismiss()
-                }
+                return .merge(
+                    .run { _ in
+                        await analytics.logEvent(event: PoseAnalyticsEvent.randomPoseSuggestionEnd(totalSwipeCount: currentSwipeCount))
+                    },
+                    .run { send in
+                        await send(.flushResources)
+                        await dismiss()
+                    }
+                )
                 
             case .tapLeft:
                 state.slideDirection = .previous
@@ -129,7 +133,7 @@ struct RandomPoseCarouselFeature {
                 return .none
                 
             case .scrapResponse(_, .success):
-                return .run { _ in analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
             case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }

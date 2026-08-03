@@ -114,7 +114,7 @@ struct PoseDetailFeature {
                 return .none
 
             case .scrapResponse(_, .success):
-                return .run { _ in analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
             case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }

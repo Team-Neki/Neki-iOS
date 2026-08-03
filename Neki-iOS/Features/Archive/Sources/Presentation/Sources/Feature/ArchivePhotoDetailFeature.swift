@@ -86,8 +86,7 @@ struct ArchivePhotoDetailFeature {
             switch action {
                 
             case .onAppear:
-                analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView)
-                return .none
+                return .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView) }
                 
             case .onTapBackButton:
                 return .run { _ in await dismiss() }
@@ -135,7 +134,7 @@ struct ArchivePhotoDetailFeature {
                 }
 
             case .memoUpdateResponse(.success):
-                return .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate) }
+                return .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate) }
 
             case .memoUpdateResponse(.failure):
                 return .none
@@ -178,7 +177,7 @@ struct ArchivePhotoDetailFeature {
                     return .merge(
                         .run { _ in
                             // 🌟 요구사항: 단일 정리 행동 분석 (album_add_from_detail)
-                            analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromDetail(albumCount: albumCount))
+                            await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromDetail(albumCount: albumCount))
                         },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
                     )

@@ -150,10 +150,10 @@ struct ArchiveAllAlbumsFeature {
                 }
                 
             case .addFolderResponse(.success):
-                analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate)
                 let toastItem = NekiToastItem("새로운 앨범을 추가했어요", style: .success)
                 
                 return .merge(
+                    .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate) },
                     .send(.delegate(.showToast(toastItem))),
                     .send(.fetchAlbums)
                 )

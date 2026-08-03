@@ -6,5 +6,6 @@
 //
 
 public protocol AttributionRepository: Sendable {
-    @MainActor func initializeAttribution()
+    func initializeAttribution() async
+    func trackCompleteRegistration() async
 }

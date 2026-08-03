@@ -15,7 +15,7 @@ public struct LoginCoordinator {
     public struct State {
         var root = LoginFeature.State()
         var path = StackState<Path.State>()
-        var pendingUser: User?
+        var pendingLoginResult: AuthLoginResult?
     }
     
     public enum Action {
@@ -26,6 +26,7 @@ public struct LoginCoordinator {
         public enum Delegate {
             case moveToMainTab(
                 User,
+                registrationStatus: RegistrationStatus,
                 shouldPresentMarketingConsentAlert: Bool,
                 didCompleteTermsAgreement: Bool,
                 marketingConsentStatus: MarketingConsentManagementStatus?
@@ -39,19 +40,19 @@ public struct LoginCoordinator {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
                 // MARK: - Login Flow
-            case let .root(.loginResponse(.success(user))):
-                if user.allRequiredTermsAgreed {
-                    return .send(.delegate(.moveToMainTab(
-                        user,
-                        shouldPresentMarketingConsentAlert: false,
-                        didCompleteTermsAgreement: false,
-                        marketingConsentStatus: nil
-                    )))
-                } else {
-                    state.pendingUser = user
+            case let .root(.loginResponse(.success(loginResult))):
+                guard loginResult.user.allRequiredTermsAgreed else {
+                    state.pendingLoginResult = loginResult
                     state.path.append(.termsAgreement(.init()))
                     return .none
                 }
+                return .send(.delegate(.moveToMainTab(
+                    loginResult.user,
+                    registrationStatus: loginResult.registrationStatus,
+                    shouldPresentMarketingConsentAlert: false,
+                    didCompleteTermsAgreement: false,
+                    marketingConsentStatus: nil
+                )))
                 
             case let .root(.loginResponse(.failure(error))):
                 Logger.presentation.error("로그인 과정 중 에러 발생: \(error)")
@@ -59,15 +60,16 @@ public struct LoginCoordinator {
                 
                 // MARK: - Onboarding Flow
             case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user, marketingConsentStatus)))):
-                guard state.pendingUser != nil else {
+                guard let pendingLoginResult = state.pendingLoginResult else {
                     Logger.presentation.error("온보딩 과정 중 중단됨.")
                     return .none
                 }
                 
-                state.pendingUser = nil
+                state.pendingLoginResult = nil
                 state.path.pop(from: id)
                 return .send(.delegate(.moveToMainTab(
                     user,
+                    registrationStatus: pendingLoginResult.registrationStatus,
                     shouldPresentMarketingConsentAlert: marketingConsentStatus == nil && user.marketingTermAgreed == false,
                     didCompleteTermsAgreement: true,
                     marketingConsentStatus: marketingConsentStatus

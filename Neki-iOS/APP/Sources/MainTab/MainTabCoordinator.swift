@@ -30,7 +30,6 @@ struct MainTabCoordinator {
         
         var isPhotoPickerPresented: Bool = false
         var pendingPresentation: PendingPresentation?
-        var isLoading: Bool = false
         
         @Presents var destination: Destination.State?
         
@@ -297,13 +296,8 @@ struct MainTabCoordinator {
                     await send(.delegate(.withdraw))
                 }
 
-            case let .imagePicker(.pickerItemsChanged(items)):
-                state.isLoading = items.isEmpty == false
-                return .none
-                
             case let .imagePicker(.delegate(.imagesConverted(entities))):
                 state.isPhotoPickerPresented = false
-                state.isLoading = false
                 state.selectedTab = .archive
                 guard !entities.isEmpty else { return .none }
                 return .send(.archive(.root(.processUploadImages(entities: entities, appGroupID: nil))))

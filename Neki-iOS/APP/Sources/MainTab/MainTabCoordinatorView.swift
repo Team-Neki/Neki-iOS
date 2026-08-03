@@ -42,8 +42,8 @@ struct MainTabCoordinatorView: View {
             
         }
         .nekiLoading(
-            isPresented: store.isLoading,
-            message: "사진을 업로드하고 있어요."
+            isPresented: store.imagePicker.isLoading,
+            message: "사진을 불러오고 있어요."
         )
         .onAppear {
             store.send(.onAppear)

@@ -39,6 +39,7 @@ public struct LoginView: View {
                 authenticationProviders
             }
         }
+        .nekiLoading(isPresented: store.isLoading)
     }
     
     private var authenticationProviders: some View {

@@ -296,6 +296,10 @@ struct MainTabCoordinator {
                     await send(.archive(.root(.clearData)))
                     await send(.delegate(.withdraw))
                 }
+
+            case let .imagePicker(.pickerItemsChanged(items)):
+                state.isLoading = items.isEmpty == false
+                return .none
                 
             case let .imagePicker(.delegate(.imagesConverted(entities))):
                 state.isPhotoPickerPresented = false

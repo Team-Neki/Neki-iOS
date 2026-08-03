@@ -94,20 +94,20 @@ struct AccountPreferenceFeature {
                 return .none
                 
             case .signOutSucceeded:
-                state.isLoading = false
                 return .run { send in
                     await analytics.endUserSession(MyPageAnalyticsEvent.logout)
                     await send(.didSignOut)
                 }
                 
             case .withdrawSucceeded:
-                state.isLoading = false
                 return .run { send in
                     await analytics.endUserSession(MyPageAnalyticsEvent.withdraw)
                     await send(.didWithdraw)
                 }
 
-            case .didSignOut, .didWithdraw: return .none
+            case .didSignOut, .didWithdraw:
+                state.isLoading = false
+                return .none
                 
             case .onLoading(let isLoading):
                 state.isLoading = isLoading

@@ -27,8 +27,7 @@ extension AnalyticsClient: DependencyKey {
         } setUserSession: { userID in
             await repository.setUserSession(with: userID)
         } endUserSession: { event in
-            await repository.logEvent(event)
-            await repository.setUserSession(with: nil)
+            await repository.endUserSession(with: event)
         } logEvent: { event in
             await repository.logEvent(event)
         }

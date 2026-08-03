@@ -40,6 +40,14 @@ public final actor AmplitudeAnalyticsRepository: AnalyticsRepository {
         amplitude?.setUserId(userId: userID.map(String.init))
     }
 
+    public func endUserSession(with event: any AnalyticsEvent) async {
+        amplitude?.track(
+            eventType: event.name.value,
+            eventProperties: event.rawParameters
+        )
+        amplitude?.setUserId(userId: nil)
+    }
+
     public func logEvent(_ event: any AnalyticsEvent) async {
         amplitude?.track(
             eventType: event.name.value,

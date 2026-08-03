@@ -10,6 +10,8 @@ import Foundation
 
 public final actor CompositeAnalyticsRepository: AnalyticsRepository {
     private let repositories: [any AnalyticsRepository]
+    private var pendingOperation: Task<Void, Never>?
+    private var operationGeneration = 0
 
     public init(repositories: [any AnalyticsRepository]) {
         self.repositories = repositories
@@ -22,15 +24,40 @@ public final actor CompositeAnalyticsRepository: AnalyticsRepository {
     }
 
     public func setUserSession(with userID: Int?) async {
-        for repository in repositories {
-            await repository.setUserSession(with: userID)
+        await enqueue { [repositories] in
+            for repository in repositories {
+                await repository.setUserSession(with: userID)
+            }
+        }
+    }
+
+    public func endUserSession(with event: any AnalyticsEvent) async {
+        await enqueue { [repositories] in
+            for repository in repositories {
+                await repository.endUserSession(with: event)
+            }
         }
     }
 
     public func logEvent(_ event: any AnalyticsEvent) async {
-        for repository in repositories {
-            await repository.logEvent(event)
+        await enqueue { [repositories] in
+            for repository in repositories {
+                await repository.logEvent(event)
+            }
         }
+    }
+
+    private func enqueue(_ operation: @escaping @Sendable () async -> Void) async {
+        operationGeneration += 1
+        let generation = operationGeneration
+        let previousOperation = pendingOperation
+        let operationTask = Task {
+            await previousOperation?.value
+            await operation()
+        }
+        pendingOperation = operationTask
+        await operationTask.value
+        if operationGeneration == generation { pendingOperation = nil }
     }
 }
 

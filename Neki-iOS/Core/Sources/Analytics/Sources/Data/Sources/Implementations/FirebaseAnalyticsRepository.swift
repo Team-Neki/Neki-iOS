@@ -18,6 +18,13 @@ public final actor FirebaseAnalyticsRepository: AnalyticsRepository {
         await MainActor.run { Analytics.setUserID(userID.map(String.init)) }
     }
 
+    public func endUserSession(with event: any AnalyticsEvent) async {
+        await MainActor.run {
+            Analytics.logEvent(event.name.value, parameters: event.rawParameters)
+            Analytics.setUserID(nil)
+        }
+    }
+
     public func logEvent(_ event: any AnalyticsEvent) async {
         await MainActor.run {
             Analytics.logEvent(event.name.value, parameters: event.rawParameters)

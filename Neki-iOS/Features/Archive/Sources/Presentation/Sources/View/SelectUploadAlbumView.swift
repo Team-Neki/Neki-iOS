@@ -24,10 +24,11 @@ struct SelectUploadAlbumView: View {
                 }
             }
             
-            if store.isLoading {
-                LoadingView(message: "사진을 업로드하고 있어요.")
-            }
         }
+        .nekiLoading(
+            isPresented: store.isLoading,
+            message: "사진을 업로드하고 있어요."
+        )
         .animation(.easeInOut, value: store.viewMode)
     }
 }

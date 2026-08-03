@@ -53,7 +53,7 @@ struct ProfileEditView: View {
                 Spacer()
             }
         }
-        .overlay { if store.isLoading { LoadingView() } }
+        .nekiLoading(isPresented: store.isLoading)
         .disabled(store.isLoading)
         .nekiToolbar(
             left: { NekiToolBar.back { dismiss() } },

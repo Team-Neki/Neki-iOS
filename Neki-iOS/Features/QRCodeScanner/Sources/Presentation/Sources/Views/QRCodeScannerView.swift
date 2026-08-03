@@ -86,7 +86,7 @@ struct QRCodeScannerView: View {
             confirmText: "갤러리에서 추가하기",
             onConfirm: { store.send(.closeExpiredAlertButtonTapped) }
         )
-        .fullScreenCover(isPresented: $store.isLoading) { LoadingView() }
+        .nekiLoading(isPresented: store.isLoading)
     }
     
     private var header: some View {

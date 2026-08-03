@@ -19,8 +19,8 @@ struct AlbumSelectionView: View {
                 // Header
                 header
                 
-                if store.isFetching && store.albums.isEmpty {
-                    LoadingView(message: "앨범을 불러오고 있어요.")
+                if isInitialLoading {
+                    Color.clear
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 20) {
@@ -74,12 +74,11 @@ struct AlbumSelectionView: View {
             }
             .navigationBarHidden(true)
             .background(Color.white.ignoresSafeArea())
-            
-            if store.isLoading {
-                LoadingView(message: "요청을 처리하고 있어요.")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
         }
+        .nekiLoading(
+            isPresented: isInitialLoading || store.isLoading,
+            message: isInitialLoading ? "앨범을 불러오고 있어요." : "요청을 처리하고 있어요."
+        )
         .task {
             await store.send(.onAppear).finish()
         }
@@ -102,6 +101,10 @@ struct AlbumSelectionView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
         }
+    }
+
+    private var isInitialLoading: Bool {
+        store.isFetching && store.albums.isEmpty
     }
 }
 

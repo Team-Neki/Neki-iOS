@@ -48,12 +48,11 @@ struct ArchiveAllPhotosView: View {
                         )
                     }
                 }
-                
-                if store.isLoading {
-                    LoadingView(message: "요청을 처리하고 있어요.")
-                }
-                
             }
+            .nekiLoading(
+                isPresented: store.isLoading,
+                message: "요청을 처리하고 있어요."
+            )
         }
         .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
         .animation(.easeInOut(duration: 0.3), value: store.photos)

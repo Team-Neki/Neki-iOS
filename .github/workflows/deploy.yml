@@ -22,7 +22,7 @@ on:
         required: true
         type: string
       release_notes:
-        description: TestFlight 선택 입력, App Store 심사 제출 시 필수인 변경사항
+        description: TestFlight 및 App Store 선택 입력인 변경사항
         required: false
         type: string
       production_release_confirmed:
@@ -126,11 +126,6 @@ jobs:
 
           if [[ ! "$APP_VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "::error::app_version must follow MAJOR.MINOR.PATCH"
-            exit 1
-          fi
-
-          if [[ "$DISTRIBUTION_DESTINATION" == "app_store_review" && -z "$RELEASE_NOTES" ]]; then
-            echo "::error::release_notes is required for App Store review submission"
             exit 1
           fi
 
@@ -305,6 +300,7 @@ jobs:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           OPERATION: ${{ inputs.operation }}
           APP_VERSION: ${{ inputs.app_version }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
           JOB_STATUS: ${{ job.status }}
           TARGET_APP_NAME: ${{ env.TARGET_APP_NAME }}
         run: |
@@ -323,16 +319,20 @@ jobs:
             --arg operation "$OPERATION" \
             --arg app "$TARGET_APP_NAME" \
             --arg version "$APP_VERSION" \
+            --arg release_notes "$RELEASE_NOTES" \
             --argjson color "$COLOR" \
-            '{
+            '($release_notes | if length > 1024 then .[0:1023] + "…" else . end) as $display_notes |
+            {
               embeds: [{
                 title: $title,
                 color: $color,
-                fields: [
+                fields: ([
                   {name: "작업 종류", value: $operation, inline: true},
                   {name: "대상 앱", value: $app, inline: true},
                   {name: "대상 버전", value: $version, inline: true}
-                ]
+                ] + (if $display_notes == "" then [] else [
+                  {name: "릴리즈 노트", value: $display_notes, inline: false}
+                ] end))
               }]
             }')
           curl --fail-with-body --silent --show-error \

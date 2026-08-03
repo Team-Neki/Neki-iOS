@@ -118,9 +118,6 @@ platform :ios do
     if distribution_destination == "app_store_review" && deployment_target != "production"
       UI.user_error!("Only the production app can be submitted for App Store review")
     end
-    if distribution_destination == "app_store_review" && release_notes.empty?
-      UI.user_error!("RELEASE_NOTES is required for App Store review submission")
-    end
     if release_notes.length > 4_000
       UI.user_error!("RELEASE_NOTES must not exceed 4,000 characters")
     end
@@ -177,13 +174,12 @@ platform :ios do
       testflight_options[:changelog] = release_notes unless release_notes.empty?
       upload_to_testflight(**testflight_options)
     else
-      # 한국어 릴리즈 노트를 반영하고 수동 출시 방식으로 심사를 제출합니다.
-      upload_to_app_store(
+      # 입력된 한국어 릴리즈 노트만 반영하고 수동 출시 방식으로 심사를 제출합니다.
+      app_store_options = {
         api_key: api_key,
         app_identifier: configuration.fetch(:app_identifier),
         ipa: ipa_path,
         app_version: marketing_version,
-        release_notes: { "ko" => release_notes },
         skip_screenshots: true,
         submit_for_review: true,
         automatic_release: false,
@@ -193,7 +189,9 @@ platform :ios do
           export_compliance_uses_encryption: false
         },
         force: true
-      )
+      }
+      app_store_options[:release_notes] = { "ko" => release_notes } unless release_notes.empty?
+      upload_to_app_store(**app_store_options)
     end
 
     export_github_environment("APP_VERSION", marketing_version)

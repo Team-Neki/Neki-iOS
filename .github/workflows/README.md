@@ -81,7 +81,7 @@ Discord 결과 메시지의 대상 앱은 개발기를 `Neki-dev`, 상용기를 
 | `상용기 권장 업데이트 활성화` | 공개된 상용 버전을 권장 업데이트로 활성화 |
 | `상용기 강제 업데이트 활성화` | 공개된 상용 버전을 강제 업데이트로 활성화 |
 
-모든 작업은 `app_version`을 입력합니다. TestFlight 작업의 `release_notes`는 선택 사항이며, 비워두면 App Store Connect에서 직접 작성할 수 있습니다. App Store 심사 제출에는 `release_notes`가 필수입니다. 상용 버전 활성화 작업은 App Store 공개를 확인한 뒤 `production_release_confirmed`를 활성화해야 합니다.
+모든 작업은 `app_version`을 입력합니다. TestFlight 및 App Store 심사 제출의 `release_notes`는 선택 사항입니다. 비워두면 릴리즈 노트를 새로 등록하지 않고 다음 단계로 진행합니다. 입력한 릴리즈 노트는 CI/CD 결과 Discord 메시지에도 표시되며, 비어 있으면 해당 항목을 생략합니다. 상용 버전 활성화 작업은 App Store 공개를 확인한 뒤 `production_release_confirmed`를 활성화해야 합니다.
 
 `개발기 연결 검증`과 `상용기 연결 검증`은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
 

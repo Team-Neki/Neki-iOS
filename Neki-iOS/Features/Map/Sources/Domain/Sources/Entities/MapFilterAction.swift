@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum MapFilterAction: String {
+enum MapFilterAction: String, Sendable {
     case select = "select"
     case deselect = "deselect"
 }

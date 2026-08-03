@@ -219,7 +219,7 @@ struct ArchiveAllPhotosFeature {
                     state.selectedIDs.removeAll()
                     
                     return .merge(
-                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )

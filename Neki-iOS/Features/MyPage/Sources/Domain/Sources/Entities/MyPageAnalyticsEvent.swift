@@ -23,5 +23,5 @@ extension MyPageAnalyticsEvent: AnalyticsEvent {
         }
     }
     
-    var parameters: [AnalyticsParameterKey : Any]? { return nil }
+    var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? { return nil }
 }

@@ -124,9 +124,10 @@ struct ArchiveFavoriteAlbumFeature {
             case let .registerPhotosResponse(.success(count)):
                 state.isLoading = false
                 return .run { send in
-                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
+                    async let tracking: Void = analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchFavoritePhotos)
+                    await tracking
                 }
                 
             case .registerPhotosResponse(.failure):
@@ -196,7 +197,7 @@ struct ArchiveFavoriteAlbumFeature {
                     state.selectedIDs.removeAll()
                     
                     return .merge(
-                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchFavoritePhotos)
                     )

@@ -145,9 +145,10 @@ struct ArchiveAlbumDetailFeature {
             case let .registerPhotosResponse(.success(count)):
                 state.isLoading = false
                 return .run { send in
-                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
+                    async let tracking: Void = analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
+                    await tracking
                 }
             case .registerPhotosResponse(.failure):
                 state.isLoading = false
@@ -220,7 +221,7 @@ struct ArchiveAlbumDetailFeature {
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
                     return .merge(
-                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )
@@ -294,7 +295,7 @@ struct ArchiveAlbumDetailFeature {
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
                     return .merge(
-                        .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoAddToAlbum(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoAddToAlbum(photoCount: photoCount, albumCount: albumCount)) },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )

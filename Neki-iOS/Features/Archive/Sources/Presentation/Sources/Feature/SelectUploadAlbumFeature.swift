@@ -106,7 +106,7 @@ struct SelectUploadAlbumFeature {
                 state.isLoading = false
                 let count = state.pendingUploadImages.count
                 return .merge(
-                    .run { _ in analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count)) },
+                    .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .direct, count: count)) },
                     .send(.delegate(.uploadDidSuccess(albumId: albumId)))
                 )
                 

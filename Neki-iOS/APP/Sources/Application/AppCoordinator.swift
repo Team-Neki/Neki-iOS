@@ -36,6 +36,7 @@ struct AppCoordinator {
             }
         }
         var pendingSessionStatus: UserSessionStatus?
+        var pendingAnalyticsSessionStatus: UserSessionStatus?
         var pendingRouteRequest: AppRouteRequest?
         var lastVersionCheckedTime: Date?
         var isSynchronizingPushNotification: Bool = false
@@ -66,6 +67,7 @@ struct AppCoordinator {
         // Internal Actions
         case splashSequenceCompleted(UserSessionStatus, AppVersionClient.VersionResult)
         case userSessionStatusChanged(UserSessionStatus)
+        case analyticsSessionConfigured(UserSessionStatus, shouldPresentMarketingConsentAlert: Bool)
         case scenePhaseChanged(ScenePhase)
         case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
         case executePendingRouteIfNeeded
@@ -84,6 +86,7 @@ struct AppCoordinator {
     }
 
     private enum CancelID: Hashable {
+        case analyticsSessionConfiguration
         case pushNotificationAuthorizationCheck
     }
     
@@ -181,23 +184,20 @@ struct AppCoordinator {
             case let .splashSequenceCompleted(finalStatus, finalVersionResult):
                 state.$userSessionStatus.withLock { $0 = finalStatus }
                 
-                let userID: Int? = extractUserID(from: finalStatus)
-                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID) }
-                
                 guard finalVersionResult.status != .mustUpdate else {
                     state.versionAlert = .updateNeeded
-                    return .none
+                    return setAnalyticsSessionEffect(state: &state, for: finalStatus)
                 }
                 
                 guard finalVersionResult.status != .optionalUpdate else {
                     state.versionAlert = .updateAvailable
                     state.pendingSessionStatus = finalStatus
-                    return .none
+                    return setAnalyticsSessionEffect(state: &state, for: finalStatus)
                 }
                 
-                return .merge(
-                    configureEffect,
-                    navigateToNextScreen(state: &state, sessionStatus: finalStatus)
+                return configureAnalyticsSession(
+                    state: &state,
+                    status: finalStatus
                 )
                 
             case .executePendingRouteIfNeeded:
@@ -219,40 +219,41 @@ struct AppCoordinator {
                 state.versionAlert = nil
                 guard let pendingSessionStatus = state.pendingSessionStatus else { return .none }
                 state.pendingSessionStatus = nil
-                return navigateToNextScreen(state: &state, sessionStatus: pendingSessionStatus)
+                return configureAnalyticsSession(
+                    state: &state,
+                    status: pendingSessionStatus
+                )
                 
             case let .userSessionStatusChanged(newStatus):
                 if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
+
+                guard state.pendingAnalyticsSessionStatus != newStatus else { return .none }
                 
-                let userID: Int? = extractUserID(from: newStatus)
-                let configureEffect: Effect<Action> = .run { _ in analytics.configure(userID) }
+                if case .splash = state.route, state.versionAlert != nil {
+                    return setAnalyticsSessionEffect(state: &state, for: newStatus)
+                }
                 
-                if case .splash = state.route, state.versionAlert != nil { return configureEffect }
-                
-                let navigationEffect: Effect<Action>
                 switch newStatus {
-                case let .signedIn(user):
-                    if case .mainTab = state.route {
-                        navigationEffect = .none
-                    } else {
-                        navigationEffect = navigateToNextScreen(
-                            state: &state,
-                            sessionStatus: .signedIn(user)
-                        )
+                case .signedIn:
+                    guard case .mainTab = state.route else {
+                        return configureAnalyticsSession(state: &state, status: newStatus)
                     }
-                    
+                    return setAnalyticsSessionEffect(state: &state, for: newStatus)
+
                 case .signedOut, .expired:
                     state.hasSynchronizedPushNotification = false
                     state.shouldRetryPushNotificationSynchronization = false
                     state.lastSynchronizedPushAgreement = nil
-                    state.route = .auth(.init())
-                    if case .expired = newStatus { state.toastItem = .init("다시 로그인 해주세요.") }
-                    navigationEffect = .none
+                    return configureAnalyticsSession(state: &state, status: newStatus)
                 }
-                
-                return .merge(
-                    configureEffect,
-                    navigationEffect
+
+            case let .analyticsSessionConfigured(status, shouldPresentMarketingConsentAlert):
+                guard state.pendingAnalyticsSessionStatus == status else { return .none }
+                state.pendingAnalyticsSessionStatus = nil
+                return navigateToNextScreen(
+                    state: &state,
+                    sessionStatus: status,
+                    shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
                 )
                 
             case .route(.onboarding(.delegate(.didFinishOnboarding))):
@@ -275,20 +276,19 @@ struct AppCoordinator {
                         )
                     }
                 }
-                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
-                let configureEffect: Effect<Action> = .run { _ in analytics.configure(user.id) }
+                let signedInStatus = UserSessionStatus.signedIn(user)
+                state.pendingAnalyticsSessionStatus = signedInStatus
+                state.$userSessionStatus.withLock { $0 = signedInStatus }
                 let registrationEffect: Effect<Action> = registrationStatus == .newlyRegistered
                     ? .send(.attribution(.completeRegistration))
                     : .none
                 return .merge(
-                    configureEffect,
                     registrationEffect,
-                    navigateToNextScreen(
+                    configureAnalyticsSession(
                         state: &state,
-                        sessionStatus: .signedIn(user),
+                        status: signedInStatus,
                         shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
-                    ),
-                    .send(.executePendingRouteIfNeeded)
+                    )
                 )
 
             case let .route(.termsAgreement(.didFinishOnboarding(user, marketingConsentStatus))):
@@ -298,10 +298,12 @@ struct AppCoordinator {
                         status: marketingConsentStatus
                     )
                 }
-                state.$userSessionStatus.withLock { $0 = .signedIn(user) }
-                return navigateToNextScreen(
+                let signedInStatus = UserSessionStatus.signedIn(user)
+                state.pendingAnalyticsSessionStatus = signedInStatus
+                state.$userSessionStatus.withLock { $0 = signedInStatus }
+                return configureAnalyticsSession(
                     state: &state,
-                    sessionStatus: .signedIn(user),
+                    status: signedInStatus,
                     shouldPresentMarketingConsentAlert: false
                 )
 
@@ -363,18 +365,19 @@ struct AppCoordinator {
                 state.hasSynchronizedPushNotification = false
                 state.shouldRetryPushNotificationSynchronization = false
                 state.lastSynchronizedPushAgreement = nil
-                state.$userSessionStatus.withLock { $0 = .signedOut }
                 if case .route(.mainTab(.delegate(.withdraw))) = action {
                     state.initializeUserDefaults()
                 }
-                state.route = .auth(.init())
-                return .run { _ in analytics.configure(nil) }
+                return .send(.userSessionStatusChanged(.signedOut))
                 
             case .binding(\.isAlertPresented):
                 guard state.isAlertPresented == false else { return .none }
                 guard let pendingSessionStatus = state.pendingSessionStatus else { return .none }
                 state.pendingSessionStatus = nil
-                return navigateToNextScreen(state: &state, sessionStatus: pendingSessionStatus)
+                return configureAnalyticsSession(
+                    state: &state,
+                    status: pendingSessionStatus
+                )
                 
             default:
                 return .none
@@ -400,6 +403,38 @@ private extension UNAuthorizationStatus {
 // MARK: - AppCoordinator + Helpers
 
 private extension AppCoordinator {
+    func configureAnalyticsSession(
+        state: inout State,
+        status: UserSessionStatus,
+        shouldPresentMarketingConsentAlert: Bool = false
+    ) -> Effect<Action> {
+        state.pendingAnalyticsSessionStatus = status
+        let userID = extractUserID(from: status)
+        return .run { send in
+            guard Task.isCancelled == false else { return }
+            await analytics.setUserSession(userID)
+            guard Task.isCancelled == false else { return }
+            await send(.analyticsSessionConfigured(
+                status,
+                shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+            ))
+        }
+        .cancellable(id: CancelID.analyticsSessionConfiguration, cancelInFlight: true)
+    }
+
+    func setAnalyticsSessionEffect(
+        state: inout State,
+        for status: UserSessionStatus
+    ) -> Effect<Action> {
+        state.pendingAnalyticsSessionStatus = nil
+        let userID = extractUserID(from: status)
+        return .run { _ in
+            guard Task.isCancelled == false else { return }
+            await analytics.setUserSession(userID)
+        }
+        .cancellable(id: CancelID.analyticsSessionConfiguration, cancelInFlight: true)
+    }
+
     func navigateToNextScreen(
         state: inout State,
         sessionStatus: UserSessionStatus,

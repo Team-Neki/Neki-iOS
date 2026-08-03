@@ -132,9 +132,9 @@ struct MainTabCoordinator {
             case let .tabChanged(tab):
                 return .run { _ in
                     switch tab {
-                    case .archive: analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
-                    case .pose: analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
-                    case .map: analyticsClient.logEvent(MainTabAnalyticsEvent.mapView)
+                    case .archive: await analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
+                    case .pose: await analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
+                    case .map: await analyticsClient.logEvent(MainTabAnalyticsEvent.mapView)
                     default: break
                     }
                 }

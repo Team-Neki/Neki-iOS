@@ -9,9 +9,12 @@ import Dependencies
 import FacebookCore
 
 final class MetaAttributionRepository: AttributionRepository {
-    @MainActor
-    func initializeAttribution() {
-        ApplicationDelegate.shared.initializeSDK()
+    func initializeAttribution() async {
+        await MainActor.run { ApplicationDelegate.shared.initializeSDK() }
+    }
+
+    func trackCompleteRegistration() async {
+        await MainActor.run { AppEvents.shared.logEvent(.completedRegistration) }
     }
 }
 
@@ -20,7 +23,8 @@ extension AttributionClient: DependencyKey {
         let repository = MetaAttributionRepository()
         
         return AttributionClient(
-            initializeAttribution: { await repository.initializeAttribution() }
+            initializeAttribution: { await repository.initializeAttribution() },
+            trackCompleteRegistration: { await repository.trackCompleteRegistration() }
         )
     }
 }

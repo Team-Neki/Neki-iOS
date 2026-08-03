@@ -10,4 +10,5 @@ import DependenciesMacros
 @DependencyClient
 public struct AttributionClient {
     public var initializeAttribution: @Sendable () async -> Void = {}
+    public var trackCompleteRegistration: @Sendable () async -> Void = {}
 }

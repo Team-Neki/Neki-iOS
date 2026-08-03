@@ -14,6 +14,7 @@ struct AttributionFeature {
     
     enum Action {
         case appLaunched
+        case completeRegistration
     }
     
     @Dependency(\.attributionClient) private var attributionClient
@@ -23,6 +24,9 @@ struct AttributionFeature {
             switch action {
             case .appLaunched:
                 return .run { _ in await attributionClient.initializeAttribution() }
+
+            case .completeRegistration:
+                return .run { _ in await attributionClient.trackCompleteRegistration() }
             }
         }
     }

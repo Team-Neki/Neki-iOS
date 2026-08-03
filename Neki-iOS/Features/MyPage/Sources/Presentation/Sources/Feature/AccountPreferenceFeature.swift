@@ -36,6 +36,8 @@ struct AccountPreferenceFeature {
         
         // Internal Actions
         case onLoading(Bool)
+        case signOutSucceeded
+        case withdrawSucceeded
         
         // Delegate Actions
         case didSignOut
@@ -67,7 +69,7 @@ struct AccountPreferenceFeature {
                 
                 return .run { send in
                     try await authClient.signOut()
-                    await send(.didSignOut)
+                    await send(.signOutSucceeded)
                 } catch: { error, send in
                     Logger.presentation.error("로그아웃 과정 중 에러 발생: \(error)")
                     await send(.onLoading(false))
@@ -80,7 +82,7 @@ struct AccountPreferenceFeature {
                 return .run { [userID = state.user.id] send in
                     try await authClient.withdraw()
                     UserDefaults.standard.removeObject(forKey: "TermsAgreed_\(userID)")
-                    await send(.didWithdraw)
+                    await send(.withdrawSucceeded)
                 } catch: { error, send in
                     Logger.presentation.error("회원탈퇴 과정 중 에러 발생: \(error)")
                     await send(.onLoading(false))
@@ -91,13 +93,21 @@ struct AccountPreferenceFeature {
                 state.isUnregisterAlertPresented = false
                 return .none
                 
-            case .didSignOut:
+            case .signOutSucceeded:
                 state.isLoading = false
-                return .run { _ in analytics.logEvent(event: MyPageAnalyticsEvent.logout) }
+                return .run { send in
+                    await analytics.endUserSession(MyPageAnalyticsEvent.logout)
+                    await send(.didSignOut)
+                }
                 
-            case .didWithdraw:
+            case .withdrawSucceeded:
                 state.isLoading = false
-                return .run { _ in analytics.logEvent(event: MyPageAnalyticsEvent.withdraw) }
+                return .run { send in
+                    await analytics.endUserSession(MyPageAnalyticsEvent.withdraw)
+                    await send(.didWithdraw)
+                }
+
+            case .didSignOut, .didWithdraw: return .none
                 
             case .onLoading(let isLoading):
                 state.isLoading = isLoading

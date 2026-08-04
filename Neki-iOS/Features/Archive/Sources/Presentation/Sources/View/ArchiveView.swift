@@ -80,17 +80,10 @@ struct ArchiveView: View {
             }
             
         }
-        .fullScreenCover(isPresented: $store.isLoading, content: {
-            LoadingView(message: "사진을 업로드하고 있어요.")
-        })
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { store.isInitialFetchingPhotos },
-                set: { _ in }
-            )
-        ) {
-            LoadingView(message: "사진을 불러오고 있어요.")
-        }
+        .nekiLoading(
+            isPresented: isBlockingLoading,
+            message: blockingLoadingMessage
+        )
         .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
@@ -128,6 +121,14 @@ struct ArchiveView: View {
         .task {
             await store.send(.onAppear).finish()
         }
+    }
+
+    private var isBlockingLoading: Bool {
+        store.isLoading || store.isInitialFetchingPhotos
+    }
+
+    private var blockingLoadingMessage: String {
+        store.isLoading ? "사진을 업로드하고 있어요." : "사진을 불러오고 있어요."
     }
 }
 

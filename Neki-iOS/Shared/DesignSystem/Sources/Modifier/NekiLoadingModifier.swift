@@ -38,6 +38,7 @@ private struct NekiLoadingModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .allowsHitTesting(isPresented == false && isIndicatorVisible == false)
+            .disabled(isPresented || isIndicatorVisible)
             .overlay {
                 if isPresented || isIndicatorVisible {
                     ZStack {

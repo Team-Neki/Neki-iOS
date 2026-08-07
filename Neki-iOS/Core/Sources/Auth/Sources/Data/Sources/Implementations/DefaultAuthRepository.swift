@@ -19,7 +19,7 @@ public struct DefaultAuthRepository: AuthRepository {
     
     public init() {}
     
-    public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> AuthTokens {
+    public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> (tokens: AuthTokens, registrationStatus: RegistrationStatus) {
         let platformParameter: String = "ios"
             
         let dto = SocialLoginDTO.Request(idToken: idToken, platform: platformParameter)
@@ -27,8 +27,9 @@ public struct DefaultAuthRepository: AuthRepository {
         
         do {
             let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let tokens = responseDTO.data?.toEntity() else { throw AuthRepositoryError.networkError(.responseDecodingError) }
-            return tokens
+            guard let data = responseDTO.data else { throw AuthRepositoryError.networkError(.responseDecodingError) }
+            let registrationStatus: RegistrationStatus = data.isNewUser ? .newlyRegistered : .existingAccount
+            return (data.toEntity(), registrationStatus)
         } catch let error as NetworkError {
             throw .networkError(error)
         } catch {

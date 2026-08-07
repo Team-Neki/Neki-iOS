@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum MapEntryPoint: String {
+enum MapEntryPoint: String, Sendable {
     case map = "map"
     case bottomSheet = "bottom_sheet"
 }

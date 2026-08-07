@@ -30,7 +30,6 @@ struct MainTabCoordinator {
         
         var isPhotoPickerPresented: Bool = false
         var pendingPresentation: PendingPresentation?
-        var isLoading: Bool = false
         
         @Presents var destination: Destination.State?
         
@@ -88,8 +87,6 @@ struct MainTabCoordinator {
         case dismissMarketingConsentAlert
         case updateMarketingConsent(Bool)
         case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
-        case requestPushNotificationAuthorizationIfNeeded
-        case pushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case route(AppRouteRequest)
         
         case onAppear
@@ -99,7 +96,6 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
-            case pushNotificationAuthorizationResolved
         }
     }
     
@@ -135,9 +131,9 @@ struct MainTabCoordinator {
             case let .tabChanged(tab):
                 return .run { _ in
                     switch tab {
-                    case .archive: analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
-                    case .pose: analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
-                    case .map: analyticsClient.logEvent(MainTabAnalyticsEvent.mapView)
+                    case .archive: await analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
+                    case .pose: await analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
+                    case .map: await analyticsClient.logEvent(MainTabAnalyticsEvent.mapView)
                     default: break
                     }
                 }
@@ -262,26 +258,10 @@ struct MainTabCoordinator {
                     for: state.user,
                     status: isAgreed ? .approved : .rejected
                 )
-                return .send(.requestPushNotificationAuthorizationIfNeeded)
+                return .none
 
             case .marketingConsentUpdateResponse(_, .failure):
                 state.isUpdatingMarketingConsent = false
-                return .none
-
-            case .requestPushNotificationAuthorizationIfNeeded:
-                return .run { send in
-                    await send(.pushNotificationAuthorizationResponse(Result {
-                        let status = try await pushNotificationClient.checkAuthorizationStatus()
-                        guard status == .notDetermined else { return status }
-                        _ = try await pushNotificationClient.requestAuthorization()
-                        return try await pushNotificationClient.checkAuthorizationStatus()
-                    }))
-                }
-
-            case .pushNotificationAuthorizationResponse(.success):
-                return .send(.delegate(.pushNotificationAuthorizationResolved))
-
-            case .pushNotificationAuthorizationResponse(.failure):
                 return .none
 
             case let .route(request):
@@ -315,10 +295,9 @@ struct MainTabCoordinator {
                     await send(.archive(.root(.clearData)))
                     await send(.delegate(.withdraw))
                 }
-                
+
             case let .imagePicker(.delegate(.imagesConverted(entities))):
                 state.isPhotoPickerPresented = false
-                state.isLoading = false
                 state.selectedTab = .archive
                 guard !entities.isEmpty else { return .none }
                 return .send(.archive(.root(.processUploadImages(entities: entities, appGroupID: nil))))

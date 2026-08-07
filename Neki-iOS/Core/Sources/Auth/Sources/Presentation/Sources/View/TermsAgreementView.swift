@@ -36,10 +36,8 @@ public struct TermsAgreementView: View {
                 
             }
             
-            if store.isLoading {
-                LoadingView()
-            }
         }
+        .nekiLoading(isPresented: store.isLoading)
         .nekiToolbar {
             NekiToolBar.back { dismiss() }
         } center: {

@@ -313,7 +313,7 @@ public struct MapFeature {
                 let event = MapAnalyticsEvent.mapReSearch(hasFilter: hasFilter, regionChanged: isRegionChanged)
                 state.lastSearchedLocation = currentCenterLocation
                 return .merge(
-                    .run { _ in analytics.logEvent(event: event) },
+                    .run { _ in await analytics.logEvent(event) },
                     .send(.fetchPhotoBooths(bounds: bounds)),
                     nearbyPhotoBoothsEffect(for: state)
                 )
@@ -412,11 +412,7 @@ public struct MapFeature {
                 state.pendingFavoriteUpdates[photoBooth.id] = requestedValue
                 updatePhotoBoothFavoriteState(&state, photoBooth: photoBooth, isFavorite: requestedValue)
 
-                let event: MapAnalyticsEvent = requestedValue
-                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name)
-                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name)
                 let stateEffect: Effect<Action> = .send(.startBackgroundCalculation)
-                let analyticsEffect: Effect<Action> = .run { _ in analytics.logEvent(event: event) }
                 let cancelFavoriteFetchEffect: Effect<Action> = .cancel(id: CancelID.favoriteFetch)
                 let requestEffect: Effect<Action> = .run { [id = photoBooth.id, requestedValue] send in
                     await send(.updatePhotoBoothFavoriteResponse(
@@ -427,7 +423,7 @@ public struct MapFeature {
                 }
                 .cancellable(id: CancelID.favorite(photoBooth.id), cancelInFlight: true)
                 
-                return .merge(stateEffect, analyticsEffect, cancelFavoriteFetchEffect, requestEffect)
+                return .merge(stateEffect, cancelFavoriteFetchEffect, requestEffect)
 
             case let .updatePhotoBoothFavoriteResponse(photoBooth, requestedValue, .success):
                 state.pendingFavoriteUpdates[photoBooth.id] = nil
@@ -435,9 +431,13 @@ public struct MapFeature {
                 let message = requestedValue
                     ? "저장한 포토부스에 추가했어요!"
                     : "저장한 포토부스에서 삭제했어요!"
+                let event: MapAnalyticsEvent = requestedValue
+                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name)
+                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name)
                 return .merge(
                     .send(.startBackgroundCalculation),
-                    .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
+                    .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
+                    .run { _ in await analytics.logEvent(event) }
                 )
 
             case let .updatePhotoBoothFavoriteResponse(photoBooth, requestedValue, .failure(error)):
@@ -485,7 +485,7 @@ public struct MapFeature {
                 let favoriteBooths = mergedFavoriteBooths(from: photoBooths, state: state)
                 let favoriteBoothCount = favoriteBooths.count
                 let viewEventEffect: Effect<Action> = shouldLogViewEvent
-                    ? .run { _ in analytics.logEvent(event: MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: favoriteBoothCount)) }
+                    ? .run { _ in await analytics.logEvent(MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: favoriteBoothCount)) }
                     : .none
                 return .merge(
                     .send(.photoBoothListAction(.setFavoriteBooths(favoriteBooths))),
@@ -560,7 +560,7 @@ public struct MapFeature {
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .map)
-                return .run { _ in analytics.logEvent(event: event) }
+                return .run { _ in await analytics.logEvent(event) }
                 
             case .didTapBoothCard:
                 state.isUserTrackingMode = false
@@ -584,7 +584,7 @@ public struct MapFeature {
                     : .favoriteBoothFilterOff
                 return .merge(
                     .send(.startBackgroundCalculation),
-                    .run { _ in analytics.logEvent(event: event) }
+                    .run { _ in await analytics.logEvent(event) }
                 )
                 
             case let .didSelectDirectionApp(appType):
@@ -592,7 +592,7 @@ public struct MapFeature {
                 guard let url = appType.connectLink(coordinate: photoBooth.coordinate, name: photoBooth.name) else { return .none }
                 state.directionSheetPhotoBooth = nil
                 return .merge(
-                    .run { _ in analytics.logEvent(event: MapAnalyticsEvent.mapRouteClick(mapType: appType)) },
+                    .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapRouteClick(mapType: appType)) },
                     .run { _ in await openURL(url) }
                 )
                 
@@ -625,7 +625,7 @@ public struct MapFeature {
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .bottomSheet)
-                return .run { _ in analytics.logEvent(event: event) }
+                return .run { _ in await analytics.logEvent(event) }
                 
             default:
                 return .none

@@ -98,12 +98,11 @@ struct PhotoImportView: View {
                     .padding(.leading, 20)
             }
             
-            if store.isLoading {
-                LoadingView(message: "요청을 처리하고 있어요.")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            
         }
+        .nekiLoading(
+            isPresented: store.isLoading,
+            message: "요청을 처리하고 있어요."
+        )
         .background(Color.white.ignoresSafeArea())
         .navigationBarHidden(true)
         .task {

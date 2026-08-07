@@ -40,10 +40,11 @@ struct MainTabCoordinatorView: View {
                 NekiTabBar(selectedTab: $store.selectedTab) { store.send(.onTapAddButton) }
             }
             
-            if store.isLoading {
-                LoadingView(message: "사진을 업로드하고 있어요.")
-            }
         }
+        .nekiLoading(
+            isPresented: store.imagePicker.isLoading,
+            message: "사진을 불러오고 있어요."
+        )
         .onAppear {
             store.send(.onAppear)
         }

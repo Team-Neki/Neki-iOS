@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>AMPLITUDE_API_KEY</key>
+	<string>$(AMPLITUDE_API_KEY)</string>
 	<key>BASE_URL</key>
 	<string>$(BASE_URL)</string>
 	<key>CFBundleURLTypes</key>
@@ -27,6 +29,14 @@
 	</array>
 	<key>FirebaseAppDelegateProxyEnabled</key>
 	<false/>
+	<key>FacebookAppID</key>
+	<string>1581306157023704</string>
+	<key>FacebookClientToken</key>
+	<string>7283d0be910e8efe54f36fa44cffa2c3</string>
+	<key>FacebookAutoLogAppEventsEnabled</key>
+	<true/>
+	<key>FacebookSKAdNetworkReportEnabled</key>
+	<true/>
 	<key>KAKAO_LOGIN_NATIVE_APP_KEY</key>
 	<string>$(KAKAO_LOGIN_NATIVE_APP_KEY)</string>
 	<key>LSApplicationQueriesSchemes</key>

@@ -44,6 +44,7 @@ struct ArchivePhotoDetailFeature {
         case cancelMemoEditing
         case doneMemoEditing
         case clearAllMemoEditing
+        case memoUpdateResponse(Result<Void, Error>)
         
         case onTapTransform
         case imageFetchResponse(Result<UIImage, Error>)
@@ -85,8 +86,7 @@ struct ArchivePhotoDetailFeature {
             switch action {
                 
             case .onAppear:
-                analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView)
-                return .none
+                return .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoDetailView) }
                 
             case .onTapBackButton:
                 return .run { _ in await dismiss() }
@@ -128,9 +128,16 @@ struct ArchivePhotoDetailFeature {
                 state.isMemoExpanded = false
                 
                 return .run { send in
-                    try? await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
-                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate)
+                    await send(.memoUpdateResponse(Result {
+                        try await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
+                    }))
                 }
+
+            case .memoUpdateResponse(.success):
+                return .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate) }
+
+            case .memoUpdateResponse(.failure):
+                return .none
                 
             case .clearAllMemoEditing:
                 state.editingMemoText = ""
@@ -170,7 +177,7 @@ struct ArchivePhotoDetailFeature {
                     return .merge(
                         .run { _ in
                             // 🌟 요구사항: 단일 정리 행동 분석 (album_add_from_detail)
-                            analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromDetail(albumCount: albumCount))
+                            await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromDetail(albumCount: albumCount))
                         },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success))))
                     )

@@ -14,6 +14,10 @@ struct PushNotificationListView: View {
     var body: some View {
         content
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .nekiLoading(
+                isPresented: store.isLoading,
+                message: "알림을 불러오고 있어요."
+            )
             .nekiToolbar {
                 NekiToolBar.back { store.send(.closeButtonTapped) }
             } center: {
@@ -27,7 +31,7 @@ private extension PushNotificationListView {
     @ViewBuilder
     var content: some View {
         if store.isLoading {
-            ProgressView()
+            Color.clear
         } else if store.notifications.isEmpty {
             unavailableView
         } else {

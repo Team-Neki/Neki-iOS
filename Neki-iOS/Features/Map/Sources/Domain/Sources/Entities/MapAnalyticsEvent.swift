@@ -39,33 +39,37 @@ extension MapAnalyticsEvent: AnalyticsEvent {
         }
     }
     
-    var parameters: [AnalyticsParameterKey : Any]? {
+    var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
         case let .mapReSearch(hasFilter, regionChanged):
-            return [.hasFilter: hasFilter, .regionChanged: regionChanged]
+            return [.hasFilter: .boolean(hasFilter), .regionChanged: .boolean(regionChanged)]
         case let .mapBrandFilterToggle(action, selectedCount, brandName):
-            return [.action: action.rawValue, .selectedCount: selectedCount, .brandName: brandName]
+            return [
+                .action: .string(action.rawValue),
+                .selectedCount: .integer(selectedCount),
+                .brandName: .string(brandName)
+            ]
         case let .boothSelect(brandName, entryPoint):
-            return [.brandName: brandName, .entryPoint: entryPoint.rawValue]
+            return [.brandName: .string(brandName), .entryPoint: .string(entryPoint.rawValue)]
         case let .boothFavoriteAdd(boothName, brandName):
-            return [.boothName: boothName, .brandName: brandName]
+            return [.boothName: .string(boothName), .brandName: .string(brandName)]
         case let .boothFavoriteRemove(boothName, brandName):
-            return [.boothName: boothName, .brandName: brandName]
+            return [.boothName: .string(boothName), .brandName: .string(brandName)]
         case let .favoriteBoothFilterOn(favoriteBoothCount):
-            return [.favoriteBoothCount: favoriteBoothCount]
+            return [.favoriteBoothCount: .integer(favoriteBoothCount)]
         case .favoriteBoothFilterOff:
             return nil
         case let .favoriteBoothView(favoriteBoothCount):
-            return [.favoriteBoothCount: favoriteBoothCount]
+            return [.favoriteBoothCount: .integer(favoriteBoothCount)]
         case let .brandOrderSave(orderedBrands):
             let priorityBrandNames = orderedBrands.map(\.name)
             return [
-                .priorityBrand1: priorityBrandNames.indices.contains(0) ? priorityBrandNames[0] : "",
-                .priorityBrand2: priorityBrandNames.indices.contains(1) ? priorityBrandNames[1] : "",
-                .priorityBrand3: priorityBrandNames.indices.contains(2) ? priorityBrandNames[2] : ""
+                .priorityBrand1: .string(priorityBrandNames.indices.contains(0) ? priorityBrandNames[0] : ""),
+                .priorityBrand2: .string(priorityBrandNames.indices.contains(1) ? priorityBrandNames[1] : ""),
+                .priorityBrand3: .string(priorityBrandNames.indices.contains(2) ? priorityBrandNames[2] : "")
             ]
         case let .mapRouteClick(mapType):
-            return [.mapType: mapType.rawValue]
+            return [.mapType: .string(mapType.rawValue)]
         }
     }
 }

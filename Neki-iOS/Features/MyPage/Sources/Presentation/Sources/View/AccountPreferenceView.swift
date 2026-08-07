@@ -27,9 +27,7 @@ struct AccountPreferenceView: View {
             left: { NekiToolBar.back(action: { dismiss() }) },
             center: { NekiToolBar.textCenter("계정 설정") }
         )
-        .overlay {
-            if store.isLoading { LoadingView() }
-        }
+        .nekiLoading(isPresented: store.isLoading)
         .nekiAlert(
             isPresented: $store.isLogoutAlertPresented,
             style: .cancelable,

@@ -12,6 +12,12 @@ enum SocialLoginDTO {
         let idToken: String
         let platform: String?
     }
-    
-    typealias Response = TokenPair
+
+    struct Response: Decodable, TokenContainer {
+        let accessToken: String
+        let refreshToken: String
+        let isNewUser: Bool
+
+        func toEntity() -> AuthTokens { .init(accessToken: accessToken, refreshToken: refreshToken) }
+    }
 }

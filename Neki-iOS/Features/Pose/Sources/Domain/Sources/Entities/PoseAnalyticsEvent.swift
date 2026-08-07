@@ -29,13 +29,13 @@ extension PoseAnalyticsEvent: AnalyticsEvent {
         }
     }
     
-    var parameters: [AnalyticsParameterKey : Any]? {
+    var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
         case .randomPoseSuggestionStart, .poseBookmarkFilter, .poseBookmark: return nil
         case let .randomPoseSuggestionEnd(totalSwipeCount):
-            return [.totalSwipeCount: totalSwipeCount]
+            return [.totalSwipeCount: .integer(totalSwipeCount)]
         case let .poseFilterToggle(peopleCount):
-            return [.peopleCount: peopleCount]
+            return [.peopleCount: .integer(peopleCount)]
         }
     }
 }

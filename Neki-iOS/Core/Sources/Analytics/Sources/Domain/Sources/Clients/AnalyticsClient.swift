@@ -12,18 +12,24 @@ import os
 
 @DependencyClient
 public struct AnalyticsClient {
-    public var configure: (_ userID: Int?) -> Void
-    public var logEvent: (_ event: AnalyticsEvent) -> Void
+    public var initialize: @Sendable () async throws -> Void
+    public var setUserSession: @Sendable (_ userID: Int?) async -> Void = { _ in }
+    public var endUserSession: @Sendable (_ event: any AnalyticsEvent) async -> Void = { _ in }
+    public var logEvent: @Sendable (_ event: any AnalyticsEvent) async -> Void = { _ in }
 }
 
 extension AnalyticsClient: DependencyKey {
     public static var liveValue: AnalyticsClient = {
         @Dependency(\.analyticsRepository) var repository
         
-        return AnalyticsClient { userID in
-            Task.detached(priority: .background) { await repository.setUserSession(with: userID) }
+        return AnalyticsClient {
+            try await repository.initialize()
+        } setUserSession: { userID in
+            await repository.setUserSession(with: userID)
+        } endUserSession: { event in
+            await repository.endUserSession(with: event)
         } logEvent: { event in
-            Task.detached(priority: .background) { await repository.logEvent(event) }
+            await repository.logEvent(event)
         }
     }()
 }

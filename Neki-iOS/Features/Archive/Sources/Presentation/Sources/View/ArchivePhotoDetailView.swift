@@ -35,11 +35,6 @@ struct ArchivePhotoDetailView: View {
             // 하단 메모 및 푸터 UI
             bottomContainer
             
-            if store.isLoading {
-                LoadingView(message: "요청을 처리하고 있어요.")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            
             if store.showDropDownMenu {
                 // 메뉴 외부 빈 공간 터치 시 드롭다운 닫기
                 Color.clear
@@ -61,6 +56,10 @@ struct ArchivePhotoDetailView: View {
                 .zIndex(10)
             }
         }
+        .nekiLoading(
+            isPresented: store.isLoading,
+            message: "요청을 처리하고 있어요."
+        )
         .onAppear {
             store.send(.onAppear)
         }

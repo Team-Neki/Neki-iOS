@@ -20,7 +20,7 @@ public enum MainTabAnalyticsEvent: AnalyticsEvent {
         }
     }
     
-    public var parameters: [AnalyticsParameterKey: Any]? {
+    public var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         return nil
     }
 }

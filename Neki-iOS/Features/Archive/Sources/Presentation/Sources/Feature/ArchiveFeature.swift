@@ -140,11 +140,13 @@ struct ArchiveFeature {
                 }
                 
             case .addFolderResponse(.success):
-                analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate)
-                return .run { send in
-                    await send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success))))
-                    await send(.fetchAlbums)
-                }
+                return .merge(
+                    .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate) },
+                    .run { send in
+                        await send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success))))
+                        await send(.fetchAlbums)
+                    }
+                )
                 
             case .addFolderResponse(.failure):
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 만들지 못했어요", style: .error))))
@@ -272,9 +274,10 @@ struct ArchiveFeature {
             case let .addPhotoFromQRScanner(imageID):
                 return .run { send in
                     try await archiveClient.registerPhotos(folderId: nil, uploads: [(imageID, nil, PhotoUploadMethod.qr)], favorite: false)
-                    analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .qr, count: 1))
+                    async let tracking: Void = analyticsClient.logEvent(ArchiveAnalyticsEvent.photoUpload(method: .qr, count: 1))
                     await send(.delegate(.showToast(NekiToastItem("이미지를 추가했어요", style: .success))))
                     await send(.fetchPhotos)
+                    await tracking
                 } catch: { error, send in
                     await send(.delegate(.showToast(NekiToastItem("사진 등록에 실패했어요", style: .error))))
                 }

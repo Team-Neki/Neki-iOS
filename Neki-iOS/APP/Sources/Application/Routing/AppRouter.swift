@@ -28,20 +28,17 @@ struct AppRouter {
         state: inout AppCoordinator.State,
         sessionStatus: UserSessionStatus,
         shouldPresentMarketingConsentAlert: Bool = false,
-        shouldPresentRequiredTermsAgreement: (User) -> Bool,
         isMarketingConsentAlertEligible: (User) -> Bool
     ) -> Effect<AppCoordinator.Action> {
         switch sessionStatus {
         case let .signedIn(user):
-            guard shouldPresentRequiredTermsAgreement(user) == false else {
+            guard user.allRequiredTermsAgreed else {
                 state.route = .termsAgreement(.init())
                 return .none
             }
 
-            state.route = .mainTab(.init(
-                shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
-                    || isMarketingConsentAlertEligible(user)
-            ))
+            let shouldPresentConsentAlert = shouldPresentMarketingConsentAlert || isMarketingConsentAlertEligible(user)
+            state.route = .mainTab(.init(shouldPresentMarketingConsentAlert: shouldPresentConsentAlert))
             return .merge(
                 .send(.checkPushNotificationAuthorization),
                 executePendingRouteIfNeeded(state: &state)

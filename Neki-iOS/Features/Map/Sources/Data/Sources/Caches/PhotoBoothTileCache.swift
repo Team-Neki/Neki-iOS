@@ -19,16 +19,6 @@ struct PhotoBoothTimeToLivePolicy: PhotoBoothCacheFreshnessPolicy {
     }
 }
 
-struct PhotoBoothCacheMetadata: Sendable {
-    let cachedAt: Date
-    let validationToken: String?
-}
-
-struct PhotoBoothTileCacheSnapshot: Sendable {
-    let photoBooths: [PhotoBooth]
-    let metadata: PhotoBoothCacheMetadata
-}
-
 struct PhotoBoothCacheConfiguration: Sendable {
     let maximumTileCount: Int
     let maximumPhotoBoothCount: Int
@@ -39,12 +29,6 @@ struct PhotoBoothCacheConfiguration: Sendable {
         maximumPhotoBoothCount: 5_000,
         freshnessPolicy: PhotoBoothTimeToLivePolicy(lifetime: 60 * 10)
     )
-}
-
-enum PhotoBoothTileCacheLookup {
-    case fresh(PhotoBoothTileCacheSnapshot)
-    case stale(PhotoBoothTileCacheSnapshot)
-    case missing
 }
 
 final class PhotoBoothTileCache {

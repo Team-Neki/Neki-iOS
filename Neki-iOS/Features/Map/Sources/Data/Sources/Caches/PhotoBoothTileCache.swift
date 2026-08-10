@@ -7,18 +7,6 @@
 
 import Foundation
 
-protocol PhotoBoothCacheFreshnessPolicy: Sendable {
-    func isFresh(metadata: PhotoBoothCacheMetadata, now: Date) -> Bool
-}
-
-struct PhotoBoothTimeToLivePolicy: PhotoBoothCacheFreshnessPolicy {
-    let lifetime: TimeInterval
-
-    func isFresh(metadata: PhotoBoothCacheMetadata, now: Date) -> Bool {
-        now.timeIntervalSince(metadata.cachedAt) < lifetime
-    }
-}
-
 struct PhotoBoothCacheConfiguration: Sendable {
     let maximumTileCount: Int
     let maximumPhotoBoothCount: Int

@@ -7,18 +7,10 @@
 
 import Foundation
 
-struct PhotoBoothCacheConfiguration: Sendable {
-    let maximumTileCount: Int
-    let maximumPhotoBoothCount: Int
-    let freshnessPolicy: any PhotoBoothCacheFreshnessPolicy
-
-    static let standard = PhotoBoothCacheConfiguration(
-        maximumTileCount: 128,
-        maximumPhotoBoothCount: 5_000,
-        freshnessPolicy: PhotoBoothTimeToLivePolicy(lifetime: 60 * 10)
-    )
-}
-
+/// 지도 타일별 포토부스 조회 결과와 캐시 메타데이터를 보관합니다.
+///
+/// 조회 시 주입된 신선도 정책을 적용하여 데이터를 구분하며,
+/// 데이터 갱신과 fallback 사용 여부는 Repository급에서 결정합니다.
 final class PhotoBoothTileCache {
     private final class Key: NSObject {
         let tile: MapTile

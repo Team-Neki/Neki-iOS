@@ -2,7 +2,7 @@
 //  MapInitialSearchState.swift
 //  Neki-iOS
 //
-//  Created by OpenAI Codex on 5/6/26.
+//  Created by SwainYun on 5/6/26.
 //
 
 import Foundation

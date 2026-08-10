@@ -2,7 +2,7 @@
 //  TogglePhotoBoothFavoriteDTO.swift
 //  Neki-iOS
 //
-//  Created by Codex on 6/3/26.
+//  Created by SwainYun on 6/3/26.
 //
 
 import Foundation

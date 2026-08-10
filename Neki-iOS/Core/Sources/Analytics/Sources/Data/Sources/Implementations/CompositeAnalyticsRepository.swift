@@ -2,7 +2,7 @@
 //  CompositeAnalyticsRepository.swift
 //  Neki-iOS
 //
-//  Created by Codex on 8/1/26.
+//  Created by SwainYun on 8/1/26.
 //
 
 import Dependencies

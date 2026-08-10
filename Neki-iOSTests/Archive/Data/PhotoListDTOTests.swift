@@ -2,7 +2,7 @@
 //  PhotoListDTOTests.swift
 //  Neki-iOSTests
 //
-//  Created by Codex on 7/3/26.
+//  Created by SwainYun on 7/3/26.
 //
 
 import Foundation

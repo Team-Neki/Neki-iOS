@@ -2,7 +2,7 @@
 //  AuthLoginResult.swift
 //  Neki-iOS
 //
-//  Created by Codex on 8/3/26.
+//  Created by SwainYun on 8/3/26.
 //
 
 public enum RegistrationStatus: Sendable, Equatable {

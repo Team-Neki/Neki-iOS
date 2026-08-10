@@ -81,8 +81,9 @@ public final actor DefaultPhotoBoothRepository {
     private var brandOrderMutationRevision: UInt = .zero
     private var brandFetchTask: Task<[BrandID: PhotoBoothBrand], Error>?
     
-    public init() {
-        let configuration = PhotoBoothCacheConfiguration.standard
+    public init() { self.init(configuration: .standard) }
+    
+    init(configuration: PhotoBoothCacheConfiguration) {
         cacheFreshnessPolicy = configuration.freshnessPolicy
         tileCache = PhotoBoothTileCache(configuration: configuration)
     }
@@ -153,6 +154,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 var tilesToFetch: [MapTile] = []
                 var stalePhotoBoothsByTile: [MapTile: [PhotoBooth]] = [:]
                 
+                // 신선한 캐시는 즉시 반환하고 만료된 캐시는 타일별 갱신 요청이 실패한 경우에만 fallback으로 활용
                 var cachedBooths: [PhotoBooth] = []
                 for tile in requiredTiles {
                     switch tileCache.lookup(tile: tile, now: now) {

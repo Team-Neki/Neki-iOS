@@ -2,7 +2,7 @@
 //  AppDiagnosticsClient.swift
 //  Neki-iOS
 //
-//  Created by Codex on 7/7/26.
+//  Created by SwainYun on 7/7/26.
 //
 
 import ComposableArchitecture

@@ -2,7 +2,7 @@
 //  PushNotificationListItem.swift
 //  Neki-iOS
 //
-//  Created by Codex on 6/19/26.
+//  Created by SwainYun on 6/19/26.
 //
 
 import Foundation

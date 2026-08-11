@@ -79,6 +79,7 @@ struct DeviceAuthorizationPreferenceFeature {
     @Dependency(\.authClient) private var authClient
     @Dependency(\.openURL) private var openURL
     @Dependency(\.date.now) private var now
+    @Dependency(\.continuousClock) private var clock
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -192,8 +193,11 @@ struct DeviceAuthorizationPreferenceFeature {
                 let requestedValue = state.isMarketingNotificationEnabled
                 return .merge(
                     .cancel(id: CancelID.marketingNotificationUpdateRequest),
-                    .send(.commitMarketingNotificationUpdate(requestedValue))
-                    .debounce(id: CancelID.marketingNotificationUpdateDebounce, for: .milliseconds(500), scheduler: DispatchQueue.main)
+                    .run { send in
+                        try await clock.sleep(for: .milliseconds(500))
+                        await send(.commitMarketingNotificationUpdate(requestedValue))
+                    }
+                    .cancellable(id: CancelID.marketingNotificationUpdateDebounce, cancelInFlight: true)
                 )
 
             case let .commitMarketingNotificationUpdate(requestedValue):

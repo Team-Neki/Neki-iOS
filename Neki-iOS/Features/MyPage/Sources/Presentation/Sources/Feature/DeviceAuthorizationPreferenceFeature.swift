@@ -81,6 +81,7 @@ struct DeviceAuthorizationPreferenceFeature {
     @Dependency(\.authClient) private var authClient
     @Dependency(\.openURL) private var openURL
     @Dependency(\.date.now) private var now
+    @Dependency(\.continuousClock) private var clock
     
     var body: some ReducerOf<Self> {
         BindingReducer()

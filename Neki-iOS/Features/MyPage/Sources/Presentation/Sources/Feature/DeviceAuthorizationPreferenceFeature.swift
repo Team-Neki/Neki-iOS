@@ -25,6 +25,8 @@ struct DeviceAuthorizationPreferenceFeature {
         var isMarketingNotificationEnabled: Bool = false
         var confirmedMarketingNotificationEnabled: Bool = false
         var isUpdatingMarketingNotification: Bool = false
+        var marketingNotificationUpdateRequestID: UUID?
+        var isMarketingNotificationUpdateRequestInFlight: Bool = false
         
         var isCameraAuthorized: Bool { cameraAuthorizationStatus == .authorized }
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
@@ -52,8 +54,8 @@ struct DeviceAuthorizationPreferenceFeature {
         case updateLocationStatus(CLAuthorizationStatus)
         case updatePhotosStatus(PHAuthorizationStatus)
         case updateNotificationStatus(UNAuthorizationStatus)
-        case commitMarketingNotificationUpdate(Bool)
-        case marketingNotificationUpdateResponse(Bool, Result<Void, Error>)
+        case commitMarketingNotificationUpdate(Bool, UUID)
+        case marketingNotificationUpdateResponse(Bool, UUID, Result<Void, Error>)
         case pushNotificationSynchronizationResponse(Result<UNAuthorizationStatus, Error>)
         case openAppSettings
 
@@ -190,27 +192,41 @@ struct DeviceAuthorizationPreferenceFeature {
             case .binding(\.isMarketingNotificationEnabled):
                 state.isUpdatingMarketingNotification = true
                 let requestedValue = state.isMarketingNotificationEnabled
+                let requestID = UUID()
+                state.marketingNotificationUpdateRequestID = requestID
                 return .merge(
                     .cancel(id: CancelID.marketingNotificationUpdateRequest),
-                    .send(.commitMarketingNotificationUpdate(requestedValue))
-                    .debounce(id: CancelID.marketingNotificationUpdateDebounce, for: .milliseconds(500), scheduler: DispatchQueue.main)
+                    .run { send in
+                        try await clock.sleep(for: .milliseconds(500))
+                        await send(.commitMarketingNotificationUpdate(requestedValue, requestID))
+                    }
+                    .cancellable(id: CancelID.marketingNotificationUpdateDebounce, cancelInFlight: true)
                 )
 
-            case let .commitMarketingNotificationUpdate(requestedValue):
-                guard requestedValue != state.confirmedMarketingNotificationEnabled else {
+            case let .commitMarketingNotificationUpdate(requestedValue, requestID):
+                guard requestID == state.marketingNotificationUpdateRequestID else { return .none }
+                guard requestedValue != state.confirmedMarketingNotificationEnabled
+                        || state.isMarketingNotificationUpdateRequestInFlight else {
                     state.isUpdatingMarketingNotification = false
+                    state.marketingNotificationUpdateRequestID = nil
                     return .none
                 }
+                state.isMarketingNotificationUpdateRequestInFlight = true
                 return .run { send in
                     await send(.marketingNotificationUpdateResponse(
                         requestedValue,
+                        requestID,
                         Result { try await authClient.updateMarketingConsent(requestedValue) }
                     ))
                 }
                 .cancellable(id: CancelID.marketingNotificationUpdateRequest, cancelInFlight: true)
 
-            case let .marketingNotificationUpdateResponse(requestedValue, .success):
+            case let .marketingNotificationUpdateResponse(requestedValue, requestID, .success):
+                guard requestID == state.marketingNotificationUpdateRequestID else { return .none }
                 state.isUpdatingMarketingNotification = false
+                state.marketingNotificationUpdateRequestID = nil
+                state.isMarketingNotificationUpdateRequestInFlight = false
+                state.isMarketingNotificationEnabled = requestedValue
                 state.confirmedMarketingNotificationEnabled = requestedValue
                 state.$userSessionStatus.withLock {
                     guard case let .signedIn(currentUser) = $0 else { return }
@@ -239,9 +255,12 @@ struct DeviceAuthorizationPreferenceFeature {
                     NekiToastItem(message, style: .success)
                 )))
 
-            case let .marketingNotificationUpdateResponse(_, .failure(error)):
+            case let .marketingNotificationUpdateResponse(_, requestID, .failure(error)):
+                guard requestID == state.marketingNotificationUpdateRequestID else { return .none }
                 if error is CancellationError { return .none }
                 state.isUpdatingMarketingNotification = false
+                state.marketingNotificationUpdateRequestID = nil
+                state.isMarketingNotificationUpdateRequestInFlight = false
                 state.isMarketingNotificationEnabled = state.confirmedMarketingNotificationEnabled
                 return .none
 

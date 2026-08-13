@@ -19,9 +19,11 @@ struct ArchiveView: View {
     
     
     var body: some View {
+        @Binding(store.$showTooltip) var showTooltip
+
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 0) {
-                header
+                header(isTooltipPresented: $showTooltip)
                     .zIndex(9)
                 
                 ScrollViewReader { proxy in
@@ -71,11 +73,11 @@ struct ArchiveView: View {
             }
             
             // 툴팁이 보여져 있을 경우 화면 어디든 누르면 사라지게
-            if store.showTooltip {
+            if showTooltip {
                 Color.clear
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        store.showTooltip = false
+                        showTooltip = false
                     }
             }
             
@@ -84,7 +86,7 @@ struct ArchiveView: View {
             isPresented: isBlockingLoading,
             message: blockingLoadingMessage
         )
-        .fullScreenCover(item: $store.scope(state: \.selectUploadAlbum, action: \.selectUploadAlbum)) { store in
+        .fullScreenCover(item: $store.scope(state: \.$selectUploadAlbum, action: \.selectUploadAlbum)) { store in
             SelectUploadAlbumView(store: store)
                 .presentationBackground(.clear)
         }
@@ -136,7 +138,7 @@ struct ArchiveView: View {
 // MARK: - Subviews
 
 private extension ArchiveView {
-    var header: some View {
+    func header(isTooltipPresented: Binding<Bool>) -> some View {
         HStack(alignment: .center, spacing: 0) {
             Image(.iconLogo)
             
@@ -149,7 +151,7 @@ private extension ArchiveView {
                     Image(.iconQrCode)
                 }
                 .nekiTooltip(
-                    isPresented: $store.showTooltip,
+                    isPresented: isTooltipPresented,
                     "QR스캔으로 빠르게 네컷을 추가해보세요!",
                     position: .bottom,
                     style: .dark,

@@ -73,15 +73,15 @@ struct MainTabCoordinatorView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.dismissPushNotificationPermissionAlert) }
         )
-        .sheet(item: $store.scope(state: \.destination?.uploadSelection, action: \.destination.uploadSelection)) {
+        .sheet(isPresented: Binding($store.scope(state: \.$destination, action: \.destination).uploadSelection)) {
             store.send(.uploadSelectionSheetDismissed)
-        } content: { _ in
+        } content: {
             UploadSelectionSheet(store: store)
         }
-        .fullScreenCover(item: $store.scope(state: \.destination?.qrScan, action: \.destination.qrScan)) { qrStore in
+        .fullScreenCover(item: $store.scope(state: \.$destination, action: \.destination).qrScan) { qrStore in
             QRCodeScannerView(store: qrStore)
         }
-        .fullScreenCover(item: $store.scope(state: \.destination?.notificationList, action: \.destination.notificationList)) { notificationStore in
+        .fullScreenCover(item: $store.scope(state: \.$destination, action: \.destination).notificationList) { notificationStore in
             PushNotificationListCoordinatorView(store: notificationStore)
         }
         .photosPicker(

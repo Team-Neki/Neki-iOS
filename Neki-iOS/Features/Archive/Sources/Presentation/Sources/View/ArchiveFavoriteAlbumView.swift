@@ -54,7 +54,7 @@ struct ArchiveFavoriteAlbumView: View {
         .animation(.easeInOut(duration: 0.3), value: store.isFetchingPhotos)
         .animation(.easeInOut(duration: 0.3), value: store.photos)
         .task { await store.send(.onAppear).finish() }
-        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+        .fullScreenCover(item: $store.scope(state: \.$albumSelection, action: \.albumSelection)) { selectionStore in
             AlbumSelectionView(store: selectionStore)
         }
         .nekiAlert(

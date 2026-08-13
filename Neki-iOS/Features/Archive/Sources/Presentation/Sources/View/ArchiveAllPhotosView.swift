@@ -76,7 +76,7 @@ struct ArchiveAllPhotosView: View {
         .task {
             await store.send(.onAppear).finish()
         }
-        .fullScreenCover(item: $store.scope(state: \.albumSelection, action: \.albumSelection)) { selectionStore in
+        .fullScreenCover(item: $store.scope(state: \.$albumSelection, action: \.albumSelection)) { selectionStore in
             AlbumSelectionView(store: selectionStore)
         }
     }

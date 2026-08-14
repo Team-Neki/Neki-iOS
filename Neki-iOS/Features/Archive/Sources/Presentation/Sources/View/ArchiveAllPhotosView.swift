@@ -185,7 +185,7 @@ private extension ArchiveAllPhotosView {
     @ViewBuilder
     var filterBar: some View {
         HStack(alignment: .center, spacing: 6) {
-            Button(store.state.selectedSortedTime) {
+            Button(store.selectedSortOrder.displayName) {
                 showDropDownMenu.toggle()
             }
             .buttonStyle(
@@ -222,15 +222,8 @@ private extension ArchiveAllPhotosView {
     @ViewBuilder
     var dropDownMenu: some View {
         VStack(alignment: .leading, spacing: 0) {
-            dropDownMenuButton(title: "최신순") {
-                withAnimation { showDropDownMenu = false }
-                store.send(.onTapFilterNewest)
-            }
-            
-            dropDownMenuButton(title: "오래된순") {
-                withAnimation { showDropDownMenu = false }
-                store.send(.onTapFilterOldest)
-            }
+            dropDownMenuButton(sortOrder: .descending)
+            dropDownMenuButton(sortOrder: .ascending)
         }
         .padding(.vertical, 6)
         .frame(width: 96, height: 72)
@@ -239,12 +232,12 @@ private extension ArchiveAllPhotosView {
         .shadow(color: .black.opacity(0.2), radius: 2.5, x: 0, y: 0)
     }
     
-    func dropDownMenuButton(
-        title: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(title)
+    func dropDownMenuButton(sortOrder: ArchivePhotoSortOrder) -> some View {
+        Button {
+            withAnimation { showDropDownMenu = false }
+            store.send(.onTapSortOrder(sortOrder))
+        } label: {
+            Text(sortOrder.displayName)
                 .nekiFont(.body14Medium)
                 .foregroundStyle(.gray900)
                 .frame(height: 20)

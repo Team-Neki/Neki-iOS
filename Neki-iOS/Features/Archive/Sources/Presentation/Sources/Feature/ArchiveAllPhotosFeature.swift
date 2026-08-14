@@ -22,7 +22,7 @@ struct ArchiveAllPhotosFeature {
         var visiblePhotos: [PhotoEntity] = []
         var lastVisiblePhotoID: Int?
         var selectedIDs: Set<Int> = []
-        var selectedSortedTime: String = "최신순"
+        var selectedSortOrder: ArchivePhotoSortOrder = .descending
         var isSelectedFavorite: Bool = false
         var isSelectionMode: Bool = false
         var isFetchingPhotos: Bool = false
@@ -43,8 +43,7 @@ struct ArchiveAllPhotosFeature {
         case downloadImagesResponse(successCount: Int)
         case onTapDeleteButton
         case deletePhotosLocally(ids: [Int])
-        case onTapFilterNewest
-        case onTapFilterOldest
+        case onTapSortOrder(ArchivePhotoSortOrder)
         case onTapFavoriteButton
         case fetchPhotos
         case photoListResponse(Result<ArchivePhotoSnapshot, Error>)
@@ -132,29 +131,13 @@ struct ArchiveAllPhotosFeature {
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
-            case .onTapFilterNewest:
-                if state.selectedSortedTime == "최신순" { return .none }
-                state.selectedSortedTime = "최신순"
+            case let .onTapSortOrder(sortOrder):
+                guard state.selectedSortOrder != sortOrder else { return .none }
+                state.selectedSortOrder = sortOrder
                 state.photos.removeAll()
                 state.visiblePhotos.removeAll()
                 state.lastVisiblePhotoID = nil
-                state.isFetchingPhotos = false
-                return .concatenate(
-                    .cancel(id: CancelID.photoRequest),
-                    .send(.fetchPhotos)
-                )
-                
-            case .onTapFilterOldest:
-                if state.selectedSortedTime == "오래된순" { return .none }
-                state.selectedSortedTime = "오래된순"
-                state.photos.removeAll()
-                state.visiblePhotos.removeAll()
-                state.lastVisiblePhotoID = nil
-                state.isFetchingPhotos = false
-                return .concatenate(
-                    .cancel(id: CancelID.photoRequest),
-                    .send(.fetchPhotos)
-                )
+                return fetchPhotos(state: &state)
                 
             case .onTapFavoriteButton:
                 state.isSelectedFavorite.toggle()
@@ -163,14 +146,7 @@ struct ArchiveAllPhotosFeature {
                 
             case .fetchPhotos:
                 guard !state.isFetchingPhotos else { return .none }
-                state.isFetchingPhotos = true
-                let sortOrder: ArchivePhotoSortOrder = state.selectedSortedTime == "최신순" ? .descending : .ascending
-                return .run { send in
-                    await send(.photoListResponse(Result {
-                        try await archiveClient.refreshPhotos(.all, 20, sortOrder)
-                    }))
-                }
-                .cancellable(id: CancelID.photoRequest, cancelInFlight: true)
+                return fetchPhotos(state: &state)
                 
             case let .photoListResponse(.success(snapshot)):
                 state.isFetchingPhotos = false
@@ -187,8 +163,7 @@ struct ArchiveAllPhotosFeature {
             case .loadMorePhotos:
                 guard state.isFetchingPhotos == false, state.hasNextPhotos else { return .none }
                 state.isFetchingPhotos = true
-                let sortOrder: ArchivePhotoSortOrder = state.selectedSortedTime == "최신순" ? .descending : .ascending
-                return .run { send in
+                return .run { [sortOrder = state.selectedSortOrder] send in
                     await send(.photoListResponse(Result {
                         try await archiveClient.fetchNextPhotos(.all, 20, sortOrder)
                     }))
@@ -239,6 +214,16 @@ struct ArchiveAllPhotosFeature {
             }
         }
         .ifLet(\.$albumSelection, action: \.albumSelection) { AlbumSelectionFeature() }
+    }
+
+    private func fetchPhotos(state: inout State) -> Effect<Action> {
+        state.isFetchingPhotos = true
+        return .run { [sortOrder = state.selectedSortOrder] send in
+            await send(.photoListResponse(Result {
+                try await archiveClient.refreshPhotos(.all, 20, sortOrder)
+            }))
+        }
+        .cancellable(id: CancelID.photoRequest, cancelInFlight: true)
     }
 }
 

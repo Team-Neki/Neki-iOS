@@ -8,11 +8,16 @@
 import Foundation
 
 struct AmplitudeAnalyticsConfiguration: Sendable {
+    private enum Constants {
+        static let minimumIdentifierLength = 1
+    }
+
     private enum InfoKey {
         static let apiKey = "AMPLITUDE_API_KEY"
     }
 
     let apiKey: String
+    let minimumIdentifierLength: Int
 
     init(bundle: Bundle = .main) throws {
         guard let apiKey = bundle.object(forInfoDictionaryKey: InfoKey.apiKey) as? String,
@@ -21,6 +26,7 @@ struct AmplitudeAnalyticsConfiguration: Sendable {
         else { throw AmplitudeAnalyticsConfigurationError.missingAPIKey }
 
         self.apiKey = apiKey
+        self.minimumIdentifierLength = Constants.minimumIdentifierLength
     }
 }
 

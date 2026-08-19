@@ -1,0 +1,37 @@
+name: 개별 서버 버전 정책 반영
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        required: true
+        type: string
+      app_version:
+        required: true
+        type: string
+      update_policy:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Update and verify version policy
+        env:
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+          APP_VERSION: ${{ inputs.app_version }}
+          UPDATE_POLICY: ${{ inputs.update_policy }}
+        run: scripts/ci/update_app_version.sh

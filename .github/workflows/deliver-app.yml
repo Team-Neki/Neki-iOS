@@ -1,0 +1,179 @@
+name: 개별 앱 검증 및 배포
+
+on:
+  workflow_call:
+    inputs:
+      environment_name:
+        required: true
+        type: string
+      deployment_target:
+        required: true
+        type: string
+      app_version:
+        required: true
+        type: string
+      delivery_mode:
+        required: true
+        type: string
+      distribution_destination:
+        required: true
+        type: string
+      release_notes:
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  delivery:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    environment:
+      name: ${{ inputs.environment_name }}
+
+    steps:
+      - name: 배포 환경 검증
+        env:
+          DEPLOYMENT_TARGET: ${{ inputs.deployment_target }}
+          DELIVERY_MODE: ${{ inputs.delivery_mode }}
+          DISTRIBUTION_DESTINATION: ${{ inputs.distribution_destination }}
+          BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
+          FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
+          MATCH_GITHUB_CLIENT_ID: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
+          MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          if [ "$DEPLOYMENT_TARGET" != "development" ] && [ "$DEPLOYMENT_TARGET" != "production" ]; then
+            echo "::error::Unsupported deployment target: $DEPLOYMENT_TARGET"
+            exit 1
+          fi
+          if [ "$DELIVERY_MODE" != "validate" ] && [ "$DELIVERY_MODE" != "deploy" ]; then
+            echo "::error::Unsupported delivery mode: $DELIVERY_MODE"
+            exit 1
+          fi
+          if [ "$DISTRIBUTION_DESTINATION" != "testflight" ] &&
+             [ "$DISTRIBUTION_DESTINATION" != "app_store_review" ]; then
+            echo "::error::Unsupported distribution destination: $DISTRIBUTION_DESTINATION"
+            exit 1
+          fi
+
+          required_names=(
+            BUILD_XCCONFIG
+            FIREBASE_PLIST
+            MATCH_GITHUB_CLIENT_ID
+            MATCH_GITHUB_APP_PRIVATE_KEY
+            ASC_KEY_ID
+            ASC_ISSUER_ID
+            ASC_KEY_CONTENT
+            MATCH_PASSWORD
+          )
+          for name in "${required_names[@]}"; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required GitHub Actions setting: $name"
+              exit 1
+            fi
+          done
+
+          if [ "$DEPLOYMENT_TARGET" = "development" ]; then
+            BUILD_SCHEME="Neki-iOS.Dev"
+            XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Debug.xcconfig"
+            FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
+          else
+            BUILD_SCHEME="Neki-iOS"
+            XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Release.xcconfig"
+            FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist"
+          fi
+
+          {
+            echo "BUILD_SCHEME=$BUILD_SCHEME"
+            echo "XCCONFIG_PATH=$XCCONFIG_PATH"
+            echo "FIREBASE_PATH=$FIREBASE_PATH"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
+        with:
+          xcode-version: '26.2'
+
+      - name: Restore environment resources
+        env:
+          BUILD_XCCONFIG: ${{ secrets.BUILD_XCCONFIG }}
+          FIREBASE_PLIST: ${{ secrets.FIREBASE_PLIST }}
+        run: |
+          mkdir -p "$(dirname "$XCCONFIG_PATH")"
+          printf '%s' "$BUILD_XCCONFIG" | base64 --decode > "$XCCONFIG_PATH"
+          test -s "$XCCONFIG_PATH"
+
+          AMPLITUDE_API_KEY_VALUE="$(
+            awk -F= '
+              /^[[:space:]]*AMPLITUDE_API_KEY[[:space:]]*=/ {
+                value = $0
+                sub(/^[^=]*=[[:space:]]*/, "", value)
+                sub(/^[[:space:]"]*/, "", value)
+                sub(/[[:space:]"]*$/, "", value)
+                print value
+                exit
+              }
+            ' "$XCCONFIG_PATH"
+          )"
+          if [ -z "$AMPLITUDE_API_KEY_VALUE" ] || [[ "$AMPLITUDE_API_KEY_VALUE" == *'$('* ]]; then
+            echo "::error::AMPLITUDE_API_KEY is missing or unresolved in $XCCONFIG_PATH"
+            exit 1
+          fi
+
+          mkdir -p "$(dirname "$FIREBASE_PATH")"
+          printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH"
+          plutil -lint "$FIREBASE_PATH"
+
+      - name: Disable Macro Validation
+        run: |
+          defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
+          defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
+
+      - name: Resolve SPM Dependencies
+        run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
+
+      - name: Create GitHub App token for Match
+        id: match-app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          client-id: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
+          private-key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+          owner: Team-Neki
+          repositories: Neki-fastlane-match-repo
+          permission-contents: read
+
+      - name: Setup Ruby and Install Gems
+        uses: ruby/setup-ruby@95ef2b042f9d7a56d8268cba8559e2842e2ad01b # v1
+        with:
+          ruby-version: '3.3.12'
+          bundler-cache: true
+
+      - name: Validate or deploy app
+        env:
+          DEPLOYMENT_TARGET: ${{ inputs.deployment_target }}
+          MARKETING_VERSION: ${{ inputs.app_version }}
+          DELIVERY_MODE: ${{ inputs.delivery_mode }}
+          DISTRIBUTION_DESTINATION: ${{ inputs.distribution_destination }}
+          RELEASE_NOTES: ${{ inputs.release_notes }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+          MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        run: |
+          if [ "$DELIVERY_MODE" = "validate" ]; then
+            bundle exec fastlane ios validate_deployment
+          else
+            bundle exec fastlane ios deploy
+          fi

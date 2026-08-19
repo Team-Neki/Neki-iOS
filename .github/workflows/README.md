@@ -65,24 +65,51 @@ GitHub App은 `Team-Neki/Neki-fastlane-match-repo`에만 설치하고 Repository
 
 ## 배포 및 버전 관리 Workflow
 
-Actions의 `Neki-iOS 배포 및 버전 관리`에서 실행할 작업을 선택합니다. 대상 환경, 배포 목적지와 업데이트 정책은 작업명에서 자동 결정됩니다.
+Actions의 Neki-iOS 배포 및 버전 관리에서 다음 순서로 입력합니다.
 
-Discord 결과 메시지의 대상 앱은 개발기를 `Neki-dev`, 상용기를 `Neki-iOS`로 표시합니다. 향후 두 앱을 함께 처리하는 작업은 `Neki-iOS & Dev`로 표시합니다.
+1. 실행할 작업을 선택합니다.
+2. 대상 앱을 Neki-dev, Neki-iOS, Neki-iOS & Dev 중에서 선택합니다.
+3. 대상에 포함된 앱의 버전만 MAJOR.MINOR.PATCH 형식으로 입력합니다.
+4. 서버 버전 정책을 함께 변경할 때만 권장 업데이트 또는 강제 업데이트를 선택합니다.
+5. Neki-iOS 서버 정책을 변경할 때만 App Store 공개 확인란을 활성화합니다.
 
-| 작업 종류 | 실행 결과 |
+### 작업 종류
+
+| 작업 | 실행 결과 |
 | --- | --- |
-| `개발기 연결 검증` | 개발기 인증·서명·App Store Connect 연결 검증 |
-| `상용기 연결 검증` | 상용기 인증·서명·App Store Connect 연결 검증 |
-| `개발기 TestFlight 업로드` | 개발기 TestFlight 업로드 |
-| `개발기 TestFlight + 권장 업데이트` | 업로드 후 개발 서버에 권장 업데이트 적용 |
-| `개발기 TestFlight + 강제 업데이트` | 업로드 후 개발 서버에 강제 업데이트 적용 |
-| `상용기 TestFlight 업로드` | 상용기 TestFlight 업로드 |
-| `상용기 App Store 심사 제출` | 상용기 App Store 심사 제출 |
-| `상용기 권장 업데이트 활성화` | 공개된 상용 버전을 권장 업데이트로 활성화 |
-| `상용기 강제 업데이트 활성화` | 공개된 상용 버전을 강제 업데이트로 활성화 |
+| 연결 검증 | 선택한 앱의 인증·서명·App Store Connect 연결만 검증 |
+| TestFlight 업로드 | 선택한 앱을 TestFlight에 업로드 |
+| App Store 심사 제출 | Neki-iOS를 App Store 심사에 제출 |
+| 서버 업데이트 정책만 적용 | 앱을 업로드하지 않고 선택한 환경의 버전 API만 갱신 |
 
-모든 작업은 `app_version`을 입력합니다. TestFlight 및 App Store 심사 제출의 `release_notes`는 선택 사항입니다. 비워두면 릴리즈 노트를 새로 등록하지 않고 다음 단계로 진행합니다. 입력한 릴리즈 노트는 CI/CD 결과 Discord 메시지에도 표시되며, 비어 있으면 해당 항목을 생략합니다. 상용 버전 활성화 작업은 App Store 공개를 확인한 뒤 `production_release_confirmed`를 활성화해야 합니다.
+Neki-iOS & Dev를 선택하면 개발기와 상용기를 독립된 Job에서 병렬 처리합니다. 두 앱의 버전 이력은 독립적이므로 development_version과 production_version을 각각 입력합니다.
 
-`개발기 연결 검증`과 `상용기 연결 검증`은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
+release_notes는 선택 사항입니다. 비워두면 TestFlight 또는 App Store Connect에 릴리즈 노트를 새로 등록하지 않습니다. 입력한 내용은 Discord 결과 메시지에도 표시됩니다.
+
+### 업데이트 정책
+
+| 정책 | 서버 반영 |
+| --- | --- |
+| 변경 안 함 | 버전 API를 호출하지 않음 |
+| 권장 업데이트 | 기존 minVersion을 유지하고 currentVersion만 입력 버전으로 변경 |
+| 강제 업데이트 | minVersion과 currentVersion을 모두 입력 버전으로 변경 |
+
+Neki-dev는 TestFlight 업로드 후 개발 서버 정책을 연속해서 적용할 수 있습니다. Neki-iOS는 TestFlight 업로드 직후 아직 App Store에 공개되지 않은 버전을 서버에 활성화하면 안 되므로, TestFlight 업로드와 서버 정책 적용을 분리합니다.
+
+Neki-iOS 서버 정책을 적용할 때는 대상 버전이 App Store에 실제 공개되었는지 확인한 뒤 "Neki-iOS 정책 적용 시, 해당 버전이 App Store에 공개됨을 확인" 항목을 활성화합니다. 연결 검증에는 업데이트 정책을 지정할 수 없고, App Store 심사 제출과 서버 정책 활성화도 한 번에 실행할 수 없습니다. 잘못된 조합은 앱 빌드 전에 입력 검증 단계에서 종료됩니다.
+
+### 결과 판정
+
+앱 처리와 서버 버전 정책은 별도 Job으로 실행되며 워크플로와 Discord에서 단계별 결과를 확인할 수 있습니다.
+
+| Discord 표시 | 의미 |
+| --- | --- |
+| 초록색 성공 | 요청한 앱 처리와 버전 정책이 모두 성공 |
+| 노란색 부분 성공 | 앱 업로드는 성공했지만 후속 버전 정책 반영 실패 |
+| 빨간색 실패 | 입력 검증, 앱 검증·업로드 또는 정책만 적용하는 작업 실패 |
+
+부분 성공도 요청한 전체 작업이 완료된 것은 아니므로 GitHub Actions 워크플로는 실패 상태를 유지합니다. 다만 Discord에는 앱 업로드 성공과 버전 정책 실패가 분리되어 표시되므로 이미 업로드된 빌드를 중복 배포하지 않고 실패한 정책 작업만 다시 실행할 수 있습니다.
+
+연결 검증은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
 
 PR 본문이나 release 브랜치 머지를 배포 트리거로 사용하지 않습니다. 코드 검토·병합과 외부 배포를 분리하여 오기입이나 의도하지 않은 재실행이 실제 배포로 이어지는 것을 방지합니다.

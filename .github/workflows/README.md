@@ -94,7 +94,7 @@ release_notes는 선택 사항입니다. 비워두면 TestFlight 또는 App Stor
 | 권장 업데이트 | 기존 minVersion을 유지하고 currentVersion만 입력 버전으로 변경 |
 | 강제 업데이트 | minVersion과 currentVersion을 모두 입력 버전으로 변경 |
 
-Neki-dev는 TestFlight 업로드 후 개발 서버 정책을 연속해서 적용할 수 있습니다. Neki-iOS는 TestFlight 업로드 직후 아직 App Store에 공개되지 않은 버전을 서버에 활성화하면 안 되므로, TestFlight 업로드와 서버 정책 적용을 분리합니다.
+대상 앱이 Neki-dev일 때만 TestFlight 업로드 후 개발 서버 정책을 연속해서 적용할 수 있습니다. Neki-iOS는 TestFlight 업로드 직후 아직 App Store에 공개되지 않은 버전을 서버에 활성화하면 안 되므로, TestFlight 업로드와 서버 정책 적용을 분리합니다. 대상 앱이 Neki-iOS 또는 Neki-iOS & Dev이면 TestFlight 업로드와 업데이트 정책을 함께 선택할 수 없으며 입력 검증에서 종료됩니다.
 
 Neki-iOS 서버 정책을 적용할 때는 대상 버전이 App Store에 실제 공개되었는지 확인한 뒤 "Neki-iOS 정책 적용 시, 해당 버전이 App Store에 공개됨을 확인" 항목을 활성화합니다. 연결 검증에는 업데이트 정책을 지정할 수 없고, App Store 심사 제출과 서버 정책 활성화도 한 번에 실행할 수 없습니다. 잘못된 조합은 앱 빌드 전에 입력 검증 단계에서 종료됩니다.
 

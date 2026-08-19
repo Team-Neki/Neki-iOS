@@ -98,7 +98,13 @@ jobs:
       delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
       distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
       release_notes: ${{ inputs.release_notes }}
-    secrets: inherit
+    secrets:
+      MATCH_GITHUB_CLIENT_ID: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
+      MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
 
   production_delivery:
     name: Neki-iOS ${{ inputs.operation }}
@@ -112,7 +118,13 @@ jobs:
       delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
       distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
       release_notes: ${{ inputs.release_notes }}
-    secrets: inherit
+    secrets:
+      MATCH_GITHUB_CLIENT_ID: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
+      MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
 
   development_version_policy:
     name: Neki-dev 서버 버전 정책
@@ -130,7 +142,6 @@ jobs:
       environment_name: development
       app_version: ${{ inputs.development_version }}
       update_policy: ${{ needs.prepare.outputs.update_policy }}
-    secrets: inherit
 
   production_version_policy:
     name: Neki-iOS 서버 버전 정책
@@ -148,7 +159,6 @@ jobs:
       environment_name: production
       app_version: ${{ inputs.production_version }}
       update_policy: ${{ needs.prepare.outputs.update_policy }}
-    secrets: inherit
 
   notify:
     name: Discord 결과 알림

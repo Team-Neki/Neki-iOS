@@ -22,6 +22,19 @@ on:
         required: false
         default: ''
         type: string
+    secrets:
+      MATCH_GITHUB_CLIENT_ID:
+        required: true
+      MATCH_GITHUB_APP_PRIVATE_KEY:
+        required: true
+      ASC_KEY_ID:
+        required: true
+      ASC_ISSUER_ID:
+        required: true
+      ASC_KEY_CONTENT:
+        required: true
+      MATCH_PASSWORD:
+        required: true
 
 permissions:
   contents: read

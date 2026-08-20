@@ -360,6 +360,9 @@ struct AppCoordinator {
                 guard state.shouldRetryPushNotificationSynchronization else { return .none }
                 state.shouldRetryPushNotificationSynchronization = false
                 return .send(.synchronizePushNotification)
+
+            case .route(.mainTab(.delegate(.requestTrackingAuthorization))):
+                return .send(.attribution(.requestTrackingAuthorization))
                 
             case .route(.mainTab(.delegate(.signedOut))), .route(.mainTab(.delegate(.withdraw))):
                 state.hasSynchronizedPushNotification = false

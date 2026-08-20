@@ -47,6 +47,7 @@ runs:
   using: composite
   steps:
     - name: 배포 환경 검증
+      id: configuration
       shell: bash
       env:
         DEPLOYMENT_TARGET: ${{ inputs.deployment_target }}
@@ -61,6 +62,8 @@ runs:
         ASC_KEY_CONTENT: ${{ inputs.asc_key_content }}
         MATCH_PASSWORD: ${{ inputs.match_password }}
       run: |
+        set -euo pipefail
+
         if [ "$DEPLOYMENT_TARGET" != "development" ] && [ "$DEPLOYMENT_TARGET" != "production" ]; then
           echo "::error::Unsupported deployment target: $DEPLOYMENT_TARGET"
           exit 1
@@ -103,10 +106,10 @@ runs:
         fi
 
         {
-          echo "BUILD_SCHEME=$BUILD_SCHEME"
-          echo "XCCONFIG_PATH=$XCCONFIG_PATH"
-          echo "FIREBASE_PATH=$FIREBASE_PATH"
-        } >> "$GITHUB_ENV"
+          echo "build_scheme=$BUILD_SCHEME"
+          echo "xcconfig_path=$XCCONFIG_PATH"
+          echo "firebase_path=$FIREBASE_PATH"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Select Xcode
       uses: maxim-lobanov/setup-xcode@ed7a3b1fda3918c0306d1b724322adc0b8cc0a90 # v1
@@ -118,9 +121,14 @@ runs:
       env:
         BUILD_XCCONFIG: ${{ inputs.build_xcconfig }}
         FIREBASE_PLIST: ${{ inputs.firebase_plist }}
+        XCCONFIG_PATH: ${{ steps.configuration.outputs.xcconfig_path }}
+        FIREBASE_PATH: ${{ steps.configuration.outputs.firebase_path }}
       run: |
+        set -euo pipefail
+
         mkdir -p "$(dirname "$XCCONFIG_PATH")"
-        printf '%s' "$BUILD_XCCONFIG" | base64 --decode > "$XCCONFIG_PATH"
+        rm -f -- "$XCCONFIG_PATH"
+        (umask 077; printf '%s' "$BUILD_XCCONFIG" | base64 --decode > "$XCCONFIG_PATH")
         test -s "$XCCONFIG_PATH"
 
         AMPLITUDE_API_KEY_VALUE="$(
@@ -141,17 +149,22 @@ runs:
         fi
 
         mkdir -p "$(dirname "$FIREBASE_PATH")"
-        printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH"
+        rm -f -- "$FIREBASE_PATH"
+        (umask 077; printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH")
         plutil -lint "$FIREBASE_PATH"
 
     - name: Disable Macro Validation
       shell: bash
       run: |
+        set -euo pipefail
+
         defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
         defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
     - name: Resolve SPM Dependencies
       shell: bash
+      env:
+        BUILD_SCHEME: ${{ steps.configuration.outputs.build_scheme }}
       run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
 
     - name: Create GitHub App token for Match
@@ -184,8 +197,22 @@ runs:
         MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
         MATCH_PASSWORD: ${{ inputs.match_password }}
       run: |
+        set -euo pipefail
+
         if [ "$DELIVERY_MODE" = "validate" ]; then
           bundle exec fastlane ios validate_deployment
         else
           bundle exec fastlane ios deploy
         fi
+
+    - name: Remove restored environment resources
+      if: always()
+      shell: bash
+      env:
+        XCCONFIG_PATH: ${{ steps.configuration.outputs.xcconfig_path }}
+        FIREBASE_PATH: ${{ steps.configuration.outputs.firebase_path }}
+      run: |
+        set -euo pipefail
+
+        if [ -n "$XCCONFIG_PATH" ]; then rm -f -- "$XCCONFIG_PATH"; fi
+        if [ -n "$FIREBASE_PATH" ]; then rm -f -- "$FIREBASE_PATH"; fi

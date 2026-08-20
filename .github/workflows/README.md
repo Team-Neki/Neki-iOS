@@ -65,7 +65,11 @@ GitHub App은 `Team-Neki/Neki-fastlane-match-repo`에만 설치하고 Repository
 
 ## 배포 및 버전 관리 Workflow
 
-Actions의 Neki-iOS 배포 및 버전 관리에서 다음 순서로 입력합니다.
+Actions에는 사용자가 직접 실행하는 `Neki-iOS 배포 및 버전 관리` 워크플로만 표시됩니다. 앱별 공통 배포 절차는 Composite Action으로, 서버 버전 정책 처리는 스크립트로 관리하므로 내부 구현이 별도 실행 항목으로 노출되지 않습니다.
+
+개발기와 상용기 Job은 각각 `development`, `production` Environment를 직접 선택합니다. 따라서 환경별 Secret은 다른 워크플로로 전달하거나 상속하지 않고 해당 Job에서만 읽습니다.
+
+`Neki-iOS 배포 및 버전 관리`에서 다음 순서로 입력합니다.
 
 1. 실행할 작업을 선택합니다.
 2. 대상 앱을 Neki-dev, Neki-iOS, Neki-iOS & Dev 중에서 선택합니다.

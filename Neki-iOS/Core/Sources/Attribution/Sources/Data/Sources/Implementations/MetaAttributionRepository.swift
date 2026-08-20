@@ -6,12 +6,19 @@
 //
 
 import Dependencies
+import AppTrackingTransparency
 import FacebookCore
 
 final class MetaAttributionRepository: AttributionRepository {
     func initializeAttribution() async {
         await MainActor.run { ApplicationDelegate.shared.initializeSDK() }
     }
+
+    @MainActor
+    func checkTrackingAuthorizationStatus() -> ATTrackingManager.AuthorizationStatus { ATTrackingManager.trackingAuthorizationStatus }
+
+    @MainActor
+    func requestTrackingAuthorization() async { _ = await ATTrackingManager.requestTrackingAuthorization() }
 
     func trackCompleteRegistration() async {
         await MainActor.run { AppEvents.shared.logEvent(.completedRegistration) }
@@ -24,6 +31,8 @@ extension AttributionClient: DependencyKey {
         
         return AttributionClient(
             initializeAttribution: { await repository.initializeAttribution() },
+            checkTrackingAuthorizationStatus: { repository.checkTrackingAuthorizationStatus() },
+            requestTrackingAuthorization: { await repository.requestTrackingAuthorization() },
             trackCompleteRegistration: { await repository.trackCompleteRegistration() }
         )
     }

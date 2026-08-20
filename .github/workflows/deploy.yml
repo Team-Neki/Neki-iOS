@@ -90,41 +90,63 @@ jobs:
     name: Neki-dev ${{ inputs.operation }}
     needs: prepare
     if: needs.prepare.outputs.run_development == 'true' && needs.prepare.outputs.run_delivery == 'true'
-    uses: ./.github/workflows/deliver-app.yml
-    with:
-      environment_name: development
-      deployment_target: development
-      app_version: ${{ inputs.development_version }}
-      delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
-      distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
-      release_notes: ${{ inputs.release_notes }}
-    secrets:
-      MATCH_GITHUB_CLIENT_ID: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
-      MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    environment: development
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Neki-dev 검증 및 배포
+        uses: ./.github/actions/deliver-app
+        with:
+          deployment_target: development
+          app_version: ${{ inputs.development_version }}
+          delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
+          distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
+          release_notes: ${{ inputs.release_notes }}
+          build_xcconfig: ${{ secrets.BUILD_XCCONFIG }}
+          firebase_plist: ${{ secrets.FIREBASE_PLIST }}
+          match_github_client_id: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
+          match_github_app_private_key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_key_content: ${{ secrets.ASC_KEY_CONTENT }}
+          match_password: ${{ secrets.MATCH_PASSWORD }}
 
   production_delivery:
     name: Neki-iOS ${{ inputs.operation }}
     needs: prepare
     if: needs.prepare.outputs.run_production == 'true' && needs.prepare.outputs.run_delivery == 'true'
-    uses: ./.github/workflows/deliver-app.yml
-    with:
-      environment_name: production
-      deployment_target: production
-      app_version: ${{ inputs.production_version }}
-      delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
-      distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
-      release_notes: ${{ inputs.release_notes }}
-    secrets:
-      MATCH_GITHUB_CLIENT_ID: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
-      MATCH_GITHUB_APP_PRIVATE_KEY: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_KEY_CONTENT: ${{ secrets.ASC_KEY_CONTENT }}
-      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+    runs-on: macos-latest
+    timeout-minutes: 90
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Neki-iOS 검증 및 배포
+        uses: ./.github/actions/deliver-app
+        with:
+          deployment_target: production
+          app_version: ${{ inputs.production_version }}
+          delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
+          distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
+          release_notes: ${{ inputs.release_notes }}
+          build_xcconfig: ${{ secrets.BUILD_XCCONFIG }}
+          firebase_plist: ${{ secrets.FIREBASE_PLIST }}
+          match_github_client_id: ${{ secrets.MATCH_GITHUB_CLIENT_ID }}
+          match_github_app_private_key: ${{ secrets.MATCH_GITHUB_APP_PRIVATE_KEY }}
+          asc_key_id: ${{ secrets.ASC_KEY_ID }}
+          asc_issuer_id: ${{ secrets.ASC_ISSUER_ID }}
+          asc_key_content: ${{ secrets.ASC_KEY_CONTENT }}
+          match_password: ${{ secrets.MATCH_PASSWORD }}
 
   development_version_policy:
     name: Neki-dev 서버 버전 정책
@@ -137,11 +159,22 @@ jobs:
       needs.prepare.outputs.run_development == 'true' &&
       needs.prepare.outputs.run_version_policy == 'true' &&
       (needs.prepare.outputs.run_delivery == 'false' || needs.development_delivery.result == 'success')
-    uses: ./.github/workflows/update-version-policy.yml
-    with:
-      environment_name: development
-      app_version: ${{ inputs.development_version }}
-      update_policy: ${{ needs.prepare.outputs.update_policy }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: development
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Neki-dev 서버 버전 정책 반영 및 검증
+        env:
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+          APP_VERSION: ${{ inputs.development_version }}
+          UPDATE_POLICY: ${{ needs.prepare.outputs.update_policy }}
+        run: scripts/ci/update_app_version.sh
 
   production_version_policy:
     name: Neki-iOS 서버 버전 정책
@@ -154,11 +187,22 @@ jobs:
       needs.prepare.outputs.run_production == 'true' &&
       needs.prepare.outputs.run_version_policy == 'true' &&
       (needs.prepare.outputs.run_delivery == 'false' || needs.production_delivery.result == 'success')
-    uses: ./.github/workflows/update-version-policy.yml
-    with:
-      environment_name: production
-      app_version: ${{ inputs.production_version }}
-      update_policy: ${{ needs.prepare.outputs.update_policy }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Neki-iOS 서버 버전 정책 반영 및 검증
+        env:
+          APP_VERSION_API_ADDRESS: ${{ secrets.APP_VERSION_API_ADDRESS }}
+          APP_VERSION: ${{ inputs.production_version }}
+          UPDATE_POLICY: ${{ needs.prepare.outputs.update_policy }}
+        run: scripts/ci/update_app_version.sh
 
   notify:
     name: Discord 결과 알림

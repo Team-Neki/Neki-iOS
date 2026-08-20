@@ -5,7 +5,6 @@
 //  Created by SwainYun on 7/30/26.
 //
 
-import AppTrackingTransparency
 import ComposableArchitecture
 
 @Reducer
@@ -18,7 +17,7 @@ struct AttributionFeature {
     enum Action {
         case appLaunched
         case requestTrackingAuthorization
-        case trackingAuthorizationStatusResponse(ATTrackingManager.AuthorizationStatus)
+        case trackingAuthorizationStatusResponse(TrackingAuthorizationStatus)
         case trackingAuthorizationRequestCompleted
         case completeRegistration
     }
@@ -46,10 +45,7 @@ struct AttributionFeature {
                         await attributionClient.requestTrackingAuthorization()
                         await send(.trackingAuthorizationRequestCompleted)
                     }
-                case .restricted, .denied, .authorized:
-                    state.isRequestingTrackingAuthorization = false
-                    return .none
-                @unknown default:
+                case .restricted, .denied, .authorized, .unknown:
                     state.isRequestingTrackingAuthorization = false
                     return .none
                 }

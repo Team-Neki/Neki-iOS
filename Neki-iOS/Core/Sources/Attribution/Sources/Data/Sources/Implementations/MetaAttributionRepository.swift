@@ -15,7 +15,15 @@ final class MetaAttributionRepository: AttributionRepository {
     }
 
     @MainActor
-    func checkTrackingAuthorizationStatus() -> ATTrackingManager.AuthorizationStatus { ATTrackingManager.trackingAuthorizationStatus }
+    func checkTrackingAuthorizationStatus() -> TrackingAuthorizationStatus {
+        switch ATTrackingManager.trackingAuthorizationStatus {
+        case .notDetermined: return .notDetermined
+        case .restricted: return .restricted
+        case .denied: return .denied
+        case .authorized: return .authorized
+        @unknown default: return .unknown
+        }
+    }
 
     @MainActor
     func requestTrackingAuthorization() async { _ = await ATTrackingManager.requestTrackingAuthorization() }

@@ -40,7 +40,6 @@ struct MainTabCoordinator {
         var shouldPresentMarketingConsentAlert: Bool
         var isMarketingConsentAlertPresented: Bool = false
         var isUpdatingMarketingConsent: Bool = false
-        var shouldRequestTrackingAuthorizationAfterMarketingConsentAlertDismissal = false
 
         init(shouldPresentMarketingConsentAlert: Bool = false) {
             self.shouldPresentMarketingConsentAlert = shouldPresentMarketingConsentAlert
@@ -86,7 +85,6 @@ struct MainTabCoordinator {
         case dismissPushNotificationPermissionAlert
         case openAppSettings
         case dismissMarketingConsentAlert
-        case marketingConsentAlertDidDismiss
         case updateMarketingConsent(Bool)
         case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
         case route(AppRouteRequest)
@@ -243,16 +241,10 @@ struct MainTabCoordinator {
             case .dismissMarketingConsentAlert:
                 guard state.isUpdatingMarketingConsent == false else { return .none }
                 state.isMarketingConsentAlertPresented = false
-                state.shouldRequestTrackingAuthorizationAfterMarketingConsentAlertDismissal = true
                 recordMarketingConsentManaged(
                     for: state.user,
                     status: .unconfirmed
                 )
-                return .none
-
-            case .marketingConsentAlertDidDismiss:
-                guard state.shouldRequestTrackingAuthorizationAfterMarketingConsentAlertDismissal else { return .none }
-                state.shouldRequestTrackingAuthorizationAfterMarketingConsentAlertDismissal = false
                 return .send(.delegate(.requestTrackingAuthorization))
 
             case let .updateMarketingConsent(isAgreed):
@@ -268,13 +260,12 @@ struct MainTabCoordinator {
             case let .marketingConsentUpdateResponse(isAgreed, .success):
                 state.isUpdatingMarketingConsent = false
                 state.isMarketingConsentAlertPresented = false
-                state.shouldRequestTrackingAuthorizationAfterMarketingConsentAlertDismissal = true
                 state.user.marketingTermAgreed = isAgreed
                 recordMarketingConsentManaged(
                     for: state.user,
                     status: isAgreed ? .approved : .rejected
                 )
-                return .none
+                return .send(.delegate(.requestTrackingAuthorization))
 
             case .marketingConsentUpdateResponse(_, .failure):
                 state.isUpdatingMarketingConsent = false

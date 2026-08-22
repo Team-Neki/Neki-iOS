@@ -114,12 +114,6 @@ private struct MarketingConsentAlertModifier: ViewModifier {
             onCancel: { store.send(.updateMarketingConsent(false)) },
             onDismiss: { store.send(.dismissMarketingConsentAlert) }
         )
-        .transaction(value: store.isMarketingConsentAlertPresented) { transaction in
-            guard store.isMarketingConsentAlertPresented == false else { return }
-            transaction.addAnimationCompletion(criteria: .removed) {
-                store.send(.marketingConsentAlertDidDismiss)
-            }
-        }
     }
 
     private var description: Text {

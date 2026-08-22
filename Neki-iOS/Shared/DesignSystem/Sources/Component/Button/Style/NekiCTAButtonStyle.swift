@@ -27,15 +27,13 @@ public struct NekiCTAButtonStyle: ButtonStyle {
     }
     
     private var backgroundColor: Color {
-        guard isEnabled else { return .hex(0xF5BEB7) }
         switch role {
         case .secondary: return .gray50
-        case .primary: return .primary400
+        case .primary: return isEnabled ? .primary400 : .hex(0xF5BEB7)
         }
     }
     
     private var foregroundColor: Color {
-        guard isEnabled else { return .white }
         switch role {
         case .secondary: return .gray300
         case .primary: return .white

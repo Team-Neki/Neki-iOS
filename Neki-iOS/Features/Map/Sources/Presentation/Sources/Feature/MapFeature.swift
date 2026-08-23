@@ -68,6 +68,7 @@ public struct MapFeature {
         
         // Child State
         var photoBoothListState = PhotoBoothListFeature.State()
+        var photoBoothSearchState = PhotoBoothSearchFeature.State()
     }
     
     public enum Action: BindableAction {
@@ -133,6 +134,7 @@ public struct MapFeature {
         // Binding & Child
         case binding(BindingAction<State>)
         case photoBoothListAction(PhotoBoothListFeature.Action)
+        case photoBoothSearchAction(PhotoBoothSearchFeature.Action)
         case delegate(Delegate)
         public enum Delegate {
             case showToast(NekiToastItem)
@@ -161,6 +163,7 @@ public struct MapFeature {
         BindingReducer()
         
         Scope(state: \.photoBoothListState, action: \.photoBoothListAction) { PhotoBoothListFeature() }
+        Scope(state: \.photoBoothSearchState, action: \.photoBoothSearchAction) { PhotoBoothSearchFeature() }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {

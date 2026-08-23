@@ -22,6 +22,14 @@ public struct PhotoBoothClient {
     public var loadBrands: @Sendable () async throws -> [PhotoBoothBrand]
     /// 브랜드 필터칩 노출 순서 변경
     public var updateBrandOrder: @Sendable (_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand]
+    /// 검색어와 페이지 번호에 대응하는 검색 후보 조회
+    ///
+    /// - Note: 페이지 번호 방식의 가계약이며 Mock API 확정 후 요청 규격을 조정합니다.
+    public var fetchSearchCandidates: @Sendable (_ query: PhotoBoothSearchQuery, _ page: Int) async throws -> PhotoBoothSearchCandidatePage
+    /// 사용자가 선택한 후보와 페이지 번호에 대응하는 포토부스 조회
+    ///
+    /// - Note: 후보 식별자와 페이지 요청 규격은 Mock API 확정 후 보강합니다.
+    public var fetchSearchPhotoBooths: @Sendable (_ candidate: PhotoBoothSearchCandidate, _ page: Int) async throws -> PhotoBoothSearchResultPage
 }
 
 
@@ -30,20 +38,27 @@ public struct PhotoBoothClient {
 extension PhotoBoothClient: DependencyKey {
     public static let liveValue: Self = {
         @Dependency(\.photoBoothRepository) var photoBoothRepository
-        
-        return PhotoBoothClient { bounds in
+
+        var client = PhotoBoothClient()
+        client.fetchPhotoBooths = { bounds in
             await photoBoothRepository.readPhotoBooths(in: bounds)
-        } fetchNearbyPhotoBooths: { coordinate in
+        }
+        client.fetchNearbyPhotoBooths = { coordinate in
             try await photoBoothRepository.readNearbyPhotoBooths(coordinate: coordinate)
-        } updatePhotoBoothFavorite: { id, isFavorite in
+        }
+        client.updatePhotoBoothFavorite = { id, isFavorite in
             try await photoBoothRepository.updatePhotoBoothFavorite(id: id, isFavorite: isFavorite)
-        } fetchFavoritePhotoBooths: {
+        }
+        client.fetchFavoritePhotoBooths = {
             try await photoBoothRepository.readFavoritePhotoBooths()
-        } loadBrands: {
+        }
+        client.loadBrands = {
             try await photoBoothRepository.loadBrands()
-        } updateBrandOrder: { brands in
+        }
+        client.updateBrandOrder = { brands in
             try await photoBoothRepository.updateBrandOrder(brands)
         }
+        return client
     }()
 }
 

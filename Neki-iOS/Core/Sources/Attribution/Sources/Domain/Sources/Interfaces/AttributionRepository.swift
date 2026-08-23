@@ -7,5 +7,7 @@
 
 public protocol AttributionRepository: Sendable {
     func initializeAttribution() async
+    @MainActor func checkTrackingAuthorizationStatus() -> TrackingAuthorizationStatus
+    @MainActor func requestTrackingAuthorization() async
     func trackCompleteRegistration() async
 }

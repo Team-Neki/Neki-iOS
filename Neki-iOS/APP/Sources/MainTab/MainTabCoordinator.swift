@@ -96,6 +96,7 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
+            case requestTrackingAuthorization
         }
     }
     
@@ -126,7 +127,13 @@ struct MainTabCoordinator {
                     state.isMarketingConsentAlertPresented = true
                     recordMarketingConsentAlertPresentation(for: state.user)
                 }
-                return .send(.tabChanged(state.selectedTab))
+                let trackingAuthorizationEffect: Effect<Action> = state.isMarketingConsentAlertPresented
+                    ? .none
+                    : .send(.delegate(.requestTrackingAuthorization))
+                return .merge(
+                    .send(.tabChanged(state.selectedTab)),
+                    trackingAuthorizationEffect
+                )
                 
             case let .tabChanged(tab):
                 return .run { _ in
@@ -238,7 +245,7 @@ struct MainTabCoordinator {
                     for: state.user,
                     status: .unconfirmed
                 )
-                return .none
+                return .send(.delegate(.requestTrackingAuthorization))
 
             case let .updateMarketingConsent(isAgreed):
                 guard state.isUpdatingMarketingConsent == false else { return .none }
@@ -258,7 +265,7 @@ struct MainTabCoordinator {
                     for: state.user,
                     status: isAgreed ? .approved : .rejected
                 )
-                return .none
+                return .send(.delegate(.requestTrackingAuthorization))
 
             case .marketingConsentUpdateResponse(_, .failure):
                 state.isUpdatingMarketingConsent = false

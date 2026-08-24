@@ -26,13 +26,9 @@ public struct PhotoBoothSearchCandidate: Equatable, Sendable {
     }
 }
 
-/// 이번 스프린트에서 지원하는 검색 후보 종류입니다.
-///
-/// 지원할 수 없는 서버 값의 처리 정책은 API 계약이 확정된 뒤 Data 계층에서 결정합니다.
+/// 검색어 기반 검색 후보 종류입니다.
 public enum PhotoBoothSearchCandidateType: Equatable, Sendable {
     case region         // 지역구
     case subwayStation  // 지하철역
     case photoBooth     // 포토부스
-    /// 서버가 반환했지만 현재 앱에서 지원하지 않는 검색 후보
-    case unknown        
 }

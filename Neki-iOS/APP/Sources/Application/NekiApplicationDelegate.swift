@@ -14,6 +14,7 @@ import UserNotifications
 final class NekiApplicationDelegate: NSObject, UIApplicationDelegate {
     @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
+    @Dependency(\.attributionClient) private var attributionClient
 
     private let pushNotificationDelegate = PushNotificationDelegate()
 
@@ -31,6 +32,7 @@ final class NekiApplicationDelegate: NSObject, UIApplicationDelegate {
                 Logger.data.error("분석 도구 초기화 실패: \(error)")
             }
         }
+        Task { await attributionClient.initializeAttribution() }
         pushNotificationClient.configureMessaging()
         UNUserNotificationCenter.current().delegate = pushNotificationDelegate
         application.registerForRemoteNotifications()

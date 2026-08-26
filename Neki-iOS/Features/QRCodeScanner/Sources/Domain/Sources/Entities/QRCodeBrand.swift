@@ -20,6 +20,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case planBStudio
     case harufilm
     case auraPic
+    case theSayCheese
 
     var hostKeywords: [String] {
         switch self {
@@ -32,6 +33,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .planBStudio: []
         case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"]
         case .auraPic: ["pos.aurapic.co.kr", "aurapic.co.kr"]
+        case .theSayCheese: ["thesaycheese.co.kr"]
         }
     }
     
@@ -46,6 +48,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .planBStudio: return "플랜비스튜디오"
         case .harufilm: return "하루필름"
         case .auraPic: return "아우라픽"
+        case .theSayCheese: return "더세이치즈"
         }
     }
 }

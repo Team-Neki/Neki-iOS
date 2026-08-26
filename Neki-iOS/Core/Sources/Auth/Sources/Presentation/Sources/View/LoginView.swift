@@ -40,6 +40,7 @@ public struct LoginView: View {
             }
         }
         .nekiLoading(isPresented: store.isLoading)
+        .task { await store.send(.onAppear).finish() }
     }
     
     private var authenticationProviders: some View {
@@ -65,6 +66,7 @@ public struct LoginView: View {
             }
             .onOpenURL { store.send(.handleKakaoOpenURL($0)) }
         }
+        .allowsHitTesting(store.advertisingTrackingAuthorizationPhase == .resolved)
         .padding(.horizontal, 20)
         .padding(.vertical, 32)
         .background(.white)

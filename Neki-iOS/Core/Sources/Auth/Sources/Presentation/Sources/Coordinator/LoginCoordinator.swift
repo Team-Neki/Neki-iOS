@@ -26,7 +26,6 @@ public struct LoginCoordinator {
         public enum Delegate {
             case moveToMainTab(
                 User,
-                registrationStatus: RegistrationStatus,
                 shouldPresentMarketingConsentAlert: Bool,
                 didCompleteTermsAgreement: Bool,
                 marketingConsentStatus: MarketingConsentManagementStatus?
@@ -48,7 +47,6 @@ public struct LoginCoordinator {
                 }
                 return .send(.delegate(.moveToMainTab(
                     loginResult.user,
-                    registrationStatus: loginResult.registrationStatus,
                     shouldPresentMarketingConsentAlert: false,
                     didCompleteTermsAgreement: false,
                     marketingConsentStatus: nil
@@ -69,7 +67,6 @@ public struct LoginCoordinator {
                 state.path.pop(from: id)
                 return .send(.delegate(.moveToMainTab(
                     user,
-                    registrationStatus: pendingLoginResult.registrationStatus,
                     shouldPresentMarketingConsentAlert: marketingConsentStatus == nil && user.marketingTermAgreed == false,
                     didCompleteTermsAgreement: true,
                     marketingConsentStatus: marketingConsentStatus
@@ -82,7 +79,6 @@ public struct LoginCoordinator {
         .forEach(\.path, action: \.path)
     }
 }
-
 
 // MARK: - OnboardingCoordinator + Path
 

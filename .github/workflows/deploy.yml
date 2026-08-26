@@ -8,18 +8,17 @@ on:
         required: true
         type: choice
         options:
-          - 연결 검증
-          - TestFlight 업로드
-          - App Store 심사 제출
-          - 서버 업데이트 정책만 적용
-      target_app:
-        description: 대상 앱
-        required: true
-        type: choice
-        options:
-          - Neki-dev
-          - Neki-iOS
-          - Neki-iOS & Dev
+          - Neki-dev 연결 검증
+          - Neki-iOS 연결 검증
+          - Neki-iOS & Dev 연결 검증
+          - Neki-dev TestFlight 업로드
+          - Neki-iOS TestFlight 업로드
+          - Neki-iOS & Dev TestFlight 업로드
+          - Neki-iOS App Store 심사 제출
+          - Neki-dev TestFlight + Neki-iOS App Store 심사 제출
+          - Neki-dev 서버 업데이트 정책만 적용
+          - Neki-iOS 서버 업데이트 정책만 적용
+          - Neki-iOS & Dev 서버 업데이트 정책만 적용
       development_version:
         description: Neki-dev 버전(대상이 아니면 빈칸)
         required: false
@@ -61,12 +60,14 @@ jobs:
     timeout-minutes: 5
     outputs:
       delivery_mode: ${{ steps.resolve.outputs.delivery_mode }}
-      distribution_destination: ${{ steps.resolve.outputs.distribution_destination }}
+      development_distribution_destination: ${{ steps.resolve.outputs.development_distribution_destination }}
+      production_distribution_destination: ${{ steps.resolve.outputs.production_distribution_destination }}
       update_policy: ${{ steps.resolve.outputs.update_policy }}
       run_delivery: ${{ steps.resolve.outputs.run_delivery }}
       run_version_policy: ${{ steps.resolve.outputs.run_version_policy }}
       run_development: ${{ steps.resolve.outputs.run_development }}
       run_production: ${{ steps.resolve.outputs.run_production }}
+      target_app: ${{ steps.resolve.outputs.target_app }}
       target_versions: ${{ steps.resolve.outputs.target_versions }}
 
     steps:
@@ -79,7 +80,6 @@ jobs:
         id: resolve
         env:
           OPERATION: ${{ inputs.operation }}
-          TARGET_APP: ${{ inputs.target_app }}
           DEVELOPMENT_VERSION: ${{ inputs.development_version }}
           PRODUCTION_VERSION: ${{ inputs.production_version }}
           UPDATE_POLICY_INPUT: ${{ inputs.update_policy }}
@@ -106,7 +106,7 @@ jobs:
           deployment_target: development
           app_version: ${{ inputs.development_version }}
           delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
-          distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
+          distribution_destination: ${{ needs.prepare.outputs.development_distribution_destination }}
           release_notes: ${{ inputs.release_notes }}
           build_xcconfig: ${{ secrets.BUILD_XCCONFIG }}
           firebase_plist: ${{ secrets.FIREBASE_PLIST }}
@@ -137,7 +137,7 @@ jobs:
           deployment_target: production
           app_version: ${{ inputs.production_version }}
           delivery_mode: ${{ needs.prepare.outputs.delivery_mode }}
-          distribution_destination: ${{ needs.prepare.outputs.distribution_destination }}
+          distribution_destination: ${{ needs.prepare.outputs.production_distribution_destination }}
           release_notes: ${{ inputs.release_notes }}
           build_xcconfig: ${{ secrets.BUILD_XCCONFIG }}
           firebase_plist: ${{ secrets.FIREBASE_PLIST }}
@@ -227,7 +227,7 @@ jobs:
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           OPERATION: ${{ inputs.operation }}
-          TARGET_APP: ${{ inputs.target_app }}
+          TARGET_APP: ${{ needs.prepare.outputs.target_app }}
           UPDATE_POLICY_INPUT: ${{ inputs.update_policy }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
           TARGET_VERSIONS: ${{ needs.prepare.outputs.target_versions }}

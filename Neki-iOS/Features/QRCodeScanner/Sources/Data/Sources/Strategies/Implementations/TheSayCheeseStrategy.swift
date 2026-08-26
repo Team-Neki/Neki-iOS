@@ -47,6 +47,7 @@ struct TheSayCheeseStrategy: QRCodeParsingStrategy {
 }
 
 private extension TheSayCheeseStrategy {
+    static let asciiDigitRange = UInt8(ascii: "0")...UInt8(ascii: "9")
     static let identifierAllowedCharacters = CharacterSet.alphanumerics.union(
         CharacterSet(charactersIn: "-_")
     )
@@ -60,8 +61,8 @@ private extension TheSayCheeseStrategy {
               identifier.isEmpty == false,
               identifier.unicodeScalars.allSatisfy({ Self.identifierAllowedCharacters.contains($0) }),
               let date = queryItems.first(where: { $0.name == "ymd" })?.value,
-              date.count == 6,
-              date.allSatisfy(\.isNumber),
+              date.utf8.count == 6,
+              date.utf8.allSatisfy(Self.asciiDigitRange.contains),
               let baseURL = URL(string: "http://thesaycheese.co.kr")
         else { return nil }
 

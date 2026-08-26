@@ -5,13 +5,17 @@
 //  Created by SwainYun on 7/30/26.
 //
 
-import Dependencies
 import AppTrackingTransparency
+import Dependencies
 import FacebookCore
 
 final class MetaAttributionRepository: AttributionRepository {
     func initializeAttribution() async {
-        await MainActor.run { ApplicationDelegate.shared.initializeSDK() }
+        await MainActor.run {
+            let isAuthorized = ATTrackingManager.trackingAuthorizationStatus == .authorized
+            Settings.shared.isAutoLogAppEventsEnabled = isAuthorized
+            ApplicationDelegate.shared.initializeSDK()
+        }
     }
 
     @MainActor
@@ -26,29 +30,40 @@ final class MetaAttributionRepository: AttributionRepository {
     }
 
     @MainActor
-    func requestTrackingAuthorization() async { _ = await ATTrackingManager.requestTrackingAuthorization() }
+    func requestTrackingAuthorization() async -> TrackingAuthorizationStatus {
+        let status = await ATTrackingManager.requestTrackingAuthorization()
+        switch status {
+        case .notDetermined: return .notDetermined
+        case .restricted: return .restricted
+        case .denied: return .denied
+        case .authorized: return .authorized
+        @unknown default: return .unknown
+        }
+    }
+
+    @MainActor
+    func updateTrackingAuthorization(_ status: TrackingAuthorizationStatus) {
+        let isAuthorized = status == .authorized
+        Settings.shared.isAutoLogAppEventsEnabled = isAuthorized
+        guard isAuthorized else { return }
+        AppEvents.shared.activateApp()
+    }
 
     func trackCompleteRegistration() async {
         await MainActor.run { AppEvents.shared.logEvent(.completedRegistration) }
     }
 }
 
-extension AttributionClient: DependencyKey {
-    public static var liveValue: AttributionClient {
-        let repository = MetaAttributionRepository()
-        
-        return AttributionClient(
-            initializeAttribution: { await repository.initializeAttribution() },
-            checkTrackingAuthorizationStatus: { repository.checkTrackingAuthorizationStatus() },
-            requestTrackingAuthorization: { await repository.requestTrackingAuthorization() },
-            trackCompleteRegistration: { await repository.trackCompleteRegistration() }
-        )
-    }
+
+// MARK: - Dependency
+
+private enum AttributionRepositoryKey: DependencyKey {
+    static let liveValue: any AttributionRepository = MetaAttributionRepository()
 }
 
 extension DependencyValues {
-    var attributionClient: AttributionClient {
-        get { self[AttributionClient.self] }
-        set { self[AttributionClient.self] = newValue }
+    var attributionRepository: any AttributionRepository {
+        get { self[AttributionRepositoryKey.self] }
+        set { self[AttributionRepositoryKey.self] = newValue }
     }
 }

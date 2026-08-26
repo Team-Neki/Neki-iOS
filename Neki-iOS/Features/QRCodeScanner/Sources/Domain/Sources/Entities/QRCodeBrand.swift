@@ -22,6 +22,9 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case auraPic
     case theSayCheese
 
+    /// QR Code 지원 브랜드의 도메인호스트입니다.
+    ///
+    /// - Note: QR 호스트 비교 시 정규화 기준으로서 소문자를 사용합니다.
     var hostKeywords: [String] {
         switch self {
         case .life4cut: ["life4cut.net", "api.life4cut.net", "life-4cut.net"]

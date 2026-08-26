@@ -15,25 +15,25 @@ struct TheSayCheeseStrategy: QRCodeParsingStrategy {
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
 
-    func canHandle(host: String) -> Bool {
-        QRCodeBrand.theSayCheese.hostKeywords.contains { host.lowercased() == $0.lowercased() }
+    func canHandle(normalizedHost: String) -> Bool {
+        QRCodeBrand.theSayCheese.hostKeywords.contains(normalizedHost)
     }
 
-    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
-        Logger.data.debug("더세이치즈 파싱 시도: \(url.absoluteString)")
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
+        Logger.data.debug("더세이치즈 파싱 시도: \(qrCodeURL.absoluteString)")
 
-        guard let imageURL = imageURL(from: url) else {
+        guard let imageSourceURL = imageSourceURL(from: qrCodeURL) else {
             Logger.domain.warning("더세이치즈 이미지 URL 생성 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
 
         do {
-            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
+            let (data, response) = try await session.data(for: URLRequest(url: imageSourceURL), delegate: nil)
 
             if let httpResponse = response as? HTTPURLResponse,
                (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.network.warning("더세이치즈 이미지 다운로드 실패 (상태코드: \(httpResponse.statusCode)). 웹뷰 폴백.")
-                throw QRParseError.fallbackToWebView(url)
+                throw QRParseError.fallbackToWebView(qrCodeURL)
             }
 
             return ParsedQRResult(brand: .theSayCheese, originalImage: data)
@@ -52,9 +52,9 @@ private extension TheSayCheeseStrategy {
         CharacterSet(charactersIn: "-_")
     )
 
-    func imageURL(from url: URL) -> URL? {
+    func imageSourceURL(from qrCodeURL: URL) -> URL? {
         guard let queryItems = URLComponents(
-            url: url,
+            url: qrCodeURL,
             resolvingAgainstBaseURL: false
         )?.queryItems,
               let identifier = queryItems.first(where: { $0.name == "idx" })?.value,

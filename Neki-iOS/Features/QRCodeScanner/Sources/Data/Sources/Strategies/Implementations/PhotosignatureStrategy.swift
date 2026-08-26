@@ -15,36 +15,36 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
 
-    func canHandle(host: String) -> Bool { QRCodeBrand.photosignature.hostKeywords.contains { host.contains($0) } }
+    func canHandle(normalizedHost: String) -> Bool { QRCodeBrand.photosignature.hostKeywords.contains { normalizedHost.contains($0) } }
 
-    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
-        Logger.data.debug("포토시그니처 파싱 시도: \(url.absoluteString)")
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
+        Logger.data.debug("포토시그니처 파싱 시도: \(qrCodeURL.absoluteString)")
         
-        if url.host() == "photosignature-viewer.web.app" {
-            return try await parseViewerURL(url)
+        if qrCodeURL.host() == "photosignature-viewer.web.app" {
+            return try await parseViewerURL(qrCodeURL)
         }
         
-        let urlString = url.absoluteString
-        var imageURLString = String()
+        let qrCodeURLString = qrCodeURL.absoluteString
+        var imageSourceURLString = String()
         
-        if urlString.hasSuffix("index.html") {
-            imageURLString = urlString.replacingOccurrences(of: "index.html", with: "a.jpg")
+        if qrCodeURLString.hasSuffix("index.html") {
+            imageSourceURLString = qrCodeURLString.replacingOccurrences(of: "index.html", with: "a.jpg")
         } else {
-            let cleanString = urlString.hasSuffix("/") ? String(urlString.dropLast()) : urlString
-            imageURLString = cleanString + "/a.jpg"
+            let cleanString = qrCodeURLString.hasSuffix("/") ? String(qrCodeURLString.dropLast()) : qrCodeURLString
+            imageSourceURLString = cleanString + "/a.jpg"
         }
         
-        guard let imageURL = URL(string: imageURLString) else {
+        guard let imageSourceURL = URL(string: imageSourceURLString) else {
             Logger.domain.error("이미지 URL 생성 실패.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         do {
-            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
+            let (data, response) = try await session.data(for: URLRequest(url: imageSourceURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.domain.notice("이미지 다운로드 에러. 웹뷰 폴백.")
-                throw QRParseError.fallbackToWebView(url)
+                throw QRParseError.fallbackToWebView(qrCodeURL)
             }
             
             return ParsedQRResult(brand: .photosignature, originalImage: data)
@@ -59,24 +59,24 @@ struct PhotoSignatureStrategy: QRCodeParsingStrategy {
 }
 
 private extension PhotoSignatureStrategy {
-    func parseViewerURL(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
-        guard let sessionID = sessionID(from: url) else {
+    func parseViewerURL(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
+        guard let sessionID = sessionID(from: qrCodeURL) else {
             Logger.domain.warning("포토시그니처 뷰어 URL에서 sessionID 추출 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
-        guard let imageURL = URL(string: "https://photosignature-asset-cdn.photosignature.workers.dev/sessions/\(sessionID)/final.jpg") else {
+        guard let imageSourceURL = URL(string: "https://photosignature-asset-cdn.photosignature.workers.dev/sessions/\(sessionID)/final.jpg") else {
             Logger.domain.error("포토시그니처 뷰어 이미지 URL 생성 실패.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         do {
-            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
+            let (data, response) = try await session.data(for: URLRequest(url: imageSourceURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse,
                (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.domain.notice("포토시그니처 뷰어 이미지 다운로드 에러. 웹뷰 폴백.")
-                throw QRParseError.fallbackToWebView(url)
+                throw QRParseError.fallbackToWebView(qrCodeURL)
             }
             
             return ParsedQRResult(brand: .photosignature, originalImage: data)
@@ -88,13 +88,13 @@ private extension PhotoSignatureStrategy {
         }
     }
     
-    func sessionID(from url: URL) -> String? {
-        if let fragment = url.fragment,
+    func sessionID(from qrCodeURL: URL) -> String? {
+        if let fragment = qrCodeURL.fragment,
            let sessionID = sessionID(fromRoute: fragment) {
             return sessionID
         }
         
-        return sessionID(fromRoute: url.path())
+        return sessionID(fromRoute: qrCodeURL.path())
     }
     
     func sessionID(fromRoute route: String) -> String? {

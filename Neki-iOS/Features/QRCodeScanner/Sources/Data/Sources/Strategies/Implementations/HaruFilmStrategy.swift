@@ -15,36 +15,36 @@ struct HaruFilmStrategy: QRCodeParsingStrategy {
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
 
-    func canHandle(host: String) -> Bool { QRCodeBrand.harufilm.hostKeywords.contains { host.contains($0) } }
+    func canHandle(normalizedHost: String) -> Bool { QRCodeBrand.harufilm.hostKeywords.contains { normalizedHost.contains($0) } }
 
-    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
-        Logger.data.debug("하루필름 파싱 시도: \(url.absoluteString)")
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
+        Logger.data.debug("하루필름 파싱 시도: \(qrCodeURL.absoluteString)")
         
-        guard let host = url.host() else {
+        guard let host = qrCodeURL.host() else {
             Logger.domain.error("유효하지 않은 호스트")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
-        let path = url.path()
+        let path = qrCodeURL.path()
         let id = path.trimmingCharacters(in: ["/", "@"])
         
         guard id.isEmpty == false else {
             Logger.domain.warning("ID 추출 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
-        guard let imageURL = URL(string: "http://\(host)/download/album/\(id)/output/output.jpg") else {
+        guard let imageSourceURL = URL(string: "http://\(host)/download/album/\(id)/output/output.jpg") else {
             Logger.domain.error("이미지 URL 구성 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         do {
-            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
+            let (data, response) = try await session.data(for: URLRequest(url: imageSourceURL), delegate: nil)
             
             if let httpResponse = response as? HTTPURLResponse,
                !(200..<300).contains(httpResponse.statusCode) {
                 Logger.network.warning("이미지 다운로드 실패 (상태코드: \(httpResponse.statusCode)). 웹뷰 폴백.")
-                throw QRParseError.fallbackToWebView(url)
+                throw QRParseError.fallbackToWebView(qrCodeURL)
             }
             
             return ParsedQRResult(brand: .harufilm, originalImage: data)

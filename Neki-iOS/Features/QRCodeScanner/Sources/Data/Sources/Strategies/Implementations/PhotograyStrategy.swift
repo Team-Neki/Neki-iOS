@@ -15,12 +15,12 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
 
-    func canHandle(host: String) -> Bool { QRCodeBrand.photogray.hostKeywords.contains { host.contains($0) } }
+    func canHandle(normalizedHost: String) -> Bool { QRCodeBrand.photogray.hostKeywords.contains { normalizedHost.contains($0) } }
 
-    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
-        Logger.data.debug("포토그레이 파싱 시도: \(url.absoluteString)")
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
+        Logger.data.debug("포토그레이 파싱 시도: \(qrCodeURL.absoluteString)")
         
-        let request = URLRequest(url: url)
+        let request = URLRequest(url: qrCodeURL)
         
         // 1. 리다이렉트 URL 획득 시도
         let response: URLResponse
@@ -31,7 +31,7 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
             if let urlError = error as? URLError, [.notConnectedToInternet, .networkConnectionLost].contains(urlError.code) {
                 throw .networkError(.networkFail)
             }
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         // 2. 파라미터 추출 및 디코딩 로직
@@ -41,14 +41,14 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
               let idValue = components.queryItems?.first(where: { $0.name == "id" })?.value
         else {
             Logger.domain.warning("리다이렉트 URL에서 id 파라미터 찾기 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         // Base64 디코딩 실패 시 폴백
         guard let data = Data(base64Encoded: idValue),
               let decodedString = String(data: data, encoding: .utf8) else {
             Logger.data.error("Base64 디코딩 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         // 3. 디코딩된 문자열에서 sessionId 추출
@@ -57,23 +57,23 @@ struct PhotograyStrategy: QRCodeParsingStrategy {
         
         guard let sessionID = dummyComponents.queryItems?.first(where: { $0.name == "sessionId" })?.value else {
             Logger.domain.warning("sessionId 추출 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         // 4. 최종 이미지 URL 구성
-        let imageURLString = "https://pg-qr-resource.aprd.io/\(sessionID)/image.jpg"
-        guard let imageURL = URL(string: imageURLString) else {
+        let imageSourceURLString = "https://pg-qr-resource.aprd.io/\(sessionID)/image.jpg"
+        guard let imageSourceURL = URL(string: imageSourceURLString) else {
             Logger.domain.error("최종 이미지 URL 구성 불가.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
         
         // 5. 다운로드
         do {
-            let (imageData, imageResponse) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
+            let (imageData, imageResponse) = try await session.data(for: URLRequest(url: imageSourceURL), delegate: nil)
             
             if let httpResponse = imageResponse as? HTTPURLResponse, (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.network.warning("이미지 리소스 접근 실패(만료됨). 웹뷰 폴백.")
-                throw QRParseError.fallbackToWebView(url)
+                throw QRParseError.fallbackToWebView(qrCodeURL)
             }
             
             return ParsedQRResult(brand: .photogray, originalImage: imageData)

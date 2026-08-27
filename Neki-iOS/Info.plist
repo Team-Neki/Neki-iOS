@@ -67,6 +67,11 @@
 				<key>NSIncludesSubdomains</key>
 				<true/>
 			</dict>
+			<key>thesaycheese.co.kr</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
 		</dict>
 	</dict>
 	<key>NSUserTrackingUsageDescription</key>

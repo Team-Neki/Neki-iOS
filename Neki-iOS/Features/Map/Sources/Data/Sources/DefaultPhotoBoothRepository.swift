@@ -139,8 +139,8 @@ public final actor DefaultPhotoBoothRepository {
 // MARK: - DefaultPhotoBoothRepository + PhotoBoothRepository
 
 extension DefaultPhotoBoothRepository: PhotoBoothRepository {
-    func readPhotoBooths(in bounds: GeographicBoundingBox) -> AsyncStream<[PhotoBooth]> {
-        let (stream, continuation) = AsyncStream<[PhotoBooth]>.makeStream()
+    func readPhotoBooths(in bounds: GeographicBoundingBox) -> AsyncThrowingStream<[PhotoBooth], Error> {
+        let (stream, continuation) = AsyncThrowingStream<[PhotoBooth], Error>.makeStream()
         let task = Task {
             do {
                 try Task.checkCancellation()
@@ -173,8 +173,10 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 if tilesToFetch.isEmpty == false {
                     try Task.checkCancellation()
                     let staleFallbackByTile = stalePhotoBoothsByTile
+                    var firstFetchError: Error?
+                    var resolvedTileCount = requiredTiles.count - tilesToFetch.count
                     
-                    try await withThrowingTaskGroup(of: [PhotoBooth]?.self) { group in
+                    try await withThrowingTaskGroup(of: [PhotoBooth].self) { group in
                         for tile in tilesToFetch {
                             group.addTask {
                                 do {
@@ -184,16 +186,24 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                                 } catch is CancellationError {
                                     throw CancellationError()
                                 } catch {
-                                    guard let stalePhotoBooths = staleFallbackByTile[tile] else { return nil }
+                                    guard let stalePhotoBooths = staleFallbackByTile[tile] else { throw error }
                                     return stalePhotoBooths
                                 }
                             }
                         }
                         
-                        for try await result in group {
-                            guard let photoBooths = result else { continue }
-                            continuation.yield(self.photoBoothsApplyingFavoriteState(photoBooths))
+                        while let result = await group.nextResult() {
+                            switch result {
+                            case let .success(photoBooths):
+                                resolvedTileCount += 1
+                                continuation.yield(self.photoBoothsApplyingFavoriteState(photoBooths))
+                            case let .failure(error):
+                                if error is CancellationError { throw CancellationError() }
+                                if firstFetchError == nil { firstFetchError = error }
+                            }
                         }
+
+                        guard resolvedTileCount > .zero else { throw firstFetchError ?? NetworkError.responseError }
                     }
                 }
                 
@@ -204,7 +214,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 continuation.finish()
             } catch {
                 Logger.data.error("POI Stream error: \(error)")
-                continuation.finish()
+                continuation.finish(throwing: error)
             }
         }
         

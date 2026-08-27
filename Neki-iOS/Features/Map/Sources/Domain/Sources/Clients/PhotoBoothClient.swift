@@ -11,7 +11,7 @@ import ComposableArchitecture
 @DependencyClient
 public struct PhotoBoothClient {
     /// 지도 영역(bounds) 내의 포토부스 데이터를 가져옵니다.
-    public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncStream<[PhotoBooth]>
+    public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncThrowingStream<[PhotoBooth], Error>
     /// 중심 좌표 주변 거리순으로 포토부스 데이터를 가져옵니다.
     public var fetchNearbyPhotoBooths: @Sendable (_ coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.

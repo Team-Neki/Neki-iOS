@@ -15,11 +15,6 @@ protocol PhotoBoothRepository {
     /// - Throws: 캐시와 네트워크 모두에서 유효한 타일을 확보하지 못한 경우의 조회 오류
     func readPhotoBooths(in bounds: GeographicBoundingBox) async -> AsyncThrowingStream<[PhotoBooth], Error>
 
-    /// 기준 좌표에서 거리순으로 포토부스 목록을 가져옵니다.
-    /// - Parameter coordinate: 기준 좌표
-    /// - Returns: 거리순으로 정렬된 포토부스 배열
-    func readNearbyPhotoBooths(coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
-
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
     /// - Parameters:
     ///   - id: 포토부스 지점 식별자

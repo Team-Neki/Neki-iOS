@@ -33,7 +33,6 @@ public struct PhotoBoothListFeature {
         var displayedBrands: IdentifiedArrayOf<PhotoBoothBrand> { selectedTab == .nearby ? nearbyBrands : brands }
         
         var selectedTab: ListTab = .nearby
-        var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         var favoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -59,7 +58,6 @@ public struct PhotoBoothListFeature {
         case setBrands(IdentifiedArrayOf<PhotoBoothBrand>)
         case setAvailableNearbyBrandIDs(Set<PhotoBoothBrand.ID>)
         case clearFilterOptions
-        case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
         case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
         case setFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
         case setVisibleFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
@@ -120,10 +118,6 @@ public struct PhotoBoothListFeature {
                 updateNearbyBrands(&state)
                 return .none
 
-            case let .setNearbyBooths(booths):
-                state.photoBooths = booths
-                return .none
-                
             case let .setVisibleBooths(booths):
                 state.visibleBooths = booths
                 return .none
@@ -160,10 +154,7 @@ private extension PhotoBoothListFeature {
     }
 
     func updateNearbyBrands(_ state: inout State) {
-        var displayedBrandIDs = state.availableNearbyBrandIDs
-        displayedBrandIDs.reserveCapacity(displayedBrandIDs.count + state.filteredBrands.count)
-        state.filteredBrands.forEach { displayedBrandIDs.insert($0.id) }
-        let nearbyBrands = state.brands.filter { displayedBrandIDs.contains($0.id) }
+        let nearbyBrands = state.brands.filter { state.availableNearbyBrandIDs.contains($0.id) }
         guard state.nearbyBrands != nearbyBrands else { return }
         state.nearbyBrands = nearbyBrands
     }

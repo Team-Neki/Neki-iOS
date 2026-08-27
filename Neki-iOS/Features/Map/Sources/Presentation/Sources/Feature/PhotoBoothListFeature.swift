@@ -34,7 +34,10 @@ public struct PhotoBoothListFeature {
     @ObservableState
     public struct State {
         var brands: IdentifiedArrayOf<PhotoBoothBrand> = []
+        var nearbyBrands: IdentifiedArrayOf<PhotoBoothBrand> = []
+        var availableNearbyBrandIDs: Set<PhotoBoothBrand.ID> = []
         var filteredBrands: Set<PhotoBoothBrand> = []
+        var displayedBrands: IdentifiedArrayOf<PhotoBoothBrand> { selectedTab == .nearby ? nearbyBrands : brands }
         
         var selectedTab: ListTab = .nearby
         /// 현재 지도 카메라가 가리키는 지역으로, 선택된 목록 탭과 독립적으로 유지됩니다.
@@ -68,6 +71,9 @@ public struct PhotoBoothListFeature {
         case didTapBrandReorderButton
 
         // Internal Actions
+        case setBrands(IdentifiedArrayOf<PhotoBoothBrand>)
+        case setAvailableNearbyBrandIDs(Set<PhotoBoothBrand.ID>)
+        case clearFilterOptions
         case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
         case setCurrentMapAddress(AdministrativeAddress?)
         case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
@@ -93,6 +99,7 @@ public struct PhotoBoothListFeature {
             case let .selectFilterOption(brand):
                 let filterAction: MapFilterAction = state.filteredBrands.contains(brand) ? .deselect : .select
                 toggleFilterOptionSelection(&state, brand: brand)
+                updateNearbyBrands(&state)
                 let selectedCount = state.filteredBrands.count
                 let event = MapAnalyticsEvent.mapBrandFilterToggle(action: filterAction, selectedCount: selectedCount, brandName: brand.name)
                 return .run { _ in await analytics.logEvent(event) }
@@ -110,6 +117,24 @@ public struct PhotoBoothListFeature {
 
             case .didTapBrandReorderButton:
                 return .send(.delegate(.didTapBrandReorderButton))
+
+            case let .setBrands(brands):
+                guard state.brands != brands else { return .none }
+                state.brands = brands
+                updateNearbyBrands(&state)
+                return .none
+
+            case let .setAvailableNearbyBrandIDs(brandIDs):
+                guard state.availableNearbyBrandIDs != brandIDs else { return .none }
+                state.availableNearbyBrandIDs = brandIDs
+                updateNearbyBrands(&state)
+                return .none
+
+            case .clearFilterOptions:
+                guard state.filteredBrands.isEmpty == false else { return .none }
+                state.filteredBrands.removeAll()
+                updateNearbyBrands(&state)
+                return .none
 
             case let .setNearbyBooths(booths):
                 state.photoBooths = booths
@@ -153,5 +178,14 @@ private extension PhotoBoothListFeature {
         } else {
             state.filteredBrands.insert(brand)
         }
+    }
+
+    func updateNearbyBrands(_ state: inout State) {
+        var displayedBrandIDs = state.availableNearbyBrandIDs
+        displayedBrandIDs.reserveCapacity(displayedBrandIDs.count + state.filteredBrands.count)
+        state.filteredBrands.forEach { displayedBrandIDs.insert($0.id) }
+        let nearbyBrands = state.brands.filter { displayedBrandIDs.contains($0.id) }
+        guard state.nearbyBrands != nearbyBrands else { return }
+        state.nearbyBrands = nearbyBrands
     }
 }

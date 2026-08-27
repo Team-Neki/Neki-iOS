@@ -94,7 +94,7 @@ private extension NearPhotoBoothListSheet {
         Section {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 2) {
-                    ForEach(store.brands, id: \.self) { brand in
+                    ForEach(store.displayedBrands, id: \.self) { brand in
                         filterCell(brand)
                     }
                 }

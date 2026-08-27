@@ -30,6 +30,33 @@ public struct MapFeature {
             }
         }
     }
+
+    struct PhotoBoothFetchContext: Equatable {
+        private(set) var generation: UInt = .zero
+        private(set) var bounds: GeographicBoundingBox?
+        private(set) var hasReceivedChunk: Bool = false
+
+        mutating func begin(in bounds: GeographicBoundingBox) -> UInt {
+            generation &+= 1
+            self.bounds = bounds
+            hasReceivedChunk = false
+            return generation
+        }
+
+        mutating func markChunkReceived() { hasReceivedChunk = true }
+
+        mutating func finish() {
+            bounds = nil
+            hasReceivedChunk = false
+        }
+
+        mutating func invalidate() {
+            generation &+= 1
+            finish()
+        }
+
+        func isCurrent(_ generation: UInt) -> Bool { bounds != nil && self.generation == generation }
+    }
     
     @ObservableState
     public struct State {
@@ -59,6 +86,7 @@ public struct MapFeature {
         // Data
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visiblePhotoBooths: IdentifiedArrayOf<PhotoBooth> = []
+        var photoBoothFetchContext = PhotoBoothFetchContext()
         
         var selectedBooth: PhotoBooth?
         var directionSheetPhotoBooth: PhotoBooth?
@@ -107,9 +135,9 @@ public struct MapFeature {
         // Data Handling Actions
         // Map
         case fetchPhotoBooths(bounds: GeographicBoundingBox)
-        case photoBoothChunkLoaded([PhotoBooth])
-        case photoBoothStreamFinished(availableBrandIDs: Set<PhotoBoothBrand.ID>)
-        case photoBoothStreamFailure(Error)
+        case photoBoothChunkLoaded([PhotoBooth], generation: UInt)
+        case photoBoothStreamFinished(generation: UInt)
+        case photoBoothStreamFailure(Error, generation: UInt)
         case updatePhotoBoothFavoriteResponse(photoBooth: PhotoBooth, requestedValue: Bool, Result<Void, Error>)
         case loadBrands
         case brandsResponse(Result<[PhotoBoothBrand], Error>)
@@ -122,8 +150,8 @@ public struct MapFeature {
         case refreshVisibleMapPhotoBooths
         case didUpdateVisibleMapPhotoBooths(IdentifiedArrayOf<PhotoBooth>)
         case startBackgroundCalculation
-        case processNewChunk([PhotoBooth], isFirstBatch: Bool)
-        case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool)
+        case processNewChunk([PhotoBooth], isFirstBatch: Bool, generation: UInt)
+        case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool, generation: UInt)
         case didFinishBackgroundCalculation(
             map: IdentifiedArrayOf<PhotoBooth>,
             list: IdentifiedArrayOf<PhotoBooth>,
@@ -144,6 +172,7 @@ public struct MapFeature {
     
     private enum CancelID: Hashable {
         case mapFetch
+        case mapChunkProcessing
         case listFetch
         case locationStream
         case locationAuthorizationStream
@@ -284,9 +313,15 @@ public struct MapFeature {
                 // MARK: - Map Camera & Search Logic
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false
-                return .merge(
-                    .cancel(id: CancelID.mapFetch),
-                    .cancel(id: CancelID.listFetch)
+                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
+                state.photoBoothFetchContext.invalidate()
+                return .concatenate(
+                    synchronizationEffect,
+                    .merge(
+                        .cancel(id: CancelID.mapFetch),
+                        .cancel(id: CancelID.mapChunkProcessing),
+                        .cancel(id: CancelID.listFetch)
+                    )
                 )
                 
             case .cameraMotionStarted:
@@ -353,29 +388,38 @@ public struct MapFeature {
 
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
-                state.photoBooths.removeAll()
-                
-                return .run { send in
+                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
+                let generation = state.photoBoothFetchContext.begin(in: bounds)
+
+                let fetchEffect: Effect<Action> = .run { send in
                     let stream = try await photoBoothClient.fetchPhotoBooths(bounds: bounds)
-                    var availableBrandIDs = Set<PhotoBoothBrand.ID>()
                     for await chunk in stream {
                         try Task.checkCancellation()
-                        availableBrandIDs.formUnion(Self.availableBrandIDs(from: chunk, in: bounds))
-                        await send(.photoBoothChunkLoaded(chunk))
+                        await send(.photoBoothChunkLoaded(chunk, generation: generation))
                     }
                     try Task.checkCancellation()
-                    await send(.photoBoothStreamFinished(availableBrandIDs: availableBrandIDs))
+                    await send(.photoBoothStreamFinished(generation: generation))
                 } catch: { error, send in
                     guard (error is CancellationError) == false else { return }
-                    await send(.photoBoothStreamFailure(error))
+                    await send(.photoBoothStreamFailure(error, generation: generation))
                 }.cancellable(id: CancelID.mapFetch, cancelInFlight: true)
-                
-            case let .photoBoothChunkLoaded(chunk):
-                state.photoBooths.append(contentsOf: chunk)
-                let isFirstBatch = state.photoBooths.count == chunk.count
-                return .send(.processNewChunk(chunk, isFirstBatch: isFirstBatch))
-                
-            case let .processNewChunk(chunk, isFirstBatch):
+
+                return .concatenate(
+                    synchronizationEffect,
+                    .cancel(id: CancelID.mapChunkProcessing),
+                    fetchEffect
+                )
+
+            case let .photoBoothChunkLoaded(chunk, generation):
+                guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
+                let isFirstBatch = state.photoBoothFetchContext.hasReceivedChunk == false
+                state.photoBoothFetchContext.markChunkReceived()
+                if isFirstBatch { state.photoBooths = IdentifiedArray(uniqueElements: chunk) }
+                else { state.photoBooths.append(contentsOf: chunk) }
+                return .send(.processNewChunk(chunk, isFirstBatch: isFirstBatch, generation: generation))
+
+            case let .processNewChunk(chunk, isFirstBatch, generation):
+                guard state.photoBoothFetchContext.generation == generation else { return .none }
                 let mapBooths = mapBoothsPreservingFavoriteState(from: chunk, state: state)
                 let favoriteBooths = isFirstBatch ? state.photoBoothListState.favoriteBooths : []
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
@@ -389,10 +433,13 @@ public struct MapFeature {
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
-                    await send(.appendProcessedChunk(map: Array(visibleMapBooths), isFirstBatch: isFirstBatch))
+                    guard Task.isCancelled == false else { return }
+                    await send(.appendProcessedChunk(map: Array(visibleMapBooths), isFirstBatch: isFirstBatch, generation: generation))
                 }
-                
-            case let .appendProcessedChunk(map, isFirstBatch):
+                .cancellable(id: CancelID.mapChunkProcessing)
+
+            case let .appendProcessedChunk(map, isFirstBatch, generation):
+                guard state.photoBoothFetchContext.generation == generation else { return .none }
                 var mergedMap: [PhotoBooth] = []
                 mergedMap.reserveCapacity(map.count)
                 map.forEach { mergedMap.append(photoBoothPreservingFavoriteState($0, state: state)) }
@@ -406,13 +453,24 @@ public struct MapFeature {
                     }
                 }
                 return .none
-                
-            case let .photoBoothStreamFinished(availableBrandIDs):
-                return .send(.photoBoothListAction(.setAvailableNearbyBrandIDs(availableBrandIDs)))
-                
-            case let .photoBoothStreamFailure(error):
+
+            case let .photoBoothStreamFinished(generation):
+                guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
+                let hasReceivedChunk = state.photoBoothFetchContext.hasReceivedChunk
+                guard hasReceivedChunk else {
+                    state.photoBoothFetchContext.finish()
+                    return .none
+                }
+                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
+                state.photoBoothFetchContext.finish()
+                return synchronizationEffect
+
+            case let .photoBoothStreamFailure(error, generation):
+                guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
                 Logger.presentation.error("PhotoBooth stream error: \(error)")
-                return .none
+                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
+                state.photoBoothFetchContext.finish()
+                return synchronizationEffect
                 
             case let .didTapFavorite(photoBooth):
                 let requestedValue = photoBooth.isFavorite == false
@@ -648,6 +706,14 @@ public struct MapFeature {
 // MARK: - MapFeature + Effect Handlers
 
 private extension MapFeature {
+    func synchronizeAvailableNearbyBrands(for state: State) -> Effect<Action> {
+        let context = state.photoBoothFetchContext
+        guard let bounds = context.bounds else { return .none }
+        guard context.hasReceivedChunk else { return .none }
+        let brandIDs = Self.availableBrandIDs(from: state.photoBooths, in: bounds)
+        return .send(.photoBoothListAction(.setAvailableNearbyBrandIDs(brandIDs)))
+    }
+
     func mergedFavoriteBooths(from fetchedPhotoBooths: [PhotoBooth], state: State) -> IdentifiedArrayOf<PhotoBooth> {
         var favoriteBooths = IdentifiedArrayOf<PhotoBooth>()
 
@@ -772,10 +838,10 @@ private extension MapFeature {
         return activeBrandIDs
     }
 
-    static func availableBrandIDs(
-        from photoBooths: [PhotoBooth],
+    static func availableBrandIDs<PhotoBooths: Sequence>(
+        from photoBooths: PhotoBooths,
         in bounds: GeographicBoundingBox
-    ) -> Set<PhotoBoothBrand.ID> {
+    ) -> Set<PhotoBoothBrand.ID> where PhotoBooths.Element == PhotoBooth {
         var brandIDs = Set<PhotoBoothBrand.ID>()
         photoBooths.forEach { photoBooth in
             guard bounds.contains(photoBooth.coordinate) else { return }

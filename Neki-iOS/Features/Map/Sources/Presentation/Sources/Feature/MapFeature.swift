@@ -148,8 +148,8 @@ public struct MapFeature {
         case refreshVisibleMapPhotoBooths
         case didUpdateVisibleMapPhotoBooths(IdentifiedArrayOf<PhotoBooth>)
         case startBackgroundCalculation
-        case processNewChunk([PhotoBooth], isFirstBatch: Bool, generation: UInt)
-        case appendProcessedChunk(map: [PhotoBooth], list: [PhotoBooth], isFirstBatch: Bool, generation: UInt)
+        case processNewChunk([PhotoBooth], includesFavoriteBooths: Bool, generation: UInt)
+        case appendProcessedChunk(map: [PhotoBooth], list: [PhotoBooth], generation: UInt)
         case didFinishBackgroundCalculation(
             map: IdentifiedArrayOf<PhotoBooth>,
             list: IdentifiedArrayOf<PhotoBooth>,
@@ -404,14 +404,19 @@ public struct MapFeature {
                 guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
                 let isFirstBatch = state.photoBoothFetchContext.hasReceivedChunk == false
                 state.photoBoothFetchContext.markChunkReceived()
-                if isFirstBatch { state.photoBooths = IdentifiedArray(uniqueElements: chunk) }
-                else { state.photoBooths.append(contentsOf: chunk) }
-                return .send(.processNewChunk(chunk, isFirstBatch: isFirstBatch, generation: generation))
+                if isFirstBatch {
+                    state.photoBooths = IdentifiedArray(uniqueElements: chunk)
+                    state.visiblePhotoBooths = []
+                    state.photoBoothListState.visibleBooths = []
+                } else {
+                    state.photoBooths.append(contentsOf: chunk)
+                }
+                return .send(.processNewChunk(chunk, includesFavoriteBooths: isFirstBatch, generation: generation))
 
-            case let .processNewChunk(chunk, isFirstBatch, generation):
+            case let .processNewChunk(chunk, includesFavoriteBooths, generation):
                 guard state.photoBoothFetchContext.generation == generation else { return .none }
                 let mapBooths = mapBoothsPreservingFavoriteState(from: chunk, state: state)
-                let favoriteBooths = isFirstBatch ? state.photoBoothListState.favoriteBooths : []
+                let favoriteBooths = includesFavoriteBooths ? state.photoBoothListState.favoriteBooths : []
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let currentBounds = state.currentBounds
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
@@ -428,13 +433,12 @@ public struct MapFeature {
                     await send(.appendProcessedChunk(
                         map: Array(visibleMapBooths),
                         list: Array(visibleListBooths),
-                        isFirstBatch: isFirstBatch,
                         generation: generation
                     ))
                 }
                 .cancellable(id: CancelID.mapChunkProcessing)
 
-            case let .appendProcessedChunk(map, list, isFirstBatch, generation):
+            case let .appendProcessedChunk(map, list, generation):
                 guard state.photoBoothFetchContext.generation == generation else { return .none }
                 var mergedMap: [PhotoBooth] = []
                 mergedMap.reserveCapacity(map.count)
@@ -443,18 +447,13 @@ public struct MapFeature {
                 mergedList.reserveCapacity(list.count)
                 list.forEach { mergedList.append(photoBoothPreservingFavoriteState($0, state: state)) }
 
-                if isFirstBatch {
-                    state.visiblePhotoBooths = IdentifiedArray(uniqueElements: mergedMap)
-                    state.photoBoothListState.visibleBooths = IdentifiedArray(uniqueElements: mergedList)
-                } else {
-                    mergedMap.forEach { photoBooth in
-                        if state.visiblePhotoBooths[id: photoBooth.id] != nil { state.visiblePhotoBooths[id: photoBooth.id] = photoBooth }
-                        else { state.visiblePhotoBooths.append(photoBooth) }
-                    }
-                    mergedList.forEach { photoBooth in
-                        if state.photoBoothListState.visibleBooths[id: photoBooth.id] != nil { state.photoBoothListState.visibleBooths[id: photoBooth.id] = photoBooth }
-                        else { state.photoBoothListState.visibleBooths.append(photoBooth) }
-                    }
+                mergedMap.forEach { photoBooth in
+                    if state.visiblePhotoBooths[id: photoBooth.id] != nil { state.visiblePhotoBooths[id: photoBooth.id] = photoBooth }
+                    else { state.visiblePhotoBooths.append(photoBooth) }
+                }
+                mergedList.forEach { photoBooth in
+                    if state.photoBoothListState.visibleBooths[id: photoBooth.id] != nil { state.photoBoothListState.visibleBooths[id: photoBooth.id] = photoBooth }
+                    else { state.photoBoothListState.visibleBooths.append(photoBooth) }
                 }
                 return .none
 

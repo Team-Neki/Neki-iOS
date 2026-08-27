@@ -15,32 +15,32 @@ struct PhotoSignatureCodeStrategy: QRCodeParsingStrategy {
 
     init(session: URLSessionProtocol = URLSession.shared) { self.session = session }
 
-    func canHandle(host: String) -> Bool {
-        QRCodeBrand.photosignatureCode.hostKeywords.contains { host.lowercased().contains($0.lowercased()) }
+    func canHandle(normalizedHost: String) -> Bool {
+        QRCodeBrand.photosignatureCode.hostKeywords.contains { normalizedHost.contains($0) }
     }
 
-    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult {
-        Logger.data.debug("포토시그니처 CODE 파싱 시도: \(url.absoluteString)")
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
+        Logger.data.debug("포토시그니처 CODE 파싱 시도: \(qrCodeURL.absoluteString)")
 
-        guard let sessionID = sessionID(from: url) else {
+        guard let sessionID = sessionID(from: qrCodeURL) else {
             Logger.domain.warning("포토시그니처 CODE URL에서 sessionID 추출 실패. 웹뷰 폴백.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
 
-        guard let imageURL = URL(
+        guard let imageSourceURL = URL(
             string: "https://photosignature-asset-cdn.photosignature.workers.dev/sessions/\(sessionID)/final.jpg"
         ) else {
             Logger.domain.error("포토시그니처 CODE 이미지 URL 생성 실패.")
-            throw .fallbackToWebView(url)
+            throw .fallbackToWebView(qrCodeURL)
         }
 
         do {
-            let (data, response) = try await session.data(for: URLRequest(url: imageURL), delegate: nil)
+            let (data, response) = try await session.data(for: URLRequest(url: imageSourceURL), delegate: nil)
 
             if let httpResponse = response as? HTTPURLResponse,
                (200..<300).contains(httpResponse.statusCode) == false {
                 Logger.domain.notice("포토시그니처 CODE 이미지 다운로드 에러. 웹뷰 폴백.")
-                throw QRParseError.fallbackToWebView(url)
+                throw QRParseError.fallbackToWebView(qrCodeURL)
             }
 
             return ParsedQRResult(brand: .photosignatureCode, originalImage: data)
@@ -58,8 +58,8 @@ private extension PhotoSignatureCodeStrategy {
         charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
     )
 
-    func sessionID(from url: URL) -> String? {
-        let pathComponents = url.pathComponents.filter { $0 != "/" }
+    func sessionID(from qrCodeURL: URL) -> String? {
+        let pathComponents = qrCodeURL.pathComponents.filter { $0 != "/" }
 
         guard pathComponents.count == 2,
               pathComponents[0].lowercased() == "v"

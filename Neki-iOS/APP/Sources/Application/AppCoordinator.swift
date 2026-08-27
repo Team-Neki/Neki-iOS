@@ -44,7 +44,6 @@ struct AppCoordinator {
         var hasSynchronizedPushNotification: Bool = false
         var lastSynchronizedPushAgreement: Bool?
         var isAPNSTokenRegistered: Bool = false
-        var attribution = AttributionFeature.State()
         var pushNotificationEvent = PushNotificationEventFeature.State()
         
         init() {
@@ -75,7 +74,6 @@ struct AppCoordinator {
         case checkPushNotificationAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case synchronizePushNotification
         case synchronizePushNotificationResponse(Result<UNAuthorizationStatus, Error>)
-        case attribution(AttributionFeature.Action)
         case pushNotificationEvent(PushNotificationEventFeature.Action)
         
         // Binding Actions
@@ -101,8 +99,6 @@ struct AppCoordinator {
     
     var body: some ReducerOf<Self> {
         BindingReducer()
-
-        Scope(state: \.attribution, action: \.attribution) { AttributionFeature() }
 
         Scope(state: \.pushNotificationEvent, action: \.pushNotificationEvent) { PushNotificationEventFeature() }
         
@@ -141,7 +137,6 @@ struct AppCoordinator {
                     await send(.splashSequenceCompleted(finalStatus, finalVersionResult))
                 }
                 return .merge(
-                    .send(.attribution(.appLaunched)),
                     .send(.pushNotificationEvent(.task)),
                     launchEffect
                 )
@@ -260,10 +255,9 @@ struct AppCoordinator {
                 state.$hasSeenOnboarding.withLock { $0 = true }
                 state.route = .auth(.init())
                 return .none
-                
+
             case let .route(.auth(.delegate(.moveToMainTab(
                 user,
-                registrationStatus,
                 shouldPresentMarketingConsentAlert,
                 didCompleteTermsAgreement,
                 marketingConsentStatus
@@ -279,16 +273,10 @@ struct AppCoordinator {
                 let signedInStatus = UserSessionStatus.signedIn(user)
                 state.pendingAnalyticsSessionStatus = signedInStatus
                 state.$userSessionStatus.withLock { $0 = signedInStatus }
-                let registrationEffect: Effect<Action> = registrationStatus == .newlyRegistered
-                    ? .send(.attribution(.completeRegistration))
-                    : .none
-                return .merge(
-                    registrationEffect,
-                    configureAnalyticsSession(
-                        state: &state,
-                        status: signedInStatus,
-                        shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
-                    )
+                return configureAnalyticsSession(
+                    state: &state,
+                    status: signedInStatus,
+                    shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
                 )
 
             case let .route(.termsAgreement(.didFinishOnboarding(user, marketingConsentStatus))):
@@ -361,9 +349,6 @@ struct AppCoordinator {
                 state.shouldRetryPushNotificationSynchronization = false
                 return .send(.synchronizePushNotification)
 
-            case .route(.mainTab(.delegate(.requestTrackingAuthorization))):
-                return .send(.attribution(.requestTrackingAuthorization))
-                
             case .route(.mainTab(.delegate(.signedOut))), .route(.mainTab(.delegate(.withdraw))):
                 state.hasSynchronizedPushNotification = false
                 state.shouldRetryPushNotificationSynchronization = false

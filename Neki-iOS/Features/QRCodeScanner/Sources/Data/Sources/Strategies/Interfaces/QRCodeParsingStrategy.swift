@@ -10,6 +10,10 @@ import Foundation
 protocol QRCodeParsingStrategy {
     var strategyType: ParsingStrategyType { get }
     
-    func canHandle(host: String) -> Bool
-    func parse(_ url: URL) async throws(QRParseError) -> ParsedQRResult
+    func canHandle(normalizedHost: String) -> Bool
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult
+}
+
+extension QRCodeParsingStrategy {
+    func canHandle(host: String) -> Bool { canHandle(normalizedHost: host.lowercased()) }
 }

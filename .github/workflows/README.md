@@ -71,22 +71,28 @@ Actions에는 사용자가 직접 실행하는 `Neki-iOS 배포 및 버전 관�
 
 `Neki-iOS 배포 및 버전 관리`에서 다음 순서로 입력합니다.
 
-1. 실행할 작업을 선택합니다.
-2. 대상 앱을 Neki-dev, Neki-iOS, Neki-iOS & Dev 중에서 선택합니다.
-3. 대상에 포함된 앱의 버전만 MAJOR.MINOR.PATCH 형식으로 입력합니다.
-4. 서버 버전 정책을 함께 변경할 때만 권장 업데이트 또는 강제 업데이트를 선택합니다.
-5. Neki-iOS 서버 정책을 변경할 때만 App Store 공개 확인란을 활성화합니다.
+1. 대상 앱과 실행 결과가 함께 명시된 작업을 선택합니다.
+2. 작업명에 포함된 앱의 버전만 MAJOR.MINOR.PATCH 형식으로 입력합니다.
+3. 서버 버전 정책을 함께 변경할 때만 권장 업데이트 또는 강제 업데이트를 선택합니다.
+4. Neki-iOS 서버 정책을 변경할 때만 App Store 공개 확인란을 활성화합니다.
 
 ### 작업 종류
 
 | 작업 | 실행 결과 |
 | --- | --- |
-| 연결 검증 | 선택한 앱의 인증·서명·App Store Connect 연결만 검증 |
-| TestFlight 업로드 | 선택한 앱을 TestFlight에 업로드 |
-| App Store 심사 제출 | Neki-iOS를 App Store 심사에 제출 |
-| 서버 업데이트 정책만 적용 | 앱을 업로드하지 않고 선택한 환경의 버전 API만 갱신 |
+| Neki-dev 연결 검증 | 개발기의 인증·서명·App Store Connect 연결만 검증 |
+| Neki-iOS 연결 검증 | 상용기의 인증·서명·App Store Connect 연결만 검증 |
+| Neki-iOS & Dev 연결 검증 | 두 앱의 연결을 병렬 검증 |
+| Neki-dev TestFlight 업로드 | 개발기만 TestFlight에 업로드 |
+| Neki-iOS TestFlight 업로드 | 상용기만 TestFlight에 업로드 |
+| Neki-iOS & Dev TestFlight 업로드 | 두 앱을 각각 TestFlight에 병렬 업로드 |
+| Neki-iOS App Store 심사 제출 | 상용기를 App Store Connect에 업로드하고 심사 제출 |
+| Neki-dev TestFlight + Neki-iOS App Store 심사 제출 | 개발기는 TestFlight에 업로드하고 상용기는 App Store 심사 제출 |
+| Neki-dev 서버 업데이트 정책만 적용 | 개발 서버의 버전 API만 갱신 |
+| Neki-iOS 서버 업데이트 정책만 적용 | 상용 서버의 버전 API만 갱신 |
+| Neki-iOS & Dev 서버 업데이트 정책만 적용 | 두 환경의 버전 API를 각각 갱신 |
 
-Neki-iOS & Dev를 선택하면 개발기와 상용기를 독립된 Job에서 병렬 처리합니다. 두 앱의 버전 이력은 독립적이므로 development_version과 production_version을 각각 입력합니다.
+작업명에 Neki-iOS & Dev가 포함되면 개발기와 상용기를 독립된 Job에서 병렬 처리합니다. 두 앱의 버전 이력은 독립적이므로 development_version과 production_version을 각각 입력합니다.
 
 release_notes는 선택 사항입니다. 비워두면 TestFlight 또는 App Store Connect에 릴리즈 노트를 새로 등록하지 않습니다. 입력한 내용은 Discord 결과 메시지에도 표시됩니다.
 
@@ -98,7 +104,7 @@ release_notes는 선택 사항입니다. 비워두면 TestFlight 또는 App Stor
 | 권장 업데이트 | 기존 minVersion을 유지하고 currentVersion만 입력 버전으로 변경 |
 | 강제 업데이트 | minVersion과 currentVersion을 모두 입력 버전으로 변경 |
 
-대상 앱이 Neki-dev일 때만 TestFlight 업로드 후 개발 서버 정책을 연속해서 적용할 수 있습니다. Neki-iOS는 TestFlight 업로드 직후 아직 App Store에 공개되지 않은 버전을 서버에 활성화하면 안 되므로, TestFlight 업로드와 서버 정책 적용을 분리합니다. 대상 앱이 Neki-iOS 또는 Neki-iOS & Dev이면 TestFlight 업로드와 업데이트 정책을 함께 선택할 수 없으며 입력 검증에서 종료됩니다.
+Neki-dev TestFlight 업로드 작업만 개발 서버 정책을 연속해서 적용할 수 있습니다. Neki-iOS는 TestFlight 업로드 직후 아직 App Store에 공개되지 않은 버전을 서버에 활성화하면 안 되므로, 상용기 배포와 서버 정책 적용을 분리합니다. 상용기가 포함된 TestFlight 또는 App Store 심사 제출 작업에서 업데이트 정책을 함께 선택하면 입력 검증에서 종료됩니다.
 
 Neki-iOS 서버 정책을 적용할 때는 대상 버전이 App Store에 실제 공개되었는지 확인한 뒤 "Neki-iOS 정책 적용 시, 해당 버전이 App Store에 공개됨을 확인" 항목을 활성화합니다. 연결 검증에는 업데이트 정책을 지정할 수 없고, App Store 심사 제출과 서버 정책 활성화도 한 번에 실행할 수 없습니다. 잘못된 조합은 앱 빌드 전에 입력 검증 단계에서 종료됩니다.
 

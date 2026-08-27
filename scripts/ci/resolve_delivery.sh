@@ -2,48 +2,92 @@
 
 set -euo pipefail
 
+delivery_mode="none"
+development_distribution_destination="none"
+production_distribution_destination="none"
+run_delivery="false"
+run_development="false"
+run_production="false"
+target_app=""
+
 case "$OPERATION" in
-  "연결 검증")
+  "Neki-dev 연결 검증")
     delivery_mode="validate"
-    distribution_destination="testflight"
+    development_distribution_destination="testflight"
     run_delivery="true"
+    run_development="true"
+    target_app="Neki-dev"
     ;;
-  "TestFlight 업로드")
+  "Neki-iOS 연결 검증")
+    delivery_mode="validate"
+    production_distribution_destination="testflight"
+    run_delivery="true"
+    run_production="true"
+    target_app="Neki-iOS"
+    ;;
+  "Neki-iOS & Dev 연결 검증")
+    delivery_mode="validate"
+    development_distribution_destination="testflight"
+    production_distribution_destination="testflight"
+    run_delivery="true"
+    run_development="true"
+    run_production="true"
+    target_app="Neki-iOS & Dev"
+    ;;
+  "Neki-dev TestFlight 업로드")
     delivery_mode="deploy"
-    distribution_destination="testflight"
+    development_distribution_destination="testflight"
     run_delivery="true"
+    run_development="true"
+    target_app="Neki-dev"
     ;;
-  "App Store 심사 제출")
+  "Neki-iOS TestFlight 업로드")
     delivery_mode="deploy"
-    distribution_destination="app_store_review"
+    production_distribution_destination="testflight"
     run_delivery="true"
+    run_production="true"
+    target_app="Neki-iOS"
     ;;
-  "서버 업데이트 정책만 적용")
-    delivery_mode="none"
-    distribution_destination="none"
-    run_delivery="false"
+  "Neki-iOS & Dev TestFlight 업로드")
+    delivery_mode="deploy"
+    development_distribution_destination="testflight"
+    production_distribution_destination="testflight"
+    run_delivery="true"
+    run_development="true"
+    run_production="true"
+    target_app="Neki-iOS & Dev"
+    ;;
+  "Neki-iOS App Store 심사 제출")
+    delivery_mode="deploy"
+    production_distribution_destination="app_store_review"
+    run_delivery="true"
+    run_production="true"
+    target_app="Neki-iOS"
+    ;;
+  "Neki-dev TestFlight + Neki-iOS App Store 심사 제출")
+    delivery_mode="deploy"
+    development_distribution_destination="testflight"
+    production_distribution_destination="app_store_review"
+    run_delivery="true"
+    run_development="true"
+    run_production="true"
+    target_app="Neki-iOS & Dev"
+    ;;
+  "Neki-dev 서버 업데이트 정책만 적용")
+    run_development="true"
+    target_app="Neki-dev"
+    ;;
+  "Neki-iOS 서버 업데이트 정책만 적용")
+    run_production="true"
+    target_app="Neki-iOS"
+    ;;
+  "Neki-iOS & Dev 서버 업데이트 정책만 적용")
+    run_development="true"
+    run_production="true"
+    target_app="Neki-iOS & Dev"
     ;;
   *)
     echo "::error::지원하지 않는 작업입니다: $OPERATION"
-    exit 1
-    ;;
-esac
-
-case "$TARGET_APP" in
-  "Neki-dev")
-    run_development="true"
-    run_production="false"
-    ;;
-  "Neki-iOS")
-    run_development="false"
-    run_production="true"
-    ;;
-  "Neki-iOS & Dev")
-    run_development="true"
-    run_production="true"
-    ;;
-  *)
-    echo "::error::지원하지 않는 대상 앱입니다: $TARGET_APP"
     exit 1
     ;;
 esac
@@ -61,28 +105,24 @@ esac
 run_version_policy="false"
 if [ "$update_policy" != "none" ]; then run_version_policy="true"; fi
 
-if [ "$OPERATION" = "연결 검증" ] && [ "$run_version_policy" = "true" ]; then
+if [[ "$OPERATION" == *"연결 검증" ]] && [ "$run_version_policy" = "true" ]; then
   echo "::error::연결 검증은 서버 버전 정책을 변경하지 않습니다"
   exit 1
 fi
 
-if [ "$OPERATION" = "서버 업데이트 정책만 적용" ] && [ "$run_version_policy" = "false" ]; then
+if [[ "$OPERATION" == *"서버 업데이트 정책만 적용" ]] && [ "$run_version_policy" = "false" ]; then
   echo "::error::서버 정책만 적용할 때는 권장 또는 강제 업데이트를 선택해야 합니다"
   exit 1
 fi
 
-if [ "$OPERATION" = "App Store 심사 제출" ]; then
-  if [ "$TARGET_APP" != "Neki-iOS" ]; then
-    echo "::error::App Store 심사 제출은 Neki-iOS만 대상으로 선택할 수 있습니다"
-    exit 1
-  fi
+if [[ "$OPERATION" == *"App Store 심사 제출" ]]; then
   if [ "$run_version_policy" = "true" ]; then
     echo "::error::App Store 심사 제출과 서버 버전 정책 활성화는 분리해서 실행해야 합니다"
     exit 1
   fi
 fi
 
-if [ "$OPERATION" = "TestFlight 업로드" ] &&
+if [[ "$OPERATION" == *"TestFlight 업로드" ]] &&
    [ "$run_production" = "true" ] &&
    [ "$run_version_policy" = "true" ]; then
   echo "::error::Neki-iOS TestFlight 업로드와 서버 버전 정책 활성화는 분리해서 실행해야 합니다"
@@ -118,11 +158,13 @@ fi
 
 {
   echo "delivery_mode=$delivery_mode"
-  echo "distribution_destination=$distribution_destination"
+  echo "development_distribution_destination=$development_distribution_destination"
+  echo "production_distribution_destination=$production_distribution_destination"
   echo "update_policy=$update_policy"
   echo "run_delivery=$run_delivery"
   echo "run_version_policy=$run_version_policy"
   echo "run_development=$run_development"
   echo "run_production=$run_production"
+  echo "target_app=$target_app"
   echo "target_versions=$target_versions"
 } >> "$GITHUB_OUTPUT"

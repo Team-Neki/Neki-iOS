@@ -143,15 +143,13 @@ public struct MapFeature {
         case brandsResponse(Result<[PhotoBoothBrand], Error>)
         
         // Sheet
-        case fetchNearbyPhotoBooths(GeographicCoordinate)
-        case nearbyPhotoBoothResponse(Result<[PhotoBooth], Error>)
         case fetchFavoritePhotoBooths(shouldLogViewEvent: Bool)
         case favoritePhotoBoothsResponse(Result<[PhotoBooth], Error>, shouldLogViewEvent: Bool, generation: Int)
         case refreshVisibleMapPhotoBooths
         case didUpdateVisibleMapPhotoBooths(IdentifiedArrayOf<PhotoBooth>)
         case startBackgroundCalculation
         case processNewChunk([PhotoBooth], isFirstBatch: Bool, generation: UInt)
-        case appendProcessedChunk(map: [PhotoBooth], isFirstBatch: Bool, generation: UInt)
+        case appendProcessedChunk(map: [PhotoBooth], list: [PhotoBooth], isFirstBatch: Bool, generation: UInt)
         case didFinishBackgroundCalculation(
             map: IdentifiedArrayOf<PhotoBooth>,
             list: IdentifiedArrayOf<PhotoBooth>,
@@ -173,7 +171,6 @@ public struct MapFeature {
     private enum CancelID: Hashable {
         case mapFetch
         case mapChunkProcessing
-        case listFetch
         case locationStream
         case locationAuthorizationStream
         case sdkAuthorizationStream
@@ -313,15 +310,11 @@ public struct MapFeature {
                 // MARK: - Map Camera & Search Logic
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false
-                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
                 state.photoBoothFetchContext.invalidate()
-                return .concatenate(
-                    synchronizationEffect,
-                    .merge(
-                        .cancel(id: CancelID.mapFetch),
-                        .cancel(id: CancelID.mapChunkProcessing),
-                        .cancel(id: CancelID.listFetch)
-                    )
+                return .merge(
+                    .cancel(id: CancelID.mapFetch),
+                    .cancel(id: CancelID.mapChunkProcessing),
+                    .cancel(id: CancelID.calculation)
                 )
                 
             case .cameraMotionStarted:
@@ -353,8 +346,7 @@ public struct MapFeature {
                 state.lastSearchedLocation = currentCenterLocation
                 return .merge(
                     .run { _ in await analytics.logEvent(event) },
-                    .send(.fetchPhotoBooths(bounds: bounds)),
-                    .send(.fetchNearbyPhotoBooths(centerCoordinate))
+                    .send(.fetchPhotoBooths(bounds: bounds))
                 )
                 
             case .attemptInitialSearch:
@@ -367,10 +359,7 @@ public struct MapFeature {
                 guard currentCameraLocation.distance(from: targetLocation) <= Constants.cameraTargetDistanceThreshold else { return .none }
                 state.initialSearchState = .completed
                 state.lastSearchedLocation = currentCameraLocation
-                return .merge(
-                    .send(.fetchPhotoBooths(bounds: bounds)),
-                    nearbyPhotoBoothsEffect(for: state)
-                )
+                return .send(.fetchPhotoBooths(bounds: bounds))
                 
                 // MARK: - Data Fetching
             case .loadBrands:
@@ -388,12 +377,11 @@ public struct MapFeature {
 
             case let .fetchPhotoBooths(bounds):
                 state.isSearchHereButtonVisible = false
-                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
                 let generation = state.photoBoothFetchContext.begin(in: bounds)
 
                 let fetchEffect: Effect<Action> = .run { send in
                     let stream = try await photoBoothClient.fetchPhotoBooths(bounds: bounds)
-                    for await chunk in stream {
+                    for try await chunk in stream {
                         try Task.checkCancellation()
                         await send(.photoBoothChunkLoaded(chunk, generation: generation))
                     }
@@ -405,8 +393,10 @@ public struct MapFeature {
                 }.cancellable(id: CancelID.mapFetch, cancelInFlight: true)
 
                 return .concatenate(
-                    synchronizationEffect,
-                    .cancel(id: CancelID.mapChunkProcessing),
+                    .merge(
+                        .cancel(id: CancelID.mapChunkProcessing),
+                        .cancel(id: CancelID.calculation)
+                    ),
                     fetchEffect
                 )
 
@@ -433,33 +423,50 @@ public struct MapFeature {
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
+                    let visibleListBooths = Self.visibleListPhotoBooths(mapBooths, activeBrandIDs: activeBrandIDs)
                     guard Task.isCancelled == false else { return }
-                    await send(.appendProcessedChunk(map: Array(visibleMapBooths), isFirstBatch: isFirstBatch, generation: generation))
+                    await send(.appendProcessedChunk(
+                        map: Array(visibleMapBooths),
+                        list: Array(visibleListBooths),
+                        isFirstBatch: isFirstBatch,
+                        generation: generation
+                    ))
                 }
                 .cancellable(id: CancelID.mapChunkProcessing)
 
-            case let .appendProcessedChunk(map, isFirstBatch, generation):
+            case let .appendProcessedChunk(map, list, isFirstBatch, generation):
                 guard state.photoBoothFetchContext.generation == generation else { return .none }
                 var mergedMap: [PhotoBooth] = []
                 mergedMap.reserveCapacity(map.count)
                 map.forEach { mergedMap.append(photoBoothPreservingFavoriteState($0, state: state)) }
+                var mergedList: [PhotoBooth] = []
+                mergedList.reserveCapacity(list.count)
+                list.forEach { mergedList.append(photoBoothPreservingFavoriteState($0, state: state)) }
 
                 if isFirstBatch {
                     state.visiblePhotoBooths = IdentifiedArray(uniqueElements: mergedMap)
+                    state.photoBoothListState.visibleBooths = IdentifiedArray(uniqueElements: mergedList)
                 } else {
                     mergedMap.forEach { photoBooth in
                         if state.visiblePhotoBooths[id: photoBooth.id] != nil { state.visiblePhotoBooths[id: photoBooth.id] = photoBooth }
                         else { state.visiblePhotoBooths.append(photoBooth) }
+                    }
+                    mergedList.forEach { photoBooth in
+                        if state.photoBoothListState.visibleBooths[id: photoBooth.id] != nil { state.photoBoothListState.visibleBooths[id: photoBooth.id] = photoBooth }
+                        else { state.photoBoothListState.visibleBooths.append(photoBooth) }
                     }
                 }
                 return .none
 
             case let .photoBoothStreamFinished(generation):
                 guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
-                let hasReceivedChunk = state.photoBoothFetchContext.hasReceivedChunk
-                guard hasReceivedChunk else {
+                guard state.photoBoothFetchContext.hasReceivedChunk else {
+                    state.photoBooths = []
                     state.photoBoothFetchContext.finish()
-                    return .none
+                    return .merge(
+                        .send(.photoBoothListAction(.setAvailableNearbyBrandIDs([]))),
+                        .send(.startBackgroundCalculation)
+                    )
                 }
                 let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
                 state.photoBoothFetchContext.finish()
@@ -468,9 +475,8 @@ public struct MapFeature {
             case let .photoBoothStreamFailure(error, generation):
                 guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
                 Logger.presentation.error("PhotoBooth stream error: \(error)")
-                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
                 state.photoBoothFetchContext.finish()
-                return synchronizationEffect
+                return .none
                 
             case let .didTapFavorite(photoBooth):
                 let requestedValue = photoBooth.isFavorite == false
@@ -512,27 +518,6 @@ public struct MapFeature {
                 state.pendingFavoriteUpdates[photoBooth.id] = nil
                 updatePhotoBoothFavoriteState(&state, photoBooth: photoBooth, isFavorite: requestedValue == false)
                 return .send(.startBackgroundCalculation)
-
-            case let .fetchNearbyPhotoBooths(coordinate):
-                state.photoBoothListState.photoBooths.removeAll()
-                
-                return .run { send in
-                    let booths = try await photoBoothClient.fetchNearbyPhotoBooths(coordinate: coordinate)
-                    await send(.nearbyPhotoBoothResponse(.success(booths)))
-                } catch: { error, send in
-                    await send(.nearbyPhotoBoothResponse(.failure(error)))
-                }.cancellable(id: CancelID.listFetch, cancelInFlight: true)
-                
-            case let .nearbyPhotoBoothResponse(.success(booths)):
-                let nearbyBooths = IdentifiedArray(uniqueElements: booths)
-                return .merge(
-                    .send(.photoBoothListAction(.setNearbyBooths(nearbyBooths))),
-                    .send(.startBackgroundCalculation)
-                )
-                
-            case let .nearbyPhotoBoothResponse(.failure(error)):
-                Logger.presentation.error("Nearby PhotoBooths fetch error: \(error)")
-                return .none
 
             case let .fetchFavoritePhotoBooths(shouldLogViewEvent):
                 state.favoriteFetchGeneration += 1
@@ -589,7 +574,6 @@ public struct MapFeature {
 
             case .startBackgroundCalculation:
                 let mapBooths = state.photoBooths
-                let listBooths = state.photoBoothListState.photoBooths
                 let favoriteBooths = state.photoBoothListState.favoriteBooths
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
@@ -605,7 +589,7 @@ public struct MapFeature {
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
-                    visibleListBooths = Self.visibleListPhotoBooths(listBooths, activeBrandIDs: activeBrandIDs)
+                    visibleListBooths = Self.visibleListPhotoBooths(mapBooths, activeBrandIDs: activeBrandIDs)
                     visibleFavoriteBooths = Self.visibleFavoritePhotoBooths(favoriteBooths, activeBrandIDs: activeBrandIDs)
                     await send(.didFinishBackgroundCalculation(map: visibleMapBooths, list: visibleListBooths, favoriteList: visibleFavoriteBooths))
                 }
@@ -667,7 +651,10 @@ public struct MapFeature {
                 return .none
                 
             case .photoBoothListAction(.selectFilterOption):
-                return .send(.startBackgroundCalculation)
+                return .concatenate(
+                    .cancel(id: CancelID.mapChunkProcessing),
+                    .send(.startBackgroundCalculation)
+                )
 
             case let .photoBoothListAction(.selectTab(tab)):
                 switch tab {
@@ -743,7 +730,6 @@ private extension MapFeature {
         return selectedBooth ??
             state.photoBooths[id: id] ??
             state.visiblePhotoBooths[id: id] ??
-            state.photoBoothListState.photoBooths[id: id] ??
             state.photoBoothListState.visibleBooths[id: id] ??
             state.photoBoothListState.favoriteBooths[id: id] ??
             state.photoBoothListState.visibleFavoriteBooths[id: id]
@@ -753,7 +739,6 @@ private extension MapFeature {
         if let pendingFavoriteState = state.pendingFavoriteUpdates[id] { return pendingFavoriteState }
         if state.selectedBooth?.id == id { return state.selectedBooth?.isFavorite }
         if let visiblePhotoBooth = state.visiblePhotoBooths[id: id] { return visiblePhotoBooth.isFavorite }
-        if let listPhotoBooth = state.photoBoothListState.photoBooths[id: id] { return listPhotoBooth.isFavorite }
         if let visibleListPhotoBooth = state.photoBoothListState.visibleBooths[id: id] { return visibleListPhotoBooth.isFavorite }
         if let favoritePhotoBooth = state.photoBoothListState.favoriteBooths[id: id] { return favoritePhotoBooth.isFavorite }
         if let visibleFavoritePhotoBooth = state.photoBoothListState.visibleFavoriteBooths[id: id] { return visibleFavoritePhotoBooth.isFavorite }
@@ -877,7 +862,6 @@ private extension MapFeature {
 
         state.photoBooths[id: id]?.isFavorite = isFavorite
         state.visiblePhotoBooths[id: id]?.isFavorite = isFavorite
-        state.photoBoothListState.photoBooths[id: id]?.isFavorite = isFavorite
         state.photoBoothListState.visibleBooths[id: id]?.isFavorite = isFavorite
 
         updateFavoriteBoothList(&state.photoBoothListState, with: updatedPhotoBooth)
@@ -931,15 +915,4 @@ private extension MapFeature {
         }
     }
     
-    func nearbyPhotoBoothsEffect(for state: State) -> Effect<Action> {
-        guard let userGeographicCoordinate = state.userGeographicCoordinate else {
-            let emptyBooths = IdentifiedArrayOf<PhotoBooth>()
-            return .merge(
-                .send(.photoBoothListAction(.setNearbyBooths(emptyBooths))),
-                .send(.photoBoothListAction(.setVisibleBooths(emptyBooths)))
-            )
-        }
-        
-        return .send(.fetchNearbyPhotoBooths(userGeographicCoordinate))
-    }
 }

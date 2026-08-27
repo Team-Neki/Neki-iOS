@@ -176,7 +176,7 @@ private extension NearPhotoBoothListSheet {
                             .frame(width: 20, height: 20)
                             .saturation(isSelected ? 1 : 0)
                         
-                        Text(tab.title(currentMapRegionTitle: store.currentMapRegionTitle))
+                        Text(tab.title)
                             .nekiFont(.body14SemiBold)
                             .foregroundStyle(isSelected ? .gray800 : .gray500)
                     }

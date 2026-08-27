@@ -22,13 +22,6 @@ public struct PhotoBoothListFeature {
             case .favorite: return "저장한 포토부스"
             }
         }
-
-        func title(currentMapRegionTitle: String) -> String {
-            switch self {
-            case .nearby: return currentMapRegionTitle
-            case .favorite: return title
-            }
-        }
     }
 
     @ObservableState
@@ -40,14 +33,6 @@ public struct PhotoBoothListFeature {
         var displayedBrands: IdentifiedArrayOf<PhotoBoothBrand> { selectedTab == .nearby ? nearbyBrands : brands }
         
         var selectedTab: ListTab = .nearby
-        /// 현재 지도 카메라가 가리키는 지역으로, 선택된 목록 탭과 독립적으로 유지됩니다.
-        var currentMapAddress: AdministrativeAddress?
-        var currentMapRegionTitle: String {
-            guard let currentMapAddress else { return ListTab.nearby.title }
-            let areaNames = currentMapAddress.displayAreas(using: .southKorea).map(\.name)
-            guard areaNames.isEmpty == false else { return ListTab.nearby.title }
-            return areaNames.joined(separator: " ")
-        }
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         var favoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -75,7 +60,6 @@ public struct PhotoBoothListFeature {
         case setAvailableNearbyBrandIDs(Set<PhotoBoothBrand.ID>)
         case clearFilterOptions
         case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
-        case setCurrentMapAddress(AdministrativeAddress?)
         case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
         case setFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
         case setVisibleFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
@@ -138,11 +122,6 @@ public struct PhotoBoothListFeature {
 
             case let .setNearbyBooths(booths):
                 state.photoBooths = booths
-                return .none
-
-            case let .setCurrentMapAddress(address):
-                // 선택된 목록 탭과 무관하게 현재 지도 지역을 갱신합니다.
-                state.currentMapAddress = address
                 return .none
                 
             case let .setVisibleBooths(booths):

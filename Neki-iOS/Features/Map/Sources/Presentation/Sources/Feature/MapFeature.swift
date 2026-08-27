@@ -108,7 +108,7 @@ public struct MapFeature {
         // Map
         case fetchPhotoBooths(bounds: GeographicBoundingBox)
         case photoBoothChunkLoaded([PhotoBooth])
-        case photoBoothStreamFinished
+        case photoBoothStreamFinished(availableBrandIDs: Set<PhotoBoothBrand.ID>)
         case photoBoothStreamFailure(Error)
         case updatePhotoBoothFavoriteResponse(photoBooth: PhotoBooth, requestedValue: Bool, Result<Void, Error>)
         case loadBrands
@@ -344,8 +344,7 @@ public struct MapFeature {
                 }
                 
             case let .brandsResponse(.success(brands)):
-                state.photoBoothListState.brands = IdentifiedArray(uniqueElements: brands)
-                return .none
+                return .send(.photoBoothListAction(.setBrands(IdentifiedArray(uniqueElements: brands))))
                 
             case let .brandsResponse(.failure(error)):
                 // TODO: 토스트
@@ -358,11 +357,16 @@ public struct MapFeature {
                 
                 return .run { send in
                     let stream = try await photoBoothClient.fetchPhotoBooths(bounds: bounds)
+                    var availableBrandIDs = Set<PhotoBoothBrand.ID>()
                     for await chunk in stream {
+                        try Task.checkCancellation()
+                        availableBrandIDs.formUnion(Self.availableBrandIDs(from: chunk, in: bounds))
                         await send(.photoBoothChunkLoaded(chunk))
                     }
-                    await send(.photoBoothStreamFinished)
+                    try Task.checkCancellation()
+                    await send(.photoBoothStreamFinished(availableBrandIDs: availableBrandIDs))
                 } catch: { error, send in
+                    guard (error is CancellationError) == false else { return }
                     await send(.photoBoothStreamFailure(error))
                 }.cancellable(id: CancelID.mapFetch, cancelInFlight: true)
                 
@@ -403,8 +407,8 @@ public struct MapFeature {
                 }
                 return .none
                 
-            case .photoBoothStreamFinished:
-                return .none
+            case let .photoBoothStreamFinished(availableBrandIDs):
+                return .send(.photoBoothListAction(.setAvailableNearbyBrandIDs(availableBrandIDs)))
                 
             case let .photoBoothStreamFailure(error):
                 Logger.presentation.error("PhotoBooth stream error: \(error)")
@@ -612,10 +616,12 @@ public struct MapFeature {
                 case .nearby:
                     return .none
                 case .favorite:
-                    state.photoBoothListState.filteredBrands.removeAll()
-                    return .merge(
-                        .send(.fetchFavoritePhotoBooths(shouldLogViewEvent: true)),
-                        .send(.startBackgroundCalculation)
+                    return .concatenate(
+                        .send(.photoBoothListAction(.clearFilterOptions)),
+                        .merge(
+                            .send(.fetchFavoritePhotoBooths(shouldLogViewEvent: true)),
+                            .send(.startBackgroundCalculation)
+                        )
                     )
                 }
 
@@ -764,6 +770,18 @@ private extension MapFeature {
         activeBrandIDs.reserveCapacity(brands.count)
         brands.forEach { activeBrandIDs.insert($0.id) }
         return activeBrandIDs
+    }
+
+    static func availableBrandIDs(
+        from photoBooths: [PhotoBooth],
+        in bounds: GeographicBoundingBox
+    ) -> Set<PhotoBoothBrand.ID> {
+        var brandIDs = Set<PhotoBoothBrand.ID>()
+        photoBooths.forEach { photoBooth in
+            guard bounds.contains(photoBooth.coordinate) else { return }
+            brandIDs.insert(photoBooth.brand.id)
+        }
+        return brandIDs
     }
 
     static func isActiveBrand(_ brand: PhotoBoothBrand, activeBrandIDs: Set<PhotoBoothBrand.ID>) -> Bool {

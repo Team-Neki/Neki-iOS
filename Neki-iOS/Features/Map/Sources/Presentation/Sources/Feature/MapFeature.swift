@@ -310,7 +310,8 @@ public struct MapFeature {
                 
             case .didTapSearchHereButton:
                 guard let bounds = state.currentBounds else { return .none }
-                let currentCenterLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
+                let centerCoordinate = bounds.center
+                let currentCenterLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
                 let isRegionChanged = checkIfRegionChanged(from: state.lastSearchedLocation, to: currentCenterLocation)
                 let hasFilter = state.photoBoothListState.filteredBrands.isEmpty == false
                 let event = MapAnalyticsEvent.mapReSearch(hasFilter: hasFilter, regionChanged: isRegionChanged)
@@ -318,7 +319,7 @@ public struct MapFeature {
                 return .merge(
                     .run { _ in await analytics.logEvent(event) },
                     .send(.fetchPhotoBooths(bounds: bounds)),
-                    nearbyPhotoBoothsEffect(for: state)
+                    .send(.fetchNearbyPhotoBooths(centerCoordinate))
                 )
                 
             case .attemptInitialSearch:

@@ -63,14 +63,14 @@ public struct MapFeature {
         // UI Control
         var isSDKAuthSuccessful: Bool = false
         var detent: NekiSheetDetent = SheetStage.first.detent
-        var isSearchHereButtonVisible: Bool = false
+        var isExploreHereButtonVisible: Bool = false
         var isPermissionAlertPresented: Bool = false
-        var initialSearchState: MapInitialSearchState = .awaitingPermission
+        var initialExplorationState: MapInitialExplorationState = .awaitingPermission
         
         // Map State
         var cameraPosition: GeographicCoordinate?
         var currentBounds: GeographicBoundingBox?
-        var lastSearchedLocation: CLLocation?
+        var lastExploredLocation: CLLocation?
         
         // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -113,7 +113,7 @@ public struct MapFeature {
         case didTapFavoriteMarkerFilterButton
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
-        case didTapSearchHereButton
+        case didTapExploreHereButton
         case dismissPermissionAlert
         
         // Internal Logic Actions
@@ -123,14 +123,14 @@ public struct MapFeature {
         case setUserTrackingMode(Bool)
         case didDetectMapInteraction
         case presentPermissionAlert
-        case attemptInitialSearch
+        case attemptInitialExploration
         
         // Map Logic Actions
         case mapLoaded(GeographicBoundingBox)
         case cameraMotionStarted
         case cameraMotionChanged(GeographicBoundingBox)
         case cameraMotionEnded(GeographicBoundingBox)
-        case updateSearchButtonVisibility(isVisible: Bool)
+        case updateExploreButtonVisibility(isVisible: Bool)
         
         // Data Handling Actions
         // Map
@@ -223,7 +223,7 @@ public struct MapFeature {
                 state.locationAuthorizationStatus = status
                 switch status {
                 case .authorizedAlways, .authorizedWhenInUse:
-                    state.initialSearchState = .waitingForUserLocation
+                    state.initialExplorationState = .waitingForUserLocation
                     return .merge(
                         .run { send in
                             for await location in await mapClient.trackingLocation() {
@@ -234,14 +234,14 @@ public struct MapFeature {
                     )
                     
                 case .notDetermined:
-                    state.initialSearchState = .awaitingPermission
+                    state.initialExplorationState = .awaitingPermission
                     return state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
                     
                 case .denied, .restricted:
                     state.isUserTrackingMode = false
-                    state.initialSearchState = .readyForDefaultLocation
+                    state.initialExplorationState = .readyForDefaultLocation
                     updateCameraPosition(&state, to: Constants.defaultInitialPosition.coordinate)
-                    return .send(.attemptInitialSearch)
+                    return .send(.attemptInitialExploration)
                     
                 @unknown default:
                     return .none
@@ -267,7 +267,7 @@ public struct MapFeature {
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
                 return .merge(
-                    .send(.attemptInitialSearch),
+                    .send(.attemptInitialExploration),
                     .send(.startBackgroundCalculation)
                 )
                 
@@ -293,9 +293,9 @@ public struct MapFeature {
                     updateCameraPosition(&state, to: location.coordinate)
                 }
                 
-                guard state.initialSearchState == .waitingForUserLocation else { return .none }
-                state.isSearchHereButtonVisible = false
-                state.initialSearchState = .readyForUserLocation
+                guard state.initialExplorationState == .waitingForUserLocation else { return .none }
+                state.isExploreHereButtonVisible = false
+                state.initialExplorationState = .readyForUserLocation
                 updateCameraPosition(&state, to: location.coordinate)
                 return .none
                 
@@ -307,7 +307,7 @@ public struct MapFeature {
                 state.isUserTrackingMode = isUserTrackingMode
                 return .none
                 
-                // MARK: - Map Camera & Search Logic
+                // MARK: - Map Camera & Exploration Logic
             case .didDetectMapInteraction:
                 state.isUserTrackingMode = false
                 state.photoBoothFetchContext.invalidate()
@@ -318,7 +318,7 @@ public struct MapFeature {
                 )
                 
             case .cameraMotionStarted:
-                return .send(.updateSearchButtonVisibility(isVisible: true))
+                return .send(.updateExploreButtonVisibility(isVisible: true))
 
             case let .cameraMotionChanged(bounds):
                 state.currentBounds = bounds
@@ -328,37 +328,37 @@ public struct MapFeature {
                 state.currentBounds = bounds
                 state.cameraPosition = bounds.center
                 return .merge(
-                    .send(.attemptInitialSearch),
+                    .send(.attemptInitialExploration),
                     .send(.startBackgroundCalculation)
                 )
                 
-            case let .updateSearchButtonVisibility(isVisible):
-                state.isSearchHereButtonVisible = isVisible
+            case let .updateExploreButtonVisibility(isVisible):
+                state.isExploreHereButtonVisible = isVisible
                 return .none
                 
-            case .didTapSearchHereButton:
+            case .didTapExploreHereButton:
                 guard let bounds = state.currentBounds else { return .none }
                 let centerCoordinate = bounds.center
                 let currentCenterLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
-                let isRegionChanged = checkIfRegionChanged(from: state.lastSearchedLocation, to: currentCenterLocation)
+                let isRegionChanged = checkIfRegionChanged(from: state.lastExploredLocation, to: currentCenterLocation)
                 let hasFilter = state.photoBoothListState.filteredBrands.isEmpty == false
-                let event = MapAnalyticsEvent.mapReSearch(hasFilter: hasFilter, regionChanged: isRegionChanged)
-                state.lastSearchedLocation = currentCenterLocation
+                let event = MapAnalyticsEvent.mapReExplore(hasFilter: hasFilter, regionChanged: isRegionChanged)
+                state.lastExploredLocation = currentCenterLocation
                 return .merge(
                     .run { _ in await analytics.logEvent(event) },
                     .send(.fetchPhotoBooths(bounds: bounds))
                 )
                 
-            case .attemptInitialSearch:
+            case .attemptInitialExploration:
                 guard let bounds = state.currentBounds else { return .none }
-                guard let targetCoordinate = initialSearchTargetCoordinate(for: state) else { return .none }
+                guard let targetCoordinate = initialExplorationTargetCoordinate(for: state) else { return .none }
                 
                 let currentCameraLocation = CLLocation(latitude: bounds.center.latitude, longitude: bounds.center.longitude)
                 let targetLocation = CLLocation(latitude: targetCoordinate.latitude, longitude: targetCoordinate.longitude)
                 
                 guard currentCameraLocation.distance(from: targetLocation) <= Constants.cameraTargetDistanceThreshold else { return .none }
-                state.initialSearchState = .completed
-                state.lastSearchedLocation = currentCameraLocation
+                state.initialExplorationState = .completed
+                state.lastExploredLocation = currentCameraLocation
                 return .send(.fetchPhotoBooths(bounds: bounds))
                 
                 // MARK: - Data Fetching
@@ -810,18 +810,6 @@ private extension MapFeature {
         return activeBrandIDs
     }
 
-    static func availableBrandIDs<PhotoBooths: Sequence>(
-        from photoBooths: PhotoBooths,
-        in bounds: GeographicBoundingBox
-    ) -> Set<PhotoBoothBrand.ID> where PhotoBooths.Element == PhotoBooth {
-        var brandIDs = Set<PhotoBoothBrand.ID>()
-        photoBooths.forEach { photoBooth in
-            guard bounds.contains(photoBooth.coordinate) else { return }
-            brandIDs.insert(photoBooth.brand.id)
-        }
-        return brandIDs
-    }
-
     static func isActiveBrand(_ brand: PhotoBoothBrand, activeBrandIDs: Set<PhotoBoothBrand.ID>) -> Bool {
         activeBrandIDs.isEmpty || activeBrandIDs.contains(brand.id)
     }
@@ -888,8 +876,8 @@ private extension MapFeature {
         return currentLocation.distance(from: lastLocation) >= Constants.regionChangeDistanceThreshold
     }
     
-    func initialSearchTargetCoordinate(for state: State) -> GeographicCoordinate? {
-        switch state.initialSearchState {
+    func initialExplorationTargetCoordinate(for state: State) -> GeographicCoordinate? {
+        switch state.initialExplorationState {
         case .awaitingPermission, .waitingForUserLocation, .completed:
             return nil
         case .readyForDefaultLocation:

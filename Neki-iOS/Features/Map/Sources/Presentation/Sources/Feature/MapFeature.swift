@@ -376,7 +376,7 @@ public struct MapFeature {
                 return .none
 
             case let .fetchPhotoBooths(bounds):
-                state.isSearchHereButtonVisible = false
+                state.isExploreHereButtonVisible = false
                 let generation = state.photoBoothFetchContext.begin(in: bounds)
 
                 let fetchEffect: Effect<Action> = .run { send in
@@ -462,14 +462,10 @@ public struct MapFeature {
                 guard state.photoBoothFetchContext.hasReceivedChunk else {
                     state.photoBooths = []
                     state.photoBoothFetchContext.finish()
-                    return .merge(
-                        .send(.photoBoothListAction(.setAvailableNearbyBrandIDs([]))),
-                        .send(.startBackgroundCalculation)
-                    )
+                    return .send(.startBackgroundCalculation)
                 }
-                let synchronizationEffect = synchronizeAvailableNearbyBrands(for: state)
                 state.photoBoothFetchContext.finish()
-                return synchronizationEffect
+                return .none
 
             case let .photoBoothStreamFailure(error, generation):
                 guard state.photoBoothFetchContext.isCurrent(generation) else { return .none }
@@ -692,14 +688,6 @@ public struct MapFeature {
 // MARK: - MapFeature + Effect Handlers
 
 private extension MapFeature {
-    func synchronizeAvailableNearbyBrands(for state: State) -> Effect<Action> {
-        let context = state.photoBoothFetchContext
-        guard let bounds = context.bounds else { return .none }
-        guard context.hasReceivedChunk else { return .none }
-        let brandIDs = Self.availableBrandIDs(from: state.photoBooths, in: bounds)
-        return .send(.photoBoothListAction(.setAvailableNearbyBrandIDs(brandIDs)))
-    }
-
     func mergedFavoriteBooths(from fetchedPhotoBooths: [PhotoBooth], state: State) -> IdentifiedArrayOf<PhotoBooth> {
         var favoriteBooths = IdentifiedArrayOf<PhotoBooth>()
 

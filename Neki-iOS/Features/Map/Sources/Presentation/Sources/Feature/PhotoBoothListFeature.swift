@@ -27,10 +27,7 @@ public struct PhotoBoothListFeature {
     @ObservableState
     public struct State {
         var brands: IdentifiedArrayOf<PhotoBoothBrand> = []
-        var nearbyBrands: IdentifiedArrayOf<PhotoBoothBrand> = []
-        var availableNearbyBrandIDs: Set<PhotoBoothBrand.ID> = []
         var filteredBrands: Set<PhotoBoothBrand> = []
-        var displayedBrands: IdentifiedArrayOf<PhotoBoothBrand> { selectedTab == .nearby ? nearbyBrands : brands }
         
         var selectedTab: ListTab = .nearby
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -56,7 +53,6 @@ public struct PhotoBoothListFeature {
 
         // Internal Actions
         case setBrands(IdentifiedArrayOf<PhotoBoothBrand>)
-        case setAvailableNearbyBrandIDs(Set<PhotoBoothBrand.ID>)
         case clearFilterOptions
         case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
         case setFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
@@ -81,7 +77,6 @@ public struct PhotoBoothListFeature {
             case let .selectFilterOption(brand):
                 let filterAction: MapFilterAction = state.filteredBrands.contains(brand) ? .deselect : .select
                 toggleFilterOptionSelection(&state, brand: brand)
-                updateNearbyBrands(&state)
                 let selectedCount = state.filteredBrands.count
                 let event = MapAnalyticsEvent.mapBrandFilterToggle(action: filterAction, selectedCount: selectedCount, brandName: brand.name)
                 return .run { _ in await analytics.logEvent(event) }
@@ -103,19 +98,11 @@ public struct PhotoBoothListFeature {
             case let .setBrands(brands):
                 guard state.brands != brands else { return .none }
                 state.brands = brands
-                updateNearbyBrands(&state)
-                return .none
-
-            case let .setAvailableNearbyBrandIDs(brandIDs):
-                guard state.availableNearbyBrandIDs != brandIDs else { return .none }
-                state.availableNearbyBrandIDs = brandIDs
-                updateNearbyBrands(&state)
                 return .none
 
             case .clearFilterOptions:
                 guard state.filteredBrands.isEmpty == false else { return .none }
                 state.filteredBrands.removeAll()
-                updateNearbyBrands(&state)
                 return .none
 
             case let .setVisibleBooths(booths):
@@ -153,9 +140,4 @@ private extension PhotoBoothListFeature {
         }
     }
 
-    func updateNearbyBrands(_ state: inout State) {
-        let nearbyBrands = state.brands.filter { state.availableNearbyBrandIDs.contains($0.id) }
-        guard state.nearbyBrands != nearbyBrands else { return }
-        state.nearbyBrands = nearbyBrands
-    }
 }

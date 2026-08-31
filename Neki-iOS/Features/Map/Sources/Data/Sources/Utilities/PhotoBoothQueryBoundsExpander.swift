@@ -31,9 +31,9 @@ enum PhotoBoothQueryBoundsExpander {
         let south = latitude(forTileY: southEastTile.y + 1, scale: tileScale)
 
         return GeographicBoundingBox(
-            minLatitude: south,
+            minLatitude: min(south, bounds.minLatitude),
             minLongitude: west,
-            maxLatitude: north,
+            maxLatitude: max(north, bounds.maxLatitude),
             maxLongitude: east
         )
     }
@@ -45,9 +45,14 @@ enum PhotoBoothQueryBoundsExpander {
 private extension PhotoBoothQueryBoundsExpander {
     private static func tileCoordinate(for coordinate: GeographicCoordinate) -> TileCoordinate {
         let tileScale = pow(2.0, Double(coverageZoomLevel))
-        let x = Int((coordinate.longitude + 180.0) / 360.0 * tileScale)
-        let latitudeRadians = coordinate.latitude * .pi / 180.0
-        let y = Int((1.0 - log(tan(latitudeRadians) + 1.0 / cos(latitudeRadians)) / .pi) / 2.0 * tileScale)
+        let lastTileIndex = Int(tileScale) - 1
+        let x = min(Int((coordinate.longitude + 180.0) / 360.0 * tileScale), lastTileIndex)
+        // 극점은 Mercator 투영이 불가능하므로 타일 인덱스만 투영 한계로 제한하고 원본 조회 위도는 유지합니다.
+        let maximumLatitude = latitude(forTileY: .zero, scale: tileScale)
+        let projectedLatitude = min(max(coordinate.latitude, -maximumLatitude), maximumLatitude)
+        let latitudeRadians = projectedLatitude * .pi / 180.0
+        let projectedY = (1.0 - log(tan(latitudeRadians) + 1.0 / cos(latitudeRadians)) / .pi) / 2.0 * tileScale
+        let y = min(max(Int(projectedY), .zero), lastTileIndex)
         return TileCoordinate(x: x, y: y)
     }
 

@@ -126,6 +126,7 @@ private extension KeychainTokenStorage {
     
     func delete(_ query: Query) throws(TokenStorageError) {
         let status = SecItemDelete(query as CFDictionary)
+        guard status != errSecItemNotFound else { return }
         try checkStatus(status, which: #function)
     }
 }
@@ -175,7 +176,7 @@ extension KeychainTokenStorage: TokenStorage {
     func delete(ifMatching revision: UUID) throws(TokenStorageError) -> Bool {
         try withLock { (state: inout State) throws(TokenStorageError) in
             guard state.revision == revision else { return false }
-            if try storedTokens() != nil { try delete(makeQuery()) }
+            try delete(makeQuery())
             state = State()
             return true
         }

@@ -55,12 +55,9 @@ private extension KeychainTokenStorage {
 
     func storeTokens(_ tokens: AuthTokens) throws(TokenStorageError) {
         let query = makeQuery()
-        do {
-            guard let _ = try read(query) else { return }
-            try update(tokens, in: query)
-        } catch TokenStorageError.notFound {
-            try create(tokens, in: query)
-        }
+        do { try update(tokens, in: query) }
+        catch .notFound { try create(tokens, in: query) }
+        catch { throw error }
     }
 
     func makeQuery() -> Query {

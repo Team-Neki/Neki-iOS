@@ -53,7 +53,7 @@ struct AlbumSelectionFeature {
         
         // 내부 통신 결과 처리
         case taskCompleted(message: String, albumCount: Int)
-        case taskFailed(message: String)
+        case taskFailed(message: String, error: Error? = nil)
         
         // 앨범 생성 액션
         case onTapCancelAddAlbum
@@ -176,7 +176,7 @@ struct AlbumSelectionFeature {
                         }
                     } catch {
                         let failMsg = purpose == .duplicate ? "사진 추가에 실패했어요" : "사진 이동에 실패했어요"
-                        await send(.taskFailed(message: failMsg))
+                        await send(.taskFailed(message: failMsg, error: error))
                     }
                 }
                 
@@ -184,8 +184,9 @@ struct AlbumSelectionFeature {
                 state.isLoading = false
                 return .send(.delegate(.didCompleteTask(message: message, albumCount: albumCount)))
                 
-            case let .taskFailed(message):
+            case let .taskFailed(message, error):
                 state.isLoading = false
+                guard error.map({ ArchiveErrorFeedback.shouldPresent(for: $0) }) ?? true else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem(message, style: .error))))
                 
             case .onTapCancelAddAlbum:
@@ -211,7 +212,8 @@ struct AlbumSelectionFeature {
                     .send(.onAppear)
                 )
                 
-            case .addFolderResponse(.failure):
+            case let .addFolderResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 만들지 못했어요", style: .error))))
                 
             case .binding(\.newAlbumTitle):

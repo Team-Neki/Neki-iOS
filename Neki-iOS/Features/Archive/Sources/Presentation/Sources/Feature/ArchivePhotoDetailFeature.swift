@@ -244,7 +244,8 @@ struct ArchivePhotoDetailFeature {
                 }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
-            case .deletePhotoResponse(.failure):
+            case let .deletePhotoResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
                 
             case .onTapShareToInstagramStory:

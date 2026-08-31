@@ -37,6 +37,8 @@ public struct DefaultImageUploadRepository: ImageUploadRepository {
         do {
             Logger.network.debug("📡 Presigned URL 요청 중...")
             response = try await networkProvider.request(endpoint: presignedEndpoint)
+        } catch NetworkError.unauthorizedError {
+            throw UploadError.authenticationRequired
         } catch {
             Logger.network.error("❌ Presigned URL 요청 실패: \(error.localizedDescription)")
             throw error
@@ -96,9 +98,4 @@ extension DependencyValues {
         get { self[ImageUploadRepositoryKey.self] }
         set { self[ImageUploadRepositoryKey.self] = newValue }
     }
-}
-
-public enum UploadError: Error {
-    case presignedUrlFailed
-    case uploadFailed
 }

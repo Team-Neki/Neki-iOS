@@ -10,6 +10,13 @@ import Security
 import os
 
 final class KeychainTokenStorage: Sendable {
+    private struct State: Sendable {
+        var generation = UUID()
+        var revision = UUID()
+    }
+
+    // 토큰의 비교/교체와 세대 변경을 같은 임계 구역에서 처리합니다. 내부에는 await가 없습니다.
+    private let lock = OSAllocatedUnfairLock(initialState: State())
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let service: String
@@ -32,6 +39,30 @@ final class KeychainTokenStorage: Sendable {
 // MARK: - KeychainTokenStorage + Helper Methods
 
 private extension KeychainTokenStorage {
+    func withLock<Value: Sendable>(_ operation: @Sendable (inout State) throws(TokenStorageError) -> Value) throws(TokenStorageError) -> Value {
+        let result: Result<Value, TokenStorageError> = lock.withLock { state in
+            do { return .success(try operation(&state)) }
+            catch { return .failure(error) }
+        }
+        return try result.get()
+    }
+
+    func storedTokens() throws(TokenStorageError) -> AuthTokens? {
+        do { return try convert(read(makeQuery())) }
+        catch .notFound { return nil }
+        catch { throw error }
+    }
+
+    func storeTokens(_ tokens: AuthTokens) throws(TokenStorageError) {
+        let query = makeQuery()
+        do {
+            guard let _ = try read(query) else { return }
+            try update(tokens, in: query)
+        } catch TokenStorageError.notFound {
+            try create(tokens, in: query)
+        }
+    }
+
     func makeQuery() -> Query {
         [
             kSecClass as String: kSecClassGenericPassword,
@@ -106,26 +137,50 @@ private extension KeychainTokenStorage {
 // MARK: - KeychainTokenStorage + TokenStorage
 
 extension KeychainTokenStorage: TokenStorage {
+    var credentialGeneration: UUID { lock.withLock { $0.generation } }
+
     func store(_ tokens: AuthTokens) throws(TokenStorageError) {
-        let query = makeQuery()
-        
-        do {
-            guard let _ = try read(query) else { return }
-            try update(tokens, in: query)
-        } catch TokenStorageError.notFound {
-            try create(tokens, in: query)
+        try withLock { (state: inout State) throws(TokenStorageError) in
+            try storeTokens(tokens)
+            state = State()
         }
     }
     
     func fetch() throws(TokenStorageError) -> AuthTokens {
-        let query = makeQuery()
-        let reference = try read(query)
-        let data = try convert(reference)
-        return data
+        try withLock { (_: inout State) throws(TokenStorageError) in
+            guard let tokens = try storedTokens() else { throw .notFound }
+            return tokens
+        }
+    }
+
+    func snapshot() throws(TokenStorageError) -> TokenStorageSnapshot {
+        try withLock { (state: inout State) throws(TokenStorageError) in
+            TokenStorageSnapshot(tokens: try storedTokens(), generation: state.generation, revision: state.revision)
+        }
     }
     
     func delete() throws(TokenStorageError) {
-        let query = makeQuery()
-        try delete(query)
+        try withLock { (state: inout State) throws(TokenStorageError) in
+            try delete(makeQuery())
+            state = State()
+        }
+    }
+
+    func store(_ tokens: AuthTokens, replacing revision: UUID) throws(TokenStorageError) -> TokenStorageSnapshot? {
+        try withLock { (state: inout State) throws(TokenStorageError) in
+            guard state.revision == revision else { return nil }
+            try storeTokens(tokens)
+            state.revision = UUID()
+            return TokenStorageSnapshot(tokens: tokens, generation: state.generation, revision: state.revision)
+        }
+    }
+
+    func delete(ifMatching revision: UUID) throws(TokenStorageError) -> Bool {
+        try withLock { (state: inout State) throws(TokenStorageError) in
+            guard state.revision == revision else { return false }
+            if try storedTokens() != nil { try delete(makeQuery()) }
+            state = State()
+            return true
+        }
     }
 }

@@ -220,8 +220,7 @@ struct ArchivePhotoDetailFeature {
             case .onTapDelete:
                 guard let id = state.currentItem?.id else { return .none }
                 return .run { send in
-                    try? await archiveClient.deletePhotoList(photoIds: [id])
-                    await send(.deletePhotoResponse(.success(())))
+                    await send(.deletePhotoResponse(Result { try await archiveClient.deletePhotoList(photoIds: [id]) }))
                 }
                 
             case .deletePhotoResponse(.success):

@@ -81,41 +81,42 @@ public final actor DefaultNetworkProvider: NetworkProvider {
 
 private extension DefaultNetworkProvider {
     func performRequest<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
-        let generation = tokenStorage.credentialGeneration
+        let generation = await tokenStorage.credentialGeneration
         do {
             let data = try await performDataRequest(endpoint: endpoint, retryCount: retryCount, generation: generation)
             try Task.checkCancellation()
-            try verifyAuthorizationGeneration(generation, for: endpoint)
+            try await verifyAuthorizationGeneration(generation, for: endpoint)
             return try decode(data: data)
         } catch {
             try Task.checkCancellation()
-            try verifyAuthorizationGeneration(generation, for: endpoint)
+            try await verifyAuthorizationGeneration(generation, for: endpoint)
             throw error
         }
     }
 
     func performDataRequest(endpoint: Endpoint, retryCount: Int, generation: UUID? = nil) async throws -> Data {
         try Task.checkCancellation()
-        let generation = generation ?? tokenStorage.credentialGeneration
-        try verifyAuthorizationGeneration(generation, for: endpoint)
+        let requestGeneration: UUID
+        if let generation { requestGeneration = generation } else { requestGeneration = await tokenStorage.credentialGeneration }
+        try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
         let credentials = try await authorizedCredentials(for: endpoint)
-        try verifyAuthorizationGeneration(generation, for: endpoint)
+        try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
         let request = try buildRequest(for: endpoint, tokens: credentials?.tokens)
         let (data, response) = try await executeSession(with: request)
         try Task.checkCancellation()
-        try verifyAuthorizationGeneration(generation, for: endpoint)
+        try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
 
         switch validateResponse(response) {
         case .success: return data
         case .unauthorized:
             guard endpoint.authorizationType == .bearer, let credentials else { throw NetworkError.unauthorizedError }
             guard retryCount > .zero else {
-                publishUnauthorizedRequest(credentials)
+                await publishUnauthorizedRequest(credentials)
                 throw NetworkError.unauthorizedError
             }
             // 다른 요청이 이미 재발급했다면 현재 토큰으로 재시도하고 중복 재발급하지 않습니다.
-            if try tokenStorage.snapshot().revision == credentials.revision { _ = try await performTokenRefresh(credentials) }
-            return try await performDataRequest(endpoint: endpoint, retryCount: retryCount - 1, generation: generation)
+            if try await tokenStorage.snapshot().revision == credentials.revision { _ = try await performTokenRefresh(credentials) }
+            return try await performDataRequest(endpoint: endpoint, retryCount: retryCount - 1, generation: requestGeneration)
         case .failure(let error): throw error
         }
     }
@@ -152,14 +153,15 @@ private extension DefaultNetworkProvider {
 // MARK: - Auth Retry Logic
 
 private extension DefaultNetworkProvider {
-    func verifyAuthorizationGeneration(_ generation: UUID, for endpoint: Endpoint) throws {
+    func verifyAuthorizationGeneration(_ generation: UUID, for endpoint: Endpoint) async throws {
         guard endpoint.authorizationType != .none else { return }
-        guard generation == tokenStorage.credentialGeneration else { throw CancellationError() }
+        let currentGeneration = await tokenStorage.credentialGeneration
+        guard generation == currentGeneration else { throw CancellationError() }
     }
 
     func authorizedCredentials(for endpoint: Endpoint) async throws -> TokenStorageSnapshot? {
         guard endpoint.authorizationType == .bearer else { return nil }
-        let credentials = try tokenStorage.snapshot()
+        let credentials = try await tokenStorage.snapshot()
         guard let tokens = credentials.tokens else {
             requestFailureEvents.publish(.init(credentialRevision: credentials.revision, reason: .credentialsUnavailable))
             throw NetworkError.unauthorizedError
@@ -171,17 +173,17 @@ private extension DefaultNetworkProvider {
     func performTokenRefresh(_ credentials: TokenStorageSnapshot) async throws -> TokenStorageSnapshot {
         if let refreshRequest, refreshRequest.revision == credentials.revision { return try await refreshRequest.task.value }
         guard let tokens = credentials.tokens,
-              try tokenStorage.snapshot().revision == credentials.revision else { throw CancellationError() }
+              try await tokenStorage.snapshot().revision == credentials.revision else { throw CancellationError() }
         let id = UUID()
         let task = Task {
             guard let refresher = tokenRefresher else { throw NetworkError.networkFail }
             do {
                 let newTokens = try await refresher.refresh(provider: self, tokens: tokens)
                 try Task.checkCancellation()
-                guard let stored = try tokenStorage.store(newTokens, replacing: credentials.revision) else { throw CancellationError() }
+                guard let stored = try await tokenStorage.store(newTokens, replacing: credentials.revision) else { throw CancellationError() }
                 return stored
             } catch NetworkError.unauthorizedError {
-                publishUnauthorizedRequest(credentials)
+                await publishUnauthorizedRequest(credentials)
                 throw NetworkError.unauthorizedError
             }
         }
@@ -192,8 +194,8 @@ private extension DefaultNetworkProvider {
         return try await task.value
     }
 
-    func publishUnauthorizedRequest(_ credentials: TokenStorageSnapshot) {
-        guard let current = try? tokenStorage.snapshot(), current.revision == credentials.revision else { return }
+    func publishUnauthorizedRequest(_ credentials: TokenStorageSnapshot) async {
+        guard let current = try? await tokenStorage.snapshot(), current.revision == credentials.revision else { return }
         requestFailureEvents.publish(.init(credentialRevision: credentials.revision, reason: .unauthorized))
     }
 }

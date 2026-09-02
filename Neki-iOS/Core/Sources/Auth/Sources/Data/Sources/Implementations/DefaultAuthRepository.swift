@@ -39,9 +39,9 @@ public final actor DefaultAuthRepository: AuthRepository {
         }
     }
 
-    public func removeCredentials(matching failure: AuthCredentialFailure) -> AuthCredentialFailure.RemovalResult {
+    public func removeCredentials(matching failure: AuthCredentialFailure) async -> AuthCredentialFailure.RemovalResult {
         do {
-            return try tokenStorage.delete(ifMatching: failure.revision) ? .removed : .superseded
+            return try await tokenStorage.delete(ifMatching: failure.revision) ? .removed : .superseded
         } catch {
             Logger.data.error("Failed to remove invalid credentials: \(error.localizedDescription)")
             return .storageFailure
@@ -58,8 +58,7 @@ public final actor DefaultAuthRepository: AuthRepository {
             let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
             let tokens = data.toEntity()
-            // 로그인 저장과 조건부 삭제는 같은 actor에서 실행하며 이 사이에는 await를 두지 않습니다.
-            try tokenStorage.store(tokens)
+            try await tokenStorage.store(tokens)
             let registrationStatus: RegistrationStatus = data.isNewUser ? .newlyRegistered : .existingAccount
             return (tokens, registrationStatus)
         } catch { throw mapError(error) }
@@ -89,24 +88,26 @@ public final actor DefaultAuthRepository: AuthRepository {
     }
     
     public func withdraw() async throws(AuthRepositoryError) {
-        let generation = tokenStorage.credentialGeneration
+        let generation = await tokenStorage.credentialGeneration
         let endpoint = AuthEndpoint.withdraw
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            guard generation == tokenStorage.credentialGeneration else { throw AuthRepositoryError.unauthorized }
-            try tokenStorage.delete()
+            let currentGeneration = await tokenStorage.credentialGeneration
+            guard generation == currentGeneration else { throw AuthRepositoryError.unauthorized }
+            try await tokenStorage.delete()
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
     }
     
     public func logout() async throws(AuthRepositoryError) {
-        let generation = tokenStorage.credentialGeneration
+        let generation = await tokenStorage.credentialGeneration
         let endpoint = AuthEndpoint.logout
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            guard generation == tokenStorage.credentialGeneration else { throw AuthRepositoryError.unauthorized }
-            try tokenStorage.delete()
+            let currentGeneration = await tokenStorage.credentialGeneration
+            guard generation == currentGeneration else { throw AuthRepositoryError.unauthorized }
+            try await tokenStorage.delete()
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
@@ -132,8 +133,8 @@ public final actor DefaultAuthRepository: AuthRepository {
         try await fetchUser()
     }
 
-    public func fetchStoredTokens() -> AuthTokens? {
-        try? tokenStorage.fetch()
+    public func fetchStoredTokens() async -> AuthTokens? {
+        try? await tokenStorage.fetch()
     }
 
     public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {

@@ -9,14 +9,9 @@ import Foundation
 import Security
 import os
 
-final class KeychainTokenStorage: Sendable {
-    private struct State: Sendable {
-        var generation = UUID()
-        var revision = UUID()
-    }
-
-    // 토큰의 비교/교체와 세대 변경을 같은 임계 구역에서 처리합니다. 내부에는 await가 없습니다.
-    private let lock = OSAllocatedUnfairLock(initialState: State())
+final actor KeychainTokenStorage {
+    private var generation = UUID()
+    private var revision = UUID()
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
     private let service: String
@@ -39,14 +34,6 @@ final class KeychainTokenStorage: Sendable {
 // MARK: - KeychainTokenStorage + Helper Methods
 
 private extension KeychainTokenStorage {
-    func withLock<Value: Sendable>(_ operation: @Sendable (inout State) throws(TokenStorageError) -> Value) throws(TokenStorageError) -> Value {
-        let result: Result<Value, TokenStorageError> = lock.withLock { state in
-            do { return .success(try operation(&state)) }
-            catch { return .failure(error) }
-        }
-        return try result.get()
-    }
-
     func storedTokens() throws(TokenStorageError) -> AuthTokens? {
         do { return try convert(read(makeQuery())) }
         catch .notFound { return nil }
@@ -60,7 +47,7 @@ private extension KeychainTokenStorage {
         catch { throw error }
     }
 
-    func makeQuery() -> Query {
+    func makeQuery() -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -81,7 +68,7 @@ private extension KeychainTokenStorage {
         return tokens
     }
     
-    func create(_ tokens: AuthTokens, in query: Query) throws(TokenStorageError) {
+    func create(_ tokens: AuthTokens, in query: [String: Any]) throws(TokenStorageError) {
         do {
             let data = try encoder.encode(tokens)
             var query = query
@@ -98,7 +85,7 @@ private extension KeychainTokenStorage {
         }
     }
     
-    func read(_ query: Query) throws(TokenStorageError) -> CFTypeRef? {
+    func read(_ query: [String: Any]) throws(TokenStorageError) -> CFTypeRef? {
         var query = query
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -109,10 +96,10 @@ private extension KeychainTokenStorage {
         return dataTypeRef
     }
     
-    func update(_ tokens: AuthTokens, in query: Query) throws(TokenStorageError) {
+    func update(_ tokens: AuthTokens, in query: [String: Any]) throws(TokenStorageError) {
         do {
             let data = try encoder.encode(tokens)
-            let queryToUpdate: Query = [kSecValueData as String: data]
+            let queryToUpdate: [String: Any] = [kSecValueData as String: data]
             let status = SecItemUpdate(query as CFDictionary, queryToUpdate as CFDictionary)
             try checkStatus(status, which: #function)
         } catch is EncodingError {
@@ -124,7 +111,7 @@ private extension KeychainTokenStorage {
         }
     }
     
-    func delete(_ query: Query) throws(TokenStorageError) {
+    func delete(_ query: [String: Any]) throws(TokenStorageError) {
         let status = SecItemDelete(query as CFDictionary)
         guard status != errSecItemNotFound else { return }
         try checkStatus(status, which: #function)
@@ -135,50 +122,41 @@ private extension KeychainTokenStorage {
 // MARK: - KeychainTokenStorage + TokenStorage
 
 extension KeychainTokenStorage: TokenStorage {
-    var credentialGeneration: UUID { lock.withLock { $0.generation } }
+    var credentialGeneration: UUID { generation }
 
-    func store(_ tokens: AuthTokens) throws(TokenStorageError) {
-        try withLock { (state: inout State) throws(TokenStorageError) in
-            try storeTokens(tokens)
-            state = State()
-        }
+    func store(_ tokens: AuthTokens) async throws(TokenStorageError) {
+        try storeTokens(tokens)
+        generation = UUID()
+        revision = UUID()
     }
     
-    func fetch() throws(TokenStorageError) -> AuthTokens {
-        try withLock { (_: inout State) throws(TokenStorageError) in
-            guard let tokens = try storedTokens() else { throw .notFound }
-            return tokens
-        }
+    func fetch() async throws(TokenStorageError) -> AuthTokens {
+        guard let tokens = try storedTokens() else { throw .notFound }
+        return tokens
     }
 
-    func snapshot() throws(TokenStorageError) -> TokenStorageSnapshot {
-        try withLock { (state: inout State) throws(TokenStorageError) in
-            TokenStorageSnapshot(tokens: try storedTokens(), generation: state.generation, revision: state.revision)
-        }
+    func snapshot() async throws(TokenStorageError) -> TokenStorageSnapshot {
+        TokenStorageSnapshot(tokens: try storedTokens(), generation: generation, revision: revision)
     }
     
-    func delete() throws(TokenStorageError) {
-        try withLock { (state: inout State) throws(TokenStorageError) in
-            try delete(makeQuery())
-            state = State()
-        }
+    func delete() async throws(TokenStorageError) {
+        try delete(makeQuery())
+        generation = UUID()
+        revision = UUID()
     }
 
-    func store(_ tokens: AuthTokens, replacing revision: UUID) throws(TokenStorageError) -> TokenStorageSnapshot? {
-        try withLock { (state: inout State) throws(TokenStorageError) in
-            guard state.revision == revision else { return nil }
-            try storeTokens(tokens)
-            state.revision = UUID()
-            return TokenStorageSnapshot(tokens: tokens, generation: state.generation, revision: state.revision)
-        }
+    func store(_ tokens: AuthTokens, replacing revision: UUID) async throws(TokenStorageError) -> TokenStorageSnapshot? {
+        guard self.revision == revision else { return nil }
+        try storeTokens(tokens)
+        self.revision = UUID()
+        return TokenStorageSnapshot(tokens: tokens, generation: generation, revision: self.revision)
     }
 
-    func delete(ifMatching revision: UUID) throws(TokenStorageError) -> Bool {
-        try withLock { (state: inout State) throws(TokenStorageError) in
-            guard state.revision == revision else { return false }
-            try delete(makeQuery())
-            state = State()
-            return true
-        }
+    func delete(ifMatching revision: UUID) async throws(TokenStorageError) -> Bool {
+        guard self.revision == revision else { return false }
+        try delete(makeQuery())
+        generation = UUID()
+        self.revision = UUID()
+        return true
     }
 }

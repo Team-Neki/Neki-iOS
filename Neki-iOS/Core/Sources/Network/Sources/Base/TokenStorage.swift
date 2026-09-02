@@ -16,6 +16,8 @@ public protocol TokenStorage: Sendable {
     func fetch() async throws(TokenStorageError) -> AuthTokens
     func snapshot() async throws(TokenStorageError) -> TokenStorageSnapshot
     func delete() async throws(TokenStorageError)
+    /// 자격증명 세대가 요청 시점과 같을 때만 현재 세션을 삭제합니다.
+    func delete(ifMatchingGeneration generation: UUID) async throws(TokenStorageError) -> Bool
     /// 저장 버전이 요청 시점과 같을 때만 재발급 결과를 저장합니다.
     func store(_ tokens: AuthTokens, replacing revision: UUID) async throws(TokenStorageError) -> TokenStorageSnapshot?
     /// 저장 버전이 일치할 때만 삭제합니다. 토큰이 없는 상태에서도 중복 처리를 막도록 버전을 변경합니다.

@@ -92,9 +92,7 @@ public final actor DefaultAuthRepository: AuthRepository {
         let endpoint = AuthEndpoint.withdraw
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            let currentGeneration = await tokenStorage.credentialGeneration
-            guard generation == currentGeneration else { throw AuthRepositoryError.unauthorized }
-            try await tokenStorage.delete()
+            guard try await tokenStorage.delete(ifMatchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
@@ -105,9 +103,7 @@ public final actor DefaultAuthRepository: AuthRepository {
         let endpoint = AuthEndpoint.logout
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            let currentGeneration = await tokenStorage.credentialGeneration
-            guard generation == currentGeneration else { throw AuthRepositoryError.unauthorized }
-            try await tokenStorage.delete()
+            guard try await tokenStorage.delete(ifMatchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }

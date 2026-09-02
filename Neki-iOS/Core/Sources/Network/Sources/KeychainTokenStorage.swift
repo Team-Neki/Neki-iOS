@@ -145,6 +145,14 @@ extension KeychainTokenStorage: TokenStorage {
         revision = UUID()
     }
 
+    func delete(ifMatchingGeneration generation: UUID) async throws(TokenStorageError) -> Bool {
+        guard self.generation == generation else { return false }
+        try delete(makeQuery())
+        self.generation = UUID()
+        revision = UUID()
+        return true
+    }
+
     func store(_ tokens: AuthTokens, replacing revision: UUID) async throws(TokenStorageError) -> TokenStorageSnapshot? {
         guard self.revision == revision else { return nil }
         try storeTokens(tokens)

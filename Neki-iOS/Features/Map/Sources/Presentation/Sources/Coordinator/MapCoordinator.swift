@@ -44,9 +44,11 @@ struct MapCoordinator {
                 return .none
 
             case let .path(.element(_, action: .brandReorder(.delegate(.saveCompleted(brands))))):
-                state.root.photoBoothListState.brands = brands
                 state.path.removeLast()
-                return .send(.root(.startBackgroundCalculation))
+                return .concatenate(
+                    .send(.root(.photoBoothListAction(.setBrands(brands)))),
+                    .send(.root(.startBackgroundCalculation))
+                )
 
             case .path(.element(_, action: .brandReorder(.delegate(.dismiss)))):
                 state.path.removeLast()

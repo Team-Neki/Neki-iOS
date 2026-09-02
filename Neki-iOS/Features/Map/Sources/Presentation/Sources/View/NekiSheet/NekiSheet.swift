@@ -18,7 +18,7 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
     let controllers: () -> Controllers
     let content: () -> Content
     
-    private let defaultSpacing: CGFloat = 20
+    private let controllerSpacing: CGFloat = 12
     
     var isControllersVisible: Bool { selection == MapFeature.SheetStage.first.detent || selection == MapFeature.SheetStage.second.detent }
     
@@ -26,7 +26,7 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
         GeometryReader { proxy in
             let layout = layout(in: proxy.size.height)
             
-            VStack(spacing: defaultSpacing) {
+            VStack(spacing: controllerSpacing) {
                 if isControllersVisible {
                     controllers()
                         .measureHeight { controllerHeight = $0 }
@@ -50,7 +50,7 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
             )
             .padding(.bottom, selection == .hidden ? 0 : configuration.bottomInset)
             .frame(height: proxy.size.height, alignment: .bottom)
-            .offset(y: max(.zero, layout.dragOffset - (isControllersVisible ? (controllerHeight + defaultSpacing) : .zero)))
+            .offset(y: max(.zero, layout.dragOffset - (isControllersVisible ? (controllerHeight + controllerSpacing) : .zero)))
             .simultaneousGesture(
                 DragGesture()
                     .onChanged { value in

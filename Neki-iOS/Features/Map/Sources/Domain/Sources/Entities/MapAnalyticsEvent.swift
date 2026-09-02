@@ -8,7 +8,7 @@
 import Foundation
 
 enum MapAnalyticsEvent {
-    case mapReSearch(hasFilter: Bool, regionChanged: Bool)
+    case mapReExplore(hasFilter: Bool, regionChanged: Bool)
     case mapBrandFilterToggle(action: MapFilterAction, selectedCount: Int, brandName: String)
     case boothSelect(brandName: String, entryPoint: MapEntryPoint)
     case boothFavoriteAdd(boothName: String, brandName: String)
@@ -26,7 +26,7 @@ enum MapAnalyticsEvent {
 extension MapAnalyticsEvent: AnalyticsEvent {
     var name: AnalyticsEventName {
         switch self {
-        case .mapReSearch: return .mapReSearch
+        case .mapReExplore: return .mapReSearch
         case .mapBrandFilterToggle: return .mapBrandFilterToggle
         case .boothSelect: return .boothSelect
         case .boothFavoriteAdd: return .boothFavoriteAdd
@@ -41,7 +41,7 @@ extension MapAnalyticsEvent: AnalyticsEvent {
     
     var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
-        case let .mapReSearch(hasFilter, regionChanged):
+        case let .mapReExplore(hasFilter, regionChanged):
             return [.hasFilter: .boolean(hasFilter), .regionChanged: .boolean(regionChanged)]
         case let .mapBrandFilterToggle(action, selectedCount, brandName):
             return [

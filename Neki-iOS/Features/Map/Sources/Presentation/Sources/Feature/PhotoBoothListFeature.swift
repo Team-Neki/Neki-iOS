@@ -18,7 +18,7 @@ public struct PhotoBoothListFeature {
 
         var title: String {
             switch self {
-            case .nearby: return "가까운 포토부스"
+            case .nearby: return "이 지역 포토부스"
             case .favorite: return "저장한 포토부스"
             }
         }
@@ -30,7 +30,6 @@ public struct PhotoBoothListFeature {
         var filteredBrands: Set<PhotoBoothBrand> = []
         
         var selectedTab: ListTab = .nearby
-        var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         var favoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -53,7 +52,8 @@ public struct PhotoBoothListFeature {
         case didTapBrandReorderButton
 
         // Internal Actions
-        case setNearbyBooths(IdentifiedArrayOf<PhotoBooth>)
+        case setBrands(IdentifiedArrayOf<PhotoBoothBrand>)
+        case clearFilterOptions
         case setVisibleBooths(IdentifiedArrayOf<PhotoBooth>)
         case setFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
         case setVisibleFavoriteBooths(IdentifiedArrayOf<PhotoBooth>)
@@ -95,10 +95,16 @@ public struct PhotoBoothListFeature {
             case .didTapBrandReorderButton:
                 return .send(.delegate(.didTapBrandReorderButton))
 
-            case let .setNearbyBooths(booths):
-                state.photoBooths = booths
+            case let .setBrands(brands):
+                guard state.brands != brands else { return .none }
+                state.brands = brands
                 return .none
-                
+
+            case .clearFilterOptions:
+                guard state.filteredBrands.isEmpty == false else { return .none }
+                state.filteredBrands.removeAll()
+                return .none
+
             case let .setVisibleBooths(booths):
                 state.visibleBooths = booths
                 return .none
@@ -133,4 +139,5 @@ private extension PhotoBoothListFeature {
             state.filteredBrands.insert(brand)
         }
     }
+
 }

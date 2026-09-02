@@ -598,8 +598,8 @@ public struct NaverMapView: View {
             DirectionAppsSheet(store: store, photoBooth: photoBooth)
         }
         .overlay(alignment: .top) {
-            if store.isSearchHereButtonVisible {
-                searchHereControl
+            if store.isExploreHereButtonVisible {
+                exploreHereControl
             }
         }
         .nekiSheet(selection: $store.detent) {
@@ -753,14 +753,14 @@ private extension NaverMapView {
         }
     }
     
-    var searchHereControl: some View {
+    var exploreHereControl: some View {
         Button {
-            store.send(.didTapSearchHereButton)
+            store.send(.didTapExploreHereButton)
         } label: {
             HStack(spacing: 7) {
                 Image(.iconRotate)
                 
-                Text("이 지역 재검색")
+                Text("이 지역 재탐색")
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
             }

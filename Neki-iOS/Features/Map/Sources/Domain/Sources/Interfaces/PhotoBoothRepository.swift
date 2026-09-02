@@ -11,13 +11,8 @@ import Dependencies
 protocol PhotoBoothRepository {
     /// 특정 지도 영역 내의 포토부스 목록을 가져옵니다.
     /// - Parameter bounds: 조회 시점의 지리적 영역
-    /// - Returns: 해당 영역 내의 포토부스 배열 스트림
-    func readPhotoBooths(in bounds: GeographicBoundingBox) async -> AsyncStream<[PhotoBooth]>
-
-    /// 기준 좌표에서 거리순으로 포토부스 목록을 가져옵니다.
-    /// - Parameter coordinate: 기준 좌표
-    /// - Returns: 거리순으로 정렬된 포토부스 배열
-    func readNearbyPhotoBooths(coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
+    /// - Returns: 조회 영역을 포함하는 포토부스 배열 스트림. 조회 실패는 스트림을 순회할 때 전달됩니다.
+    func readPhotoBooths(in bounds: GeographicBoundingBox) async -> AsyncThrowingStream<[PhotoBooth], Error>
 
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
     /// - Parameters:

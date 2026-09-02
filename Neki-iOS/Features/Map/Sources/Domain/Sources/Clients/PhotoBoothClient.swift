@@ -11,9 +11,7 @@ import ComposableArchitecture
 @DependencyClient
 public struct PhotoBoothClient {
     /// 지도 영역(bounds) 내의 포토부스 데이터를 가져옵니다.
-    public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncStream<[PhotoBooth]>
-    /// 중심 좌표 주변 거리순으로 포토부스 데이터를 가져옵니다.
-    public var fetchNearbyPhotoBooths: @Sendable (_ coordinate: GeographicCoordinate) async throws -> [PhotoBooth]
+    public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncThrowingStream<[PhotoBooth], Error>
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
     public var updatePhotoBoothFavorite: @Sendable (_ id: Int, _ isFavorite: Bool) async throws -> Void
     /// 즐겨찾기 포토부스 목록 조회
@@ -42,9 +40,6 @@ extension PhotoBoothClient: DependencyKey {
         var client = PhotoBoothClient()
         client.fetchPhotoBooths = { bounds in
             await photoBoothRepository.readPhotoBooths(in: bounds)
-        }
-        client.fetchNearbyPhotoBooths = { coordinate in
-            try await photoBoothRepository.readNearbyPhotoBooths(coordinate: coordinate)
         }
         client.updatePhotoBoothFavorite = { id, isFavorite in
             try await photoBoothRepository.updatePhotoBoothFavorite(id: id, isFavorite: isFavorite)

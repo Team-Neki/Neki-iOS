@@ -100,6 +100,7 @@ private extension DefaultNetworkProvider {
         if let generation { requestGeneration = generation } else { requestGeneration = await tokenStorage.credentialGeneration }
         try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
         let credentials = try await authorizedCredentials(for: endpoint)
+        try Task.checkCancellation()
         try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
         let request = try buildRequest(for: endpoint, tokens: credentials?.tokens)
         let (data, response) = try await executeSession(with: request)

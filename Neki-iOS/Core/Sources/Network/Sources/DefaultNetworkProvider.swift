@@ -175,6 +175,7 @@ private extension DefaultNetworkProvider {
         if let refreshRequest, refreshRequest.revision == credentials.revision { return try await refreshRequest.task.value }
         guard let tokens = credentials.tokens,
               try await tokenStorage.snapshot().revision == credentials.revision else { throw CancellationError() }
+        if let refreshRequest, refreshRequest.revision == credentials.revision { return try await refreshRequest.task.value }
         let id = UUID()
         let task = Task {
             guard let refresher = tokenRefresher else { throw NetworkError.networkFail }

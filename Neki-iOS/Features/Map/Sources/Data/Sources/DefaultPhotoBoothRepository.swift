@@ -180,12 +180,114 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         brandOrderIDs = orderedIDs
         return brands
     }
+
+    func searchCandidates(
+        keyword: String,
+        type: PhotoBoothSearchCandidateType,
+        page: Int,
+        size: Int
+    ) async throws -> PhotoBoothSearchCandidatePage {
+        switch type {
+        case .region:
+            let endpoint = MapEndpoint.searchRegions(keyword: keyword, page: page, size: size)
+            let responseDTO: BaseResponseDTO<SearchRegionsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+            return PhotoBoothSearchCandidatePage(
+                type: .region,
+                candidates: data.items.map { .region($0.toEntity()) },
+                hasNext: data.hasNext
+            )
+
+        case .subwayStation:
+            let endpoint = MapEndpoint.searchStations(keyword: keyword, page: page, size: size)
+            let responseDTO: BaseResponseDTO<SearchStationsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+            return PhotoBoothSearchCandidatePage(
+                type: .subwayStation,
+                candidates: data.items.map { .subwayStation($0.toEntity()) },
+                hasNext: data.hasNext
+            )
+
+        case .photoBooth:
+            let brands = try await ensureBrandsLoadedByCode()
+            let endpoint = MapEndpoint.searchPhotoBooths(keyword: keyword, page: page, size: size)
+            let responseDTO: BaseResponseDTO<SearchPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+            let photoBooths = photoBoothsApplyingFavoriteState(searchPhotoBooths(from: data.items, brands: brands))
+            return PhotoBoothSearchCandidatePage(
+                type: .photoBooth,
+                candidates: photoBooths.map { .photoBooth($0) },
+                hasNext: data.hasNext
+            )
+        }
+    }
+
+    func readSearchResultPhotoBooths(
+        target: PhotoBoothSearchTarget,
+        userCoordinate: GeographicCoordinate?
+    ) async throws -> [PhotoBooth] {
+        let brands = try await ensureBrandsLoadedByCode()
+        let requestDTO = FetchSearchResultPhotoBoothsDTO.Request(target: target, userCoordinate: userCoordinate)
+        let endpoint = MapEndpoint.searchResultPhotoBooths(dto: requestDTO)
+        let responseDTO: BaseResponseDTO<FetchSearchResultPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        guard let items = responseDTO.data?.photoBooths else { throw NetworkError.responseDecodingError }
+        return photoBoothsApplyingFavoriteState(searchPhotoBooths(from: items, brands: brands))
+    }
+
+    func readSearchResultBrandFilters(
+        target: PhotoBoothSearchTarget
+    ) async throws -> [PhotoBoothSearchBrandFilter] {
+        let brands = try await ensureBrandsLoadedByCode()
+        // 필터 집계는 거리를 쓰지 않아 서버가 기준 위치를 무시하므로 담지 않습니다.
+        let requestDTO = FetchSearchFilterDTO.Request(target: target, userCoordinate: nil)
+        let endpoint = MapEndpoint.searchFilter(dto: requestDTO)
+        let responseDTO: BaseResponseDTO<FetchSearchFilterDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+        guard let items = responseDTO.data?.brandFilters else { throw NetworkError.responseDecodingError }
+        return searchBrandFilters(from: items, brands: brands)
+    }
 }
 
 
 // MARK: - DefaultPhotoBoothRepository + Cache Helpers
 
 private extension DefaultPhotoBoothRepository {
+    /// 브랜드 코드로 조회할 수 있도록 다시 키를 잡은 브랜드 목록입니다.
+    ///
+    /// 검색 계열 응답은 브랜드명과 함께 코드를 내려주므로, 표기가 바뀔 수 있는 이름 대신 코드로 매칭합니다.
+    func ensureBrandsLoadedByCode() async throws -> [String: PhotoBoothBrand] {
+        let brands = try await ensureBrandsLoaded()
+        return Dictionary(brands.values.map { ($0.englishName, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    func searchPhotoBooths(
+        from dtos: [SearchPhotoBoothDTO],
+        brands: [String: PhotoBoothBrand]
+    ) -> [PhotoBooth] {
+        dtos.compactMap { dto in
+            guard let brand = brands[dto.brandCode] else {
+                Logger.data.error("Brand Mapping Failed: '\(dto.brandCode)' not found in brand codes")
+                return nil
+            }
+            return dto.toEntity(brand: brand)
+        }
+    }
+
+    /// 필터 응답에 없는 브랜드 이미지를 브랜드 전체 조회 결과에서 채웁니다.
+    ///
+    /// 서버가 사용자별 정렬 순서로 내려주므로 순서를 그대로 유지합니다.
+    func searchBrandFilters(
+        from dtos: [FetchSearchFilterDTO.Response.BrandFilter],
+        brands: [String: PhotoBoothBrand]
+    ) -> [PhotoBoothSearchBrandFilter] {
+        dtos.compactMap { dto in
+            guard let brand = brands[dto.code] else {
+                Logger.data.error("Brand Mapping Failed: '\(dto.code)' not found in brand codes")
+                return nil
+            }
+            return PhotoBoothSearchBrandFilter(brand: brand, count: dto.count)
+        }
+    }
+
     func photoBoothsApplyingFavoriteState(_ photoBooths: [PhotoBooth]) -> [PhotoBooth] {
         photoBooths.map { photoBooth in
             var updatedPhotoBooth = photoBooth

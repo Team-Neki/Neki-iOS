@@ -8,7 +8,5 @@
 import Foundation
 
 public protocol TokenRefresher: Sendable {
-    var destination: Endpoint { get }
-    
-    func refresh(provider: NetworkProvider) async throws(NetworkError) -> AuthTokens
+    func refresh(provider: NetworkProvider, tokens: AuthTokens) async throws -> AuthTokens
 }

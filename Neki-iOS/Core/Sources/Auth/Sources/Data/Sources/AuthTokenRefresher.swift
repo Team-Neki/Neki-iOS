@@ -9,17 +9,18 @@ import Foundation
 import os
 
 struct AuthTokenRefresher: TokenRefresher {
-    var destination: Endpoint { AuthEndpoint.reissueToken }
-    
-    func refresh(provider: any NetworkProvider) async throws(NetworkError) -> AuthTokens {
+    func refresh(provider: any NetworkProvider, tokens: AuthTokens) async throws -> AuthTokens {
+        let destination = AuthEndpoint.reissueToken(dto: .init(refreshToken: tokens.refreshToken))
         do {
             let dto: BaseResponseDTO<ReissueTokenDTO.Response> = try await provider.request(endpoint: destination)
             guard let data = dto.data else { throw NetworkError.networkFail }
             return AuthTokens(accessToken: data.accessToken, refreshToken: data.refreshToken)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             guard let error = error as? NetworkError else {
                 Logger.data.error("Reissue token failed with unknown error: \(error.localizedDescription)")
-                throw .unknownError(error)
+                throw NetworkError.unknownError(error)
             }
             Logger.data.error("Reissue token failed with error: \(error.localizedDescription)")
             throw error

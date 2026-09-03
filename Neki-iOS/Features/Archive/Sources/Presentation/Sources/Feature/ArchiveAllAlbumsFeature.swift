@@ -127,7 +127,8 @@ struct ArchiveAllAlbumsFeature {
                     .send(.fetchAlbums)
                 )
                 
-            case .deleteFoldersResponse(.failure):
+            case let .deleteFoldersResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 let toastItem = NekiToastItem("앨범을 삭제하지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
                 
@@ -158,7 +159,8 @@ struct ArchiveAllAlbumsFeature {
                     .send(.fetchAlbums)
                 )
                 
-            case .addFolderResponse(.failure):
+            case let .addFolderResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 let toastItem = NekiToastItem("앨범을 만들지 못했어요", style: .error)
                 return .send(.delegate(.showToast(toastItem)))
                 
@@ -200,7 +202,8 @@ struct ArchiveAllAlbumsFeature {
                 state.albums.insert(album, at: 0)
                 return .none
                 
-            case .favoriteAlbumResponse(.failure):
+            case let .favoriteAlbumResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 앨범을 불러오지 못했어요", style: .error))))
                 
             case let .albumListResponse(.success(fetchedAlbums)):
@@ -212,7 +215,8 @@ struct ArchiveAllAlbumsFeature {
                 state.albums = IdentifiedArray(uniqueElements: newAlbums)
                 return .none
                 
-            case .albumListResponse(.failure):
+            case let .albumListResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 불러오지 못했어요", style: .error))))
                 
                 

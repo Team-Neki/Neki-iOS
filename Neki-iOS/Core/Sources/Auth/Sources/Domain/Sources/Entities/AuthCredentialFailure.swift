@@ -22,6 +22,11 @@ public struct AuthCredentialFailure: Sendable {
         case storageFailure
     }
 
-    let revision: UUID
-    let reason: Reason
+    public let revision: UUID
+    public let reason: Reason
+
+    public init(revision: UUID, reason: Reason) {
+        self.revision = revision
+        self.reason = reason
+    }
 }

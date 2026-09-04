@@ -25,6 +25,7 @@ struct NearPhotoBoothListSheet: View {
     private enum Constants {
         static let verticalScrollCoordinateSpaceName = "NearPhotoBoothListSheet.VerticalScroll"
         static let scrollTopThreshold: CGFloat = -1
+        static let searchResultTopPadding: CGFloat = 12
     }
 
     private enum FavoriteRemovalEffect {
@@ -43,17 +44,21 @@ struct NearPhotoBoothListSheet: View {
         ScrollView(.vertical) {
             verticalScrollTopReader
 
-            photoBoothBrandFilterOptionsSection
+            if store.isSearchResultPresented {
+                searchResultPhotoBoothListSection
+            } else {
+                photoBoothBrandFilterOptionsSection
 
-            VStack(spacing: 12) {
-                listTabBar
+                VStack(spacing: 12) {
+                    listTabBar
 
-                Group {
-                    switch store.selectedTab {
-                    case .nearby:
-                        nearByPhotoBoothListSection
-                    case .favorite:
-                        favoritePhotoBoothListSection
+                    Group {
+                        switch store.selectedTab {
+                        case .nearby:
+                            nearByPhotoBoothListSection
+                        case .favorite:
+                            favoritePhotoBoothListSection
+                        }
                     }
                 }
             }
@@ -61,6 +66,11 @@ struct NearPhotoBoothListSheet: View {
         .coordinateSpace(name: Constants.verticalScrollCoordinateSpaceName)
         .onPreferenceChange(NearPhotoBoothListScrollOffsetPreferenceKey.self) { offset in
             updateVerticalScrollTopState(offset)
+        }
+        .onChange(of: store.isSearchResultPresented) { _, _ in
+            // 목록을 통째로 갈아 끼우면 스크롤이 맨 위로 돌아가므로 시트가 아는 위치도 함께 맞춥니다.
+            isVerticalScrollAtTop = true
+            sheetScrollStateHandler.updateIsAtTop(true)
         }
         .onDisappear {
             delayedFavoriteTasks.values.forEach { $0.cancel() }
@@ -94,7 +104,7 @@ private extension NearPhotoBoothListSheet {
         Section {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 2) {
-                    ForEach(store.brands, id: \.self) { brand in
+                    ForEach(store.filterBrands, id: \.self) { brand in
                         filterCell(brand)
                     }
                 }
@@ -238,6 +248,41 @@ private extension NearPhotoBoothListSheet {
             }
         }
         .frame(maxHeight: .infinity)
+    }
+
+    /// 검색 결과를 탭과 브랜드 필터 없이 개수와 목록만으로 노출합니다.
+    var searchResultPhotoBoothListSection: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 12) {
+                searchResultBoothCountText
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+
+                if store.visibleBooths.isEmpty {
+                    unavailableView("조건에 맞는 포토부스가 없어요.")
+                } else {
+                    LazyVStack(alignment: .leading, spacing: .zero) {
+                        ForEach(store.visibleBooths) { photoBooth in
+                            photoBoothCell(photoBooth)
+                        }
+                    }
+                }
+            }
+            .padding(.top, Constants.searchResultTopPadding)
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    var searchResultBoothCountText: some View {
+        HStack(spacing: 0) {
+            Text("\(store.visibleBooths.count)")
+                .nekiFont(.body14SemiBold)
+                .foregroundStyle(.gray400)
+
+            Text("곳의 포토부스를 찾았어요.")
+                .nekiFont(.body14Medium)
+                .foregroundStyle(.gray300)
+        }
     }
 
     var favoriteBoothCountText: some View {

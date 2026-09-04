@@ -23,33 +23,43 @@ public enum NekiSearchFieldState: Equatable {
 /// 캡슐형 검색 필드입니다.
 ///
 /// `state`에 따라 좌측 아이콘, 테두리와 그림자, 검색어 서체, 지우기 버튼 노출이 달라집니다.
-/// 입력 없이 검색 화면으로 이동하기만 하는 진입점에는 ``NekiSearchField/entry(_:action:)``을 사용합니다.
+/// 입력 없이 검색 화면으로 이동하기만 하는 진입점에는 ``NekiSearchField/entry(_:action:)``을,
+/// 검색 화면 밖에서 완료한 검색어만 보여 주는 자리에는 ``NekiSearchField/completed(_:onEdit:onClear:)``을 사용합니다.
 public struct NekiSearchField: View {
     @Binding private var text: String
 
     private let state: NekiSearchFieldState
     private let prompt: String
     private let isFocused: FocusState<Bool>.Binding?
+    /// 검색어를 이 필드에서 직접 고칠 수 있는지 여부입니다.
+    ///
+    /// 검색 화면 밖에서는 검색어를 보여 주기만 하므로 텍스트 필드 대신 문자열을 그립니다.
+    private let isEditable: Bool
     private let onBack: (() -> Void)?
     private let onSubmit: (() -> Void)?
     private let onTap: (() -> Void)?
+    private let onClear: (() -> Void)?
 
     private init(
         text: Binding<String>,
         state: NekiSearchFieldState,
         isFocused: FocusState<Bool>.Binding?,
+        isEditable: Bool,
         prompt: String,
         onBack: (() -> Void)?,
         onSubmit: (() -> Void)?,
-        onTap: (() -> Void)?
+        onTap: (() -> Void)?,
+        onClear: (() -> Void)?
     ) {
         self._text = text
         self.state = state
         self.isFocused = isFocused
+        self.isEditable = isEditable
         self.prompt = prompt
         self.onBack = onBack
         self.onSubmit = onSubmit
         self.onTap = onTap
+        self.onClear = onClear
     }
 
     /// 검색어를 입력받는 검색 필드를 생성합니다.
@@ -73,10 +83,12 @@ public struct NekiSearchField: View {
             text: text,
             state: state,
             isFocused: isFocused,
+            isEditable: true,
             prompt: prompt,
             onBack: onBack,
             onSubmit: onSubmit,
-            onTap: nil
+            onTap: nil,
+            onClear: nil
         )
     }
 
@@ -92,10 +104,40 @@ public struct NekiSearchField: View {
             text: .constant(""),
             state: .idle,
             isFocused: nil,
+            isEditable: false,
             prompt: prompt,
             onBack: nil,
             onSubmit: nil,
-            onTap: action
+            onTap: action,
+            onClear: nil
+        )
+    }
+
+    /// 검색을 완료한 검색어를 노출하는 검색 필드를 생성합니다.
+    ///
+    /// 입력은 검색 화면에서 하고 결과 화면에서는 검색어만 보여 주는 자리에 사용합니다.
+    /// 검색어를 여기서 고치지 않으므로 검색어를 바인딩이 아닌 값으로 받고 포커스를 받지 않습니다.
+    /// 뒤로가기·검색어·검색 버튼은 모두 검색어를 다시 입력하러 가는 하나의 동작으로 이어집니다.
+    ///
+    /// - Parameters:
+    ///   - keyword: 검색을 완료한 검색어
+    ///   - onEdit: 검색어를 다시 입력하러 갈 때 실행할 동작
+    ///   - onClear: 우측 지우기 버튼으로 검색을 끝낼 때 실행할 동작
+    public static func completed(
+        _ keyword: String,
+        onEdit: @escaping () -> Void,
+        onClear: @escaping () -> Void
+    ) -> NekiSearchField {
+        NekiSearchField(
+            text: .constant(keyword),
+            state: .completed,
+            isFocused: nil,
+            isEditable: false,
+            prompt: "",
+            onBack: onEdit,
+            onSubmit: onEdit,
+            onTap: onEdit,
+            onClear: onClear
         )
     }
 
@@ -126,7 +168,7 @@ private extension NekiSearchField {
             }
 
             if state == .completed {
-                icon(.iconXmarkBlack, action: clear)
+                icon(.iconXmarkBlack, action: onClear ?? clear)
             }
         }
         .searchFieldContainer(state.decoration)
@@ -142,17 +184,24 @@ private extension NekiSearchField {
         }
     }
 
-    /// 진입점에서는 안내 문구를, 그 외에는 편집 가능한 텍스트 필드를 노출합니다.
+    /// 진입점에서는 안내 문구를, 검색 화면에서는 편집 가능한 텍스트 필드를 노출합니다.
     ///
-    /// - Note: 검색을 완료한 뒤에도 텍스트 필드를 계층에 그대로 둡니다.
+    /// 검색 화면 밖에서 결과를 보여 주는 동안에는 누르면 검색 화면으로 돌아가는 검색어를 노출합니다.
+    ///
+    /// - Note: 검색 화면에서는 검색을 완료한 뒤에도 텍스트 필드를 계층에 그대로 둡니다.
     ///   텍스트로 바꿔 끼우면 포커스를 받을 뷰가 사라져 `isFocused`에 `true`를 써도 무시되고,
     ///   필드를 눌러도 키보드가 다시 올라오지 않습니다.
     @ViewBuilder
     var input: some View {
         if state == .idle {
             label(prompt, font: .body16Medium, color: .gray800)
-        } else {
+        } else if isEditable {
             textField
+        } else {
+            Button { onTap?() } label: {
+                label(text, font: .body16SemiBold, color: .gray900)
+            }
+            .buttonStyle(.plain)
         }
     }
 

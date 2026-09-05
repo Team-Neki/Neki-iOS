@@ -19,6 +19,10 @@ fileprivate enum Constants {
     static let minZoomLevel: Double = 12.0
     static let maxZoomLevel: Double = 20.0
     static let initialZoomLevel: Double = 14.0
+    /// 영역에 카메라를 맞출 때 가장자리에 남길 여백
+    static let fitBoundsPadding: CGFloat = 40
+    /// 영역에 카메라를 맞출 때 보장할 최소 크기(위경도). 약 220m에 해당합니다.
+    static let minimumFitSpan: Double = 0.002
     
     // Marker Size
     static let normalSize = CGSize(width: 54, height: 62)
@@ -74,6 +78,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
         // State 변경 시 카메라 이동
         if context.coordinator.isMapLoaded {
             updateCameraPosition(uiView.mapView, context: context)
+            updateCameraFitBounds(uiView.mapView, context: context)
         }
         
         // 마커 업데이트
@@ -127,7 +132,31 @@ private extension NaverMapRepresentable {
         mapView.moveCamera(cameraUpdate)
         context.coordinator.lastCameraPosition = cameraPosition
     }
-    
+
+    /// 여러 지점을 한 화면에 담도록 카메라를 영역에 맞춥니다.
+    ///
+    /// 지점이 하나뿐이거나 몰려 있으면 영역이 한 점에 가까워 최대 배율까지 당겨지므로,
+    /// 최소 크기만큼 넓혀 적당한 배율을 유지합니다.
+    func updateCameraFitBounds(_ mapView: NMFMapView, context: Context) {
+        guard let bounds = store.cameraFitBounds,
+              bounds != context.coordinator.lastCameraFitBounds
+        else { return }
+        context.coordinator.lastCameraFitBounds = bounds
+
+        let latitudePadding = max(Constants.minimumFitSpan - (bounds.maxLatitude - bounds.minLatitude), .zero) / 2
+        let longitudePadding = max(Constants.minimumFitSpan - (bounds.maxLongitude - bounds.minLongitude), .zero) / 2
+        let latLngBounds = NMGLatLngBounds(
+            southWestLat: bounds.minLatitude - latitudePadding,
+            southWestLng: bounds.minLongitude - longitudePadding,
+            northEastLat: bounds.maxLatitude + latitudePadding,
+            northEastLng: bounds.maxLongitude + longitudePadding
+        )
+        let cameraUpdate = NMFCameraUpdate(fit: latLngBounds, padding: Constants.fitBoundsPadding)
+        cameraUpdate.animation = .linear
+        cameraUpdate.animationDuration = Constants.animationDuration
+        mapView.moveCamera(cameraUpdate)
+    }
+
     func updateContentInset(_ mapView: NMFMapView) {
         let sheetHeight = store.detent.resolve(in: UIScreen.main.bounds.height, inset: .screenTabBarHeight)
         let targetInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
@@ -150,6 +179,7 @@ extension NaverMapRepresentable {
         typealias BrandID = Int
         
         var lastCameraPosition: GeographicCoordinate?
+        var lastCameraFitBounds: GeographicBoundingBox?
         var isMapLoaded: Bool = false
         
         let parent: NaverMapRepresentable
@@ -597,10 +627,19 @@ public struct NaverMapView: View {
         .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
             DirectionAppsSheet(store: store, photoBooth: photoBooth)
         }
+        .fullScreenCover(isPresented: $store.isSearchPresented) {
+            PhotoBoothSearchView(
+                store: store.scope(state: \.photoBoothSearchState, action: \.photoBoothSearchAction)
+            )
+        }
         .overlay(alignment: .top) {
-            if store.isExploreHereButtonVisible {
-                exploreHereControl
+            VStack(spacing: 12) {
+                searchField
+                if store.isExploreHereButtonVisible {
+                    exploreHereControl
+                }
             }
+            .safeAreaPadding(.top, 8)
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
@@ -753,14 +792,28 @@ private extension NaverMapView {
         }
     }
     
+    /// 지도 상단의 재탐색 컨트롤입니다.
+    ///
+    /// 검색으로 지도가 옮겨진 상태(`appliedSearchQuery != nil`)에서는 지도 영역을 다시 조회하면
+    /// 검색 결과가 지워지므로, 문구와 동작을 모두 검색 전용으로 갈라 둡니다.
+    ///
+    /// - TODO: 검색 상태에서의 동작이 확정되지 않았습니다.
+    ///   문구는 "결과 더보기"로 확정했고, `didTapSearchResultMapControl`은 아직 아무 동작도 하지 않습니다.
+    @ViewBuilder
     var exploreHereControl: some View {
-        Button {
-            store.send(.didTapExploreHereButton)
-        } label: {
+        if store.appliedSearchQuery == nil {
+            mapTopControl(title: "이 지역 재탐색") { store.send(.didTapExploreHereButton) }
+        } else {
+            mapTopControl(title: "결과 더보기") { store.send(.didTapSearchResultMapControl) }
+        }
+    }
+
+    func mapTopControl(title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: 7) {
                 Image(.iconRotate)
-                
-                Text("이 지역 재탐색")
+
+                Text(title)
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
             }
@@ -776,7 +829,26 @@ private extension NaverMapView {
                     .strokeBorder(.primary400)
             }
         }
-        .safeAreaPadding(.top)
+    }
+
+    /// 검색 결과를 보는 동안에는 검색어를 검색 완료 형태로 남겨 둡니다.
+    ///
+    /// 검색어를 누르면 그 검색어로 검색 화면에 다시 들어가고, 지우기 버튼은 검색을 끝냅니다.
+    @ViewBuilder
+    var searchField: some View {
+        if let keyword = store.appliedSearchQuery?.rawValue {
+            NekiSearchField.completed(
+                keyword,
+                onEdit: { withoutAnimation { store.send(.didTapSearchField) } },
+                onClear: { store.send(.didTapClearSearchButton) }
+            )
+            .padding(.horizontal, 20)
+        } else {
+            NekiSearchField.entry("네컷 부스 검색하기") {
+                withoutAnimation { store.send(.didTapSearchField) }
+            }
+            .padding(.horizontal, 20)
+        }
     }
 }
 

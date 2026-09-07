@@ -7,6 +7,7 @@
 
 import Foundation
 import Dependencies
+import ImageIO
 import os
 
 struct DefaultQRCodeScanRepository: QRCodeScanRepository {
@@ -34,7 +35,9 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         
         for strategy in strategies {
             guard strategy.canHandle(host: host) else { continue }
-            return try await strategy.parse(qrCodeURL)
+            let parsedResult = try await strategy.parse(qrCodeURL)
+            guard isValidImageData(parsedResult.originalImage) else { throw .fallbackToWebView(qrCodeURL) }
+            return parsedResult
         }
         
         Task.detached(priority: .background) {
@@ -47,5 +50,15 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         }
         
         throw .unsupportedBrand
+    }
+}
+
+private extension DefaultQRCodeScanRepository {
+    func isValidImageData(_ data: Data) -> Bool {
+        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else { return false }
+        return CGImageSourceGetStatus(imageSource) == .statusComplete
+            && CGImageSourceGetCount(imageSource) > .zero
+            && CGImageSourceGetType(imageSource) != nil
     }
 }

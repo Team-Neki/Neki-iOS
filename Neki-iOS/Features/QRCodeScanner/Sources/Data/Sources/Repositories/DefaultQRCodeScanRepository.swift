@@ -55,10 +55,18 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
 
 private extension DefaultQRCodeScanRepository {
     func isValidImageData(_ data: Data) -> Bool {
-        let options: [CFString: Any] = [kCGImageSourceShouldCache: false]
-        guard let imageSource = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else { return false }
-        return CGImageSourceGetStatus(imageSource) == .statusComplete
-            && CGImageSourceGetCount(imageSource) > .zero
-            && CGImageSourceGetType(imageSource) != nil
+        let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary),
+              CGImageSourceGetStatus(imageSource) == .statusComplete,
+              CGImageSourceGetCount(imageSource) > .zero,
+              CGImageSourceGetType(imageSource) != nil
+        else { return false }
+
+        let decodingOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(imageSource, .zero, decodingOptions as CFDictionary) != nil
     }
 }

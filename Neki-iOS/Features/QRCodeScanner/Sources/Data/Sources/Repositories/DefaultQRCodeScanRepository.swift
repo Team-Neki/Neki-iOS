@@ -24,6 +24,7 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
             Life4CutStrategy(session: session),
             MonomansionStrategy(session: session),
             TheSayCheeseStrategy(session: session),
+            PixPixLinkStrategy(session: session),
             PhotoismStrategy()
         ]
     }

@@ -21,6 +21,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
     case harufilm
     case auraPic
     case theSayCheese
+    case pixPixLink
 
     /// QR Code 지원 브랜드의 도메인호스트입니다.
     ///
@@ -37,6 +38,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .harufilm: ["haru4.mx2.co.kr", "haru3.mx2.co.kr", "haru2.mx2.co.kr", "haru1.mx2.co.kr", "haru.mx2.co.kr"]
         case .auraPic: ["pos.aurapic.co.kr", "aurapic.co.kr"]
         case .theSayCheese: ["thesaycheese.co.kr"]
+        case .pixPixLink: ["t.pixpixlink.com"]
         }
     }
     
@@ -52,6 +54,7 @@ public enum QRCodeBrand: CustomStringConvertible, Sendable {
         case .harufilm: return "하루필름"
         case .auraPic: return "아우라픽"
         case .theSayCheese: return "더세이치즈"
+        case .pixPixLink: return "PixPixLink"
         }
     }
 }

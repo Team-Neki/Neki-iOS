@@ -30,18 +30,12 @@ public struct PhotoBoothSearchCandidatePage: Equatable, Sendable {
     }
 }
 
-/// 검색 세션에서 서버 순서대로 누적할 POI 페이지입니다.
-public struct PhotoBoothSearchResultPage: Equatable, Sendable {
-    public let photoBooths: [PhotoBooth]
-    public let hasNext: Bool
-
-    /// POI 검색 결과 페이지를 생성합니다.
-    ///
-    /// - Parameters:
-    ///   - photoBooths: 서버 순서를 유지한 포토부스 지점
-    ///   - hasNext: 다음 POI 페이지의 존재 여부
-    public init(photoBooths: [PhotoBooth], hasNext: Bool) {
-        self.photoBooths = photoBooths
-        self.hasNext = hasNext
-    }
+/// 검색 목록의 페이징 규격입니다.
+///
+/// 부스 조회에는 페이징이 없으므로 검색 후보 목록에만 적용합니다.
+public enum PhotoBoothSearchPaging {
+    /// 첫 페이지 번호입니다.
+    public static let firstPage: Int = 0
+    /// 한 번에 요청할 후보 수입니다. 서버가 허용하는 범위는 1~100입니다.
+    public static let size: Int = 20
 }

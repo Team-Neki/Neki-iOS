@@ -15,16 +15,15 @@ public final actor DefaultAuthRepository: AuthRepository {
     }
 
     @Dependency(\.networkProvider) private var networkProvider
-    @Dependency(\.tokenStorage) private var tokenStorage
-    @Dependency(\.networkRequestFailureEvents) private var requestFailureEvents
+    @Dependency(\.networkCredentialBroker) private var credentialBroker
     
     public init() {}
 
     public func credentialFailures() -> AsyncStream<AuthCredentialFailure> {
-        let failures = requestFailureEvents.failures()
         return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
             let task = Task {
                 defer { continuation.finish() }
+                let failures = await credentialBroker.failures()
                 for await failure in failures {
                     guard Task.isCancelled == false else { return }
                     let reason: AuthCredentialFailure.Reason
@@ -41,7 +40,7 @@ public final actor DefaultAuthRepository: AuthRepository {
 
     public func removeCredentials(matching failure: AuthCredentialFailure) async -> AuthCredentialFailure.RemovalResult {
         do {
-            return try await tokenStorage.delete(ifMatching: failure.revision) ? .removed : .superseded
+            return try await credentialBroker.removeCredentials(matchingRevision: failure.revision) ? .removed : .superseded
         } catch {
             Logger.data.error("Failed to remove invalid credentials: \(error.localizedDescription)")
             return .storageFailure
@@ -58,7 +57,7 @@ public final actor DefaultAuthRepository: AuthRepository {
             let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
             let tokens = data.toEntity()
-            try await tokenStorage.store(tokens)
+            try await credentialBroker.store(tokens)
             let registrationStatus: RegistrationStatus = data.isNewUser ? .newlyRegistered : .existingAccount
             return (tokens, registrationStatus)
         } catch { throw mapError(error) }
@@ -88,22 +87,22 @@ public final actor DefaultAuthRepository: AuthRepository {
     }
     
     public func withdraw() async throws(AuthRepositoryError) {
-        let generation = await tokenStorage.credentialGeneration
+        let generation = await credentialBroker.credentialGeneration
         let endpoint = AuthEndpoint.withdraw
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            guard try await tokenStorage.delete(ifMatchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
+            guard try await credentialBroker.removeCredentials(matchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
     }
     
     public func logout() async throws(AuthRepositoryError) {
-        let generation = await tokenStorage.credentialGeneration
+        let generation = await credentialBroker.credentialGeneration
         let endpoint = AuthEndpoint.logout
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            guard try await tokenStorage.delete(ifMatchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
+            guard try await credentialBroker.removeCredentials(matchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
@@ -130,7 +129,7 @@ public final actor DefaultAuthRepository: AuthRepository {
     }
 
     public func fetchStoredTokens() async -> AuthTokens? {
-        try? await tokenStorage.fetch()
+        try? await credentialBroker.fetchStoredTokens()
     }
 
     public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {

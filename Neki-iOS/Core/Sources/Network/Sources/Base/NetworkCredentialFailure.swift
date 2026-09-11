@@ -1,5 +1,5 @@
 //
-//  NetworkRequestFailure.swift
+//  NetworkCredentialFailure.swift
 //  Neki-iOS
 //
 //  Created by SwainYun on 8/31/26.
@@ -7,8 +7,8 @@
 
 import Foundation
 
-/// 재시도로 복구되지 않은 요청 실패입니다. 로그인 상태나 토큰 원문은 전달하지 않습니다.
-struct NetworkRequestFailure: Sendable {
+/// 재시도로 복구되지 않은 자격증명 실패입니다. 로그인 상태나 토큰 원문은 전달하지 않습니다.
+struct NetworkCredentialFailure: Sendable {
     enum Reason: Sendable {
         case credentialsUnavailable
         case unauthorized

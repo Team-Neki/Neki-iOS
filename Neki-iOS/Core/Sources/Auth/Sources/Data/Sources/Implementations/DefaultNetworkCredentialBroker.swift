@@ -74,7 +74,6 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker {
         let currentCredentials = try tokenStorage.snapshot()
         guard currentCredentials.generation == credentials.generation else { throw CancellationError() }
         guard currentCredentials.revision == credentials.revision else { return currentCredentials }
-        if let refreshRequest, refreshRequest.revision == credentials.revision { return try await refreshRequest.task.value }
 
         let id = UUID()
         let task = Task {

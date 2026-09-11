@@ -9,7 +9,7 @@ import Foundation
 import os
 
 enum AuthEndpoint {
-    case reissueToken
+    case reissueToken(dto: ReissueTokenDTO.Request)
     case login(dto: SocialLoginDTO.Request, provider: ProviderType)
     case logout
     case fetchTerms
@@ -68,7 +68,8 @@ extension AuthEndpoint: Endpoint {
     
     var body: (any Encodable)? {
         switch self {
-        case .reissueToken, .logout, .fetchUserInfo, .fetchTerms, .withdraw: return nil
+        case .logout, .fetchUserInfo, .fetchTerms, .withdraw: return nil
+        case let .reissueToken(dto): return dto
         case let .login(dto, _): return dto
         case let .agreeWithTerms(dto): return dto
         case let .editNickname(dto): return dto

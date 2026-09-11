@@ -97,8 +97,9 @@ struct ArchiveFavoriteAlbumFeature {
                 }
                 
             case .toggleFavoriteResponse(_, .success): return .none
-            case let .toggleFavoriteResponse(photoID, .failure):
+            case let .toggleFavoriteResponse(photoID, .failure(error)):
                 state.photos[id: photoID]?.isFavorite.toggle()
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case let .imagePicker(.delegate(.imagesConverted(entities))):
@@ -130,8 +131,9 @@ struct ArchiveFavoriteAlbumFeature {
                     await tracking
                 }
                 
-            case .registerPhotosResponse(.failure):
+            case let .registerPhotosResponse(.failure(error)):
                 state.isLoading = false
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
             case .fetchFavoritePhotos:
@@ -151,7 +153,7 @@ struct ArchiveFavoriteAlbumFeature {
                 
             case let .favoritePhotoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
-                guard error is CancellationError == false else { return .none }
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
             case .loadMorePhotos:
@@ -244,7 +246,8 @@ struct ArchiveFavoriteAlbumFeature {
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
-            case .deletePhotosResponse(.failure):
+            case let .deletePhotosResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
                 
             default: return .none

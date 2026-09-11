@@ -19,8 +19,9 @@ extension AppDiagnosticsClient: DependencyKey {
             @Dependency(\.authRepository) var authRepository
             @Dependency(\.pushNotificationRepository) var pushNotificationRepository
 
+            let authTokens = await authRepository.fetchStoredTokens()
             return await appDiagnosticsRepository.fetch(
-                authTokens: authRepository.fetchStoredTokens(),
+                authTokens: authTokens,
                 apnsTokenStatus: .from(pushNotificationRepository.fetchCurrentAPNSToken()),
                 fcmTokenStatus: .from(pushNotificationRepository.fetchCurrentFCMToken())
             )

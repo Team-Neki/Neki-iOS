@@ -68,9 +68,8 @@ extension DefaultArchiveRepository {
             )
         }
         let request = RegisterPhotoDTO.Request(folderID: folderID, uploads: uploadData, favorite: favorite)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.registerPhoto(request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.registerPhoto(request: request)) }
+        catch { throw mapArchiveRequestError(error) }
 
         markPhotoScopeDirty(.all)
         if let folderID {
@@ -85,9 +84,9 @@ extension DefaultArchiveRepository {
 
     func addFolder(name: String) async throws -> Int {
         let request = FolderDTO.Request(name: name)
-        let result: BaseResponseDTO<FolderDTO.Response> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.addFolder(request: request)
-        )
+        let result: BaseResponseDTO<FolderDTO.Response>
+        do { result = try await networkProvider.request(endpoint: ArchiveEndpoint.addFolder(request: request)) }
+        catch { throw mapArchiveRequestError(error) }
         guard let data = result.data else { throw NetworkError.responseDecodingError }
         isAlbumCacheDirty = true
         return data.folderId
@@ -106,9 +105,7 @@ extension DefaultArchiveRepository {
            pageState.isDirty == false,
            pageState.sortOrder == sortOrder {
             let hasCachedResult = pageState.orderedIDs.isEmpty == false || pageState.loadedPages.isEmpty == false
-            let hasInFlightRequest = inFlightRequests.keys.contains {
-                $0.scope == scope && $0.generation == pageState.generation
-            }
+            let hasInFlightRequest = inFlightRequests.keys.contains { $0.scope == scope && $0.generation == pageState.generation }
             if hasCachedResult { return snapshot(for: scope) }
             if hasInFlightRequest { return try await fetchPage(scope: scope, size: size, sortOrder: sortOrder) }
         }
@@ -135,9 +132,9 @@ extension DefaultArchiveRepository {
     func getAlbumList() async throws -> [AlbumEntity] {
         if isAlbumCacheDirty == false, albumCache.isEmpty == false { return albumCache }
 
-        let result: BaseResponseDTO<AlbumInfoDTO> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.getAlbumList
-        )
+        let result: BaseResponseDTO<AlbumInfoDTO>
+        do { result = try await networkProvider.request(endpoint: ArchiveEndpoint.getAlbumList) }
+        catch { throw mapArchiveRequestError(error) }
         guard let data = result.data else { throw NetworkError.responseDecodingError }
 
         albumCache = data.items.map {
@@ -155,9 +152,9 @@ extension DefaultArchiveRepository {
     func getFavoriteAlbumInfo() async throws -> FavoriteAlbumEntity {
         if isFavoriteAlbumInfoDirty == false, let favoriteAlbumInfoCache { return favoriteAlbumInfoCache }
 
-        let result: BaseResponseDTO<FavoriteAlbumInfoDTO> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.getFavoriteAlbumInfo
-        )
+        let result: BaseResponseDTO<FavoriteAlbumInfoDTO>
+        do { result = try await networkProvider.request(endpoint: ArchiveEndpoint.getFavoriteAlbumInfo) }
+        catch { throw mapArchiveRequestError(error) }
         guard let data = result.data else { throw NetworkError.responseDecodingError }
 
         let entity = FavoriteAlbumEntity(
@@ -175,9 +172,8 @@ extension DefaultArchiveRepository {
 extension DefaultArchiveRepository {
     func toggleFavorite(photoID: Int, request: Bool) async throws {
         let dto = ToggleFavoriteDTO(favorite: request)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.toggleFavorite(photoID: photoID, request: dto)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.toggleFavorite(photoID: photoID, request: dto)) }
+        catch { throw mapArchiveRequestError(error) }
 
         photosByID[photoID]?.isFavorite = request
         markPhotoScopeDirty(.favorites)
@@ -186,27 +182,24 @@ extension DefaultArchiveRepository {
 
     func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws {
         let request = DeletePhotoRequestDTO(photoIds: photoIDs)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.excludePhotosInAlbum(albumID: albumID, request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.excludePhotosInAlbum(albumID: albumID, request: request)) }
+        catch { throw mapArchiveRequestError(error) }
         isAlbumCacheDirty = true
         markPhotoScopeDirty(.album(albumID))
     }
 
     func editAlbumName(albumID: Int, name: String) async throws {
         let request = FolderDTO.Request(name: name)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.editFolderName(albumID: albumID, request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.editFolderName(albumID: albumID, request: request)) }
+        catch { throw mapArchiveRequestError(error) }
         isAlbumCacheDirty = true
     }
 
     func updatePhotoMemo(photoID: Int, memo: String) async throws {
         let capturedAt = photosByID[photoID]?.createdAtRawValue ?? Date().ISO8601Format()
         let request = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.updateMemo(photoID: photoID, request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.updateMemo(photoID: photoID, request: request)) }
+        catch { throw mapArchiveRequestError(error) }
         photosByID[photoID]?.memo = memo
     }
 
@@ -215,9 +208,8 @@ extension DefaultArchiveRepository {
             photoIDs: photoIDs,
             targetFolderIDs: targetFolderIDs
         )
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.duplicatePhoto(request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.duplicatePhoto(request: request)) }
+        catch { throw mapArchiveRequestError(error) }
 
         isAlbumCacheDirty = true
         targetFolderIDs.forEach { markPhotoScopeDirty(.album($0)) }
@@ -229,9 +221,8 @@ extension DefaultArchiveRepository {
             photoIDs: photoIDs,
             targetFolderIDs: targetFolderIDs
         )
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.movePhoto(request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.movePhoto(request: request)) }
+        catch { throw mapArchiveRequestError(error) }
 
         isAlbumCacheDirty = true
         markPhotoScopeDirty(.album(sourceFolderId))
@@ -244,9 +235,8 @@ extension DefaultArchiveRepository {
 extension DefaultArchiveRepository {
     func deletePhotoList(photoIDs: [Int]) async throws {
         let request = DeletePhotoRequestDTO(photoIds: photoIDs)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.deletePhoto(request: request)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.deletePhoto(request: request)) }
+        catch { throw mapArchiveRequestError(error) }
 
         let deletedIDs = Set(photoIDs)
         var affectedScopes = Set(pagesByScope.keys)
@@ -263,9 +253,8 @@ extension DefaultArchiveRepository {
 
     func deleteFolders(folderIDs: [Int], deletePhotos: Bool) async throws {
         let request = DeleteFoldersRequestDTO(folderIds: folderIDs)
-        let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(
-            endpoint: ArchiveEndpoint.deleteFolders(request: request, deletePhotos: deletePhotos)
-        )
+        do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.deleteFolders(request: request, deletePhotos: deletePhotos)) }
+        catch { throw mapArchiveRequestError(error) }
 
         isAlbumCacheDirty = true
         folderIDs.forEach { removePhotoPage(for: .album($0)) }
@@ -287,6 +276,17 @@ extension DefaultArchiveRepository {
         isFavoriteAlbumInfoDirty = true
     }
 }
+
+// MARK: - Error Mapping
+
+private extension DefaultArchiveRepository {
+    func mapArchiveRequestError(_ error: Error) -> Error {
+        guard let networkError = error as? NetworkError else { return error }
+        guard case .unauthorizedError = networkError else { return error }
+        return ArchiveRequestError.authenticationRequired
+    }
+}
+
 
 // MARK: - Photo Cache
 
@@ -366,9 +366,9 @@ private extension DefaultArchiveRepository {
         let endpoint: ArchiveEndpoint = scope == .favorites
             ? .getFavoritePhotoList(request: request)
             : .getPhotoList(request: request)
-        let response: BaseResponseDTO<PhotoListDTO.PhotoListData> = try await networkProvider.request(
-            endpoint: endpoint
-        )
+        let response: BaseResponseDTO<PhotoListDTO.PhotoListData>
+        do { response = try await networkProvider.request(endpoint: endpoint) }
+        catch { throw mapArchiveRequestError(error) }
         guard let data = response.data else { throw NetworkError.responseDecodingError }
         var photos = data.toEntity()
         if scope == .favorites {

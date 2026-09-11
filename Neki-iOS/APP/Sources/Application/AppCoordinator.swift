@@ -37,6 +37,7 @@ struct AppCoordinator {
         }
         var pendingSessionStatus: UserSessionStatus?
         var pendingAnalyticsSessionStatus: UserSessionStatus?
+        var sessionObservationID: UUID?
         var pendingRouteRequest: AppRouteRequest?
         var lastVersionCheckedTime: Date?
         var isSynchronizingPushNotification: Bool = false
@@ -66,6 +67,7 @@ struct AppCoordinator {
         // Internal Actions
         case splashSequenceCompleted(UserSessionStatus, AppVersionClient.VersionResult)
         case userSessionStatusChanged(UserSessionStatus)
+        case sessionExpirationReceived(UserSessionStatus, observationID: UUID)
         case analyticsSessionConfigured(UserSessionStatus, shouldPresentMarketingConsentAlert: Bool)
         case scenePhaseChanged(ScenePhase)
         case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
@@ -84,6 +86,7 @@ struct AppCoordinator {
     }
 
     private enum CancelID: Hashable {
+        case sessionExpirationObservation
         case analyticsSessionConfiguration
         case pushNotificationAuthorizationCheck
     }
@@ -95,6 +98,7 @@ struct AppCoordinator {
     @Dependency(\.continuousClock) var clock
     @Dependency(\.openURL) private var openURL
     @Dependency(\.date.now) private var now
+    @Dependency(\.uuid) private var uuid
     private let appRouter = AppRouter()
     
     var body: some ReducerOf<Self> {
@@ -137,6 +141,7 @@ struct AppCoordinator {
                     await send(.splashSequenceCompleted(finalStatus, finalVersionResult))
                 }
                 return .merge(
+                    observeSessionExpiration(state: &state),
                     .send(.pushNotificationEvent(.task)),
                     launchEffect
                 )
@@ -177,6 +182,7 @@ struct AppCoordinator {
                 }
                 
             case let .splashSequenceCompleted(finalStatus, finalVersionResult):
+                let finalStatus: UserSessionStatus = state.userSessionStatus == .expired ? .expired : finalStatus
                 state.$userSessionStatus.withLock { $0 = finalStatus }
                 
                 guard finalVersionResult.status != .mustUpdate else {
@@ -219,28 +225,14 @@ struct AppCoordinator {
                     status: pendingSessionStatus
                 )
                 
+            case let .sessionExpirationReceived(status, observationID):
+                guard state.sessionObservationID == observationID,
+                      case .signedIn = state.userSessionStatus,
+                      status == .expired else { return .none }
+                return handleSessionStatusChanged(state: &state, status: status)
+
             case let .userSessionStatusChanged(newStatus):
-                if state.userSessionStatus != newStatus { state.$userSessionStatus.withLock { $0 = newStatus } }
-
-                guard state.pendingAnalyticsSessionStatus != newStatus else { return .none }
-                
-                if case .splash = state.route, state.versionAlert != nil {
-                    return setAnalyticsSessionEffect(state: &state, for: newStatus)
-                }
-                
-                switch newStatus {
-                case .signedIn:
-                    guard case .mainTab = state.route else {
-                        return configureAnalyticsSession(state: &state, status: newStatus)
-                    }
-                    return setAnalyticsSessionEffect(state: &state, for: newStatus)
-
-                case .signedOut, .expired:
-                    state.hasSynchronizedPushNotification = false
-                    state.shouldRetryPushNotificationSynchronization = false
-                    state.lastSynchronizedPushAgreement = nil
-                    return configureAnalyticsSession(state: &state, status: newStatus)
-                }
+                return handleSessionStatusChanged(state: &state, status: newStatus)
 
             case let .analyticsSessionConfigured(status, shouldPresentMarketingConsentAlert):
                 guard state.pendingAnalyticsSessionStatus == status else { return .none }
@@ -273,10 +265,13 @@ struct AppCoordinator {
                 let signedInStatus = UserSessionStatus.signedIn(user)
                 state.pendingAnalyticsSessionStatus = signedInStatus
                 state.$userSessionStatus.withLock { $0 = signedInStatus }
-                return configureAnalyticsSession(
-                    state: &state,
-                    status: signedInStatus,
-                    shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                return .merge(
+                    observeSessionExpiration(state: &state),
+                    configureAnalyticsSession(
+                        state: &state,
+                        status: signedInStatus,
+                        shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                    )
                 )
 
             case let .route(.termsAgreement(.didFinishOnboarding(user, marketingConsentStatus))):
@@ -391,6 +386,42 @@ private extension UNAuthorizationStatus {
 // MARK: - AppCoordinator + Helpers
 
 private extension AppCoordinator {
+    func observeSessionExpiration(state: inout State) -> Effect<Action> {
+        let observationID = uuid()
+        state.sessionObservationID = observationID
+        return .run { send in
+            let statuses = try await authClient.observeSessionExpiration()
+            for await status in statuses {
+                guard Task.isCancelled == false else { return }
+                await send(.sessionExpirationReceived(status, observationID: observationID))
+            }
+        }
+        .cancellable(id: CancelID.sessionExpirationObservation, cancelInFlight: true)
+    }
+
+    func handleSessionStatusChanged(state: inout State, status: UserSessionStatus) -> Effect<Action> {
+        if state.userSessionStatus != status { state.$userSessionStatus.withLock { $0 = status } }
+        if status == .expired {
+            if state.pendingSessionStatus != nil { state.pendingSessionStatus = .expired }
+            state.pendingRouteRequest = nil
+        }
+        guard state.pendingAnalyticsSessionStatus != status else { return .none }
+        if case .splash = state.route {
+            guard state.versionAlert != nil else { return .none }
+            return setAnalyticsSessionEffect(state: &state, for: status)
+        }
+        switch status {
+        case .signedIn:
+            guard case .mainTab = state.route else { return configureAnalyticsSession(state: &state, status: status) }
+            return setAnalyticsSessionEffect(state: &state, for: status)
+        case .signedOut, .expired:
+            state.hasSynchronizedPushNotification = false
+            state.shouldRetryPushNotificationSynchronization = false
+            state.lastSynchronizedPushAgreement = nil
+            return configureAnalyticsSession(state: &state, status: status)
+        }
+    }
+
     func configureAnalyticsSession(
         state: inout State,
         status: UserSessionStatus,

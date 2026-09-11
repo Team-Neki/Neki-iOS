@@ -7,7 +7,7 @@
 
 import Foundation
 
-public enum UserSessionStatus: Equatable, Codable {
+public enum UserSessionStatus: Sendable, Equatable, Codable {
     case signedIn(User)
     case signedOut
     case expired

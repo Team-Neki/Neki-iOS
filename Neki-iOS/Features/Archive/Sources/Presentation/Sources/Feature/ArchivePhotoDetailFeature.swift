@@ -220,8 +220,7 @@ struct ArchivePhotoDetailFeature {
             case .onTapDelete:
                 guard let id = state.currentItem?.id else { return .none }
                 return .run { send in
-                    try? await archiveClient.deletePhotoList(photoIds: [id])
-                    await send(.deletePhotoResponse(.success(())))
+                    await send(.deletePhotoResponse(Result { try await archiveClient.deletePhotoList(photoIds: [id]) }))
                 }
                 
             case .deletePhotoResponse(.success):
@@ -244,7 +243,8 @@ struct ArchivePhotoDetailFeature {
                 }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
                 
-            case .deletePhotoResponse(.failure):
+            case let .deletePhotoResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
                 
             case .onTapShareToInstagramStory:

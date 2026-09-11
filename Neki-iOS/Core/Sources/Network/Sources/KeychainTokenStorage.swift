@@ -9,7 +9,7 @@ import Foundation
 import Security
 import os
 
-final actor KeychainTokenStorage {
+final class KeychainTokenStorage {
     private var generation = UUID()
     private var revision = UUID()
     private let encoder: JSONEncoder
@@ -124,28 +124,28 @@ private extension KeychainTokenStorage {
 extension KeychainTokenStorage: TokenStorage {
     var credentialGeneration: UUID { generation }
 
-    func store(_ tokens: AuthTokens) async throws(TokenStorageError) {
+    func store(_ tokens: AuthTokens) throws(TokenStorageError) {
         try storeTokens(tokens)
         generation = UUID()
         revision = UUID()
     }
     
-    func fetch() async throws(TokenStorageError) -> AuthTokens {
+    func fetch() throws(TokenStorageError) -> AuthTokens {
         guard let tokens = try storedTokens() else { throw .notFound }
         return tokens
     }
 
-    func snapshot() async throws(TokenStorageError) -> TokenStorageSnapshot {
+    func snapshot() throws(TokenStorageError) -> TokenStorageSnapshot {
         TokenStorageSnapshot(tokens: try storedTokens(), generation: generation, revision: revision)
     }
     
-    func delete() async throws(TokenStorageError) {
+    func delete() throws(TokenStorageError) {
         try delete(makeQuery())
         generation = UUID()
         revision = UUID()
     }
 
-    func delete(ifMatchingGeneration generation: UUID) async throws(TokenStorageError) -> Bool {
+    func delete(ifMatchingGeneration generation: UUID) throws(TokenStorageError) -> Bool {
         guard self.generation == generation else { return false }
         try delete(makeQuery())
         self.generation = UUID()
@@ -153,14 +153,14 @@ extension KeychainTokenStorage: TokenStorage {
         return true
     }
 
-    func store(_ tokens: AuthTokens, replacing revision: UUID) async throws(TokenStorageError) -> TokenStorageSnapshot? {
+    func store(_ tokens: AuthTokens, replacing revision: UUID) throws(TokenStorageError) -> TokenStorageSnapshot? {
         guard self.revision == revision else { return nil }
         try storeTokens(tokens)
         self.revision = UUID()
         return TokenStorageSnapshot(tokens: tokens, generation: generation, revision: self.revision)
     }
 
-    func delete(ifMatching revision: UUID) async throws(TokenStorageError) -> Bool {
+    func delete(ifMatching revision: UUID) throws(TokenStorageError) -> Bool {
         guard self.revision == revision else { return false }
         try delete(makeQuery())
         generation = UUID()

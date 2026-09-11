@@ -20,39 +20,43 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker {
         let task: Task<TokenStorageSnapshot, Error>
     }
 
-    @Dependency(\.tokenStorage) private var tokenStorage
+    private let tokenStorage: any TokenStorage
 
     private var refreshRequest: RefreshRequest?
     private var pendingFailure: NetworkCredentialFailure?
     private var lastPublishedRevision: UUID?
     private var continuations: [UUID: AsyncStream<NetworkCredentialFailure>.Continuation] = [:]
 
-    var credentialGeneration: UUID { get async { await tokenStorage.credentialGeneration } }
+    init(tokenStorage: any TokenStorage = KeychainTokenStorage(encoder: .init(), decoder: .init())) {
+        self.tokenStorage = tokenStorage
+    }
+
+    var credentialGeneration: UUID { tokenStorage.credentialGeneration }
 
     deinit { continuations.values.forEach { $0.finish() } }
 
     func isCurrent(generation: UUID) async -> Bool {
-        await tokenStorage.credentialGeneration == generation
+        tokenStorage.credentialGeneration == generation
     }
 
     func store(_ tokens: AuthTokens) async throws {
-        try await tokenStorage.store(tokens)
+        try tokenStorage.store(tokens)
     }
 
     func fetchStoredTokens() async throws -> AuthTokens {
-        try await tokenStorage.fetch()
+        try tokenStorage.fetch()
     }
 
     func removeCredentials(matchingRevision revision: UUID) async throws -> Bool {
-        try await tokenStorage.delete(ifMatching: revision)
+        try tokenStorage.delete(ifMatching: revision)
     }
 
     func removeCredentials(matchingGeneration generation: UUID) async throws -> Bool {
-        try await tokenStorage.delete(ifMatchingGeneration: generation)
+        try tokenStorage.delete(ifMatchingGeneration: generation)
     }
 
     func authorizedCredentials(using provider: any NetworkProvider) async throws -> TokenStorageSnapshot {
-        let credentials = try await tokenStorage.snapshot()
+        let credentials = try tokenStorage.snapshot()
         guard let tokens = credentials.tokens else {
             publish(.init(credentialRevision: credentials.revision, reason: .credentialsUnavailable))
             throw NetworkError.unauthorizedError
@@ -67,18 +71,16 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker {
     ) async throws -> TokenStorageSnapshot {
         if let refreshRequest, refreshRequest.revision == credentials.revision { return try await refreshRequest.task.value }
         guard let tokens = credentials.tokens else { throw CancellationError() }
-        let currentCredentials = try await tokenStorage.snapshot()
+        let currentCredentials = try tokenStorage.snapshot()
         guard currentCredentials.generation == credentials.generation else { throw CancellationError() }
         guard currentCredentials.revision == credentials.revision else { return currentCredentials }
         if let refreshRequest, refreshRequest.revision == credentials.revision { return try await refreshRequest.task.value }
 
         let id = UUID()
-        let tokenStorage = self.tokenStorage
         let task = Task {
             let newTokens = try await Self.requestRefresh(provider: provider, tokens: tokens)
             try Task.checkCancellation()
-            guard let stored = try await tokenStorage.store(newTokens, replacing: credentials.revision) else { throw CancellationError() }
-            return stored
+            return try self.storeRefreshedTokens(newTokens, replacing: credentials.revision)
         }
         refreshRequest = RefreshRequest(id: id, revision: credentials.revision, task: task)
         defer {
@@ -93,7 +95,7 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker {
     }
 
     func reportUnauthorized(_ credentials: TokenStorageSnapshot) async {
-        guard let current = try? await tokenStorage.snapshot(), current.revision == credentials.revision else { return }
+        guard let current = try? tokenStorage.snapshot(), current.revision == credentials.revision else { return }
         publish(.init(credentialRevision: credentials.revision, reason: .unauthorized))
     }
 
@@ -122,6 +124,11 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker {
     }
 
     private func removeContinuation(id: UUID) { continuations[id] = nil }
+
+    private func storeRefreshedTokens(_ tokens: AuthTokens, replacing revision: UUID) throws -> TokenStorageSnapshot {
+        guard let stored = try tokenStorage.store(tokens, replacing: revision) else { throw CancellationError() }
+        return stored
+    }
 
     private static func requestRefresh(provider: any NetworkProvider, tokens: AuthTokens) async throws -> AuthTokens {
         let destination = AuthEndpoint.reissueToken(dto: .init(refreshToken: tokens.refreshToken))

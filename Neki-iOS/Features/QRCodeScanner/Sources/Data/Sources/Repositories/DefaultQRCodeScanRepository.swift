@@ -7,6 +7,7 @@
 
 import Foundation
 import Dependencies
+import ImageIO
 import os
 
 struct DefaultQRCodeScanRepository: QRCodeScanRepository {
@@ -24,6 +25,7 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
             Life4CutStrategy(session: session),
             MonomansionStrategy(session: session),
             TheSayCheeseStrategy(session: session),
+            PixPixLinkStrategy(session: session),
             PhotoismStrategy()
         ]
     }
@@ -33,7 +35,9 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         
         for strategy in strategies {
             guard strategy.canHandle(host: host) else { continue }
-            return try await strategy.parse(qrCodeURL)
+            let parsedResult = try await strategy.parse(qrCodeURL)
+            guard isValidImageData(parsedResult.originalImage) else { throw .fallbackToWebView(qrCodeURL) }
+            return parsedResult
         }
         
         Task.detached(priority: .background) {
@@ -46,5 +50,23 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         }
         
         throw .unsupportedBrand
+    }
+}
+
+private extension DefaultQRCodeScanRepository {
+    func isValidImageData(_ data: Data) -> Bool {
+        let sourceOptions: [CFString: Any] = [kCGImageSourceShouldCache: false]
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, sourceOptions as CFDictionary),
+              CGImageSourceGetStatus(imageSource) == .statusComplete,
+              CGImageSourceGetCount(imageSource) > .zero,
+              CGImageSourceGetType(imageSource) != nil
+        else { return false }
+
+        let decodingOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1,
+            kCGImageSourceShouldCacheImmediately: true
+        ]
+        return CGImageSourceCreateThumbnailAtIndex(imageSource, .zero, decodingOptions as CFDictionary) != nil
     }
 }

@@ -9,7 +9,6 @@ import Foundation
 import os
 
 enum AuthEndpoint {
-    case reissueToken(dto: ReissueTokenDTO.Request)
     case login(dto: SocialLoginDTO.Request, provider: ProviderType)
     case logout
     case fetchTerms
@@ -25,9 +24,16 @@ enum AuthEndpoint {
 // MARK: - AuthEndpoint + Endpoint
 
 extension AuthEndpoint: Endpoint {
+    var credentialOperation: CredentialOperation {
+        switch self {
+        case .login: return .replaceOnSuccess
+        case .logout, .withdraw: return .removeOnSuccess
+        default: return .none
+        }
+    }
+
     var authorizationType: AuthorizationType {
         switch self {
-        case .reissueToken: return .reissue
         case .login, .fetchTerms: return .none
         case .logout, .agreeWithTerms, .withdraw, .editNickname, .editProfileImage, .fetchUserInfo: return .bearer
         }
@@ -45,7 +51,6 @@ extension AuthEndpoint: Endpoint {
     
     var path: String {
         switch self {
-        case .reissueToken: return "auth/refresh"
         case let .login(_, provider): return "auth/\(provider.name)/login"
         case .logout: return "users/logout"
         case .fetchTerms: return "terms"
@@ -59,7 +64,7 @@ extension AuthEndpoint: Endpoint {
     
     var method: HTTPMethodType {
         switch self {
-        case .reissueToken, .login, .logout, .agreeWithTerms: return .post
+        case .login, .logout, .agreeWithTerms: return .post
         case .withdraw: return .delete
         case .editNickname, .editProfileImage: return .patch
         case .fetchUserInfo, .fetchTerms: return .get
@@ -69,7 +74,6 @@ extension AuthEndpoint: Endpoint {
     var body: (any Encodable)? {
         switch self {
         case .logout, .fetchUserInfo, .fetchTerms, .withdraw: return nil
-        case let .reissueToken(dto): return dto
         case let .login(dto, _): return dto
         case let .agreeWithTerms(dto): return dto
         case let .editNickname(dto): return dto

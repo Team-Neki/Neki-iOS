@@ -12,12 +12,12 @@ protocol NetworkCredentialBroker: Sendable {
     var credentialGeneration: UUID { get async }
 
     func isCurrent(generation: UUID) async -> Bool
-    func store(_ tokens: AuthTokens) async throws
-    func fetchStoredTokens() async throws -> AuthTokens
-    func removeCredentials(matchingRevision revision: UUID) async throws -> Bool
+    func store(_ tokens: AuthTokens, matchingGeneration generation: UUID) async throws
     func removeCredentials(matchingGeneration generation: UUID) async throws -> Bool
-    func authorizedCredentials(using provider: any NetworkProvider) async throws -> TokenStorageSnapshot
-    func refresh(using provider: any NetworkProvider, credentials: TokenStorageSnapshot) async throws -> TokenStorageSnapshot
-    func reportUnauthorized(_ credentials: TokenStorageSnapshot) async
-    func failures() async -> AsyncStream<NetworkCredentialFailure>
+    /// 인증 복구와 한 차례의 재시도를 조율합니다. 실제 HTTP 전송은 operation이 담당합니다.
+    func performAuthenticatedRequest(
+        using provider: any NetworkProvider,
+        generation: UUID,
+        operation: @Sendable (AuthTokens) async throws -> Data
+    ) async throws -> Data
 }

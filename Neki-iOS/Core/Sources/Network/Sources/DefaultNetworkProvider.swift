@@ -12,14 +12,17 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     private let session: URLSessionProtocol
     private let credentialBroker: any NetworkCredentialBroker
     private let decoder: JSONDecoder
+    private let reportCredentialFailure: @Sendable (NetworkCredentialFailure, @escaping @Sendable () async -> Bool) async -> Void
 
     init(
         session: URLSessionProtocol = URLSession.shared,
         credentialBroker: any NetworkCredentialBroker,
-        decoder: JSONDecoder = JSONDecoder()
+        decoder: JSONDecoder = JSONDecoder(),
+        reportCredentialFailure: @escaping @Sendable (NetworkCredentialFailure, @escaping @Sendable () async -> Bool) async -> Void
     ) {
         self.session = session
         self.credentialBroker = credentialBroker
+        self.reportCredentialFailure = reportCredentialFailure
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
         decoder.dateDecodingStrategy = .formatted(formatter)
@@ -29,12 +32,21 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
     /// 임시 구현 - Presigned URL 요청 시에만 사용합니다
     public func requestVoid(endpoint: Endpoint) async throws -> Void {
+        guard endpoint.credentialOperation == .none else {
+            let _: BaseResponseDTO<EmptyData> = try await performRequest(endpoint: endpoint)
+            return
+        }
         guard endpoint.authorizationType == .none else {
-            _ = try await performDataRequest(endpoint: endpoint, retryCount: 1)
+            let generation = await credentialBroker.credentialGeneration
+            do { _ = try await performDataRequest(endpoint: endpoint, generation: generation) }
+            catch let failure as NetworkCredentialFailure {
+                guard await credentialBroker.isCurrent(generation: failure.credentialGeneration) else { throw CancellationError() }
+                throw NetworkError.unauthorizedError
+            }
             return
         }
         // Presigned URL 업로드의 기존 응답/오류 계약은 변경하지 않습니다.
-        let request = try buildRequest(for: endpoint, tokens: nil)
+        let request = try endpoint.asURLRequest()
         requestLog(request)
         do {
             let (_, response) = try await session.data(for: request, delegate: nil)
@@ -53,12 +65,12 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     /// 네트워크 요청을 수행하고 성공 여부만 판단하며 BaseResponseDTO<EmptyData>를 반환합니다
     @discardableResult
     public func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData> {
-        try await performRequest(endpoint: endpoint, retryCount: 1)
+        try await performRequest(endpoint: endpoint)
     }
     
     /// 네트워크 요청을 수행하고 제네릭 타입으로 응답 데이터를 디코딩합니다.
     public func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
-        try await performRequest(endpoint: endpoint, retryCount: 1)
+        try await performRequest(endpoint: endpoint)
     }
 }
 
@@ -66,13 +78,26 @@ public final actor DefaultNetworkProvider: NetworkProvider {
 // MARK: - Core Logics
 
 private extension DefaultNetworkProvider {
-    func performRequest<T: Decodable>(endpoint: Endpoint, retryCount: Int) async throws -> BaseResponseDTO<T> {
+    func performRequest<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
+        try Task.checkCancellation()
         let generation = await credentialBroker.credentialGeneration
         do {
-            let data = try await performDataRequest(endpoint: endpoint, retryCount: retryCount, generation: generation)
+            let data = try await performDataRequest(endpoint: endpoint, generation: generation)
             try Task.checkCancellation()
             try await verifyAuthorizationGeneration(generation, for: endpoint)
-            return try decode(data: data)
+            let response: BaseResponseDTO<T> = try decode(data: data)
+            switch endpoint.credentialOperation {
+            case .none: break
+            case .replaceOnSuccess:
+                guard let tokens = response.data as? any TokenContainer else { throw NetworkError.responseDecodingError }
+                try await credentialBroker.store(tokens.toEntity(), matchingGeneration: generation)
+            case .removeOnSuccess:
+                guard try await credentialBroker.removeCredentials(matchingGeneration: generation) else { throw CancellationError() }
+            }
+            return response
+        } catch let failure as NetworkCredentialFailure {
+            guard await credentialBroker.isCurrent(generation: failure.credentialGeneration) else { throw CancellationError() }
+            throw NetworkError.unauthorizedError
         } catch {
             try Task.checkCancellation()
             try await verifyAuthorizationGeneration(generation, for: endpoint)
@@ -80,35 +105,39 @@ private extension DefaultNetworkProvider {
         }
     }
 
-    func performDataRequest(endpoint: Endpoint, retryCount: Int, generation: UUID? = nil) async throws -> Data {
+    func performDataRequest(endpoint: Endpoint, generation: UUID) async throws -> Data {
         try Task.checkCancellation()
-        let requestGeneration: UUID
-        if let generation { requestGeneration = generation } else { requestGeneration = await credentialBroker.credentialGeneration }
-        try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
-        let credentials: TokenStorageSnapshot?
-        if endpoint.authorizationType == .bearer {
-            credentials = try await credentialBroker.authorizedCredentials(using: self)
-        } else {
-            credentials = nil
+        try await verifyAuthorizationGeneration(generation, for: endpoint)
+        let request = try endpoint.asURLRequest()
+        guard endpoint.authorizationType == .bearer else { return try await executeValidatedRequest(request) }
+
+        do {
+            return try await credentialBroker.performAuthenticatedRequest(using: self, generation: generation) { tokens in
+                try Task.checkCancellation()
+                guard await self.credentialBroker.isCurrent(generation: generation) else { throw CancellationError() }
+                var authorizedRequest = request
+                authorizedRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
+                let data = try await self.executeValidatedRequest(authorizedRequest)
+                try Task.checkCancellation()
+                guard await self.credentialBroker.isCurrent(generation: generation) else { throw CancellationError() }
+                return data
+            }
+        } catch let failure as NetworkCredentialFailure {
+            guard await credentialBroker.isCurrent(generation: failure.credentialGeneration) else { throw CancellationError() }
+            // 수신자는 조립 지점에서 연결합니다. Network는 AuthClient나 세션 스트림을 알지 않습니다.
+            await reportCredentialFailure(failure) { [credentialBroker] in
+                await credentialBroker.isCurrent(generation: failure.credentialGeneration)
+            }
+            throw failure
         }
-        try Task.checkCancellation()
-        try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
-        let request = try buildRequest(for: endpoint, tokens: credentials?.tokens)
+    }
+
+    func executeValidatedRequest(_ request: URLRequest) async throws -> Data {
         let (data, response) = try await executeSession(with: request)
         try Task.checkCancellation()
-        try await verifyAuthorizationGeneration(requestGeneration, for: endpoint)
-
         switch validateResponse(response) {
         case .success: return data
-        case .unauthorized:
-            guard endpoint.authorizationType == .bearer, let credentials else { throw NetworkError.unauthorizedError }
-            guard retryCount > .zero else {
-                await credentialBroker.reportUnauthorized(credentials)
-                throw NetworkError.unauthorizedError
-            }
-            // 다른 요청이 이미 재발급했다면 현재 토큰으로 재시도하고 중복 재발급하지 않습니다.
-            _ = try await credentialBroker.refresh(using: self, credentials: credentials)
-            return try await performDataRequest(endpoint: endpoint, retryCount: retryCount - 1, generation: requestGeneration)
+        case .unauthorized: throw NetworkError.unauthorizedError
         case .failure(let error): throw error
         }
     }
@@ -131,22 +160,11 @@ private extension DefaultNetworkProvider {
 }
 
 
-// MARK: - Build Request
-
-private extension DefaultNetworkProvider {
-    func buildRequest(for endpoint: Endpoint, tokens: AuthTokens?) throws -> URLRequest {
-        var request = try endpoint.asURLRequest()
-        if let tokens { request.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization") }
-        return request
-    }
-}
-
-
 // MARK: - Auth Retry Logic
 
 private extension DefaultNetworkProvider {
     func verifyAuthorizationGeneration(_ generation: UUID, for endpoint: Endpoint) async throws {
-        guard endpoint.authorizationType != .none else { return }
+        guard endpoint.authorizationType != .none || endpoint.credentialOperation != .none else { return }
         guard await credentialBroker.isCurrent(generation: generation) else { throw CancellationError() }
     }
 }

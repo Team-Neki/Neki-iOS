@@ -18,11 +18,9 @@ public enum ProfileImageEditAction: Sendable, Equatable {
     case keep
 }
 
-public protocol AuthRepository: Sendable {
-    /// 요청에 사용할 수 없었던 자격증명을 관찰합니다. 세션 만료 정책은 적용하지 않습니다.
-    func credentialFailures() async -> AsyncStream<AuthCredentialFailure>
-    /// 실패한 자격증명이 아직 저장되어 있을 때만 삭제합니다. 다른 자격증명은 변경하지 않습니다.
-    func removeCredentials(matching failure: AuthCredentialFailure) async -> AuthCredentialFailure.RemovalResult
+public protocol AuthRepository: AuthCredentialFailureHandling {
+    /// 실패 처리 후 새로운 로그인이 이루어지지 않았는지 확인합니다.
+    func isCurrentSession(matching failure: AuthCredentialFailure) async throws(AuthRepositoryError) -> Bool
     /// 로그인/회원가입, idToken으로 서비스 토큰을 확보
     func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> (tokens: AuthTokens, registrationStatus: RegistrationStatus)
     /// 사용자 정보 조회
@@ -35,8 +33,6 @@ public protocol AuthRepository: Sendable {
     func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void
     /// 자동 로그인 (유저 세션 복구)
     func restoreSession() async throws(AuthRepositoryError) -> User
-    /// 로컬 인증 토큰 조회
-    func fetchStoredTokens() async -> AuthTokens?
     /// 이용약관 목록 조회
     func fetchTerms() async throws(AuthRepositoryError) -> [Term]
     /// 이용약관 동의

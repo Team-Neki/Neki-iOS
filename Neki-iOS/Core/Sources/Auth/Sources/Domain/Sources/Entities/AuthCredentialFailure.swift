@@ -7,26 +7,18 @@
 
 import Foundation
 
-/// 요청을 인증할 수 없었던 자격증명입니다. 사용자 세션을 만료시킬지는 Client가 결정합니다.
+/// 인증 복구 실패가 발생한 세션입니다. 현재 세션에 해당하는지 확인한 후 만료시킵니다.
 public struct AuthCredentialFailure: Sendable {
     public enum Reason: Sendable {
         case missingCredentials
         case rejectedCredentials
     }
 
-    public enum RemovalResult: Sendable {
-        case removed
-        /// 새 로그인 또는 재발급으로 다른 자격증명이 저장되어 삭제하지 않았습니다.
-        case superseded
-        /// 일치하는 자격증명을 확인했으나 저장소에서 제거하지 못했습니다.
-        case storageFailure
-    }
-
-    public let revision: UUID
+    public let generation: UUID
     public let reason: Reason
 
-    public init(revision: UUID, reason: Reason) {
-        self.revision = revision
+    public init(generation: UUID, reason: Reason) {
+        self.generation = generation
         self.reason = reason
     }
 }

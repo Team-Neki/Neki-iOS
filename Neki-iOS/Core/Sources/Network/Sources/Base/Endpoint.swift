@@ -30,6 +30,7 @@ public enum HTTPContentType {
 }
 
 public protocol Endpoint {
+    var credentialOperation: CredentialOperation { get }
     var authorizationType: AuthorizationType { get }
     var contentType: HTTPContentType { get }
     var baseURL: String { get }
@@ -43,6 +44,8 @@ public protocol Endpoint {
 }
 
 extension Endpoint {
+    public var credentialOperation: CredentialOperation { .none }
+
     public var baseURL: String {
         guard let baseURLString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
             Logger.data.fault("Base URL not found in Bundle")

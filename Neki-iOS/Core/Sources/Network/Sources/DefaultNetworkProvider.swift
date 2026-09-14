@@ -112,14 +112,14 @@ private extension DefaultNetworkProvider {
         guard endpoint.authorizationType == .bearer else { return try await executeValidatedRequest(request) }
 
         do {
-            return try await credentialBroker.performAuthenticatedRequest(using: self, generation: generation) { tokens in
+            return try await credentialBroker.performAuthenticatedRequest(using: self, generation: generation) { tokens, revision in
                 try Task.checkCancellation()
-                guard await self.credentialBroker.isCurrent(generation: generation) else { throw CancellationError() }
+                guard await self.credentialBroker.isUsable(generation: generation, revision: revision) else { throw CancellationError() }
                 var authorizedRequest = request
                 authorizedRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
                 let data = try await self.executeValidatedRequest(authorizedRequest)
                 try Task.checkCancellation()
-                guard await self.credentialBroker.isCurrent(generation: generation) else { throw CancellationError() }
+                guard await self.credentialBroker.isUsable(generation: generation, revision: revision) else { throw CancellationError() }
                 return data
             }
         } catch let failure as NetworkCredentialFailure {

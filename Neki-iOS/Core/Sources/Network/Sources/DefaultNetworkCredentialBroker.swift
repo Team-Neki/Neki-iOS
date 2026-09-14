@@ -22,6 +22,8 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDi
     private let tokenStorage: any TokenStorage
 
     private var refreshRequest: RefreshRequest?
+    /// 삭제 실패 시에도 서버가 거부한 자격증명을 차단합니다. 앱 재시작 시 자동 로그인 시도는 유지합니다.
+    private var rejectedCredentialRevision: UUID?
 
     init(tokenStorage: any TokenStorage = KeychainTokenStorage(encoder: .init(), decoder: .init())) {
         self.tokenStorage = tokenStorage
@@ -33,10 +35,15 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDi
         tokenStorage.credentialGeneration == generation
     }
 
+    func isUsable(generation: UUID, revision: UUID) -> Bool {
+        tokenStorage.credentialGeneration == generation && rejectedCredentialRevision != revision
+    }
+
     func store(_ tokens: AuthTokens, matchingGeneration generation: UUID) throws {
         try Task.checkCancellation()
         guard tokenStorage.credentialGeneration == generation else { throw CancellationError() }
         try tokenStorage.store(tokens)
+        rejectedCredentialRevision = nil
     }
 
     func fetchStoredTokens() throws -> AuthTokens {
@@ -45,22 +52,26 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDi
 
     func removeCredentials(matchingGeneration generation: UUID) throws -> Bool {
         try Task.checkCancellation()
-        return try tokenStorage.delete(ifMatchingGeneration: generation)
+        let removed = try tokenStorage.delete(ifMatchingGeneration: generation)
+        if removed { rejectedCredentialRevision = nil }
+        return removed
     }
 
     func performAuthenticatedRequest(
         using provider: any NetworkProvider,
         generation: UUID,
-        operation: @Sendable (AuthTokens) async throws -> Data
+        operation: @Sendable (AuthTokens, UUID) async throws -> Data
     ) async throws -> Data {
         guard tokenStorage.credentialGeneration == generation else { throw CancellationError() }
         let credentials = try await authorizedCredentials(using: provider)
+        try ensureUsable(credentials)
         guard let tokens = credentials.tokens else { throw CancellationError() }
-        do { return try await operation(tokens) }
+        do { return try await operation(tokens, credentials.revision) }
         catch NetworkError.unauthorizedError {
             let refreshed = try await refresh(using: provider, credentials: credentials)
+            try ensureUsable(refreshed)
             guard let tokens = refreshed.tokens else { throw CancellationError() }
-            do { return try await operation(tokens) }
+            do { return try await operation(tokens, refreshed.revision) }
             catch NetworkError.unauthorizedError { throw try unauthorizedFailure(refreshed) }
         }
     }
@@ -72,6 +83,7 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDi
 private extension DefaultNetworkCredentialBroker {
     func authorizedCredentials(using provider: any NetworkProvider) async throws -> TokenStorageSnapshot {
         let credentials = try tokenStorage.snapshot()
+        try ensureUsable(credentials)
         guard let tokens = credentials.tokens else {
             throw NetworkCredentialFailure(credentialGeneration: credentials.generation, reason: .credentialsUnavailable)
         }
@@ -83,6 +95,7 @@ private extension DefaultNetworkCredentialBroker {
         using provider: any NetworkProvider,
         credentials: TokenStorageSnapshot
     ) async throws -> TokenStorageSnapshot {
+        try ensureUsable(credentials)
         if let refreshRequest, refreshRequest.revision == credentials.revision {
             do { return try await refreshRequest.task.value }
             catch NetworkError.unauthorizedError { throw try unauthorizedFailure(credentials) }
@@ -111,6 +124,7 @@ private extension DefaultNetworkCredentialBroker {
 
     func unauthorizedFailure(_ credentials: TokenStorageSnapshot) throws -> NetworkCredentialFailure {
         guard try tokenStorage.snapshot().revision == credentials.revision else { throw CancellationError() }
+        rejectedCredentialRevision = credentials.revision
         // 비교와 삭제는 동일한 actor 구간에서 완료합니다. 삭제 실패도 인증 복구 성공은 아닙니다.
         do { _ = try tokenStorage.delete(ifMatching: credentials.revision) }
         catch { Logger.data.error("Failed to remove invalid credentials: \(error.localizedDescription)") }
@@ -118,8 +132,17 @@ private extension DefaultNetworkCredentialBroker {
     }
 
     func storeRefreshedTokens(_ tokens: AuthTokens, replacing revision: UUID) throws -> TokenStorageSnapshot {
+        guard rejectedCredentialRevision != revision else { throw CancellationError() }
         guard let stored = try tokenStorage.store(tokens, replacing: revision) else { throw CancellationError() }
         return stored
+    }
+
+    func ensureUsable(_ credentials: TokenStorageSnapshot) throws {
+        try Task.checkCancellation()
+        guard tokenStorage.credentialGeneration == credentials.generation else { throw CancellationError() }
+        guard rejectedCredentialRevision != credentials.revision else {
+            throw NetworkCredentialFailure(credentialGeneration: credentials.generation, reason: .unauthorized)
+        }
     }
 
     func requestRefresh(provider: any NetworkProvider, tokens: AuthTokens) async throws -> AuthTokens {

@@ -16,10 +16,10 @@ extension AppDiagnosticsClient: DependencyKey {
     public static let liveValue = Self(
         fetch: {
             @Dependency(\.appDiagnosticsRepository) var appDiagnosticsRepository
-            @Dependency(\.authRepository) var authRepository
+            @Dependency(\.authTokenDiagnosticsReader) var tokenReader
             @Dependency(\.pushNotificationRepository) var pushNotificationRepository
 
-            let authTokens = await authRepository.fetchStoredTokens()
+            let authTokens = try? await tokenReader.fetchStoredTokens()
             return await appDiagnosticsRepository.fetch(
                 authTokens: authTokens,
                 apnsTokenStatus: .from(pushNotificationRepository.fetchCurrentAPNSToken()),

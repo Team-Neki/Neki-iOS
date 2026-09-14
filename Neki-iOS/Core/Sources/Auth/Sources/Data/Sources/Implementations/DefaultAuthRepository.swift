@@ -14,37 +14,22 @@ public final actor DefaultAuthRepository: AuthRepository {
         static let marketingTermType = "MARKETING"
     }
 
+    private var pendingCredentialFailure: AuthCredentialFailure?
+    private var lastPublishedCredentialGeneration: UUID?
+    private var credentialFailureContinuations: [UUID: AsyncStream<AuthCredentialFailure>.Continuation] = [:]
+    private var credentialFailureValidation: (@Sendable () async -> Bool)?
+
     @Dependency(\.networkProvider) private var networkProvider
-    @Dependency(\.networkCredentialBroker) private var credentialBroker
     
     public init() {}
 
-    public func credentialFailures() -> AsyncStream<AuthCredentialFailure> {
-        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
-            let task = Task {
-                defer { continuation.finish() }
-                let failures = await credentialBroker.failures()
-                for await failure in failures {
-                    guard Task.isCancelled == false else { return }
-                    let reason: AuthCredentialFailure.Reason
-                    switch failure.reason {
-                    case .credentialsUnavailable: reason = .missingCredentials
-                    case .unauthorized: reason = .rejectedCredentials
-                    }
-                    continuation.yield(.init(revision: failure.credentialRevision, reason: reason))
-                }
-            }
-            continuation.onTermination = { _ in task.cancel() }
-        }
-    }
+    deinit { credentialFailureContinuations.values.forEach { $0.finish() } }
 
-    public func removeCredentials(matching failure: AuthCredentialFailure) async -> AuthCredentialFailure.RemovalResult {
-        do {
-            return try await credentialBroker.removeCredentials(matchingRevision: failure.revision) ? .removed : .superseded
-        } catch {
-            Logger.data.error("Failed to remove invalid credentials: \(error.localizedDescription)")
-            return .storageFailure
-        }
+    public func isCurrentSession(matching failure: AuthCredentialFailure) async throws(AuthRepositoryError) -> Bool {
+        guard lastPublishedCredentialGeneration == failure.generation,
+              let credentialFailureValidation else { return false }
+        guard await credentialFailureValidation() else { return false }
+        return lastPublishedCredentialGeneration == failure.generation
     }
     
     public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> (tokens: AuthTokens, registrationStatus: RegistrationStatus) {
@@ -57,7 +42,6 @@ public final actor DefaultAuthRepository: AuthRepository {
             let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
             let tokens = data.toEntity()
-            try await credentialBroker.store(tokens)
             let registrationStatus: RegistrationStatus = data.isNewUser ? .newlyRegistered : .existingAccount
             return (tokens, registrationStatus)
         } catch { throw mapError(error) }
@@ -87,22 +71,18 @@ public final actor DefaultAuthRepository: AuthRepository {
     }
     
     public func withdraw() async throws(AuthRepositoryError) {
-        let generation = await credentialBroker.credentialGeneration
         let endpoint = AuthEndpoint.withdraw
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            guard try await credentialBroker.removeCredentials(matchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
     }
     
     public func logout() async throws(AuthRepositoryError) {
-        let generation = await credentialBroker.credentialGeneration
         let endpoint = AuthEndpoint.logout
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            guard try await credentialBroker.removeCredentials(matchingGeneration: generation) else { throw AuthRepositoryError.unauthorized }
         } catch is TokenStorageError {
             throw .userNotFound
         } catch { throw mapError(error) }
@@ -126,10 +106,6 @@ public final actor DefaultAuthRepository: AuthRepository {
     
     public func restoreSession() async throws(AuthRepositoryError) -> User {
         try await fetchUser()
-    }
-
-    public func fetchStoredTokens() async -> AuthTokens? {
-        try? await credentialBroker.fetchStoredTokens()
     }
 
     public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {
@@ -156,9 +132,46 @@ public final actor DefaultAuthRepository: AuthRepository {
 }
 
 
+// MARK: - DefaultAuthRepository + AuthCredentialFailureHandling
+
+extension DefaultAuthRepository {
+    public func reportCredentialFailure(
+        _ failure: AuthCredentialFailure,
+        isCurrent: @escaping @Sendable () async -> Bool
+    ) async {
+        // 유효성 확인 중 다른 실패가 반영되었다면 재검증해 오래된 결과의 역전 반영을 막습니다.
+        while true {
+            let previousGeneration = lastPublishedCredentialGeneration
+            guard await isCurrent() else { return }
+            guard previousGeneration == lastPublishedCredentialGeneration else { continue }
+            guard lastPublishedCredentialGeneration != failure.generation else { return }
+            lastPublishedCredentialGeneration = failure.generation
+            credentialFailureValidation = isCurrent
+            // 구독 교체 도중 소비되지 않은 실패도 다음 구독에서 다시 확인할 수 있도록 한 건만 유지합니다.
+            pendingCredentialFailure = failure
+            credentialFailureContinuations.values.forEach { $0.yield(failure) }
+            return
+        }
+    }
+
+    public func credentialFailures() -> AsyncStream<AuthCredentialFailure> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<AuthCredentialFailure>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        credentialFailureContinuations[id] = continuation
+        if let pendingCredentialFailure { continuation.yield(pendingCredentialFailure) }
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeCredentialFailureContinuation(id: id) }
+        }
+        return stream
+    }
+}
+
+
 // MARK: - DefaultAuthRepository + Helpers
 
 private extension DefaultAuthRepository {
+    func removeCredentialFailureContinuation(id: UUID) { credentialFailureContinuations[id] = nil }
+
     func mapError(_ error: Error) -> AuthRepositoryError {
         switch error {
         case let error as AuthRepositoryError: return error

@@ -53,13 +53,12 @@ extension AuthClient: DependencyKey {
                         guard Task.isCancelled == false else { return }
                         switch failure.reason {
                         case .missingCredentials, .rejectedCredentials:
-                            let result = await authRepository.removeCredentials(matching: failure)
-                            guard Task.isCancelled == false else { return }
-                            switch result {
-                            case .superseded: continue
-                            // 저장소 삭제 실패도 인증 불가능한 세션을 유지할 근거가 되지는 않습니다.
-                            case .removed, .storageFailure: continuation.yield(.expired)
-                            }
+                            do {
+                                guard try await authRepository.isCurrentSession(matching: failure) else { continue }
+                                guard Task.isCancelled == false else { return }
+                                continuation.yield(.expired)
+                            } catch AuthRepositoryError.cancelled { return }
+                            catch { Logger.domain.error("Session expiration validation failed: \(error.localizedDescription)") }
                         }
                     }
                 }

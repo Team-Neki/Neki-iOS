@@ -121,8 +121,9 @@ struct ArchiveFeature {
             case .toggleFavoriteResponse(_, .success):
                 return .merge(.send(.fetchAlbums), .send(.fetchPhotos))
                 
-            case let .toggleFavoriteResponse(photoID, .failure):
+            case let .toggleFavoriteResponse(photoID, .failure(error)):
                 state.photos[id: photoID]?.isFavorite.toggle()
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapCancelAddAlbum:
@@ -148,7 +149,8 @@ struct ArchiveFeature {
                     }
                 )
                 
-            case .addFolderResponse(.failure):
+            case let .addFolderResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 만들지 못했어요", style: .error))))
                 
             case .onTapQRScan: return .send(.delegate(.requestQRScan))
@@ -180,7 +182,8 @@ struct ArchiveFeature {
                 state.albums.insert(album, at: 0)
                 return .none
                 
-            case .favoriteAlbumResponse(.failure):
+            case let .favoriteAlbumResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 앨범을 불러오지 못했어요", style: .error))))
                 
             case let .albumsResponse(.success(fetchedAlbums)):
@@ -191,7 +194,8 @@ struct ArchiveFeature {
                 state.albums = IdentifiedArray(uniqueElements: newAlbums)
                 return .none
                 
-            case .albumsResponse(.failure):
+            case let .albumsResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 불러오지 못했어요", style: .error))))
                 
             case .fetchPhotos:
@@ -211,7 +215,7 @@ struct ArchiveFeature {
                 
             case let .photoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
-                guard error is CancellationError == false else { return .none }
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
             case .loadMorePhotos:
@@ -267,8 +271,9 @@ struct ArchiveFeature {
                     await send(.fetchAlbums)
                 }
                 
-            case .selectUploadAlbum(.presented(.delegate(.uploadDidFail))):
+            case let .selectUploadAlbum(.presented(.delegate(.uploadDidFail(error)))):
                 state.selectUploadAlbum = nil
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
                 
             case let .addPhotoFromQRScanner(imageID):
@@ -279,6 +284,7 @@ struct ArchiveFeature {
                     await send(.fetchPhotos)
                     await tracking
                 } catch: { error, send in
+                    guard ArchiveErrorFeedback.shouldPresent(for: error) else { return }
                     await send(.delegate(.showToast(NekiToastItem("사진 등록에 실패했어요", style: .error))))
                 }
                 

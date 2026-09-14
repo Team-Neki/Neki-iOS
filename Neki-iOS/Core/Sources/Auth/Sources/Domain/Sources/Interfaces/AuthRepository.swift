@@ -7,13 +7,6 @@
 
 import Foundation
 
-public enum AuthRepositoryError: Error {
-    case networkError(NetworkError)
-    case unknown
-    case unauthorized
-    case userNotFound
-}
-
 public enum ProfileImageEditAction: Sendable, Equatable {
     public typealias ImageID = Int
     
@@ -25,7 +18,9 @@ public enum ProfileImageEditAction: Sendable, Equatable {
     case keep
 }
 
-public protocol AuthRepository {
+public protocol AuthRepository: AuthCredentialFailureHandling {
+    /// 실패 처리 후 새로운 로그인이 이루어지지 않았는지 확인합니다.
+    func isCurrentSession(matching failure: AuthCredentialFailure) async throws(AuthRepositoryError) -> Bool
     /// 로그인/회원가입, idToken으로 서비스 토큰을 확보
     func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> (tokens: AuthTokens, registrationStatus: RegistrationStatus)
     /// 사용자 정보 조회
@@ -38,10 +33,6 @@ public protocol AuthRepository {
     func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void
     /// 자동 로그인 (유저 세션 복구)
     func restoreSession() async throws(AuthRepositoryError) -> User
-    /// 로컬 인증 토큰 조회
-    func fetchStoredTokens() -> AuthTokens?
-    /// 유저 세션 상태 갱신
-    func updateSessionStatus(_ status: UserSessionStatus)
     /// 이용약관 목록 조회
     func fetchTerms() async throws(AuthRepositoryError) -> [Term]
     /// 이용약관 동의

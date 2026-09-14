@@ -24,6 +24,7 @@ public enum ProfileImageUpdateAction: Sendable, Equatable {
 
 @DependencyClient
 public struct AuthClient {
+    public var observeSessionExpiration: @Sendable () async throws -> AsyncStream<UserSessionStatus>
     public var loginWithApple: @Sendable (_ idToken: Data) async throws -> AuthLoginResult
     public var loginWithKakao: @Sendable () async throws -> AuthLoginResult
     public var autoLogin: @Sendable () async throws -> User
@@ -42,6 +43,28 @@ extension AuthClient: DependencyKey {
         let kakaoSDKHelper = KakaoSDKHelper()
         @Dependency(\.authRepository) var authRepository
         @Dependency(\.imageUploadRepository) var imageUploadRepository
+
+        @Sendable func observeSessionExpiration() async -> AsyncStream<UserSessionStatus> {
+            let failures = await authRepository.credentialFailures()
+            return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+                let task = Task {
+                    defer { continuation.finish() }
+                    for await failure in failures {
+                        guard Task.isCancelled == false else { return }
+                        switch failure.reason {
+                        case .missingCredentials, .rejectedCredentials:
+                            do {
+                                guard try await authRepository.isCurrentSession(matching: failure) else { continue }
+                                guard Task.isCancelled == false else { return }
+                                continuation.yield(.expired)
+                            } catch AuthRepositoryError.cancelled { return }
+                            catch { Logger.domain.error("Session expiration validation failed: \(error.localizedDescription)") }
+                        }
+                    }
+                }
+                continuation.onTermination = { _ in task.cancel() }
+            }
+        }
         
         @discardableResult
         @Sendable func loginWithApple(idToken: Data) async throws -> AuthLoginResult {
@@ -183,6 +206,7 @@ extension AuthClient: DependencyKey {
         }
         
         return AuthClient(
+            observeSessionExpiration: observeSessionExpiration,
             loginWithApple: loginWithApple,
             loginWithKakao: loginWithKakao,
             autoLogin: autoLogin,
@@ -203,16 +227,11 @@ extension AuthClient: DependencyKey {
 
 private extension AuthClient {
     static func mapError(_ error: Error) -> AuthClientError {
-        @Dependency(\.authRepository) var authRepository
-
         if let repositoryError = error as? AuthRepositoryError {
             switch repositoryError {
-            case .networkError(let networkError):
-                switch networkError {
-                case .networkFail: return .networkConnectionLost
-                case .unauthorizedError: authRepository.updateSessionStatus(.signedOut); return .sessionExpired
-                default: return .serverError(networkError.localizedDescription)
-                }
+            case .networkConnectionLost: return .networkConnectionLost
+            case let .serverError(message): return .serverError(message)
+            case .cancelled: return .cancelled
             case .unauthorized, .userNotFound:
                 return .sessionExpired
             case .unknown:
@@ -222,6 +241,8 @@ private extension AuthClient {
         
         if let uploadError = error as? UploadError {
             switch uploadError {
+            case .authenticationRequired:
+                return .sessionExpired
             case .presignedUrlFailed:
                 return .serverError("이미지 업로드 정보를 받아올 수 없음.")
             case .uploadFailed:

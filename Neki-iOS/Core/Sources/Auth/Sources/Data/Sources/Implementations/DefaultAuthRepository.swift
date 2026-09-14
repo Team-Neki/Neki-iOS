@@ -9,15 +9,28 @@ import Foundation
 import Dependencies
 import os
 
-public struct DefaultAuthRepository: AuthRepository {
+public final actor DefaultAuthRepository: AuthRepository {
     private enum Constants {
         static let marketingTermType = "MARKETING"
     }
 
+    private var pendingCredentialFailure: AuthCredentialFailure?
+    private var lastPublishedCredentialGeneration: UUID?
+    private var credentialFailureContinuations: [UUID: AsyncStream<AuthCredentialFailure>.Continuation] = [:]
+    private var credentialFailureValidation: (@Sendable () async -> Bool)?
+
     @Dependency(\.networkProvider) private var networkProvider
-    @Dependency(\.tokenStorage) private var tokenStorage
     
     public init() {}
+
+    deinit { credentialFailureContinuations.values.forEach { $0.finish() } }
+
+    public func isCurrentSession(matching failure: AuthCredentialFailure) async throws(AuthRepositoryError) -> Bool {
+        guard lastPublishedCredentialGeneration == failure.generation,
+              let credentialFailureValidation else { return false }
+        guard await credentialFailureValidation() else { return false }
+        return lastPublishedCredentialGeneration == failure.generation
+    }
     
     public func login(idToken: String, provider: ProviderType) async throws(AuthRepositoryError) -> (tokens: AuthTokens, registrationStatus: RegistrationStatus) {
         let platformParameter: String = "ios"
@@ -27,14 +40,11 @@ public struct DefaultAuthRepository: AuthRepository {
         
         do {
             let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let data = responseDTO.data else { throw AuthRepositoryError.networkError(.responseDecodingError) }
+            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+            let tokens = data.toEntity()
             let registrationStatus: RegistrationStatus = data.isNewUser ? .newlyRegistered : .existingAccount
-            return (data.toEntity(), registrationStatus)
-        } catch let error as NetworkError {
-            throw .networkError(error)
-        } catch {
-            throw .unauthorized
-        }
+            return (tokens, registrationStatus)
+        } catch { throw mapError(error) }
     }
     
     public func fetchUser() async throws(AuthRepositoryError) -> User {
@@ -44,7 +54,7 @@ public struct DefaultAuthRepository: AuthRepository {
             let responseDTO: BaseResponseDTO<UserInfoDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data,
                   let providerType = ProviderType(rawValue: data.providerType.lowercased())
-            else { throw AuthRepositoryError.networkError(.responseDecodingError) }
+            else { throw NetworkError.responseDecodingError }
             
             let profileImageURL = URL(string: data.profileImageURLString ?? "")
             return User(
@@ -57,39 +67,25 @@ public struct DefaultAuthRepository: AuthRepository {
                 marketingTermAgreed: data.marketingTerm,
                 pushNotificationAgreed: data.pushNotificationAgreed
             )
-        } catch let error as NetworkError {
-            throw .networkError(error)
-        } catch {
-            throw .userNotFound
-        }
+        } catch { throw mapError(error) }
     }
     
     public func withdraw() async throws(AuthRepositoryError) {
         let endpoint = AuthEndpoint.withdraw
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            try tokenStorage.delete()
-        } catch let error as NetworkError {
-            throw .networkError(error)
         } catch is TokenStorageError {
             throw .userNotFound
-        } catch {
-            throw .unknown
-        }
+        } catch { throw mapError(error) }
     }
     
     public func logout() async throws(AuthRepositoryError) {
         let endpoint = AuthEndpoint.logout
         do {
             let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
-            try tokenStorage.delete()
-        } catch let error as NetworkError {
-            throw .networkError(error)
         } catch is TokenStorageError {
             throw .userNotFound
-        } catch {
-            throw .unknown
-        }
+        } catch { throw mapError(error) }
     }
     
     public func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void {
@@ -98,11 +94,7 @@ public struct DefaultAuthRepository: AuthRepository {
             let endpoint = AuthEndpoint.editNickname(dto: requestDTO)
             do {
                 let _: BaseResponseDTO<EditNicknameDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            } catch let error as NetworkError {
-                throw .networkError(error)
-            } catch {
-                throw .unknown
-            }
+            } catch { throw mapError(error) }
         }
         
         switch editAction {
@@ -113,22 +105,7 @@ public struct DefaultAuthRepository: AuthRepository {
     }
     
     public func restoreSession() async throws(AuthRepositoryError) -> User {
-        guard let _ = try? tokenStorage.fetch() else { throw .unauthorized }
-        do {
-            return try await fetchUser()
-        } catch {
-            try? tokenStorage.delete()
-            throw .unauthorized
-        }
-    }
-
-    public func fetchStoredTokens() -> AuthTokens? {
-        try? tokenStorage.fetch()
-    }
-
-    public func updateSessionStatus(_ status: UserSessionStatus) {
-        guard let data = try? JSONEncoder().encode(status) else { return }
-        UserDefaults.standard.set(data, forKey: AppStorageKey.userSessionStatus)
+        try await fetchUser()
     }
 
     public func fetchTerms() async throws(AuthRepositoryError) -> [Term] {
@@ -155,25 +132,68 @@ public struct DefaultAuthRepository: AuthRepository {
 }
 
 
+// MARK: - DefaultAuthRepository + AuthCredentialFailureHandling
+
+extension DefaultAuthRepository {
+    public func reportCredentialFailure(
+        _ failure: AuthCredentialFailure,
+        isCurrent: @escaping @Sendable () async -> Bool
+    ) async {
+        // 유효성 확인 중 다른 실패가 반영되었다면 재검증해 오래된 결과의 역전 반영을 막습니다.
+        while true {
+            let previousGeneration = lastPublishedCredentialGeneration
+            guard await isCurrent() else { return }
+            guard previousGeneration == lastPublishedCredentialGeneration else { continue }
+            guard lastPublishedCredentialGeneration != failure.generation else { return }
+            lastPublishedCredentialGeneration = failure.generation
+            credentialFailureValidation = isCurrent
+            // 구독 교체 도중 소비되지 않은 실패도 다음 구독에서 다시 확인할 수 있도록 한 건만 유지합니다.
+            pendingCredentialFailure = failure
+            credentialFailureContinuations.values.forEach { $0.yield(failure) }
+            return
+        }
+    }
+
+    public func credentialFailures() -> AsyncStream<AuthCredentialFailure> {
+        let id = UUID()
+        let (stream, continuation) = AsyncStream<AuthCredentialFailure>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        credentialFailureContinuations[id] = continuation
+        if let pendingCredentialFailure { continuation.yield(pendingCredentialFailure) }
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.removeCredentialFailureContinuation(id: id) }
+        }
+        return stream
+    }
+}
+
+
 // MARK: - DefaultAuthRepository + Helpers
 
 private extension DefaultAuthRepository {
+    func removeCredentialFailureContinuation(id: UUID) { credentialFailureContinuations[id] = nil }
+
+    func mapError(_ error: Error) -> AuthRepositoryError {
+        switch error {
+        case let error as AuthRepositoryError: return error
+        case is CancellationError: return .cancelled
+        case let error as NetworkError:
+            switch error {
+            case .unauthorizedError: return .unauthorized
+            case .networkFail: return .networkConnectionLost
+            default: return .serverError(error.localizedDescription)
+            }
+        default: return .unknown
+        }
+    }
+
     func fetchTermDTOs() async throws(AuthRepositoryError) -> [TermDTO] {
         let endpoint = AuthEndpoint.fetchTerms
 
         do {
             let responseDTO: BaseResponseDTO<FetchTermsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let data = responseDTO.data else {
-                throw AuthRepositoryError.networkError(.responseDecodingError)
-            }
+            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
             return data.terms
-        } catch let error as AuthRepositoryError {
-            throw error
-        } catch let error as NetworkError {
-            throw .networkError(error)
-        } catch {
-            throw .unknown
-        }
+        } catch { throw mapError(error) }
     }
 
     func requestTermsAgreement(_ agreements: [AgreementsDTO]) async throws(AuthRepositoryError) {
@@ -182,11 +202,7 @@ private extension DefaultAuthRepository {
         
         do {
             let _: BaseResponseDTO<AgreeTermsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        } catch let error as NetworkError {
-            throw .networkError(error)
-        } catch {
-            throw .unknown
-        }
+        } catch { throw mapError(error) }
     }
 
     func requestUpdateProfileImage(id: ProfileImageEditAction.ImageID?) async throws(AuthRepositoryError) {
@@ -195,11 +211,7 @@ private extension DefaultAuthRepository {
         
         do {
             let _: BaseResponseDTO<EditProfileImageDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        } catch let error as NetworkError {
-            throw .networkError(error)
-        } catch {
-            throw .unknown
-        }
+        } catch { throw mapError(error) }
     }
 }
 

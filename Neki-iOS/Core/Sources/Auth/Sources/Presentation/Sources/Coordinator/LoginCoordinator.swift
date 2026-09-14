@@ -58,7 +58,7 @@ public struct LoginCoordinator {
                 
                 // MARK: - Onboarding Flow
             case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user, marketingConsentStatus)))):
-                guard let pendingLoginResult = state.pendingLoginResult else {
+                guard state.pendingLoginResult != nil else {
                     Logger.presentation.error("온보딩 과정 중 중단됨.")
                     return .none
                 }

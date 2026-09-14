@@ -96,9 +96,10 @@ struct ArchiveAllPhotosFeature {
                 }
                 
             case .toggleFavoriteResponse(_, .success): return .none
-            case let .toggleFavoriteResponse(photoID, .failure):
+            case let .toggleFavoriteResponse(photoID, .failure(error)):
                 state.photos[id: photoID]?.isFavorite.toggle()
                 state.updateVisiblePhoto(id: photoID)
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
                 
             case .onTapDownloadButton:
@@ -157,7 +158,7 @@ struct ArchiveAllPhotosFeature {
                 
             case let .photoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
-                guard error is CancellationError == false else { return .none }
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
                 
             case .loadMorePhotos:

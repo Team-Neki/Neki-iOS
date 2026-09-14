@@ -121,8 +121,9 @@ struct ArchiveAlbumDetailFeature {
                     }
                 }
             case .toggleFavoriteResponse(_, .success): return .none
-            case let .toggleFavoriteResponse(photoID, .failure):
+            case let .toggleFavoriteResponse(photoID, .failure(error)):
                 state.photos[id: photoID]?.isFavorite.toggle()
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("즐겨찾기 변경에 실패했어요", style: .error))))
             case let .imagePicker(.delegate(.imagesConverted(entities))):
                 state.showDropDownMenu = false
@@ -150,8 +151,9 @@ struct ArchiveAlbumDetailFeature {
                     await send(.fetchPhotos)
                     await tracking
                 }
-            case .registerPhotosResponse(.failure):
+            case let .registerPhotosResponse(.failure(error)):
                 state.isLoading = false
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("업로드에 실패했어요", style: .error))))
             case .onTapCancelEditAlbum:
                 state.newAlbumTitle = state.album.title
@@ -165,8 +167,9 @@ struct ArchiveAlbumDetailFeature {
                     await send(.editAlbumResponse(Result { try await archiveClient.editAlbumName(albumId, title) }))
                 }
             case .editAlbumResponse(.success): return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경했어요", style: .success))))
-            case .editAlbumResponse(.failure):
+            case let .editAlbumResponse(.failure(error)):
                 state.newAlbumTitle = state.album.title
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("앨범 이름을 변경하지 못했어요", style: .error))))
             case .fetchPhotos:
                 guard state.isFetchingPhotos == false else { return .none }
@@ -183,7 +186,7 @@ struct ArchiveAlbumDetailFeature {
                 return .none
             case let .photoListResponse(.failure(error)):
                 state.isFetchingPhotos = false
-                guard error is CancellationError == false else { return .none }
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 불러오지 못했어요", style: .error))))
             case .loadMorePhotos:
                 guard state.isFetchingPhotos == false, state.hasNextPhotos else { return .none }
@@ -264,7 +267,8 @@ struct ArchiveAlbumDetailFeature {
                 state.isSelectionMode = false
                 state.selectedIDs.removeAll()
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제했어요", style: .success))))
-            case .deletePhotosResponse(.failure):
+            case let .deletePhotosResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("사진을 삭제하지 못했어요", style: .error))))
             case let .onTapExecuteDeleteAlbum(option):
                 let shouldDeletePhotos = (option == .withPhotos)
@@ -279,7 +283,8 @@ struct ArchiveAlbumDetailFeature {
                     await send(.delegate(.showToast(NekiToastItem("앨범을 삭제했어요", style: .success))))
                     await dismiss()
                 }
-            case .deleteAlbumResponse(.failure):
+            case let .deleteAlbumResponse(.failure(error)):
+                guard ArchiveErrorFeedback.shouldPresent(for: error) else { return .none }
                 return .send(.delegate(.showToast(NekiToastItem("앨범을 삭제하지 못했어요", style: .error))))
                 
             case .onTapImportPhotos:

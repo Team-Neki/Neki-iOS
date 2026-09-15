@@ -25,7 +25,9 @@ struct NearPhotoBoothListSheet: View {
     private enum Constants {
         static let verticalScrollCoordinateSpaceName = "NearPhotoBoothListSheet.VerticalScroll"
         static let scrollTopThreshold: CGFloat = -1
-        static let searchResultTopPadding: CGFloat = 12
+        /// 시트 손잡이(24pt)와 검색 결과 첫 줄 사이의 간격입니다.
+        static let searchResultTopPadding: CGFloat = 4
+        static let searchResultSectionSpacing: CGFloat = 4
     }
 
     private enum FavoriteRemovalEffect {
@@ -71,6 +73,9 @@ struct NearPhotoBoothListSheet: View {
             // 목록을 통째로 갈아 끼우면 스크롤이 맨 위로 돌아가므로 시트가 아는 위치도 함께 맞춥니다.
             isVerticalScrollAtTop = true
             sheetScrollStateHandler.updateIsAtTop(true)
+        }
+        .sheet(isPresented: $store.isSearchResultBrandFilterSheetPresented) {
+            PhotoBoothBrandFilterSheet(store: store)
         }
         .onDisappear {
             delayedFavoriteTasks.values.forEach { $0.cancel() }
@@ -250,13 +255,18 @@ private extension NearPhotoBoothListSheet {
         .frame(maxHeight: .infinity)
     }
 
-    /// 검색 결과를 탭과 브랜드 필터 없이 개수와 목록만으로 노출합니다.
+    /// 검색 결과를 탭 없이 개수, `브랜드` 칩, 목록으로 노출합니다.
     var searchResultPhotoBoothListSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: Constants.searchResultSectionSpacing) {
                 searchResultBoothCountText
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 20)
+
+                // 결과에 브랜드가 하나도 없으면 시트를 열어도 고를 게 없으므로 칩을 두지 않습니다.
+                if store.selectableBrands.isEmpty == false {
+                    searchResultBrandFilterChipRow
+                }
 
                 if store.visibleBooths.isEmpty {
                     unavailableView("조건에 맞는 포토부스가 없어요.")
@@ -274,15 +284,25 @@ private extension NearPhotoBoothListSheet {
     }
 
     var searchResultBoothCountText: some View {
-        HStack(spacing: 0) {
-            Text("\(store.visibleBooths.count)")
-                .nekiFont(.body14SemiBold)
-                .foregroundStyle(.gray400)
+        Text("\(store.visibleBooths.count)곳의 포토부스를 찾았어요.")
+            .nekiFont(.body14SemiBold)
+            .foregroundStyle(.gray600)
+    }
 
-            Text("곳의 포토부스를 찾았어요.")
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray300)
+    /// 브랜드 필터 바텀시트를 여는 칩입니다.
+    ///
+    /// 고른 브랜드가 없으면 `브랜드`, 있으면 첫 브랜드 이름(둘 이상이면 나머지 개수까지)을 적고 채워진 모양이 됩니다.
+    var searchResultBrandFilterChipRow: some View {
+        HStack(spacing: .zero) {
+            Button(store.searchResultBrandFilterChipTitle) {
+                store.send(.didTapSearchResultBrandFilterChip)
+            }
+            .buttonStyle(SearchResultBrandFilterChipStyle(isHighlighted: store.filteredBrands.isEmpty == false))
+
+            Spacer(minLength: .zero)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 8)
     }
 
     var favoriteBoothCountText: some View {
@@ -442,6 +462,43 @@ private extension NearPhotoBoothListSheet {
 }
 
 
+// MARK: - SearchResultBrandFilterChipStyle
+
+/// 검색 결과 위에 놓이는 외곽선 형태의 드롭다운 칩입니다.
+///
+/// 디자인 시스템의 `NekiChipButtonStyle`(회색 채움, 20pt 화살표)과 달리 흰 바탕에 1.2pt 테두리와 24pt 화살표를 씁니다.
+/// 브랜드가 하나라도 골라져 있으면 채워진 모양으로 바뀌어 필터가 걸려 있음을 알립니다.
+private struct SearchResultBrandFilterChipStyle: ButtonStyle {
+    let isHighlighted: Bool
+
+    private enum Constants {
+        static let borderWidth: CGFloat = 1.2
+        static let leadingPadding: CGFloat = 12
+        static let trailingPadding: CGFloat = 9
+        static let verticalPadding: CGFloat = 6
+        static let pressedOpacity: Double = 0.6
+    }
+
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(spacing: .zero) {
+            configuration.label
+                .nekiFont(.body14SemiBold)
+                .foregroundStyle(isHighlighted ? .white : .gray600)
+
+            Image(.iconChevronDown)
+                .renderingMode(.template)
+                .foregroundStyle(isHighlighted ? .white : .gray400)
+        }
+        .padding(.leading, Constants.leadingPadding)
+        .padding(.trailing, Constants.trailingPadding)
+        .padding(.vertical, Constants.verticalPadding)
+        .background { Capsule().fill(isHighlighted ? .gray800 : .white) }
+        .overlay { Capsule().strokeBorder(isHighlighted ? .gray800 : .gray50, lineWidth: Constants.borderWidth) }
+        .opacity(configuration.isPressed ? Constants.pressedOpacity : 1)
+    }
+}
+
+
 // MARK: - NearPhotoBoothListScrollOffsetPreferenceKey
 
 private struct NearPhotoBoothListScrollOffsetPreferenceKey: PreferenceKey {
@@ -453,4 +510,53 @@ private struct NearPhotoBoothListScrollOffsetPreferenceKey: PreferenceKey {
     ) {
         value = nextValue()
     }
+}
+
+
+// MARK: - Preview
+
+#Preview("검색 결과") {
+    @Previewable @State var detent: NekiSheetDetent = .large
+
+    Color.gray50
+        .ignoresSafeArea()
+        .nekiSheet(selection: $detent) {
+            NearPhotoBoothListSheet(
+                store: PhotoBoothListPreviewData.store(PhotoBoothListPreviewData.searchResultState())
+            )
+        } controllers: {
+            EmptyView()
+        }
+}
+
+#Preview("검색 결과 · 브랜드 선택") {
+    @Previewable @State var detent: NekiSheetDetent = .large
+
+    Color.gray50
+        .ignoresSafeArea()
+        .nekiSheet(selection: $detent) {
+            NearPhotoBoothListSheet(
+                store: PhotoBoothListPreviewData.store(
+                    PhotoBoothListPreviewData.searchResultState(
+                        selecting: [PhotoBoothListPreviewData.brands[1], PhotoBoothListPreviewData.brands[4]]
+                    )
+                )
+            )
+        } controllers: {
+            EmptyView()
+        }
+}
+
+#Preview("지도 영역 목록") {
+    @Previewable @State var detent: NekiSheetDetent = .large
+
+    Color.gray50
+        .ignoresSafeArea()
+        .nekiSheet(selection: $detent) {
+            NearPhotoBoothListSheet(
+                store: PhotoBoothListPreviewData.store(PhotoBoothListPreviewData.nearbyState())
+            )
+        } controllers: {
+            EmptyView()
+        }
 }

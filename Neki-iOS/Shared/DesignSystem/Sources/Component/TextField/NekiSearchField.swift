@@ -7,34 +7,31 @@
 
 import SwiftUI
 
-/// 검색 필드의 상태입니다.
+/// 검색어를 입력받는 검색 필드의 상태입니다.
+///
+/// 검색 화면에서 입력하는 동안 바뀌는 상태만 담습니다.
+/// 진입점과 검색 화면 밖의 검색 완료 형태는 상태가 아닌 생성 방법으로 고릅니다.
 ///
 /// - Note: `State`가 아닌 최상위 타입인 이유는 `NekiSearchField` 안에 중첩하면
 ///   SwiftUI의 `@State`를 가리기 때문입니다.
 public enum NekiSearchFieldState: Equatable {
-    /// 검색 화면으로 이동하기 위한 진입점입니다. 입력할 수 없고 탭하면 이동합니다.
-    case idle
     /// 검색어를 입력하는 중입니다. 테두리를 노출하고 입력한 검색어를 Medium으로 표시합니다.
     case editing
-    /// 검색을 완료한 상태입니다. 그림자와 지우기 버튼을 노출하고 검색어를 SemiBold로 표시합니다.
-    case completed
+    /// 검색어를 제출해 결과를 보고 있습니다. 입력 중처럼 테두리를 노출하고 검색어는 검색 완료처럼 SemiBold로 표시합니다.
+    case submitted
 }
 
 /// 캡슐형 검색 필드입니다.
 ///
-/// `state`에 따라 좌측 아이콘, 테두리와 그림자, 검색어 서체, 지우기 버튼 노출이 달라집니다.
+/// 생성 방법과 `state`에 따라 좌측 아이콘, 테두리와 그림자, 검색어 서체, 지우기 버튼 노출이 달라집니다.
 /// 입력 없이 검색 화면으로 이동하기만 하는 진입점에는 ``NekiSearchField/entry(_:action:)``을,
 /// 검색 화면 밖에서 완료한 검색어만 보여 주는 자리에는 ``NekiSearchField/completed(_:onEdit:onClear:)``을 사용합니다.
 public struct NekiSearchField: View {
     @Binding private var text: String
 
-    private let state: NekiSearchFieldState
+    private let variant: Variant
     private let prompt: String
     private let isFocused: FocusState<Bool>.Binding?
-    /// 검색어를 이 필드에서 직접 고칠 수 있는지 여부입니다.
-    ///
-    /// 검색 화면 밖에서는 검색어를 보여 주기만 하므로 텍스트 필드 대신 문자열을 그립니다.
-    private let isEditable: Bool
     private let onBack: (() -> Void)?
     private let onSubmit: (() -> Void)?
     private let onTap: (() -> Void)?
@@ -42,9 +39,8 @@ public struct NekiSearchField: View {
 
     private init(
         text: Binding<String>,
-        state: NekiSearchFieldState,
+        variant: Variant,
         isFocused: FocusState<Bool>.Binding?,
-        isEditable: Bool,
         prompt: String,
         onBack: (() -> Void)?,
         onSubmit: (() -> Void)?,
@@ -52,9 +48,8 @@ public struct NekiSearchField: View {
         onClear: (() -> Void)?
     ) {
         self._text = text
-        self.state = state
+        self.variant = variant
         self.isFocused = isFocused
-        self.isEditable = isEditable
         self.prompt = prompt
         self.onBack = onBack
         self.onSubmit = onSubmit
@@ -66,7 +61,7 @@ public struct NekiSearchField: View {
     ///
     /// - Parameters:
     ///   - text: 사용자가 입력 중인 검색어
-    ///   - state: 검색 필드의 상태. `.editing` 또는 `.completed`를 전달합니다.
+    ///   - state: 검색 필드의 상태. 입력 중에는 `.editing`, 제출한 검색어로 결과를 보는 동안에는 `.submitted`를 전달합니다.
     ///   - isFocused: 입력 포커스를 제어할 바인딩
     ///   - prompt: 검색어가 비어 있을 때 표시할 안내 문구
     ///   - onBack: 좌측 뒤로가기 버튼을 눌렀을 때 실행할 동작
@@ -81,9 +76,8 @@ public struct NekiSearchField: View {
     ) {
         self.init(
             text: text,
-            state: state,
+            variant: .input(state),
             isFocused: isFocused,
-            isEditable: true,
             prompt: prompt,
             onBack: onBack,
             onSubmit: onSubmit,
@@ -102,9 +96,8 @@ public struct NekiSearchField: View {
     public static func entry(_ prompt: String, action: @escaping () -> Void) -> NekiSearchField {
         NekiSearchField(
             text: .constant(""),
-            state: .idle,
+            variant: .entry,
             isFocused: nil,
-            isEditable: false,
             prompt: prompt,
             onBack: nil,
             onSubmit: nil,
@@ -130,9 +123,8 @@ public struct NekiSearchField: View {
     ) -> NekiSearchField {
         NekiSearchField(
             text: .constant(keyword),
-            state: .completed,
+            variant: .completed,
             isFocused: nil,
-            isEditable: false,
             prompt: "",
             onBack: onEdit,
             onSubmit: onEdit,
@@ -142,11 +134,55 @@ public struct NekiSearchField: View {
     }
 
     public var body: some View {
-        if state == .idle {
+        switch variant {
+        case .entry:
             Button { onTap?() } label: { field }
                 .buttonStyle(.plain)
-        } else {
+        case .input, .completed:
             field
+        }
+    }
+}
+
+
+// MARK: - NekiSearchField + Variant
+
+private extension NekiSearchField {
+    /// 생성 방법으로 정해지는 검색 필드의 형태입니다.
+    ///
+    /// 형태는 사용하는 자리마다 고정되고, 검색 화면에서 입력하는 동안 바뀌는 상태만 ``NekiSearchFieldState``로 받습니다.
+    ///
+    /// - Note: 형태별 모양은 `==` 비교 대신 `switch`로 고릅니다.
+    ///   형태나 상태가 늘어나면 모양을 정해야 하는 곳마다 컴파일러가 알려 줍니다.
+    enum Variant {
+        /// 검색 화면으로 이동하기 위한 진입점입니다. 입력할 수 없고 탭하면 이동합니다.
+        case entry
+        /// 검색 화면에서 검색어를 입력받습니다.
+        case input(NekiSearchFieldState)
+        /// 검색 화면 밖에서 검색을 완료한 검색어를 보여 줍니다. 그림자와 지우기 버튼을 노출하고 검색어를 SemiBold로 표시합니다.
+        case completed
+
+        var decoration: SearchFieldDecoration {
+            switch self {
+            case .input: .border
+            case .entry, .completed: .shadow
+            }
+        }
+
+        /// 제출하거나 완료한 검색어는 입력 중보다 굵게 표시합니다.
+        var textFont: FontStyle {
+            switch self {
+            case .entry, .input(.editing): .body16Medium
+            case .input(.submitted), .completed: .body16SemiBold
+            }
+        }
+
+        /// 제출하거나 완료한 검색어는 입력 중보다 진하게 표시합니다.
+        var textColor: Color {
+            switch self {
+            case .entry, .input(.editing): .gray800
+            case .input(.submitted), .completed: .gray900
+            }
         }
     }
 }
@@ -161,25 +197,18 @@ private extension NekiSearchField {
 
             input
 
-            if state != .idle {
-                icon(.iconSearch) { onSubmit?() }
-            } else {
-                iconImage(.iconSearch)
-            }
-
-            if state == .completed {
-                icon(.iconXmarkBlack, action: onClear ?? clear)
-            }
+            trailing
         }
-        .searchFieldContainer(state.decoration)
+        .searchFieldContainer(variant.decoration)
     }
 
-    /// 진입점에서는 서비스 심볼을, 검색 화면에서는 뒤로가기 버튼을 노출합니다.
+    /// 진입점에서는 서비스 심볼을, 그 외에는 뒤로가기 버튼을 노출합니다.
     @ViewBuilder
     var leading: some View {
-        if state == .idle {
+        switch variant {
+        case .entry:
             iconImage(.iconNeki)
-        } else {
+        case .input, .completed:
             icon(.iconChevronLeft) { onBack?() }
         }
     }
@@ -188,24 +217,43 @@ private extension NekiSearchField {
     ///
     /// 검색 화면 밖에서 결과를 보여 주는 동안에는 누르면 검색 화면으로 돌아가는 검색어를 노출합니다.
     ///
-    /// - Note: 검색 화면에서는 검색을 완료한 뒤에도 텍스트 필드를 계층에 그대로 둡니다.
+    /// - Note: 검색 화면에서는 검색어를 제출한 뒤에도 텍스트 필드를 계층에 그대로 둡니다.
     ///   텍스트로 바꿔 끼우면 포커스를 받을 뷰가 사라져 `isFocused`에 `true`를 써도 무시되고,
     ///   필드를 눌러도 키보드가 다시 올라오지 않습니다.
+    ///   같은 이유로 `.editing`과 `.submitted`는 가지를 나누지 않고 서체만 바꿉니다.
+    ///   가지가 바뀌면 텍스트 필드가 새로 만들어져 포커스가 풀립니다.
     @ViewBuilder
     var input: some View {
-        if state == .idle {
-            label(prompt, font: .body16Medium, color: .gray800)
-        } else if isEditable {
+        switch variant {
+        case .entry:
+            label(prompt)
+        case .input:
             textField
-        } else {
+        case .completed:
             Button { onTap?() } label: {
-                label(text, font: .body16SemiBold, color: .gray900)
+                label(text)
             }
             .buttonStyle(.plain)
         }
     }
 
-    /// 검색을 완료한 상태에서는 입력 중보다 굵고 진하게 표시합니다.
+    /// 진입점에서는 검색 아이콘을, 그 외에는 검색 버튼을 노출합니다.
+    ///
+    /// 검색 화면 밖에서 결과를 보여 주는 동안에는 검색을 끝내는 지우기 버튼을 함께 노출합니다.
+    @ViewBuilder
+    var trailing: some View {
+        switch variant {
+        case .entry:
+            iconImage(.iconSearch)
+        case .input:
+            icon(.iconSearch) { onSubmit?() }
+        case .completed:
+            icon(.iconSearch) { onSubmit?() }
+
+            icon(.iconXmarkBlack) { onClear?() }
+        }
+    }
+
     @ViewBuilder
     var textField: some View {
         let field = TextField(
@@ -213,8 +261,8 @@ private extension NekiSearchField {
             text: $text,
             prompt: Text(prompt).foregroundStyle(.gray300)
         )
-        .nekiFont(state == .completed ? .body16SemiBold : .body16Medium)
-        .foregroundStyle(state == .completed ? .gray900 : .gray800)
+        .nekiFont(variant.textFont)
+        .foregroundStyle(variant.textColor)
         .submitLabel(.search)
         .onSubmit { onSubmit?() }
 
@@ -225,10 +273,10 @@ private extension NekiSearchField {
         }
     }
 
-    func label(_ text: String, font: FontStyle, color: Color) -> some View {
+    func label(_ text: String) -> some View {
         Text(text)
-            .nekiFont(font)
-            .foregroundStyle(color)
+            .nekiFont(variant.textFont)
+            .foregroundStyle(variant.textColor)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -245,12 +293,6 @@ private extension NekiSearchField {
             .buttonStyle(.plain)
     }
 
-    /// 검색어를 지우고 다시 입력할 수 있도록 포커스를 되돌립니다.
-    func clear() {
-        text = ""
-        isFocused?.wrappedValue = true
-    }
-
     enum Metrics {
         static let spacing: CGFloat = 12
         static let iconSize: CGFloat = 24
@@ -264,21 +306,12 @@ private extension NekiSearchField {
 
 // MARK: - Shared Container
 
-/// 검색 필드가 상태별로 사용하는 테두리/그림자 표현입니다.
+/// 검색 필드가 형태별로 사용하는 테두리/그림자 표현입니다.
 private enum SearchFieldDecoration {
-    /// 입력 중에 사용하는 테두리입니다.
+    /// 검색 화면에서 검색어를 입력받는 동안 사용하는 테두리입니다.
     case border
     /// 진입점과 검색 완료에서 사용하는 그림자입니다.
     case shadow
-}
-
-private extension NekiSearchFieldState {
-    var decoration: SearchFieldDecoration {
-        switch self {
-        case .editing: .border
-        case .idle, .completed: .shadow
-        }
-    }
 }
 
 /// 검색 필드가 상태와 무관하게 공유하는 형태(여백, 배경, 모서리, 테두리/그림자)입니다.

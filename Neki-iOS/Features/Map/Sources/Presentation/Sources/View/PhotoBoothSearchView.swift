@@ -158,13 +158,13 @@ private extension PhotoBoothSearchView {
         store.isFetchingSearchResult ? "포토부스를 불러오고 있어요." : "검색 결과를 불러오고 있어요."
     }
 
-    /// 제출한 검색어가 필드에 남아 결과를 보고 있는 동안에만 검색 완료 형태로 표시합니다.
+    /// 제출한 검색어가 필드에 남아 결과를 보고 있는 동안에만 제출 형태로 표시합니다.
     ///
     /// 다시 입력을 시작하거나(포커스가 돌아오거나) 검색어를 비우면 입력 중 형태로 되돌아갑니다.
     /// 검색어를 비워도 결과는 그대로 두므로 필드 모양만 입력 중으로 되돌아갑니다.
     var searchFieldState: NekiSearchFieldState {
         let hasSubmittedKeyword = store.mode == .searching && store.searchText.isEmpty == false
-        return isSearchFieldFocused || hasSubmittedKeyword == false ? .editing : .completed
+        return isSearchFieldFocused || hasSubmittedKeyword == false ? .editing : .submitted
     }
 }
 

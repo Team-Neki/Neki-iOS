@@ -137,11 +137,15 @@ private extension NaverMapRepresentable {
     ///
     /// 지점이 하나뿐이거나 몰려 있으면 영역이 한 점에 가까워 최대 배율까지 당겨지므로,
     /// 최소 크기만큼 넓혀 적당한 배율을 유지합니다.
+    ///
+    /// 마커나 시트 갱신처럼 카메라와 무관한 이유로도 이 메서드가 다시 불리므로,
+    /// 이미 반영한 요청인지 세대로 가려내 같은 요청을 거듭 적용하지 않습니다.
     func updateCameraFitBounds(_ mapView: NMFMapView, context: Context) {
-        guard let bounds = store.cameraFitBounds,
-              bounds != context.coordinator.lastCameraFitBounds
+        let request = store.cameraFitRequest
+        guard let bounds = request.bounds,
+              request.generation != context.coordinator.appliedCameraFitGeneration
         else { return }
-        context.coordinator.lastCameraFitBounds = bounds
+        context.coordinator.appliedCameraFitGeneration = request.generation
 
         let latitudePadding = max(Constants.minimumFitSpan - (bounds.maxLatitude - bounds.minLatitude), .zero) / 2
         let longitudePadding = max(Constants.minimumFitSpan - (bounds.maxLongitude - bounds.minLongitude), .zero) / 2
@@ -179,7 +183,7 @@ extension NaverMapRepresentable {
         typealias BrandID = Int
         
         var lastCameraPosition: GeographicCoordinate?
-        var lastCameraFitBounds: GeographicBoundingBox?
+        var appliedCameraFitGeneration: UInt?
         var isMapLoaded: Bool = false
         
         let parent: NaverMapRepresentable

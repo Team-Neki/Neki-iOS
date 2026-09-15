@@ -31,6 +31,30 @@ public struct MapFeature {
         }
     }
 
+    /// 카메라를 한 지점이 아니라 특정 영역에 맞춰 달라는 요청입니다.
+    ///
+    /// 검색 결과처럼 여러 지점을 한 화면에 담아야 하는 경우에 씁니다.
+    /// 한 지점으로 옮기는 ``State/cameraPosition``과 동시에 채우지 않습니다.
+    ///
+    /// 좌표만으로는 서로 다른 두 요청을 구분할 수 없어 세대를 함께 둡니다.
+    /// 검색 뒤 지도를 옮기고 같은 검색을 다시 해도 새 세대라 카메라가 다시 맞춰집니다.
+    struct CameraFitRequest: Equatable {
+        private(set) var generation: UInt = .zero
+        private(set) var bounds: GeographicBoundingBox?
+
+        /// 새 영역 맞춤을 요청합니다. 맞출 영역이 없으면 요청을 지웁니다.
+        mutating func fit(to bounds: GeographicBoundingBox?) {
+            guard let bounds else { return clear() }
+            generation &+= 1
+            self.bounds = bounds
+        }
+
+        /// 맞출 영역이 없음을 표시합니다.
+        mutating func clear() {
+            bounds = nil
+        }
+    }
+
     struct PhotoBoothFetchContext: Equatable {
         private(set) var generation: UInt = .zero
         private(set) var bounds: GeographicBoundingBox?
@@ -74,11 +98,7 @@ public struct MapFeature {
         
         // Map State
         var cameraPosition: GeographicCoordinate?
-        /// 카메라를 한 지점이 아니라 특정 영역에 맞춰야 할 때 담는 영역입니다.
-        ///
-        /// 검색 결과처럼 여러 지점을 한 화면에 담아야 하는 경우에 씁니다.
-        /// 한 지점으로 옮기는 ``cameraPosition``과 동시에 채우지 않습니다.
-        var cameraFitBounds: GeographicBoundingBox?
+        var cameraFitRequest = CameraFitRequest()
         var currentBounds: GeographicBoundingBox?
         var lastExploredLocation: CLLocation?
         
@@ -747,7 +767,7 @@ public struct MapFeature {
                 // 지역과 지하철역은 응답 자체가 지도에 그릴 목록이므로 영역 조회를 대신합니다.
                 // 서버가 보여 줄 영역을 주지 않아 목록으로 직접 정하며, 0건이면 지도를 옮기지 않습니다.
                 resetToMapMode(&state, for: .second)
-                state.cameraFitBounds = Self.searchResultBounds(of: photoBooths)
+                state.cameraFitRequest.fit(to: Self.searchResultBounds(of: photoBooths))
                 // 고른 범위 전체가 곧 목록이므로 탭 없이 개수, `브랜드` 칩, 결과 목록만 노출합니다.
                 state.photoBoothListState.isSearchResultPresented = true
                 // 검색을 끝내고 목록으로 돌아왔을 때 이 지역 탭에서 시작하도록 되돌립니다.
@@ -955,13 +975,13 @@ private extension MapFeature {
         state.selectedBooth = nil
         state.detent = stage.detent
         state.cameraPosition = nil
-        state.cameraFitBounds = nil
+        state.cameraFitRequest.clear()
     }
 
     func selectPhotoBooth(_ state: inout State, photoBooth: PhotoBooth) {
         state.selectedBooth = photoBooth
         state.detent = SheetStage.photoBoothSelected.detent
-        state.cameraFitBounds = nil
+        state.cameraFitRequest.clear()
         state.cameraPosition = photoBooth.coordinate
     }
     
@@ -1007,7 +1027,7 @@ private extension MapFeature {
     }
 
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {
-        state.cameraFitBounds = nil
+        state.cameraFitRequest.clear()
         state.cameraPosition = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
     }
     

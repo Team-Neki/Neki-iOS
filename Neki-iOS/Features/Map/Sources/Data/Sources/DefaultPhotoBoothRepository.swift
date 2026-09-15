@@ -181,6 +181,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return brands
     }
 
+    /// 후보 종류(지역·지하철역·포토부스)에 맞는 검색 API를 호출해 후보 페이지로 변환합니다.
     func searchCandidates(
         keyword: String,
         type: PhotoBoothSearchCandidateType,
@@ -222,6 +223,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         }
     }
 
+    /// 고른 지역·역에 속한 포토부스 목록을 조회하고 즐겨찾기 상태를 반영합니다.
     func readSearchResultPhotoBooths(
         target: PhotoBoothSearchTarget,
         userCoordinate: GeographicCoordinate?
@@ -234,6 +236,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return photoBoothsApplyingFavoriteState(searchPhotoBooths(from: items, brands: brands))
     }
 
+    /// 고른 지역·역의 부스 목록에서 쓸 수 있는 브랜드 필터를 조회합니다.
     func readSearchResultBrandFilters(
         target: PhotoBoothSearchTarget
     ) async throws -> [PhotoBoothSearchBrandFilter] {
@@ -259,6 +262,7 @@ private extension DefaultPhotoBoothRepository {
         return Dictionary(brands.values.map { ($0.englishName, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
+    /// 검색 계열 응답의 부스 DTO를 브랜드 코드로 매칭해 엔티티로 변환합니다. 매칭되지 않은 부스는 제외합니다.
     func searchPhotoBooths(
         from dtos: [SearchPhotoBoothDTO],
         brands: [String: PhotoBoothBrand]

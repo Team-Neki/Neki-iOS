@@ -748,13 +748,11 @@ public struct MapFeature {
                 // 서버가 보여 줄 영역을 주지 않아 목록으로 직접 정하며, 0건이면 지도를 옮기지 않습니다.
                 resetToMapMode(&state, for: .second)
                 state.cameraFitBounds = Self.searchResultBounds(of: photoBooths)
-                // 고른 범위 전체가 곧 목록이므로 탭과 브랜드 필터 없이 결과 목록만 노출합니다.
+                // 고른 범위 전체가 곧 목록이므로 탭 없이 개수, `브랜드` 칩, 결과 목록만 노출합니다.
                 state.photoBoothListState.isSearchResultPresented = true
                 // 검색을 끝내고 목록으로 돌아왔을 때 이 지역 탭에서 시작하도록 되돌립니다.
                 state.photoBoothListState.selectedTab = .nearby
-                // 이 목록에 없는 브랜드는 눌러도 빈 화면이 되므로 칩을 목록에 있는 브랜드로 좁힙니다.
-                // 다만 현재 UI에는 검색 결과에 필터가 없어 이 값이 화면에 닿지 않습니다.
-                // 자세한 내용과 남은 작업은 `PhotoBoothListFeature.State.filterBrands` 주석 참고.
+                // 이 목록에 없는 브랜드는 눌러도 빈 화면이 되므로 브랜드 필터 시트의 칩을 목록에 있는 브랜드로 좁힙니다.
                 state.photoBoothListState.searchResultBrandFilters = result.brandFilters
 
                 // 영역 조회를 대신하는 경로이므로 진행 중인 스트림 결과가 덮어쓰지 않도록 세대를 무효화합니다.
@@ -949,6 +947,7 @@ private extension MapFeature {
     func clearAppliedSearch(_ state: inout State) {
         state.appliedSearchQuery = nil
         state.photoBoothListState.isSearchResultPresented = false
+        state.photoBoothListState.isSearchResultBrandFilterSheetPresented = false
         state.photoBoothListState.searchResultBrandFilters = nil
     }
 

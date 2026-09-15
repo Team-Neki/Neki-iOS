@@ -330,8 +330,9 @@ private extension NearPhotoBoothListSheet {
                 .cancelOnDisappear(true)
                 .frame(width: 64, height: 64)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay { RoundedRectangle(cornerRadius: 8).strokeBorder(.gray75, lineWidth: 0.5) }
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(photoBooth.brand.name)
                     .nekiFont(.title18SemiBold)
                     .foregroundStyle(.gray900)
@@ -342,6 +343,18 @@ private extension NearPhotoBoothListSheet {
                         .nekiFont(.body14Medium)
                         .foregroundStyle(.gray600)
                         .lineLimit(1)
+
+                    // 거리는 검색 결과 카드에만 있는 요소입니다. 지도 영역 조회 목록은 시안에 거리가 없어 두지 않습니다.
+                    if store.isSearchResultPresented, let distance = photoBooth.nearbyDistance {
+                        Rectangle()
+                            .fill(.gray100)
+                            .frame(width: 1, height: 10)
+
+                        Text(distance.distanceString)
+                            .nekiFont(.body14SemiBold)
+                            .foregroundStyle(.gray700)
+                            .fixedSize()
+                    }
                 }
             }
             

@@ -165,18 +165,20 @@ struct PhotoBoothSearchFeatureTests {
         #expect(distancesByType[.photoBooth]??.isMultiple(of: 1) == true)
     }
 
-    @Test("위치에 동의하지 않으면 거리를 노출하지 않는다")
-    func rows_hideDistanceWhenLocationIsNotAuthorized() async {
+    @Test("위치에 동의하지 않아도 기본 좌표를 기준으로 거리를 노출한다")
+    func rows_showDistanceFromDefaultOriginWhenLocationIsNotAuthorized() async {
         let store = makeStore(pages: [
             .region: [makeRegionPage(count: 0, hasNext: false)],
             .subwayStation: [makeStationPage(count: 0, hasNext: false)],
-            .photoBooth: [makePhotoBoothPage(count: 1, hasNext: false)]
+            .photoBooth: [makePhotoBoothPage(coordinates: [.init(latitude: 37.5000, longitude: 127.0276)])]
         ])
 
         await submitSearch(on: store)
 
+        // 요청 시점에 위치를 몰라도 거리를 비우지 않고 기본 지점을 기준으로 세웁니다.
         #expect(store.state.userCoordinate == nil)
-        #expect(store.state.rows.allSatisfy { $0.distance == nil })
+        #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
+        #expect(store.state.rows.first?.distance != nil)
     }
 
     @Test("종류 순서를 지키면서 좌표가 있는 후보를 가까운 순으로 세운다")
@@ -295,8 +297,30 @@ struct PhotoBoothSearchFeatureTests {
         #expect(store.state.rows.first?.distance == distanceAtSearchTime)
     }
 
-    @Test("위치를 모르면 서버가 내려준 순서를 그대로 지킨다")
-    func rows_keepServerOrderWhenUserCoordinateIsUnknown() async {
+    @Test("검색 도중 도착한 좌표는 이 검색에 반영하지 않고 다음 검색 요청의 기준으로 쓴다")
+    func rows_repinDistanceOriginOnNextSearchRequest() async {
+        let store = makeStore(pages: [
+            .photoBooth: [makePhotoBoothPage(coordinates: [.init(latitude: 37.5000, longitude: 127.0276)])]
+        ])
+
+        // 첫 위치를 받기 전에 검색을 요청하면 기본 좌표로 기준을 세웁니다.
+        await submitSearch(on: store)
+        let defaultOriginDistance = store.state.rows.first?.distance
+        #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
+
+        // 검색 도중 좌표가 도착해도 보고 있는 목록의 거리는 흔들리지 않습니다.
+        await store.send(.setUserCoordinate(.init(latitude: 37.4000, longitude: 127.0276)))
+        #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
+        #expect(store.state.rows.first?.distance == defaultOriginDistance)
+
+        // 다음 검색을 요청하면 그 시점의 위치로 기준을 다시 세웁니다.
+        await submitSearch(on: store)
+        #expect(store.state.distanceOrigin == .init(latitude: 37.4000, longitude: 127.0276))
+        #expect(store.state.rows.first?.distance != defaultOriginDistance)
+    }
+
+    @Test("위치를 몰라도 기본 좌표를 기준으로 가까운 순으로 세운다")
+    func rows_sortByDefaultOriginWhenUserCoordinateIsUnknown() async {
         let store = makeStore(pages: [
             .photoBooth: [makePhotoBoothPage(coordinates: [
                 .init(latitude: 37.6000, longitude: 127.0276),
@@ -308,7 +332,7 @@ struct PhotoBoothSearchFeatureTests {
         await submitSearch(on: store)
 
         #expect(store.state.userCoordinate == nil)
-        #expect(store.state.rows.map(\.id) == ["photoBooth:0", "photoBooth:1", "photoBooth:2"])
+        #expect(store.state.rows.map(\.id) == ["photoBooth:1", "photoBooth:2", "photoBooth:0"])
     }
 
     @Test("첫 화면을 채우는 후보 요청 동안 로딩을 노출한다")
@@ -386,6 +410,33 @@ struct PhotoBoothSearchFeatureTests {
 
         // 요청 body가 같아 고른 후보 그대로 필터도 함께 조회합니다.
         #expect(await filterLog.candidates == [candidate])
+    }
+
+    @Test("부스 조회에도 검색을 요청한 시점에 고정한 기준 좌표를 넘긴다")
+    func didSelectCandidate_sendsPinnedDistanceOrigin() async {
+        let requestedCoordinate = LockIsolated<GeographicCoordinate?>(nil)
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]])
+        store.dependencies.photoBoothClient.fetchSearchPhotoBooths = { _, coordinate in
+            requestedCoordinate.setValue(coordinate)
+            return []
+        }
+
+        let searchTimeCoordinate = GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)
+        await store.send(.setUserCoordinate(searchTimeCoordinate))
+        await submitSearch(on: store)
+
+        // 검색 도중 위치가 갱신되어도 이 검색의 기준은 바뀌지 않습니다.
+        await store.send(.setUserCoordinate(.init(latitude: 37.4000, longitude: 127.0276)))
+        guard let candidate = store.state.rows.first?.candidate else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+
+        await store.send(.didSelectCandidate(candidate))
+        await store.receive(\.delegate)
+
+        // 후보 목록과 결과 목록의 거리가 어긋나지 않도록 같은 기준을 씁니다.
+        #expect(requestedCoordinate.value == searchTimeCoordinate)
     }
 
     @Test("부스 조회가 진행 중이면 다른 후보를 골라도 다시 조회하지 않는다")

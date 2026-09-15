@@ -11,6 +11,18 @@ import ComposableArchitecture
 
 @Reducer
 public struct PhotoBoothSearchFeature {
+    enum Constants {
+        /// 사용자 위치를 알 수 없을 때 거리 표기의 기준으로 쓰는 좌표입니다.
+        ///
+        /// 위치 권한에 동의하지 않았거나 첫 좌표를 아직 받지 못했어도 거리를 비워 두지 않고
+        /// 이 좌표를 기준으로 계산합니다. 지도가 위치 없이 여는 시작 지점과 같은 곳이라
+        /// ``MapFeature/Constants/defaultInitialPosition``을 그대로 옮겨 씁니다.
+        static let defaultDistanceOrigin = GeographicCoordinate(
+            latitude: MapFeature.Constants.defaultInitialPosition.coordinate.latitude,
+            longitude: MapFeature.Constants.defaultInitialPosition.coordinate.longitude
+        )
+    }
+
     /// 한 종류의 검색 후보를 페이지가 도착한 순서대로 누적하는 상태입니다.
     struct TypePagination: Equatable {
         var candidates: [PhotoBoothSearchCandidate] = []
@@ -69,14 +81,17 @@ public struct PhotoBoothSearchFeature {
         var query: PhotoBoothSearchQuery?
         /// 상위 화면(지도)이 전달한 가장 최근의 사용자 현재 위치입니다. 위치 권한에 동의하지 않았으면 `nil`입니다.
         ///
-        /// 이 값 자체는 거리 표기에 쓰지 않습니다. 검색을 시작할 때 ``distanceOrigin``으로 옮겨 고정합니다.
+        /// 후보 목록의 거리 표기에는 이 값을 직접 쓰지 않습니다. 검색을 요청할 때 ``distanceOrigin``으로 옮겨 고정합니다.
         var userCoordinate: GeographicCoordinate?
-        /// 거리 표기의 기준으로 고정한 좌표입니다. 검색을 시작한 시점의 현재 위치를 그대로 씁니다.
+        /// 거리 표기의 기준으로 고정한 좌표입니다. 검색을 요청한 시점의 현재 위치를 그대로 씁니다.
         ///
         /// 위치는 계속 갱신되지만 그때마다 목록 전체의 거리를 다시 계산하면 낭비이고,
         /// 이미 보고 있는 목록의 거리가 흔들려 읽기도 어렵습니다.
+        /// 그래서 한 검색이 끝날 때까지는 이 값을 바꾸지 않고, 다음 검색을 요청할 때 그 시점의 위치로 다시 세웁니다.
+        ///
+        /// 요청 시점에 위치를 알 수 없으면 ``Constants/defaultDistanceOrigin``으로 세워 거리를 비워 두지 않습니다.
         /// - Note: 검색 중 이동을 거리에 반영할지는 정책이 정해지지 않아, 지금은 검색 시점으로 고정합니다.
-        var distanceOrigin: GeographicCoordinate?
+        var distanceOrigin: GeographicCoordinate = Constants.defaultDistanceOrigin
         var region = TypePagination()
         var station = TypePagination()
         var photoBooth = TypePagination()
@@ -231,7 +246,8 @@ public struct PhotoBoothSearchFeature {
                 state.isFetchingSearchResult = true
                 let generation = state.requestGeneration
                 // 서버가 사용자 위치를 기준으로 거리를 계산하므로 기준 좌표를 함께 넘깁니다.
-                let userCoordinate = state.userCoordinate
+                // 후보 목록과 같은 기준을 써야 두 화면의 거리가 어긋나지 않으므로 최신 위치가 아니라 고정한 기준을 넘깁니다.
+                let userCoordinate = state.distanceOrigin
                 return .run { send in
                     do {
                         // 부스 목록과 필터는 요청 body가 같아 함께 조회하고, 둘 다 도착해야 지도를 다시 그립니다.
@@ -270,7 +286,8 @@ public struct PhotoBoothSearchFeature {
                 return .none
 
             case let .setUserCoordinate(coordinate):
-                // 거리 표기의 기준은 검색을 시작할 때 고정하므로 여기서는 최신 위치만 받아 둡니다.
+                // 거리 표기의 기준은 검색을 요청할 때 고정하므로 여기서는 최신 위치만 받아 둡니다.
+                // 여기서 받아 둔 위치는 다음 검색을 요청할 때 새 기준이 됩니다.
                 guard state.userCoordinate != coordinate else { return .none }
                 state.userCoordinate = coordinate
                 return .none
@@ -300,7 +317,8 @@ private extension PhotoBoothSearchFeature.State {
         mode = .searching
         self.query = query
         // 이 검색이 끝날 때까지 거리 표기의 기준으로 쓸 좌표를 여기서 고정합니다.
-        distanceOrigin = userCoordinate
+        // 요청 시점에 위치를 모르면 기본 좌표로 세우고, 그 뒤 좌표가 도착해도 이 검색에는 반영하지 않습니다.
+        distanceOrigin = userCoordinate ?? PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
         region = .init()
         station = .init()
         photoBooth = .init()
@@ -329,9 +347,9 @@ private extension PhotoBoothSearchFeature.State {
         return true
     }
 
-    /// 거리 계산의 기준이 되는 위치입니다. 검색을 시작한 시점에 고정한 좌표를 씁니다.
-    var userLocation: CLLocation? {
-        distanceOrigin.map { CLLocation(latitude: $0.latitude, longitude: $0.longitude) }
+    /// 거리 계산의 기준이 되는 위치입니다. 검색을 요청한 시점에 고정한 좌표를 씁니다.
+    var userLocation: CLLocation {
+        CLLocation(latitude: distanceOrigin.latitude, longitude: distanceOrigin.longitude)
     }
 
     /// 한 페이지를 가까운 순으로 세운 후보입니다.
@@ -340,7 +358,7 @@ private extension PhotoBoothSearchFeature.State {
     /// 거리가 같으면 먼저 내려온 후보를 앞에 둡니다.
     static func nearestFirst(
         _ candidates: [PhotoBoothSearchCandidate],
-        from userLocation: CLLocation?
+        from userLocation: CLLocation
     ) -> [PhotoBoothSearchCandidate] {
         let distances = candidates.map { distance(to: $0, from: userLocation) }
         guard distances.contains(where: { $0 != nil }) else { return candidates }
@@ -369,11 +387,9 @@ private extension PhotoBoothSearchFeature.State {
 
     /// 정책상 노출해야 하는 거리(m)입니다.
     ///
-    /// 위치 권한에 동의하지 않았거나, 거리를 노출하지 않는 종류(지역)이거나,
-    /// 후보에 기준 좌표가 없으면(지하철역) `nil`입니다.
-    static func distance(to candidate: PhotoBoothSearchCandidate, from userLocation: CLLocation?) -> Int? {
+    /// 거리를 노출하지 않는 종류(지역)이거나 후보에 기준 좌표가 없으면(지하철역) `nil`입니다.
+    static func distance(to candidate: PhotoBoothSearchCandidate, from userLocation: CLLocation) -> Int? {
         guard candidate.type.providesDistance,
-              let userLocation,
               let coordinate = candidate.coordinate
         else { return nil }
         let candidateLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
@@ -384,7 +400,7 @@ private extension PhotoBoothSearchFeature.State {
         requestGeneration &+= 1
         mode = .inactive
         query = nil
-        distanceOrigin = nil
+        distanceOrigin = PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
         region = .init()
         station = .init()
         photoBooth = .init()

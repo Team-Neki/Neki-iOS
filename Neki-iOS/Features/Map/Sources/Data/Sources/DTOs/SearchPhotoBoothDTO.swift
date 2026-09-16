@@ -9,8 +9,8 @@ import Foundation
 
 /// 통합 검색과 검색 결과 부스 조회가 공통으로 사용하는 포토부스 지점입니다.
 ///
-/// 기존 지도 조회(`/photo-booths/polygon`, `/point`)와 달리 즐겨찾기 키가 `favorite`이고
-/// 브랜드 코드가 함께 내려오므로 ``PhotoBoothDTO``와 분리했습니다.
+/// 기존 지도 조회(`/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
+/// 브랜드 이름 대신 코드로 브랜드를 매칭하기 위해 ``PhotoBoothDTO``와 분리했습니다.
 struct SearchPhotoBoothDTO: Decodable {
     let id: Int
     let brandName: String

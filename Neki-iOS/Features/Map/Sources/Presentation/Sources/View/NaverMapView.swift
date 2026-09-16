@@ -639,7 +639,8 @@ public struct NaverMapView: View {
         .overlay(alignment: .top) {
             VStack(spacing: 12) {
                 searchField
-                if store.isExploreHereButtonVisible {
+                // 검색 결과를 보는 동안에는 영역을 다시 조회하면 검색 결과가 지워지므로 재탐색 컨트롤을 숨깁니다.
+                if store.isExploreHereButtonVisible, store.appliedSearchQuery == nil {
                     exploreHereControl
                 }
             }
@@ -796,28 +797,14 @@ private extension NaverMapView {
         }
     }
     
-    /// 지도 상단의 재탐색 컨트롤입니다.
-    ///
-    /// 검색으로 지도가 옮겨진 상태(`appliedSearchQuery != nil`)에서는 지도 영역을 다시 조회하면
-    /// 검색 결과가 지워지므로, 문구와 동작을 모두 검색 전용으로 갈라 둡니다.
-    ///
-    /// - TODO: 검색 상태에서의 동작이 확정되지 않았습니다.
-    ///   문구는 "결과 더보기"로 확정했고, `didTapSearchResultMapControl`은 아직 아무 동작도 하지 않습니다.
-    @ViewBuilder
     var exploreHereControl: some View {
-        if store.appliedSearchQuery == nil {
-            mapTopControl(title: "이 지역 재탐색") { store.send(.didTapExploreHereButton) }
-        } else {
-            mapTopControl(title: "결과 더보기") { store.send(.didTapSearchResultMapControl) }
-        }
-    }
-
-    func mapTopControl(title: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+        Button {
+            store.send(.didTapExploreHereButton)
+        } label: {
             HStack(spacing: 7) {
                 Image(.iconRotate)
 
-                Text(title)
+                Text("이 지역 재탐색")
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
             }

@@ -144,8 +144,6 @@ public struct MapFeature {
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
         case didTapExploreHereButton
-        /// 검색으로 지도가 옮겨진 상태에서 상단 컨트롤을 눌렀을 때입니다.
-        case didTapSearchResultMapControl
         case didTapSearchField
         case didTapClearSearchButton
         case dismissPermissionAlert
@@ -392,14 +390,6 @@ public struct MapFeature {
                 resetToMapMode(&state, for: .second)
                 guard let bounds = state.currentBounds else { return .none }
                 return .send(.fetchPhotoBooths(bounds: bounds))
-
-            case .didTapSearchResultMapControl:
-                // TODO: 검색으로 지도가 옮겨진 상태의 상단 컨트롤 동작 정의 필요.
-                // 노출 문구는 "결과 더보기"로 확정했고 동작만 남았습니다.
-                // 지도가 검색 때문에 옮겨졌는지는 `state.appliedSearchQuery`로 구분합니다.
-                // 이 지역 재탐색(`didTapExploreHereButton`)은 영역 조회로 검색 결과를 지우므로
-                // 그대로 재사용할 수 없습니다.
-                return .none
 
             case .didTapExploreHereButton:
                 guard let bounds = state.currentBounds else { return .none }

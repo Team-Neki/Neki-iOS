@@ -17,5 +17,6 @@ import SwiftUI
 public func withoutAnimation(_ body: () -> Void) {
     var transaction = Transaction()
     transaction.disablesAnimations = true
+    transaction.animation = nil
     withTransaction(transaction, body)
 }

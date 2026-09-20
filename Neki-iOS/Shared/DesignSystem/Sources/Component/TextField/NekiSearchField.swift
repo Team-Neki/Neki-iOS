@@ -145,7 +145,7 @@ public struct NekiSearchField: View {
 }
 
 
-// MARK: - NekiSearchField + Variant
+// MARK: - NekiSearchField + Types
 
 private extension NekiSearchField {
     /// 생성 방법으로 정해지는 검색 필드의 형태입니다.
@@ -162,7 +162,7 @@ private extension NekiSearchField {
         /// 검색 화면 밖에서 검색을 완료한 검색어를 보여 줍니다. 그림자와 지우기 버튼을 노출하고 검색어를 SemiBold로 표시합니다.
         case completed
 
-        var decoration: SearchFieldDecoration {
+        var decoration: Decoration {
             switch self {
             case .input: .border
             case .entry, .completed: .shadow
@@ -184,6 +184,23 @@ private extension NekiSearchField {
             case .input(.submitted), .completed: .gray900
             }
         }
+    }
+
+    /// 검색 필드가 형태별로 사용하는 테두리/그림자 표현입니다.
+    enum Decoration {
+        /// 검색 화면에서 검색어를 입력받는 동안 사용하는 테두리입니다.
+        case border
+        /// 진입점과 검색 완료에서 사용하는 그림자입니다.
+        case shadow
+    }
+
+    enum Metrics {
+        static let spacing: CGFloat = 12
+        static let iconSize: CGFloat = 24
+        static let horizontalPadding: CGFloat = 16
+        static let verticalPadding: CGFloat = 12
+        static let shadowRadius: CGFloat = 4
+        static let shadowOffsetY: CGFloat = 2
     }
 }
 
@@ -292,31 +309,14 @@ private extension NekiSearchField {
         Button(action: action) { iconImage(icon) }
             .buttonStyle(.plain)
     }
-
-    enum Metrics {
-        static let spacing: CGFloat = 12
-        static let iconSize: CGFloat = 24
-        static let horizontalPadding: CGFloat = 16
-        static let verticalPadding: CGFloat = 12
-        static let shadowRadius: CGFloat = 4
-        static let shadowOffsetY: CGFloat = 2
-    }
 }
 
 
 // MARK: - Shared Container
 
-/// 검색 필드가 형태별로 사용하는 테두리/그림자 표현입니다.
-private enum SearchFieldDecoration {
-    /// 검색 화면에서 검색어를 입력받는 동안 사용하는 테두리입니다.
-    case border
-    /// 진입점과 검색 완료에서 사용하는 그림자입니다.
-    case shadow
-}
-
 /// 검색 필드가 상태와 무관하게 공유하는 형태(여백, 배경, 모서리, 테두리/그림자)입니다.
 private struct SearchFieldContainer: ViewModifier {
-    let decoration: SearchFieldDecoration
+    let decoration: NekiSearchField.Decoration
 
     func body(content: Content) -> some View {
         content
@@ -338,7 +338,7 @@ private struct SearchFieldContainer: ViewModifier {
 }
 
 private extension View {
-    func searchFieldContainer(_ decoration: SearchFieldDecoration) -> some View {
+    func searchFieldContainer(_ decoration: NekiSearchField.Decoration) -> some View {
         modifier(SearchFieldContainer(decoration: decoration))
     }
 }

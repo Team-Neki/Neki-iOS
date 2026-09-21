@@ -26,7 +26,7 @@ struct PhotoBoothSearchView: View {
         VStack(spacing: .zero) {
             NekiSearchField(
                 text: $store.searchText,
-                state: searchFieldState,
+                phase: searchFieldPhase,
                 isFocused: $isSearchFieldFocused,
                 prompt: "브랜드, 지점명, 지역을 검색해보세요",
                 onBack: { withoutAnimation { store.send(.dismissSearch) } },
@@ -162,7 +162,7 @@ private extension PhotoBoothSearchView {
     ///
     /// 다시 입력을 시작하거나(포커스가 돌아오거나) 검색어를 비우면 입력 중 형태로 되돌아갑니다.
     /// 검색어를 비워도 결과는 그대로 두므로 필드 모양만 입력 중으로 되돌아갑니다.
-    var searchFieldState: NekiSearchFieldState {
+    var searchFieldPhase: NekiSearchField.Phase {
         let hasSubmittedKeyword = store.mode == .searching && store.searchText.isEmpty == false
         return isSearchFieldFocused || hasSubmittedKeyword == false ? .editing : .submitted
     }

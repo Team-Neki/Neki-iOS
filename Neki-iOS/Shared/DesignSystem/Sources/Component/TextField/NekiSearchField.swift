@@ -7,23 +7,9 @@
 
 import SwiftUI
 
-/// 검색어를 입력받는 검색 필드의 상태입니다.
-///
-/// 검색 화면에서 입력하는 동안 바뀌는 상태만 담습니다.
-/// 진입점과 검색 화면 밖의 검색 완료 형태는 상태가 아닌 생성 방법으로 고릅니다.
-///
-/// - Note: `State`가 아닌 최상위 타입인 이유는 `NekiSearchField` 안에 중첩하면
-///   SwiftUI의 `@State`를 가리기 때문입니다.
-public enum NekiSearchFieldState: Equatable {
-    /// 검색어를 입력하는 중입니다. 테두리를 노출하고 입력한 검색어를 Medium으로 표시합니다.
-    case editing
-    /// 검색어를 제출해 결과를 보고 있습니다. 입력 중처럼 테두리를 노출하고 검색어는 검색 완료처럼 SemiBold로 표시합니다.
-    case submitted
-}
-
 /// 캡슐형 검색 필드입니다.
 ///
-/// 생성 방법과 `state`에 따라 좌측 아이콘, 테두리와 그림자, 검색어 서체, 지우기 버튼 노출이 달라집니다.
+/// 생성 방법과 `phase`에 따라 좌측 아이콘, 테두리와 그림자, 검색어 서체, 지우기 버튼 노출이 달라집니다.
 /// 입력 없이 검색 화면으로 이동하기만 하는 진입점에는 ``NekiSearchField/entry(_:action:)``을,
 /// 검색 화면 밖에서 완료한 검색어만 보여 주는 자리에는 ``NekiSearchField/completed(_:onEdit:onClear:)``을 사용합니다.
 public struct NekiSearchField: View {
@@ -61,14 +47,14 @@ public struct NekiSearchField: View {
     ///
     /// - Parameters:
     ///   - text: 사용자가 입력 중인 검색어
-    ///   - state: 검색 필드의 상태. 입력 중에는 `.editing`, 제출한 검색어로 결과를 보는 동안에는 `.submitted`를 전달합니다.
+    ///   - phase: 검색 필드의 단계. 입력 중에는 `.editing`, 제출한 검색어로 결과를 보는 동안에는 `.submitted`를 전달합니다.
     ///   - isFocused: 입력 포커스를 제어할 바인딩
     ///   - prompt: 검색어가 비어 있을 때 표시할 안내 문구
     ///   - onBack: 좌측 뒤로가기 버튼을 눌렀을 때 실행할 동작
     ///   - onSubmit: 키보드 검색 또는 우측 검색 버튼으로 검색어를 제출했을 때 실행할 동작
     public init(
         text: Binding<String>,
-        state: NekiSearchFieldState,
+        phase: Phase,
         isFocused: FocusState<Bool>.Binding,
         prompt: String,
         onBack: @escaping () -> Void,
@@ -76,7 +62,7 @@ public struct NekiSearchField: View {
     ) {
         self.init(
             text: text,
-            variant: .input(state),
+            variant: .input(phase),
             isFocused: isFocused,
             prompt: prompt,
             onBack: onBack,
@@ -147,18 +133,31 @@ public struct NekiSearchField: View {
 
 // MARK: - NekiSearchField + Types
 
+public extension NekiSearchField {
+    /// 검색어를 입력받는 검색 필드의 단계입니다.
+    ///
+    /// 검색 화면에서 입력하는 동안 바뀌는 단계만 담습니다.
+    /// 진입점과 검색 화면 밖의 검색 완료 형태는 단계가 아닌 생성 방법으로 고릅니다.
+    enum Phase: Equatable {
+        /// 검색어를 입력하는 중입니다. 테두리를 노출하고 입력한 검색어를 Medium으로 표시합니다.
+        case editing
+        /// 검색어를 제출해 결과를 보고 있습니다. 입력 중처럼 테두리를 노출하고 검색어는 검색 완료처럼 SemiBold로 표시합니다.
+        case submitted
+    }
+}
+
 private extension NekiSearchField {
     /// 생성 방법으로 정해지는 검색 필드의 형태입니다.
     ///
-    /// 형태는 사용하는 자리마다 고정되고, 검색 화면에서 입력하는 동안 바뀌는 상태만 ``NekiSearchFieldState``로 받습니다.
+    /// 형태는 사용하는 자리마다 고정되고, 검색 화면에서 입력하는 동안 바뀌는 단계만 ``NekiSearchField/Phase``로 받습니다.
     ///
     /// - Note: 형태별 모양은 `==` 비교 대신 `switch`로 고릅니다.
-    ///   형태나 상태가 늘어나면 모양을 정해야 하는 곳마다 컴파일러가 알려 줍니다.
+    ///   형태나 단계가 늘어나면 모양을 정해야 하는 곳마다 컴파일러가 알려 줍니다.
     enum Variant {
         /// 검색 화면으로 이동하기 위한 진입점입니다. 입력할 수 없고 탭하면 이동합니다.
         case entry
         /// 검색 화면에서 검색어를 입력받습니다.
-        case input(NekiSearchFieldState)
+        case input(Phase)
         /// 검색 화면 밖에서 검색을 완료한 검색어를 보여 줍니다. 그림자와 지우기 버튼을 노출하고 검색어를 SemiBold로 표시합니다.
         case completed
 

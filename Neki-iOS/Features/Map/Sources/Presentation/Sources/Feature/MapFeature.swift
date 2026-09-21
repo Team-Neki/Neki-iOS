@@ -42,9 +42,8 @@ public struct MapFeature {
         private(set) var generation: UInt = .zero
         private(set) var bounds: GeographicBoundingBox?
 
-        /// 새 영역 맞춤을 요청합니다. 맞출 영역이 없으면 요청을 지웁니다.
-        mutating func fit(to bounds: GeographicBoundingBox?) {
-            guard let bounds else { return clear() }
+        /// 새 영역 맞춤을 요청합니다.
+        mutating func fit(to bounds: GeographicBoundingBox) {
             generation &+= 1
             self.bounds = bounds
         }
@@ -757,7 +756,9 @@ public struct MapFeature {
                 // 지역과 지하철역은 응답 자체가 지도에 그릴 목록이므로 영역 조회를 대신합니다.
                 // 서버가 보여 줄 영역을 주지 않아 목록으로 직접 정하며, 0건이면 지도를 옮기지 않습니다.
                 resetToMapMode(&state, for: .second)
-                state.cameraFitRequest.fit(to: Self.searchResultBounds(of: photoBooths))
+                if let bounds = Self.searchResultBounds(of: photoBooths) {
+                    state.cameraFitRequest.fit(to: bounds)
+                }
                 // 고른 범위 전체가 곧 목록이므로 탭 없이 개수, `브랜드` 칩, 결과 목록만 노출합니다.
                 state.photoBoothListState.isSearchResultPresented = true
                 // 검색을 끝내고 목록으로 돌아왔을 때 이 지역 탭에서 시작하도록 되돌립니다.

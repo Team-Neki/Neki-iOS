@@ -236,7 +236,7 @@ public struct PhotoBoothSearchFeature {
             case let .candidatePageResponse(.failure(error), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
                 state.isFetching = false
-                state.failure = PhotoBoothSearchFailure(error)
+                state.failure = (error as? PhotoBoothSearchFailure) ?? .unknown
                 return .none
 
             case let .didSelectCandidate(candidate):
@@ -282,7 +282,8 @@ public struct PhotoBoothSearchFeature {
                 state.isFetchingSearchResult = false
                 // 이미 쌓아 둔 후보 목록을 덮지 않도록 실패는 알림으로만 알립니다.
                 // TODO: 실패한 후보를 그 자리에서 다시 고르는 인라인 재시도가 필요한지 확인 필요.
-                state.toast = NekiToastItem(PhotoBoothSearchFailure(error).message, style: .error)
+                let failure = (error as? PhotoBoothSearchFailure) ?? .unknown
+                state.toast = NekiToastItem(failure.message, style: .error)
                 return .none
 
             case let .setUserCoordinate(coordinate):

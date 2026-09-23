@@ -188,38 +188,42 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         page: Int,
         size: Int
     ) async throws -> PhotoBoothSearchCandidatePage {
-        switch type {
-        case .region:
-            let endpoint = MapEndpoint.searchRegions(keyword: keyword, page: page, size: size)
-            let responseDTO: BaseResponseDTO<SearchRegionsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-            return PhotoBoothSearchCandidatePage(
-                type: .region,
-                candidates: data.items.map { .region($0.toEntity()) },
-                hasNext: data.hasNext
-            )
+        do {
+            switch type {
+            case .region:
+                let endpoint = MapEndpoint.searchRegions(keyword: keyword, page: page, size: size)
+                let responseDTO: BaseResponseDTO<SearchRegionsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+                guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+                return PhotoBoothSearchCandidatePage(
+                    type: .region,
+                    candidates: data.items.map { .region($0.toEntity()) },
+                    hasNext: data.hasNext
+                )
 
-        case .subwayStation:
-            let endpoint = MapEndpoint.searchStations(keyword: keyword, page: page, size: size)
-            let responseDTO: BaseResponseDTO<SearchStationsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-            return PhotoBoothSearchCandidatePage(
-                type: .subwayStation,
-                candidates: data.items.map { .subwayStation($0.toEntity()) },
-                hasNext: data.hasNext
-            )
+            case .subwayStation:
+                let endpoint = MapEndpoint.searchStations(keyword: keyword, page: page, size: size)
+                let responseDTO: BaseResponseDTO<SearchStationsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+                guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+                return PhotoBoothSearchCandidatePage(
+                    type: .subwayStation,
+                    candidates: data.items.map { .subwayStation($0.toEntity()) },
+                    hasNext: data.hasNext
+                )
 
-        case .photoBooth:
-            let brands = try await ensureBrandsLoadedByCode()
-            let endpoint = MapEndpoint.searchPhotoBooths(keyword: keyword, page: page, size: size)
-            let responseDTO: BaseResponseDTO<SearchPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-            let photoBooths = photoBoothsApplyingFavoriteState(searchPhotoBooths(from: data.items, brands: brands))
-            return PhotoBoothSearchCandidatePage(
-                type: .photoBooth,
-                candidates: photoBooths.map { .photoBooth($0) },
-                hasNext: data.hasNext
-            )
+            case .photoBooth:
+                let brands = try await ensureBrandsLoadedByCode()
+                let endpoint = MapEndpoint.searchPhotoBooths(keyword: keyword, page: page, size: size)
+                let responseDTO: BaseResponseDTO<SearchPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+                guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+                let photoBooths = photoBoothsApplyingFavoriteState(searchPhotoBooths(from: data.items, brands: brands))
+                return PhotoBoothSearchCandidatePage(
+                    type: .photoBooth,
+                    candidates: photoBooths.map { .photoBooth($0) },
+                    hasNext: data.hasNext
+                )
+            }
+        } catch {
+            throw mapSearchFailure(error)
         }
     }
 
@@ -228,25 +232,71 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         target: PhotoBoothSearchTarget,
         userCoordinate: GeographicCoordinate?
     ) async throws -> [PhotoBooth] {
-        let brands = try await ensureBrandsLoadedByCode()
-        let requestDTO = FetchSearchResultPhotoBoothsDTO.Request(target: target, userCoordinate: userCoordinate)
-        let endpoint = MapEndpoint.searchResultPhotoBooths(dto: requestDTO)
-        let responseDTO: BaseResponseDTO<FetchSearchResultPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        guard let items = responseDTO.data?.photoBooths else { throw NetworkError.responseDecodingError }
-        return photoBoothsApplyingFavoriteState(searchPhotoBooths(from: items, brands: brands))
+        do {
+            let brands = try await ensureBrandsLoadedByCode()
+            let requestDTO = FetchSearchResultPhotoBoothsDTO.Request(target: target, userCoordinate: userCoordinate)
+            let endpoint = MapEndpoint.searchResultPhotoBooths(dto: requestDTO)
+            let responseDTO: BaseResponseDTO<FetchSearchResultPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let items = responseDTO.data?.photoBooths else { throw NetworkError.responseDecodingError }
+            return photoBoothsApplyingFavoriteState(searchPhotoBooths(from: items, brands: brands))
+        } catch {
+            throw mapSearchFailure(error)
+        }
     }
 
     /// 고른 지역·역의 부스 목록에서 쓸 수 있는 브랜드 필터를 조회합니다.
     func readSearchResultBrandFilters(
         target: PhotoBoothSearchTarget
     ) async throws -> [PhotoBoothSearchBrandFilter] {
-        let brands = try await ensureBrandsLoadedByCode()
-        // 필터 집계는 거리를 쓰지 않아 서버가 기준 위치를 무시하므로 담지 않습니다.
-        let requestDTO = FetchSearchFilterDTO.Request(target: target, userCoordinate: nil)
-        let endpoint = MapEndpoint.searchFilter(dto: requestDTO)
-        let responseDTO: BaseResponseDTO<FetchSearchFilterDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-        guard let items = responseDTO.data?.brandFilters else { throw NetworkError.responseDecodingError }
-        return searchBrandFilters(from: items, brands: brands)
+        do {
+            let brands = try await ensureBrandsLoadedByCode()
+            // 필터 집계는 거리를 쓰지 않아 서버가 기준 위치를 무시하므로 담지 않습니다.
+            let requestDTO = FetchSearchFilterDTO.Request(target: target, userCoordinate: nil)
+            let endpoint = MapEndpoint.searchFilter(dto: requestDTO)
+            let responseDTO: BaseResponseDTO<FetchSearchFilterDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let items = responseDTO.data?.brandFilters else { throw NetworkError.responseDecodingError }
+            return searchBrandFilters(from: items, brands: brands)
+        } catch {
+            throw mapSearchFailure(error)
+        }
+    }
+}
+
+
+// MARK: - DefaultPhotoBoothRepository + Error Mapping
+
+private extension DefaultPhotoBoothRepository {
+    /// 검색 요청에서 던져진 오류를 화면이 구분하는 실패 사유로 바꿉니다.
+    ///
+    /// 연결이 끊긴 경우만 바꾸고, 취소를 비롯한 나머지 오류는 그대로 넘겨 호출부의 기존 처리를 따릅니다.
+    func mapSearchFailure(_ error: Error) -> Error {
+        isConnectionLost(error) ? PhotoBoothSearchFailure.network : error
+    }
+
+    /// 연결이 끊겨 발생한 오류인지 판정합니다.
+    ///
+    /// `DefaultNetworkProvider`는 연결 실패 `URLError`를 `NetworkError.unknownError`로 감싸 던지므로
+    /// 감싸인 오류까지 따라 들어가 확인합니다.
+    /// 이름과 달리 `NetworkError.networkFail`은 따로 분류하지 않은 상태 코드에 쓰이므로 연결 문제로 보지 않습니다.
+    func isConnectionLost(_ error: Error) -> Bool {
+        switch error {
+        case let urlError as URLError:
+            return Self.connectionLostCodes.contains(urlError.code)
+
+        case let networkError as NetworkError:
+            guard case let .unknownError(underlyingError) = networkError else { return false }
+            return isConnectionLost(underlyingError)
+
+        default:
+            return false
+        }
+    }
+
+    /// 연결이 끊긴 상황으로 취급할 `URLError` 코드입니다.
+    ///
+    /// - Note: QR 코드 스캐너의 판정 기준과 동일하게 맞췄습니다.
+    static var connectionLostCodes: Set<URLError.Code> {
+        [.notConnectedToInternet, .networkConnectionLost]
     }
 }
 

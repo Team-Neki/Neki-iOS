@@ -346,10 +346,13 @@ struct PhotoBoothSearchFeatureTests {
 
         #expect(store.state.rows.isEmpty)
         #expect(store.state.isLoading)
+        // 안내 문구 대신 본문에 로딩을 띄웁니다.
+        #expect(store.state.contentState == .loading)
 
         await settle(store)
 
         #expect(store.state.isLoading == false)
+        #expect(store.state.contentState == .results)
     }
 
     @Test("목록을 이어붙이는 후보 요청은 로딩으로 목록을 덮지 않는다")
@@ -368,7 +371,7 @@ struct PhotoBoothSearchFeatureTests {
         #expect(store.state.isLoading == false)
     }
 
-    @Test("후보를 선택해 부스를 조회하는 동안 로딩을 노출한다")
+    @Test("후보를 선택해 부스를 조회하는 동안 로딩 상태로 둔다")
     func isLoading_whileSearchResultIsInFlight_showsLoading() async {
         let store = makeStore(
             pages: [.region: [makeRegionPage(count: 1, hasNext: false)]],

@@ -47,7 +47,6 @@ struct PhotoBoothSearchView: View {
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
                 .padding(.bottom, Metrics.floatingButtonBottomPadding)
         }
-        .nekiLoading(isPresented: store.isLoading, message: loadingMessage)
         // 앱 전역 토스트는 이 화면(전체 화면 표시) 아래에 그려져 보이지 않으므로 여기서 직접 띄웁니다.
         .nekiToast(item: $store.toast)
         // 지도에서 검색어를 눌러 다시 들어온 경우에는 결과를 가리지 않도록 키보드를 올리지 않습니다.
@@ -63,6 +62,10 @@ private extension PhotoBoothSearchView {
     @ViewBuilder
     var content: some View {
         switch store.contentState {
+        case .loading:
+            NekiLoadingIndicator()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
         case .results:
             candidateList
 
@@ -153,11 +156,6 @@ private extension PhotoBoothSearchView {
 // MARK: - PhotoBoothSearchView + Policy
 
 private extension PhotoBoothSearchView {
-    /// 진행 중인 요청에 맞는 로딩 문구입니다.
-    var loadingMessage: String {
-        store.isFetchingSearchResult ? "포토부스를 불러오고 있어요." : "검색 결과를 불러오고 있어요."
-    }
-
     /// 제출한 검색어가 필드에 남아 결과를 보고 있는 동안에만 제출 형태로 표시합니다.
     ///
     /// 다시 입력을 시작하거나(포커스가 돌아오거나) 검색어를 비우면 입력 중 형태로 되돌아갑니다.

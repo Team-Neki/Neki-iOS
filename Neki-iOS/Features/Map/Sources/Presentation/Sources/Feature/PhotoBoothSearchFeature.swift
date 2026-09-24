@@ -68,6 +68,8 @@ public struct PhotoBoothSearchFeature {
         public enum ContentState: Equatable {
             /// 검색 전 안내
             case guide
+            /// 검색어로 첫 후보를 불러오는 중
+            case loading
             /// 검색 후보 목록
             case results
             /// 모든 유형에서 결과가 없음
@@ -117,10 +119,7 @@ public struct PhotoBoothSearchFeature {
             PhotoBoothSearchCandidateType.displayOrdered.first { pagination(for: $0).isExhausted == false }
         }
 
-        /// 화면을 덮는 로딩을 노출해야 하는지 여부입니다.
-        ///
-        /// 첫 화면을 채우는 요청만 화면을 덮고, 목록을 이어붙이는 페이지 요청은 목록을 그대로 둡니다.
-        /// 부스 후보는 네트워크 호출 없이 응답하므로 노출 지연 정책에 걸려 로딩이 보이지 않습니다.
+        /// 첫 후보나 고른 후보의 부스를 불러오는 중인지 여부입니다. 목록을 이어붙이는 페이지 요청은 포함하지 않습니다.
         var isLoading: Bool {
             isFetchingSearchResult || (isFetching && rows.isEmpty)
         }
@@ -133,7 +132,7 @@ public struct PhotoBoothSearchFeature {
             guard mode == .searching else { return .guide }
             if rows.isEmpty == false { return .results }
             if let failure { return .failure(failure) }
-            return hasNoSearchResult ? .noResult : .guide
+            return hasNoSearchResult ? .noResult : .loading
         }
 
         /// 모든 유형에서 검색 결과가 없어 전체 검색 결과 없음 상태를 노출해야 하는지 여부입니다.
@@ -240,7 +239,7 @@ public struct PhotoBoothSearchFeature {
                 return .none
 
             case let .didSelectCandidate(candidate):
-                // 조회 중에는 로딩이 화면을 덮지만, 여러 셀이 한 번에 눌리면 액션이 겹쳐 들어올 수 있어 여기서도 막습니다.
+                // 조회 중에도 목록을 누를 수 있으므로 여기서 막습니다.
                 // 먼저 고른 후보의 조회를 끝까지 살려 두어 나중에 눌린 셀이 결과를 가로채지 않게 합니다.
                 guard state.mode == .searching, state.isFetchingSearchResult == false else { return .none }
                 state.isFetchingSearchResult = true

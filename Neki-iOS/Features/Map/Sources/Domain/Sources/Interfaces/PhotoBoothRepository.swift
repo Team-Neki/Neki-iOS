@@ -32,6 +32,42 @@ protocol PhotoBoothRepository {
     /// - Parameter brands: 사용자가 저장한 브랜드 순서
     /// - Returns: 저장된 순서가 반영된 브랜드 배열
     func updateBrandOrder(_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand]
+
+    /// 검색어에 대응하는 특정 종류의 검색 후보 페이지를 가져옵니다.
+    /// - Parameters:
+    ///   - keyword: 사용자가 입력한 검색어 원문
+    ///   - type: 조회할 후보의 종류
+    ///   - page: 0부터 시작하는 페이지 번호
+    ///   - size: 한 페이지에 담을 후보 수
+    /// - Returns: 서버 순서를 유지한 후보 페이지
+    func searchCandidates(
+        keyword: String,
+        type: PhotoBoothSearchCandidateType,
+        page: Int,
+        size: Int
+    ) async throws -> PhotoBoothSearchCandidatePage
+
+    /// 고른 지역·역에 속한 포토부스 목록을 가져옵니다.
+    ///
+    /// 시군구를 고르면 그 아래 읍면동까지 포함하며, 역 주변 반경은 수집 단계에서 미리 계산된
+    /// 값이라 클라이언트가 조정할 수 없습니다.
+    /// - Parameters:
+    ///   - target: 사용자가 고른 지역 또는 지하철역
+    ///   - userCoordinate: 거리 계산의 기준이 되는 사용자 현재 위치. `nil`이면 거리가 내려오지 않습니다.
+    /// - Returns: 기준 위치가 있으면 가까운 순, 없으면 브랜드와 지점 이름 순으로 정렬된 포토부스 배열
+    func readSearchResultPhotoBooths(
+        target: PhotoBoothSearchTarget,
+        userCoordinate: GeographicCoordinate?
+    ) async throws -> [PhotoBooth]
+
+    /// 고른 지역·역의 부스 목록에서 실제로 쓸 수 있는 브랜드 필터를 가져옵니다.
+    ///
+    /// 그 범위에 없는 브랜드를 눌러 빈 화면을 보는 일이 없도록, 목록에 있는 브랜드만 내려옵니다.
+    /// - Parameter target: 사용자가 고른 지역 또는 지하철역
+    /// - Returns: 사용자별 브랜드 정렬 순서를 유지한 브랜드 필터 배열
+    func readSearchResultBrandFilters(
+        target: PhotoBoothSearchTarget
+    ) async throws -> [PhotoBoothSearchBrandFilter]
 }
 
 private enum PhotoBoothRepositoryKey: DependencyKey {

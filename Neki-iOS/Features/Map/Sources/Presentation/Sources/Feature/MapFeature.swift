@@ -31,6 +31,29 @@ public struct MapFeature {
         }
     }
 
+    /// 카메라를 한 지점이 아니라 특정 영역에 맞춰 달라는 요청입니다.
+    ///
+    /// 검색 결과처럼 여러 지점을 한 화면에 담아야 하는 경우에 씁니다.
+    /// 한 지점으로 옮기는 ``State/cameraPosition``과 동시에 채우지 않습니다.
+    ///
+    /// 좌표만으로는 서로 다른 두 요청을 구분할 수 없어 세대를 함께 둡니다.
+    /// 검색 뒤 지도를 옮기고 같은 검색을 다시 해도 새 세대라 카메라가 다시 맞춰집니다.
+    struct CameraFitRequest: Equatable {
+        private(set) var generation: UInt = .zero
+        private(set) var bounds: GeographicBoundingBox?
+
+        /// 새 영역 맞춤을 요청합니다.
+        mutating func fit(to bounds: GeographicBoundingBox) {
+            generation &+= 1
+            self.bounds = bounds
+        }
+
+        /// 맞출 영역이 없음을 표시합니다.
+        mutating func clear() {
+            bounds = nil
+        }
+    }
+
     struct PhotoBoothFetchContext: Equatable {
         private(set) var generation: UInt = .zero
         private(set) var bounds: GeographicBoundingBox?
@@ -64,11 +87,17 @@ public struct MapFeature {
         var isSDKAuthSuccessful: Bool = false
         var detent: NekiSheetDetent = SheetStage.first.detent
         var isExploreHereButtonVisible: Bool = false
+        var isSearchPresented: Bool = false
+        /// 지도에 반영 중인 검색어입니다. 검색 결과를 보고 있지 않으면 `nil`입니다.
+        ///
+        /// 상단 검색 필드를 검색 완료 형태로 유지하고, 검색 화면으로 되돌아갈 때 그대로 다시 검색합니다.
+        var appliedSearchQuery: PhotoBoothSearchQuery?
         var isPermissionAlertPresented: Bool = false
         var initialExplorationState: MapInitialExplorationState = .awaitingPermission
         
         // Map State
         var cameraPosition: GeographicCoordinate?
+        var cameraFitRequest = CameraFitRequest()
         var currentBounds: GeographicBoundingBox?
         var lastExploredLocation: CLLocation?
         
@@ -114,6 +143,8 @@ public struct MapFeature {
         case didTapCurrentLocationButton
         case didTapDirectionAppsButton
         case didTapExploreHereButton
+        case didTapSearchField
+        case didTapClearSearchButton
         case dismissPermissionAlert
         
         // Internal Logic Actions
@@ -241,7 +272,11 @@ public struct MapFeature {
                     state.isUserTrackingMode = false
                     state.initialExplorationState = .readyForDefaultLocation
                     updateCameraPosition(&state, to: Constants.defaultInitialPosition.coordinate)
-                    return .send(.attemptInitialExploration)
+                    // 위치에 동의하지 않으면 검색 결과에 거리를 노출하지 않습니다.
+                    return .merge(
+                        .send(.attemptInitialExploration),
+                        .send(.photoBoothSearchAction(.setUserCoordinate(nil)))
+                    )
                     
                 @unknown default:
                     return .none
@@ -288,16 +323,20 @@ public struct MapFeature {
                 
             case let .updateUserLocation(.success(location)):
                 state.userLocation = location
+                // 검색 결과의 거리 표기가 현재 위치를 따라가도록 기준 좌표를 넘깁니다.
+                let syncSearchCoordinate = Effect<Action>.send(
+                    .photoBoothSearchAction(.setUserCoordinate(state.userGeographicCoordinate))
+                )
                 
                 if state.isUserTrackingMode {
                     updateCameraPosition(&state, to: location.coordinate)
                 }
                 
-                guard state.initialExplorationState == .waitingForUserLocation else { return .none }
+                guard state.initialExplorationState == .waitingForUserLocation else { return syncSearchCoordinate }
                 state.isExploreHereButtonVisible = false
                 state.initialExplorationState = .readyForUserLocation
                 updateCameraPosition(&state, to: location.coordinate)
-                return .none
+                return syncSearchCoordinate
                 
             case .updateUserLocation(.failure):
                 state.isUserTrackingMode = false
@@ -336,6 +375,21 @@ public struct MapFeature {
                 state.isExploreHereButtonVisible = isVisible
                 return .none
                 
+            case .didTapSearchField:
+                state.isSearchPresented = true
+                // 지도에 반영 중인 검색이 있으면 그 검색어로 되돌려 후보 목록부터 다시 보여 줍니다.
+                // 화면이 뜨기 전에 검색어가 자리해야 검색 완료 형태로 열리므로 이펙트로 미루지 않습니다.
+                guard let query = state.appliedSearchQuery else { return .none }
+                state.photoBoothSearchState.searchText = query.rawValue
+                return .send(.photoBoothSearchAction(.beginSearch(query)))
+
+            case .didTapClearSearchButton:
+                // 검색을 끝내면 검색 결과를 지우고 다시 지도 영역을 조회해 이 지역 목록으로 돌아갑니다.
+                clearAppliedSearch(&state)
+                resetToMapMode(&state, for: .second)
+                guard let bounds = state.currentBounds else { return .none }
+                return .send(.fetchPhotoBooths(bounds: bounds))
+
             case .didTapExploreHereButton:
                 guard let bounds = state.currentBounds else { return .none }
                 let centerCoordinate = bounds.center
@@ -350,6 +404,11 @@ public struct MapFeature {
                 )
                 
             case .attemptInitialExploration:
+                // 검색 결과를 보고 있으면 사용자가 고른 범위를 뒤늦은 초기 탐색이 덮지 않도록 여기서 끝냅니다.
+                guard state.appliedSearchQuery == nil else {
+                    state.initialExplorationState = .completed
+                    return .none
+                }
                 guard let bounds = state.currentBounds else { return .none }
                 guard let targetCoordinate = initialExplorationTargetCoordinate(for: state) else { return .none }
                 
@@ -377,6 +436,8 @@ public struct MapFeature {
 
             case let .fetchPhotoBooths(bounds):
                 state.isExploreHereButtonVisible = false
+                // 영역 조회는 검색 결과를 대신하므로 검색어와 좁혀 둔 필터 칩을 함께 되돌립니다.
+                clearAppliedSearch(&state)
                 let generation = state.photoBoothFetchContext.begin(in: bounds)
 
                 let fetchEffect: Effect<Action> = .run { send in
@@ -668,6 +729,61 @@ public struct MapFeature {
             case let .photoBoothListAction(.delegate(.didTapFavorite(photoBooth))):
                 return .send(.didTapFavorite(photoBooth))
 
+            case .photoBoothSearchAction(.dismissSearch):
+                state.isSearchPresented = false
+                return .none
+
+            case let .photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate, result))):
+                state.isSearchPresented = false
+                state.isUserTrackingMode = false
+                // 결과를 보는 동안 상단 검색 필드에 검색어를 검색 완료 형태로 남깁니다.
+                state.appliedSearchQuery = state.photoBoothSearchState.query
+                let photoBooths = result.photoBooths
+
+                // 부스를 직접 고르면 추가 조회 없이 그 지점만 선택합니다. 나머지 마커는 그대로 둡니다.
+                // 지도에 한 지점만 찍는 경로라 필터 칩도 그대로 둡니다.
+                if case let .photoBooth(photoBooth) = candidate {
+                    selectPhotoBooth(&state, photoBooth: photoBooth)
+                    if state.photoBooths[id: photoBooth.id] == nil {
+                        state.photoBooths.append(photoBooth)
+                    }
+                    return .merge(
+                        .send(.photoBoothSearchAction(.dismissSearch)),
+                        .send(.startBackgroundCalculation)
+                    )
+                }
+
+                // 지역과 지하철역은 응답 자체가 지도에 그릴 목록이므로 영역 조회를 대신합니다.
+                // 서버가 보여 줄 영역을 주지 않아 목록으로 직접 정하며, 0건이면 지도를 옮기지 않습니다.
+                resetToMapMode(&state, for: .second)
+                if let bounds = Self.searchResultBounds(of: photoBooths) {
+                    state.cameraFitRequest.fit(to: bounds)
+                }
+                // 고른 범위 전체가 곧 목록이므로 탭 없이 개수, `브랜드` 칩, 결과 목록만 노출합니다.
+                state.photoBoothListState.isSearchResultPresented = true
+                // 검색을 끝내고 목록으로 돌아왔을 때 이 지역 탭에서 시작하도록 되돌립니다.
+                state.photoBoothListState.selectedTab = .nearby
+                // 이 목록에 없는 브랜드는 눌러도 빈 화면이 되므로 브랜드 필터 시트의 칩을 목록에 있는 브랜드로 좁힙니다.
+                state.photoBoothListState.searchResultBrandFilters = result.brandFilters
+
+                // 영역 조회를 대신하는 경로이므로 진행 중인 스트림 결과가 덮어쓰지 않도록 세대를 무효화합니다.
+                state.photoBoothFetchContext.invalidate()
+                state.photoBooths = IdentifiedArray(uniqueElements: photoBooths)
+                state.visiblePhotoBooths = []
+                state.photoBoothListState.visibleBooths = []
+                state.isExploreHereButtonVisible = false
+                return .merge(
+                    .cancel(id: CancelID.mapFetch),
+                    .cancel(id: CancelID.mapChunkProcessing),
+                    .send(.photoBoothSearchAction(.dismissSearch)),
+                    .concatenate(
+                        // 좁혀진 칩에 없는 브랜드가 선택된 채로 남으면 목록이 통째로 비므로 함께 풉니다.
+                        // 계산이 선택된 브랜드를 읽으므로 필터를 먼저 푼 뒤에 계산을 시작합니다.
+                        .send(.photoBoothListAction(.clearFilterOptions)),
+                        .send(.startBackgroundCalculation)
+                    )
+                )
+
             case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
                 return .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands)))
 
@@ -802,6 +918,30 @@ private extension MapFeature {
         return photoBooths.filter { $0.isFavorite && activeBrandIDs.contains($0.brand.id) }
     }
 
+    /// 검색 결과를 한 화면에 담는 지도 영역입니다.
+    ///
+    /// 서버가 보여 줄 영역을 내려주지 않으므로 받은 부스 목록을 모두 감싸는 영역으로 직접 정합니다.
+    /// 중심만 옮기면 넓은 지역을 골랐을 때 결과가 화면 밖으로 밀리므로 영역째 넘겨 배율까지 맞춥니다.
+    /// 부스가 0건이면 옮길 이유가 없으므로 `nil`입니다.
+    static func searchResultBounds(of photoBooths: [PhotoBooth]) -> GeographicBoundingBox? {
+        guard let first = photoBooths.first?.coordinate else { return nil }
+        var minLatitude = first.latitude, maxLatitude = first.latitude
+        var minLongitude = first.longitude, maxLongitude = first.longitude
+        for photoBooth in photoBooths.dropFirst() {
+            let coordinate = photoBooth.coordinate
+            minLatitude = min(minLatitude, coordinate.latitude)
+            maxLatitude = max(maxLatitude, coordinate.latitude)
+            minLongitude = min(minLongitude, coordinate.longitude)
+            maxLongitude = max(maxLongitude, coordinate.longitude)
+        }
+        return .init(
+            minLatitude: minLatitude,
+            minLongitude: minLongitude,
+            maxLatitude: maxLatitude,
+            maxLongitude: maxLongitude
+        )
+    }
+
     static func activeBrandIDs(from brands: Set<PhotoBoothBrand>) -> Set<PhotoBoothBrand.ID> {
         guard brands.isEmpty == false else { return [] }
         var activeBrandIDs = Set<PhotoBoothBrand.ID>()
@@ -814,16 +954,26 @@ private extension MapFeature {
         activeBrandIDs.isEmpty || activeBrandIDs.contains(brand.id)
     }
 
+    /// 지도에 반영 중인 검색을 지우고 검색 이전의 목록 구성으로 되돌립니다.
+    func clearAppliedSearch(_ state: inout State) {
+        state.appliedSearchQuery = nil
+        state.photoBoothListState.isSearchResultPresented = false
+        state.photoBoothListState.isSearchResultBrandFilterSheetPresented = false
+        state.photoBoothListState.searchResultBrandFilters = nil
+    }
+
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {
         state.selectedBooth = nil
         state.detent = stage.detent
         state.cameraPosition = nil
+        state.cameraFitRequest.clear()
     }
-    
+
     func selectPhotoBooth(_ state: inout State, photoBooth: PhotoBooth) {
         state.selectedBooth = photoBooth
         state.detent = SheetStage.photoBoothSelected.detent
-        state.cameraPosition = photoBooth.coordinate   
+        state.cameraFitRequest.clear()
+        state.cameraPosition = photoBooth.coordinate
     }
     
     func updatePhotoBoothFavoriteState(_ state: inout State, photoBooth: PhotoBooth, isFavorite: Bool) {
@@ -868,6 +1018,7 @@ private extension MapFeature {
     }
 
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {
+        state.cameraFitRequest.clear()
         state.cameraPosition = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
     }
     

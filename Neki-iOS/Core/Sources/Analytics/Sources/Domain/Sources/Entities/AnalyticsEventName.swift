@@ -27,6 +27,10 @@ public enum AnalyticsEventName: String {
     
     // 지도
     case mapView = "map_view"
+    case mapSearchView = "map_search_view"
+    case mapSearchResult = "map_search_result"
+    case mapSearchCandidateSelect = "map_search_candidate_select"
+    case mapSearchLoadMore = "map_search_load_more"
     case mapReSearch = "map_re_search"
     case mapBrandFilterToggle = "map_brand_filter_toggle"
     case boothSelect = "booth_select"

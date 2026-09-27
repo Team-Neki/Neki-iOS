@@ -631,11 +631,6 @@ public struct NaverMapView: View {
         .sheet(item: $store.directionSheetPhotoBooth) { photoBooth in
             DirectionAppsSheet(store: store, photoBooth: photoBooth)
         }
-        .fullScreenCover(isPresented: $store.isSearchPresented) {
-            PhotoBoothSearchView(
-                store: store.scope(state: \.photoBoothSearchState, action: \.photoBoothSearchAction)
-            )
-        }
         .overlay(alignment: .top) {
             VStack(spacing: 12) {
                 searchField
@@ -662,6 +657,21 @@ public struct NaverMapView: View {
         }
         .animation(.easeInOut, value: store.detent)
         .animation(.easeInOut, value: store.selectedBooth?.id)
+        // 검색 화면은 지도 화면의 검색 모드라 새 화면으로 띄우지 않고 지도 위에 겹쳐 그립니다.
+        // 시트·버튼보다 위, 알림보다 아래에 그려지도록 이 자리에 둡니다.
+        // 검색 중 키보드가 올라와도 지도 크기가 바뀌지 않도록 지도 쪽은 키보드 영역을 무시하고,
+        // 가려진 지도는 VoiceOver가 읽지 않게 합니다.
+        .ignoresSafeArea(.keyboard)
+        .accessibilityHidden(store.isSearchPresented)
+        .overlay {
+            if store.isSearchPresented {
+                PhotoBoothSearchView(
+                    store: store.scope(state: \.photoBoothSearchState, action: \.photoBoothSearchAction)
+                )
+                // 결과를 고르는 순간처럼 지도 쪽 애니메이션이 섞여도 검색 화면은 전환 없이 바로 바뀝니다.
+                .transition(.identity)
+            }
+        }
         .nekiAlert(
             isPresented: $store.isPermissionAlertPresented,
             style: .cancelable,
@@ -830,13 +840,13 @@ private extension NaverMapView {
         if let keyword = store.appliedSearchQuery?.rawValue {
             NekiSearchField.completed(
                 keyword,
-                onEdit: { withoutAnimation { store.send(.didTapSearchField) } },
+                onEdit: { store.send(.didTapSearchField) },
                 onClear: { store.send(.didTapClearSearchButton) }
             )
             .padding(.horizontal, 20)
         } else {
             NekiSearchField.entry("네컷 부스 검색하기") {
-                withoutAnimation { store.send(.didTapSearchField) }
+                store.send(.didTapSearchField)
             }
             .padding(.horizontal, 20)
         }

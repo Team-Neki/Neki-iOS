@@ -325,7 +325,7 @@ struct MainTabCoordinator {
             case .archive: state.isTabbarHidden = !state.archive.path.isEmpty
             case .pose: state.isTabbarHidden = !state.pose.path.isEmpty
             case .add: return .none
-            case .map: state.isTabbarHidden = !state.map.path.isEmpty
+            case .map: state.isTabbarHidden = state.map.hidesTabBar
             case .myPage: state.isTabbarHidden = !state.myPage.path.isEmpty
             }
             return .none

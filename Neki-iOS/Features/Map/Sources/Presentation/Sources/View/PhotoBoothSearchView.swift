@@ -29,7 +29,7 @@ struct PhotoBoothSearchView: View {
                 phase: searchFieldPhase,
                 isFocused: $isSearchFieldFocused,
                 prompt: "브랜드, 지점명, 지역을 검색해보세요",
-                onBack: { withoutAnimation { store.send(.dismissSearch) } },
+                onBack: { store.send(.dismissSearch) },
                 onSubmit: {
                     isSearchFieldFocused = false
                     store.send(.submitSearch)
@@ -43,11 +43,10 @@ struct PhotoBoothSearchView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.white)
         .safeAreaInset(edge: .bottom, spacing: .zero) {
-            ChipFloatingButton(.map) { withoutAnimation { store.send(.dismissSearch) } }
+            ChipFloatingButton(.map) { store.send(.dismissSearch) }
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
                 .padding(.bottom, Metrics.floatingButtonBottomPadding)
         }
-        // 앱 전역 토스트는 이 화면(전체 화면 표시) 아래에 그려져 보이지 않으므로 여기서 직접 띄웁니다.
         .nekiToast(item: $store.toast)
         // 지도에서 검색어를 눌러 다시 들어온 경우에는 결과를 가리지 않도록 키보드를 올리지 않습니다.
         .onAppear { isSearchFieldFocused = store.searchText.isEmpty }

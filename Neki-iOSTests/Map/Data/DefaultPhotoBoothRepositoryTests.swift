@@ -23,11 +23,11 @@ struct DefaultPhotoBoothRepositoryTests {
         }
     }
 
-    @Test("따로 분류하지 않은 상태 코드로 실패한 검색은 네트워크 실패로 보지 않는다")
-    func searchCandidates_keepsUnexpectedStatusCodeFailure() async {
+    @Test("따로 분류하지 않은 상태 코드로 실패한 검색은 기타 실패로 바꾼다")
+    func searchCandidates_mapsUnexpectedStatusCodeToUnknownFailure() async {
         let repository = makeRepository(networkProvider: ThrowingNetworkProviderStub(error: NetworkError.networkFail))
 
-        await #expect(throws: NetworkError.self) {
+        await #expect(throws: PhotoBoothSearchFailure.unknown) {
             try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10)
         }
     }

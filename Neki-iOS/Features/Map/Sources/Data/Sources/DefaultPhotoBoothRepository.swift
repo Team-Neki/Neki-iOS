@@ -222,8 +222,10 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                     hasNext: data.hasNext
                 )
             }
+        } catch let error as CancellationError {
+            throw error
         } catch {
-            throw mapSearchFailure(error)
+            throw searchFailure(from: error)
         }
     }
 
@@ -239,8 +241,10 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             let responseDTO: BaseResponseDTO<FetchSearchResultPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let items = responseDTO.data?.photoBooths else { throw NetworkError.responseDecodingError }
             return photoBoothsApplyingFavoriteState(searchPhotoBooths(from: items, brands: brands))
+        } catch let error as CancellationError {
+            throw error
         } catch {
-            throw mapSearchFailure(error)
+            throw searchFailure(from: error)
         }
     }
 
@@ -256,8 +260,10 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
             let responseDTO: BaseResponseDTO<FetchSearchFilterDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let items = responseDTO.data?.brandFilters else { throw NetworkError.responseDecodingError }
             return searchBrandFilters(from: items, brands: brands)
+        } catch let error as CancellationError {
+            throw error
         } catch {
-            throw mapSearchFailure(error)
+            throw searchFailure(from: error)
         }
     }
 }
@@ -268,9 +274,12 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
 private extension DefaultPhotoBoothRepository {
     /// 검색 요청에서 던져진 오류를 화면이 구분하는 실패 사유로 바꿉니다.
     ///
-    /// 연결이 끊긴 경우만 바꾸고, 취소를 비롯한 나머지 오류는 그대로 넘겨 호출부의 기존 처리를 따릅니다.
-    func mapSearchFailure(_ error: Error) -> Error {
-        isConnectionLost(error) ? PhotoBoothSearchFailure.network : error
+    /// 실패는 모두 이 타입으로 바꿔 전송 계층의 오류가 밖으로 나가지 않게 합니다.
+    /// 원인은 여기서만 남길 수 있으므로 바꾸기 전에 기록합니다.
+    /// 취소는 실패가 아니라 호출부가 조용히 접어야 하는 사건이라, 호출부에서 먼저 갈라내 그대로 던집니다.
+    func searchFailure(from error: Error) -> PhotoBoothSearchFailure {
+        Logger.data.error("Search Request Failed: \(error)")
+        return isConnectionLost(error) ? .network : .unknown
     }
 
     /// 연결이 끊겨 발생한 오류인지 판정합니다.

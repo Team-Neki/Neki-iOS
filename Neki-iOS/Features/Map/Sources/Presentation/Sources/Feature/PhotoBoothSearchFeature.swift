@@ -156,9 +156,9 @@ public struct PhotoBoothSearchFeature {
         case submitSearch
         case beginSearch(PhotoBoothSearchQuery)
         case fetchNextCandidatePage
-        case candidatePageResponse(Result<PhotoBoothSearchCandidatePage, Error>, generation: Int)
+        case candidatePageResponse(Result<PhotoBoothSearchCandidatePage, PhotoBoothSearchFailure>, generation: Int)
         case didSelectCandidate(PhotoBoothSearchCandidate)
-        case searchResultResponse(Result<PhotoBoothSearchResult, Error>, candidate: PhotoBoothSearchCandidate, generation: Int)
+        case searchResultResponse(Result<PhotoBoothSearchResult, PhotoBoothSearchFailure>, candidate: PhotoBoothSearchCandidate, generation: Int)
         /// 거리 계산의 기준이 되는 현재 위치를 갱신합니다. 상위 화면(지도)이 전달합니다.
         case setUserCoordinate(GeographicCoordinate?)
         /// 검색 화면을 닫습니다. 상위 화면(지도)이 이 액션을 보고 표시를 해제합니다.
@@ -218,7 +218,7 @@ public struct PhotoBoothSearchFeature {
                         let response = try await photoBoothClient.searchCandidates(query, type, page)
                         await send(.candidatePageResponse(.success(response), generation: generation))
                     } catch is CancellationError { return } catch {
-                        await send(.candidatePageResponse(.failure(error), generation: generation))
+                        await send(.candidatePageResponse(.failure(PhotoBoothSearchFailure(from: error)), generation: generation))
                     }
                 }
                 .cancellable(id: CancelID.candidatePage)
@@ -232,10 +232,10 @@ public struct PhotoBoothSearchFeature {
                 guard hasNewCandidates == false, state.pendingType != nil else { return .none }
                 return .send(.fetchNextCandidatePage)
 
-            case let .candidatePageResponse(.failure(error), generation):
+            case let .candidatePageResponse(.failure(failure), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
                 state.isFetching = false
-                state.failure = (error as? PhotoBoothSearchFailure) ?? .unknown
+                state.failure = failure
                 return .none
 
             case let .didSelectCandidate(candidate):
@@ -263,7 +263,7 @@ public struct PhotoBoothSearchFeature {
                         ))
                     } catch is CancellationError { return } catch {
                         await send(.searchResultResponse(
-                            .failure(error),
+                            .failure(PhotoBoothSearchFailure(from: error)),
                             candidate: candidate,
                             generation: generation
                         ))
@@ -276,12 +276,11 @@ public struct PhotoBoothSearchFeature {
                 state.isFetchingSearchResult = false
                 return .send(.delegate(.didSelectSearchResult(candidate: candidate, result: result)))
 
-            case let .searchResultResponse(.failure(error), _, generation):
+            case let .searchResultResponse(.failure(failure), _, generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
                 state.isFetchingSearchResult = false
                 // 이미 쌓아 둔 후보 목록을 덮지 않도록 실패는 알림으로만 알립니다.
                 // TODO: 실패한 후보를 그 자리에서 다시 고르는 인라인 재시도가 필요한지 확인 필요.
-                let failure = (error as? PhotoBoothSearchFailure) ?? .unknown
                 state.toast = NekiToastItem(failure.message, style: .error)
                 return .none
 
@@ -416,6 +415,14 @@ private extension PhotoBoothSearchFeature.State {
 // MARK: - PhotoBoothSearchFailure + Message
 
 private extension PhotoBoothSearchFailure {
+    /// 이펙트에서 받은 오류를 실패 사유로 되살립니다.
+    ///
+    /// 리포지토리는 실패를 모두 이 타입으로 바꿔 던지지만, 클라이언트 클로저가 `any Error`라 타입이 지워집니다.
+    /// 취소는 이펙트에서 먼저 걸러내므로 여기까지 오지 않습니다.
+    init(from error: Error) {
+        self = (error as? Self) ?? .unknown
+    }
+
     /// 실패를 알릴 때 사용자에게 보여 줄 문구입니다.
     var message: String {
         switch self {

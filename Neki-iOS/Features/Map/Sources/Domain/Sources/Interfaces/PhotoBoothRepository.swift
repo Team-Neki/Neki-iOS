@@ -40,6 +40,7 @@ protocol PhotoBoothRepository {
     ///   - page: 0부터 시작하는 페이지 번호
     ///   - size: 한 페이지에 담을 후보 수
     /// - Returns: 서버 순서를 유지한 후보 페이지
+    /// - Throws: 실패는 ``PhotoBoothSearchFailure``로 전달합니다. 취소는 `CancellationError`로 그대로 전달합니다.
     func searchCandidates(
         keyword: String,
         type: PhotoBoothSearchCandidateType,
@@ -55,6 +56,7 @@ protocol PhotoBoothRepository {
     ///   - target: 사용자가 고른 지역 또는 지하철역
     ///   - userCoordinate: 거리 계산의 기준이 되는 사용자 현재 위치. `nil`이면 거리가 내려오지 않습니다.
     /// - Returns: 기준 위치가 있으면 가까운 순, 없으면 브랜드와 지점 이름 순으로 정렬된 포토부스 배열
+    /// - Throws: 실패는 ``PhotoBoothSearchFailure``로 전달합니다. 취소는 `CancellationError`로 그대로 전달합니다.
     func readSearchResultPhotoBooths(
         target: PhotoBoothSearchTarget,
         userCoordinate: GeographicCoordinate?
@@ -65,6 +67,7 @@ protocol PhotoBoothRepository {
     /// 그 범위에 없는 브랜드를 눌러 빈 화면을 보는 일이 없도록, 목록에 있는 브랜드만 내려옵니다.
     /// - Parameter target: 사용자가 고른 지역 또는 지하철역
     /// - Returns: 사용자별 브랜드 정렬 순서를 유지한 브랜드 필터 배열
+    /// - Throws: 실패는 ``PhotoBoothSearchFailure``로 전달합니다. 취소는 `CancellationError`로 그대로 전달합니다.
     func readSearchResultBrandFilters(
         target: PhotoBoothSearchTarget
     ) async throws -> [PhotoBoothSearchBrandFilter]

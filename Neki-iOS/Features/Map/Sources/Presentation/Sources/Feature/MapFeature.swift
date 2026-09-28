@@ -384,9 +384,11 @@ public struct MapFeature {
                 return .send(.photoBoothSearchAction(.beginSearch(query)))
 
             case .didTapClearSearchButton:
-                // 검색을 끝내면 검색 결과를 지우고 다시 지도 영역을 조회해 이 지역 목록으로 돌아갑니다.
+                // 검색을 끝내면 검색 결과를 지우고 시트 높이와 탭·필터를 지도 탭에 처음 들어왔을 때의 값으로 되돌립니다.
+                // 카메라는 옮기지 않으므로 보고 있던 지역을 다시 조회해 이 지역 목록을 채웁니다.
                 clearAppliedSearch(&state)
-                resetToMapMode(&state, for: .second)
+                resetTabAndFilters(&state)
+                resetToMapMode(&state, for: .first)
                 guard let bounds = state.currentBounds else { return .none }
                 return .send(.fetchPhotoBooths(bounds: bounds))
 
@@ -761,10 +763,12 @@ public struct MapFeature {
                 }
                 // 고른 범위 전체가 곧 목록이므로 탭 없이 개수, `브랜드` 칩, 결과 목록만 노출합니다.
                 state.photoBoothListState.isSearchResultPresented = true
-                // 검색을 끝내고 목록으로 돌아왔을 때 이 지역 탭에서 시작하도록 되돌립니다.
-                state.photoBoothListState.selectedTab = .nearby
                 // 이 목록에 없는 브랜드는 눌러도 빈 화면이 되므로 브랜드 필터 시트의 칩을 목록에 있는 브랜드로 좁힙니다.
                 state.photoBoothListState.searchResultBrandFilters = result.brandFilters
+                // 검색 결과에는 기존 탭과 필터를 섞지 않습니다.
+                // 좁혀진 칩에 없는 브랜드가 선택된 채로 남으면 목록이 통째로 비고,
+                // 즐겨찾기 마커 필터가 켜져 있으면 지도에서 검색 결과 마커가 가려집니다.
+                resetTabAndFilters(&state)
 
                 // 영역 조회를 대신하는 경로이므로 진행 중인 스트림 결과가 덮어쓰지 않도록 세대를 무효화합니다.
                 state.photoBoothFetchContext.invalidate()
@@ -776,12 +780,7 @@ public struct MapFeature {
                     .cancel(id: CancelID.mapFetch),
                     .cancel(id: CancelID.mapChunkProcessing),
                     .send(.photoBoothSearchAction(.dismissSearch)),
-                    .concatenate(
-                        // 좁혀진 칩에 없는 브랜드가 선택된 채로 남으면 목록이 통째로 비므로 함께 풉니다.
-                        // 계산이 선택된 브랜드를 읽으므로 필터를 먼저 푼 뒤에 계산을 시작합니다.
-                        .send(.photoBoothListAction(.clearFilterOptions)),
-                        .send(.startBackgroundCalculation)
-                    )
+                    .send(.startBackgroundCalculation)
                 )
 
             case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
@@ -960,6 +959,15 @@ private extension MapFeature {
         state.photoBoothListState.isSearchResultPresented = false
         state.photoBoothListState.isSearchResultBrandFilterSheetPresented = false
         state.photoBoothListState.searchResultBrandFilters = nil
+    }
+
+    /// 목록 탭과 필터를 지도 탭에 처음 들어왔을 때의 값으로 되돌립니다.
+    ///
+    /// `이 지역 포토부스` 탭을 고르고, 브랜드 필터를 풀고, 즐겨찾기 마커 필터를 끕니다.
+    func resetTabAndFilters(_ state: inout State) {
+        state.photoBoothListState.selectedTab = .nearby
+        state.photoBoothListState.filteredBrands = []
+        state.isFavoriteMarkerFilterEnabled = false
     }
 
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {

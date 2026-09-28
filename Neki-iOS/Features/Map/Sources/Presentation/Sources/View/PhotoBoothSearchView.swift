@@ -72,7 +72,6 @@ private extension PhotoBoothSearchView {
             messageView(
                 inputImage: .iconPlace,
                 title: "어디에서 네컷을 찍을까요?\n브랜드나 지점을 검색해보세요.",
-                caption: "지역 상세 검색은 현재 서울만 지원하고 있어요."
             )
 
         case .noResult:

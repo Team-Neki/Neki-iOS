@@ -218,7 +218,7 @@ private extension NearPhotoBoothListSheet {
     var nearByPhotoBoothListSection: some View {
         Section {
             if store.visibleBooths.isEmpty {
-                unavailableView("이 지역에 네컷 사진관이 없어요!")
+                unavailableView("지금 보고 있는 곳에는 네컷 사진관이 없어요\n지도를 살짝 옮겨볼까요?")
             } else {
                 LazyVStack(alignment: .leading, spacing: .zero) {
                     ForEach(store.visibleBooths) { photoBooth in
@@ -381,6 +381,8 @@ private extension NearPhotoBoothListSheet {
             Text(message)
                 .nekiFont(.body16Medium)
                 .foregroundStyle(.gray500)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, minHeight: 375, alignment: .center)
     }

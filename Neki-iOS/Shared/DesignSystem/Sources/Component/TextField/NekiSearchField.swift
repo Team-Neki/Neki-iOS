@@ -14,6 +14,8 @@ import SwiftUI
 /// 검색 화면 밖에서 완료한 검색어만 보여 주는 자리에는 ``NekiSearchField/completed(_:onEdit:onClear:)``을 사용합니다.
 public struct NekiSearchField: View {
     @Binding private var text: String
+    /// 진입점을 누르고 있는지 여부입니다.
+    @State private var isPressed = false
 
     private let variant: Variant
     private let prompt: String
@@ -120,13 +122,12 @@ public struct NekiSearchField: View {
     }
 
     public var body: some View {
-        switch variant {
-        case .entry:
-            Button { onTap?() } label: { field }
-                .buttonStyle(.plain)
-        case .input, .completed:
-            field
-        }
+        field
+            .opacity(isPressed ? Metrics.pressedOpacity : 1)
+            .overlay { wholeFieldButton }
+            // 진입점은 필드 내용과 탭 영역을 한 요소로 합쳐 VoiceOver에서 버튼 하나로 읽히게 합니다.
+            // 내용을 accessibilityHidden으로 가리면 조상 뷰에 걸린 accessibilityHidden(false)가 덮어써 다시 드러납니다.
+            .accessibilityElement(children: variant.isTappableAsWhole ? .combine : .contain)
     }
 }
 
@@ -183,6 +184,14 @@ private extension NekiSearchField {
             case .input(.submitted), .completed: .gray900
             }
         }
+
+        /// 진입점은 필드 전체가 하나의 버튼입니다. 그 외에는 필드 안의 버튼과 텍스트 필드가 각자 입력을 받습니다.
+        var isTappableAsWhole: Bool {
+            switch self {
+            case .entry: true
+            case .input, .completed: false
+            }
+        }
     }
 
     /// 검색 필드가 형태별로 사용하는 테두리/그림자 표현입니다.
@@ -200,6 +209,7 @@ private extension NekiSearchField {
         static let verticalPadding: CGFloat = 12
         static let shadowRadius: CGFloat = 4
         static let shadowOffsetY: CGFloat = 2
+        static let pressedOpacity: Double = 0.75
     }
 }
 
@@ -216,6 +226,23 @@ private extension NekiSearchField {
             trailing
         }
         .searchFieldContainer(variant.decoration)
+    }
+
+    /// 진입점에서 필드 전체를 덮는 버튼입니다.
+    ///
+    /// 버튼은 투명한 탭 영역이라 눌림 상태만 넘겨받아 아래 필드를 흐리게 표시합니다.
+    ///
+    /// - Note: 진입점만 `Button`으로 감싸면 다른 형태와 뷰 계층이 달라져, 형태가 바뀔 때 캡슐까지 통째로 교체됩니다.
+    ///   그 업데이트에 애니메이션이 걸리면 두 캡슐이 겹쳐 크로스페이드되므로, 필드는 그대로 두고 버튼만 위에 붙였다 뗍니다.
+    @ViewBuilder
+    var wholeFieldButton: some View {
+        if variant.isTappableAsWhole {
+            Button { onTap?() } label: {
+                Color.clear
+                    .contentShape(.capsule)
+            }
+            .buttonStyle(PressReportingButtonStyle(isPressed: $isPressed))
+        }
     }
 
     /// 진입점에서는 서비스 심볼을, 그 외에는 뒤로가기 버튼을 노출합니다.
@@ -321,7 +348,8 @@ private struct SearchFieldContainer: ViewModifier {
         content
             .padding(.horizontal, NekiSearchField.Metrics.horizontalPadding)
             .padding(.vertical, NekiSearchField.Metrics.verticalPadding)
-            .background(.white)
+            // 안전 영역에 맞닿아도 배경을 늘리지 않습니다. 늘어난 배경은 잘려 보이지 않지만 VoiceOver 초점 영역에는 포함됩니다.
+            .background(.white, ignoresSafeAreaEdges: [])
             .clipShape(.capsule)
             .overlay {
                 if case .border = decoration {
@@ -339,5 +367,24 @@ private struct SearchFieldContainer: ViewModifier {
 private extension View {
     func searchFieldContainer(_ decoration: NekiSearchField.Decoration) -> some View {
         modifier(SearchFieldContainer(decoration: decoration))
+    }
+}
+
+
+// MARK: - Press Reporting
+
+/// 버튼의 눌림 상태를 바깥 상태로 넘겨주는 스타일입니다.
+///
+/// 버튼 자신은 꾸미지 않고, 눌림 표시는 상태를 받은 쪽이 그립니다.
+private struct PressReportingButtonStyle: ButtonStyle {
+    @Binding var isPressed: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                self.isPressed = isPressed
+            }
+            // 눌린 채로 버튼이 사라져도 눌림 표시가 남지 않도록 풀어 둡니다.
+            .onDisappear { isPressed = false }
     }
 }

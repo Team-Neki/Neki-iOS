@@ -19,6 +19,10 @@ fileprivate enum Constants {
     static let minZoomLevel: Double = 12.0
     static let maxZoomLevel: Double = 20.0
     static let initialZoomLevel: Double = 14.0
+    /// 영역에 카메라를 맞출 때 가장자리에 남길 여백
+    static let fitBoundsPadding: CGFloat = 40
+    /// 영역에 카메라를 맞출 때 보장할 최소 크기(위경도). 약 220m에 해당합니다.
+    static let minimumFitSpan: Double = 0.002
     
     // Marker Size
     static let normalSize = CGSize(width: 54, height: 62)
@@ -74,6 +78,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
         // State 변경 시 카메라 이동
         if context.coordinator.isMapLoaded {
             updateCameraPosition(uiView.mapView, context: context)
+            updateCameraFitBounds(uiView.mapView, context: context)
         }
         
         // 마커 업데이트
@@ -127,7 +132,35 @@ private extension NaverMapRepresentable {
         mapView.moveCamera(cameraUpdate)
         context.coordinator.lastCameraPosition = cameraPosition
     }
-    
+
+    /// 여러 지점을 한 화면에 담도록 카메라를 영역에 맞춥니다.
+    ///
+    /// 지점이 하나뿐이거나 몰려 있으면 영역이 한 점에 가까워 최대 배율까지 당겨지므로,
+    /// 최소 크기만큼 넓혀 적당한 배율을 유지합니다.
+    ///
+    /// 마커나 시트 갱신처럼 카메라와 무관한 이유로도 이 메서드가 다시 불리므로,
+    /// 이미 반영한 요청인지 세대로 가려내 같은 요청을 거듭 적용하지 않습니다.
+    func updateCameraFitBounds(_ mapView: NMFMapView, context: Context) {
+        let request = store.cameraFitRequest
+        guard let bounds = request.bounds,
+              request.generation != context.coordinator.appliedCameraFitGeneration
+        else { return }
+        context.coordinator.appliedCameraFitGeneration = request.generation
+
+        let latitudePadding = max(Constants.minimumFitSpan - (bounds.maxLatitude - bounds.minLatitude), .zero) / 2
+        let longitudePadding = max(Constants.minimumFitSpan - (bounds.maxLongitude - bounds.minLongitude), .zero) / 2
+        let latLngBounds = NMGLatLngBounds(
+            southWestLat: bounds.minLatitude - latitudePadding,
+            southWestLng: bounds.minLongitude - longitudePadding,
+            northEastLat: bounds.maxLatitude + latitudePadding,
+            northEastLng: bounds.maxLongitude + longitudePadding
+        )
+        let cameraUpdate = NMFCameraUpdate(fit: latLngBounds, padding: Constants.fitBoundsPadding)
+        cameraUpdate.animation = .linear
+        cameraUpdate.animationDuration = Constants.animationDuration
+        mapView.moveCamera(cameraUpdate)
+    }
+
     func updateContentInset(_ mapView: NMFMapView) {
         let sheetHeight = store.detent.resolve(in: UIScreen.main.bounds.height, inset: .screenTabBarHeight)
         let targetInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
@@ -150,6 +183,7 @@ extension NaverMapRepresentable {
         typealias BrandID = Int
         
         var lastCameraPosition: GeographicCoordinate?
+        var appliedCameraFitGeneration: UInt?
         var isMapLoaded: Bool = false
         
         let parent: NaverMapRepresentable
@@ -598,9 +632,15 @@ public struct NaverMapView: View {
             DirectionAppsSheet(store: store, photoBooth: photoBooth)
         }
         .overlay(alignment: .top) {
-            if store.isExploreHereButtonVisible {
-                exploreHereControl
+            VStack(spacing: 12) {
+                MapSearchField(store: store)
+                    .padding(.horizontal, 20)
+
+                if store.isExploreHereButtonVisible {
+                    exploreHereControl
+                }
             }
+            .safeAreaPadding(.top, 8)
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
@@ -618,6 +658,21 @@ public struct NaverMapView: View {
         }
         .animation(.easeInOut, value: store.detent)
         .animation(.easeInOut, value: store.selectedBooth?.id)
+        // 검색 화면은 지도 화면의 검색 모드라 새 화면으로 띄우지 않고 지도 위에 겹쳐 그립니다.
+        // 시트·버튼보다 위, 알림보다 아래에 그려지도록 이 자리에 둡니다.
+        // 검색 중 키보드가 올라와도 지도 크기가 바뀌지 않도록 지도 쪽은 키보드 영역을 무시하고,
+        // 가려진 지도는 VoiceOver가 읽지 않게 합니다.
+        .ignoresSafeArea(.keyboard)
+        .accessibilityHidden(store.isSearchPresented)
+        .overlay {
+            if store.isSearchPresented {
+                PhotoBoothSearchView(
+                    store: store.scope(state: \.photoBoothSearchState, action: \.photoBoothSearchAction)
+                )
+                // 결과를 고르는 순간처럼 지도 쪽 애니메이션이 섞여도 검색 화면은 전환 없이 바로 바뀝니다.
+                .transition(.identity)
+            }
+        }
         .nekiAlert(
             isPresented: $store.isPermissionAlertPresented,
             style: .cancelable,
@@ -759,7 +814,7 @@ private extension NaverMapView {
         } label: {
             HStack(spacing: 7) {
                 Image(.iconRotate)
-                
+
                 Text("이 지역 재탐색")
                     .nekiFont(.body14SemiBold)
                     .foregroundStyle(.gray800)
@@ -776,7 +831,6 @@ private extension NaverMapView {
                     .strokeBorder(.primary400)
             }
         }
-        .safeAreaPadding(.top)
     }
 }
 

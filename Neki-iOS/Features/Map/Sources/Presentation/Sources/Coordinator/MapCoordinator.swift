@@ -15,6 +15,12 @@ struct MapCoordinator {
     struct State {
         var root = MapFeature.State()
         var path = StackState<Path.State>()
+
+        /// 탭바를 가려야 하는지 여부입니다.
+        ///
+        /// 하위 화면으로 들어갔거나 검색 화면을 띄운 동안에는 탭바를 가립니다.
+        /// 검색 화면은 지도 위에 겹쳐 그리므로 지도 밖에서 그리는 탭바를 따로 가려야 합니다.
+        var hidesTabBar: Bool { !path.isEmpty || root.isSearchPresented }
     }
     
     enum Action {

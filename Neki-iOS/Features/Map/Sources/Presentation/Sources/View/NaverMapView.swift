@@ -634,8 +634,8 @@ public struct NaverMapView: View {
         .overlay(alignment: .top) {
             VStack(spacing: 12) {
                 searchField
-                // 검색 결과를 보는 동안에는 영역을 다시 조회하면 검색 결과가 지워지므로 재탐색 컨트롤을 숨깁니다.
-                if store.isExploreHereButtonVisible, store.appliedSearchQuery == nil {
+
+                if store.isExploreHereButtonVisible {
                     exploreHereControl
                 }
             }

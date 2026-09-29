@@ -42,7 +42,6 @@ struct MapFeatureTests {
     @Test("부스를 직접 고른 검색은 탭과 필터를 그대로 두고, 검색을 끝내면 지도 탭 첫 진입 값으로 되돌린다")
     func didTapClearSearchButton_afterPhotoBoothCandidate_resetsToInitialValues() {
         let store = makeStore()
-        let photoBoothResult = PhotoBoothSearchResult(photoBooths: [searchedPhotoBooth], brandFilters: [])
         store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: .photoBooth(searchedPhotoBooth), result: photoBoothResult))))
         #expect(store.photoBoothListState.selectedTab == .favorite)
         #expect(store.photoBoothListState.filteredBrands == [photoism])
@@ -55,18 +54,47 @@ struct MapFeatureTests {
         #expect(store.photoBoothListState.filteredBrands.isEmpty)
         #expect(store.isFavoriteMarkerFilterEnabled == false)
     }
+
+    @Test("재탐색 버튼이 떠 있을 때 부스든 지역이든 검색 결과를 고르면 버튼을 내린다", arguments: [true, false])
+    func didSelectSearchResult_hidesExploreHereButton(selectsPhotoBooth: Bool) {
+        let store = makeStore()
+        store.send(.cameraMotionStarted)
+        #expect(store.isExploreHereButtonVisible)
+
+        if selectsPhotoBooth {
+            store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: .photoBooth(searchedPhotoBooth), result: photoBoothResult))))
+        } else {
+            store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: regionCandidate, result: regionResult))))
+        }
+
+        #expect(store.isExploreHereButtonVisible == false)
+    }
+
+    @Test("검색 결과를 보는 동안에는 카메라가 움직여도 재탐색 버튼을 띄우지 않고, 검색을 끝내면 다시 띄운다")
+    func cameraMotionStarted_showsExploreHereButtonOnlyWithoutSearchResult() {
+        let store = makeStore()
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: regionCandidate, result: regionResult))))
+
+        store.send(.cameraMotionStarted)
+        #expect(store.isExploreHereButtonVisible == false)
+
+        store.send(.didTapClearSearchButton)
+        store.send(.cameraMotionStarted)
+        #expect(store.isExploreHereButtonVisible)
+    }
 }
 
 
 // MARK: - Helpers
 
 private extension MapFeatureTests {
-    /// 저장한 포토부스 탭에서 포토이즘만 고르고 즐겨찾기 마커 필터를 켜 둔 지도 스토어입니다.
+    /// 검색 화면에 `강남`을 검색해 두고, 저장한 포토부스 탭에서 포토이즘만 고르고 즐겨찾기 마커 필터를 켜 둔 지도 스토어입니다.
     ///
     /// `MapFeature.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     /// 리듀서가 곧바로 바꾸는 상태만 확인하므로 이펙트가 뒤이어 보내는 액션은 기다리지 않습니다.
     func makeStore() -> StoreOf<MapFeature> {
         var state = MapFeature.State()
+        state.photoBoothSearchState.query = PhotoBoothSearchQuery(rawValue: "강남")
         state.photoBoothListState.selectedTab = .favorite
         state.photoBoothListState.filteredBrands = [photoism]
         state.isFavoriteMarkerFilterEnabled = true
@@ -94,6 +122,10 @@ private extension MapFeatureTests {
             coordinate: .init(latitude: 37.5021077, longitude: 127.0271830),
             address: "서울 강남구 강남대로102길 16"
         )
+    }
+
+    var photoBoothResult: PhotoBoothSearchResult {
+        PhotoBoothSearchResult(photoBooths: [searchedPhotoBooth], brandFilters: [])
     }
 
     var regionCandidate: PhotoBoothSearchCandidate {

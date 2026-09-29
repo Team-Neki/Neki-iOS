@@ -372,7 +372,8 @@ public struct MapFeature {
                 )
                 
             case let .updateExploreButtonVisibility(isVisible):
-                state.isExploreHereButtonVisible = isVisible
+                // 검색 결과를 보는 동안 영역을 다시 조회하면 검색 결과가 지워지므로 재탐색 버튼을 띄우지 않습니다.
+                state.isExploreHereButtonVisible = isVisible && state.appliedSearchQuery == nil
                 return .none
                 
             case .didTapSearchField:
@@ -738,8 +739,9 @@ public struct MapFeature {
             case let .photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate, result))):
                 state.isSearchPresented = false
                 state.isUserTrackingMode = false
-                // 결과를 보는 동안 상단 검색 필드에 검색어를 검색 완료 형태로 남깁니다.
+                // 결과를 보는 동안 상단 검색 필드에 검색어를 검색 완료 형태로 남기고, 재탐색 버튼은 내립니다.
                 state.appliedSearchQuery = state.photoBoothSearchState.query
+                state.isExploreHereButtonVisible = false
                 let photoBooths = result.photoBooths
 
                 // 부스를 직접 고르면 추가 조회 없이 그 지점만 선택합니다. 나머지 마커는 그대로 둡니다.
@@ -775,7 +777,6 @@ public struct MapFeature {
                 state.photoBooths = IdentifiedArray(uniqueElements: photoBooths)
                 state.visiblePhotoBooths = []
                 state.photoBoothListState.visibleBooths = []
-                state.isExploreHereButtonVisible = false
                 return .merge(
                     .cancel(id: CancelID.mapFetch),
                     .cancel(id: CancelID.mapChunkProcessing),

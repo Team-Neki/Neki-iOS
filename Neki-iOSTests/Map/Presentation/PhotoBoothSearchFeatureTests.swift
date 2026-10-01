@@ -127,7 +127,28 @@ struct PhotoBoothSearchFeatureTests {
         await submitSearch(on: store)
 
         #expect(await log.requests == [.init(type: .region, page: 0), .init(type: .subwayStation, page: 0)])
-        #expect(store.state.contentState == .results)
+        #expect(store.state.contentState.isResults)
+    }
+
+    @Test("후보 목록은 다시 그리는 데 필요한 값과 검색마다 다른 요청 차수를 함께 담는다")
+    func contentState_whenResultsArrive_carriesListValuesAndGeneration() async {
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
+
+        await submitSearch(on: store)
+        guard case let .results(rows, keyword, firstGeneration) = store.state.contentState else {
+            Issue.record("후보 목록 상태가 아닙니다")
+            return
+        }
+        #expect(rows == store.state.rows)
+        #expect(keyword == "강남")
+
+        // 같은 검색어로 다시 검색해도 새 목록은 직전 목록과 구분되어야 스크롤이 처음부터 시작합니다.
+        await submitSearch(on: store)
+        guard case let .results(_, _, secondGeneration) = store.state.contentState else {
+            Issue.record("다시 검색한 뒤 후보 목록 상태가 아닙니다")
+            return
+        }
+        #expect(secondGeneration != firstGeneration)
     }
 
     @Test("검색 후보를 지역 → 지하철역 → 포토부스 순서로 이어붙인다")
@@ -336,7 +357,7 @@ struct PhotoBoothSearchFeatureTests {
     }
 
     @Test("첫 화면을 채우는 후보 요청 동안 로딩을 노출한다")
-    func isLoading_whileFirstCandidatePageIsInFlight_showsLoading() async {
+    func isAwaitingFirstCandidates_whileFirstCandidatePageIsInFlight_showsLoading() async {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
 
         await store.send(.binding(.set(\.searchText, "강남")))
@@ -345,18 +366,87 @@ struct PhotoBoothSearchFeatureTests {
         await store.receive(\.fetchNextCandidatePage)
 
         #expect(store.state.rows.isEmpty)
-        #expect(store.state.isLoading)
-        // 안내 문구 대신 본문에 로딩을 띄웁니다.
-        #expect(store.state.contentState == .loading)
+        #expect(store.state.isAwaitingFirstCandidates)
+        // 첫 후보가 올 때까지 본문은 안내를 그대로 두고, 로딩은 본문과 따로 알립니다.
+        #expect(store.state.contentState == .guide)
 
         await settle(store)
 
-        #expect(store.state.isLoading == false)
-        #expect(store.state.contentState == .results)
+        #expect(store.state.isAwaitingFirstCandidates == false)
+        #expect(store.state.contentState.isResults)
+    }
+
+    @Test("새 검색을 제출하면 첫 후보가 올 때까지 직전 목록을 그대로 노출한다")
+    func contentState_whileAwaitingNewSearch_keepsPreviousResults() async {
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
+        await submitSearch(on: store)
+        let previousContent = store.state.contentState
+
+        await submitPendingSearch(on: store, keyword: "홍대")
+
+        #expect(store.state.isAwaitingFirstCandidates)
+        #expect(store.state.rows.isEmpty)
+        // 검색어와 요청 차수까지 직전 그대로라 뷰는 같은 목록을 같은 스크롤 위치에서 이어서 그립니다.
+        #expect(store.state.contentState == previousContent)
+
+        // 붙잡아 둔 요청을 취소해 테스트를 끝냅니다.
+        await store.send(.dismissSearch)
+        await store.finish()
+    }
+
+    @Test("첫 후보를 기다리는 동안 노출 중인 직전 목록의 후보를 골라도 조회하지 않는다")
+    func didSelectCandidate_whileAwaitingNewSearch_ignoresPreviousCandidate() async {
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
+        await submitSearch(on: store)
+        guard let previousCandidate = store.state.rows.first?.candidate else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+
+        await submitPendingSearch(on: store, keyword: "홍대")
+        await store.send(.didSelectCandidate(previousCandidate))
+
+        #expect(store.state.isFetchingSearchResult == false)
+
+        // 붙잡아 둔 요청을 취소해 테스트를 끝냅니다.
+        await store.send(.dismissSearch)
+        await store.finish()
+    }
+
+    @Test("새 검색이 실패하면 직전 목록 대신 실패를 노출한다")
+    func contentState_whenNewSearchFails_showsFailureInsteadOfPreviousResults() async {
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
+        await submitSearch(on: store)
+
+        store.dependencies.photoBoothClient.searchCandidates = { _, _, _ in
+            throw NetworkError.responseDecodingError
+        }
+        await store.send(.binding(.set(\.searchText, "홍대")))
+        await store.send(.submitSearch)
+        await settle(store)
+
+        #expect(store.state.isAwaitingFirstCandidates == false)
+        #expect(store.state.contentState == .failure(.unknown))
+    }
+
+    @Test("검색을 닫았다가 다시 검색하면 직전 결과가 아니라 안내를 유지한다")
+    func contentState_afterDismissSearch_keepsGuideWhileAwaiting() async {
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
+        await submitSearch(on: store)
+        await store.send(.dismissSearch)
+
+        await submitPendingSearch(on: store, keyword: "홍대")
+
+        #expect(store.state.isAwaitingFirstCandidates)
+        #expect(store.state.contentState == .guide)
+
+        // 붙잡아 둔 요청을 취소해 테스트를 끝냅니다.
+        await store.send(.dismissSearch)
+        await store.finish()
     }
 
     @Test("목록을 이어붙이는 후보 요청은 로딩으로 목록을 덮지 않는다")
-    func isLoading_whileAppendingCandidatePage_keepsList() async {
+    func isAwaitingFirstCandidates_whileAppendingCandidatePage_keepsList() async {
         let store = makeStore(pages: [
             .region: [
                 makeRegionPage(count: 20, hasNext: true),
@@ -368,11 +458,11 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.fetchNextCandidatePage)
 
         #expect(store.state.isFetching)
-        #expect(store.state.isLoading == false)
+        #expect(store.state.isAwaitingFirstCandidates == false)
     }
 
-    @Test("후보를 선택해 부스를 조회하는 동안 로딩 상태로 둔다")
-    func isLoading_whileSearchResultIsInFlight_showsLoading() async {
+    @Test("후보를 선택하면 부스를 조회하는 동안 조회 중 상태로 둔다")
+    func didSelectCandidate_whileSearchResultIsInFlight_marksFetchingSearchResult() async {
         let store = makeStore(
             pages: [.region: [makeRegionPage(count: 1, hasNext: false)]],
             searchResult: { [] }
@@ -385,11 +475,11 @@ struct PhotoBoothSearchFeatureTests {
         }
 
         await store.send(.didSelectCandidate(candidate))
-        #expect(store.state.isLoading)
+        #expect(store.state.isFetchingSearchResult)
 
         await settle(store)
 
-        #expect(store.state.isLoading == false)
+        #expect(store.state.isFetchingSearchResult == false)
     }
 
     @Test("후보를 고르면 부스 목록과 필터를 함께 조회한다")
@@ -493,12 +583,12 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.didSelectCandidate(candidate))
         await settle(store)
 
-        #expect(store.state.isLoading == false)
+        #expect(store.state.isFetchingSearchResult == false)
         #expect(store.state.toast != nil)
     }
 
-    @Test("부스 조회가 실패하면 로딩을 내리고 후보 목록을 지킨 채 실패를 알린다")
-    func isLoading_whenSearchResultFails_hidesLoading() async {
+    @Test("부스 조회가 실패하면 조회 중 상태를 내리고 후보 목록을 지킨 채 실패를 알린다")
+    func didSelectCandidate_whenSearchResultFails_keepsListAndSurfacesFailure() async {
         struct SearchResultError: Error {}
         let store = makeStore(
             pages: [.region: [makeRegionPage(count: 1, hasNext: false)]],
@@ -514,14 +604,14 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.didSelectCandidate(candidate))
         await settle(store)
 
-        #expect(store.state.isLoading == false)
+        #expect(store.state.isFetchingSearchResult == false)
         #expect(store.state.toast != nil)
         // 실패 알림이 이미 쌓아 둔 후보 목록을 덮지 않습니다.
-        #expect(store.state.contentState == .results)
+        #expect(store.state.contentState.isResults)
     }
 
-    @Test("새 검색을 제출하면 진행 중이던 부스 조회 로딩을 내린다")
-    func isLoading_whenSearchRestarts_hidesSearchResultLoading() async {
+    @Test("새 검색을 제출하면 진행 중이던 부스 조회 상태를 내린다")
+    func beginSearch_whileSearchResultIsInFlight_clearsFetchingSearchResult() async {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]])
 
         await submitSearch(on: store)
@@ -573,20 +663,29 @@ struct PhotoBoothSearchFeatureTests {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
 
         await submitSearch(on: store)
-        #expect(store.state.contentState == .results)
+        #expect(store.state.contentState.isResults)
 
         await store.send(.binding(.set(\.searchText, "")))
         await settle(store)
 
         #expect(store.state.mode == .searching)
         #expect(store.state.query?.rawValue == "강남")
-        #expect(store.state.contentState == .results)
+        #expect(store.state.contentState.isResults)
         #expect(store.state.rows.count == 2)
     }
 }
 
 
 // MARK: - Helpers
+
+private extension PhotoBoothSearchFeature.State.ContentState {
+    /// 목록 내용과 상관없이 후보 목록을 노출하는 상태인지 여부입니다.
+    var isResults: Bool {
+        guard case .results = self else { return false }
+        return true
+    }
+}
+
 
 private struct SearchRequest: Equatable {
     let type: PhotoBoothSearchCandidateType
@@ -668,6 +767,17 @@ private extension PhotoBoothSearchFeatureTests {
         await store.send(.binding(.set(\.searchText, "강남")))
         await store.send(.submitSearch)
         await settle(store)
+    }
+
+    /// 응답을 붙잡아 둔 채 새 검색을 제출해, 첫 후보를 기다리는 상태로 만듭니다.
+    func submitPendingSearch(on store: TestStoreOf<PhotoBoothSearchFeature>, keyword: String) async {
+        store.dependencies.photoBoothClient.searchCandidates = { _, type, _ in
+            try await Task.sleep(for: .seconds(60))
+            return PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
+        }
+        await store.send(.binding(.set(\.searchText, keyword)))
+        await store.send(.submitSearch)
+        await store.receive(\.fetchNextCandidatePage)
     }
 
     /// 스크롤로 다음 페이지를 부르는 동작을 대신해 남은 종류를 모두 불러옵니다.

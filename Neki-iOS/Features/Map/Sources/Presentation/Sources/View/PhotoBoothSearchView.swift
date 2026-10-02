@@ -39,6 +39,7 @@ struct PhotoBoothSearchView: View {
             .padding(.top, Metrics.searchFieldTopPadding)
 
             content
+                .nekiLoading(isPresented: store.isAwaitingFirstCandidates, style: .inline)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.white)
@@ -61,12 +62,10 @@ private extension PhotoBoothSearchView {
     @ViewBuilder
     var content: some View {
         switch store.contentState {
-        case .loading:
-            NekiLoadingIndicator()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-        case .results:
-            candidateList
+        case let .results(rows, keyword, generation):
+            candidateList(rows: rows, keyword: keyword)
+                // 새 검색의 목록이 직전 목록의 스크롤 위치를 물려받지 않도록 검색마다 스크롤을 새로 만듭니다.
+                .id(generation)
 
         case .guide:
             messageView(
@@ -97,16 +96,15 @@ private extension PhotoBoothSearchView {
     /// 지역 → 지하철역 → 포토부스 순서로 정렬된 검색 후보를 유형 구분 없이 한 목록으로 노출합니다.
     ///
     /// 앞선 유형을 모두 불러온 뒤 다음 유형으로 넘어가므로 새 후보는 항상 목록 끝에 이어집니다.
-    var candidateList: some View {
-        let keyword = store.query?.rawValue ?? ""
-        let lastRowID = store.rows.last?.id
+    func candidateList(rows: [PhotoBoothSearchFeature.Row], keyword: String) -> some View {
+        let lastRowID = rows.last?.id
         // 마지막 셀에서 부르면 요청이 오가는 동안 목록이 바닥에서 멈추므로 몇 셀 앞에서 미리 부릅니다.
         // 목록이 임계값보다 짧으면 첫 셀이 곧 미리 부를 셀입니다.
-        let prefetchRowID = store.rows.dropLast(Metrics.prefetchDistance).last?.id ?? store.rows.first?.id
+        let prefetchRowID = rows.dropLast(Metrics.prefetchDistance).last?.id ?? rows.first?.id
 
         return ScrollView {
             LazyVStack(spacing: Metrics.cellSpacing) {
-                ForEach(store.rows) { row in
+                ForEach(rows) { row in
                     PhotoBoothSearchCandidateCell(
                         candidate: row.candidate,
                         keyword: keyword,

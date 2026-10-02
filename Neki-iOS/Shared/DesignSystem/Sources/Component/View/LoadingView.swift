@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import Lottie
 
 public struct LoadingView: View {
     private let message: String
@@ -21,14 +20,7 @@ public struct LoadingView: View {
                 .ignoresSafeArea()
             
             VStack(spacing: 0) {
-                LottieView(animation: .named("ios_loading"))
-                    .configure { lottieAnimationView in
-                        lottieAnimationView.contentMode = .scaleAspectFill
-                        lottieAnimationView.shouldRasterizeWhenIdle = false
-                    }
-                    .playbackMode(.playing(.toProgress(1, loopMode: .loop)))
-                    .frame(width: 150, height: 150)
-                    .aspectRatio(contentMode: .fill)
+                NekiLoadingIndicator()
                 
                 Text(message)
                     .nekiFont(.body16Medium)

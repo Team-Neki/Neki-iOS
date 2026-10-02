@@ -24,6 +24,14 @@ public enum AnalyticsParameterKey: String {
     case photoCount = "photo_count"
     
     // 지도
+    case query = "query"
+    case resultStatus = "result_status"
+    case candidateType = "candidate_type"
+    case candidateName = "candidate_name"
+    case page = "page"
+    case pageResultCount = "page_result_count"
+    case hasNextPage = "has_next_page"
+    case source = "source"
     case hasFilter = "has_filter"
     case regionChanged = "region_changed"
     case action = "action"

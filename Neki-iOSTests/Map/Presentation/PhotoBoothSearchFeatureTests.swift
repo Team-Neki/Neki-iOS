@@ -82,7 +82,6 @@ struct PhotoBoothSearchFeatureTests {
 
         await store.send(.binding(.set(\.searchText, "강남")))
         await store.send(.submitSearch)
-        await store.receive(\.fetchNextCandidatePage)
 
         // 미리 부르는 셀과 마지막 셀이 함께 나타나 트리거가 두 번 발생한 상황입니다.
         await store.send(.fetchNextCandidatePage)
@@ -361,9 +360,8 @@ struct PhotoBoothSearchFeatureTests {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
 
         await store.send(.binding(.set(\.searchText, "강남")))
+        // 제출하면 같은 액션 안에서 첫 페이지 요청까지 시작하므로, 응답을 흘려보내기 전 상태를 봅니다.
         await store.send(.submitSearch)
-        // 응답까지 흘려보내면 로딩이 이미 내려가므로 요청을 시작한 지점까지만 진행합니다.
-        await store.receive(\.fetchNextCandidatePage)
 
         #expect(store.state.rows.isEmpty)
         #expect(store.state.isAwaitingFirstCandidates)
@@ -777,7 +775,6 @@ private extension PhotoBoothSearchFeatureTests {
         }
         await store.send(.binding(.set(\.searchText, keyword)))
         await store.send(.submitSearch)
-        await store.receive(\.fetchNextCandidatePage)
     }
 
     /// 스크롤로 다음 페이지를 부르는 동작을 대신해 남은 종류를 모두 불러옵니다.

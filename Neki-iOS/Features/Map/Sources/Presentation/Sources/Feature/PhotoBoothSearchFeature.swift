@@ -65,13 +65,18 @@ public struct PhotoBoothSearchFeature {
         }
 
         /// 검색 화면 본문에 노출할 내용입니다.
-        public enum ContentState: Equatable {
+        ///
+        /// 로딩 여부는 본문과 따로 ``isAwaitingFirstCandidates``가 알립니다.
+        /// 새 검색의 첫 후보를 기다리는 동안에는 직전 본문을 그대로 돌려주므로, 각 내용은 그리는 데 필요한 값을 모두 담습니다.
+        enum ContentState: Equatable {
             /// 검색 전 안내
             case guide
-            /// 검색어로 첫 후보를 불러오는 중
-            case loading
             /// 검색 후보 목록
-            case results
+            ///
+            /// - rows: 노출할 후보
+            /// - keyword: 후보 이름에서 강조할 검색어
+            /// - generation: 목록을 불러온 검색의 요청 차수. 같은 검색어라도 새로 검색할 때마다 달라집니다.
+            case results(rows: [Row], keyword: String, generation: Int)
             /// 모든 유형에서 결과가 없음
             case noResult
             /// 요청 실패
@@ -109,6 +114,11 @@ public struct PhotoBoothSearchFeature {
         /// 화면에 띄울 알림입니다. 후보를 선택한 뒤 부스 조회가 실패한 경우에 채웁니다.
         var toast: NekiToastItem?
         var requestGeneration: Int = .zero
+        /// 새 검색을 요청하기 직전에 노출하던 본문입니다.
+        ///
+        /// 새 검색은 후보를 새로 쌓기 위해 목록을 비우지만, 본문은 첫 후보가 올 때까지 이 내용을 이어서 노출해 비지 않게 합니다.
+        /// 첫 후보가 온 뒤에는 읽지 않고, 다음 검색을 요청할 때 다시 채웁니다.
+        var contentBeforeSearch: ContentState = .guide
 
         public init() {}
 
@@ -119,20 +129,25 @@ public struct PhotoBoothSearchFeature {
             PhotoBoothSearchCandidateType.displayOrdered.first { pagination(for: $0).isExhausted == false }
         }
 
-        /// 첫 후보나 고른 후보의 부스를 불러오는 중인지 여부입니다. 목록을 이어붙이는 페이지 요청은 포함하지 않습니다.
-        var isLoading: Bool {
-            isFetchingSearchResult || (isFetching && rows.isEmpty)
+        /// 새 검색의 첫 후보를 기다리는 중인지 여부입니다. 본문 자리의 로딩 인디케이터를 올릴 때 씁니다.
+        ///
+        /// 목록을 이어붙이는 페이지 요청이나 고른 후보의 부스 조회는 포함하지 않습니다.
+        var isAwaitingFirstCandidates: Bool {
+            mode == .searching && rows.isEmpty && failure == nil && hasNoSearchResult == false
         }
 
         /// 검색 화면 본문에 노출할 내용입니다.
         ///
+        /// 새 검색의 첫 후보를 기다리는 동안에는 ``contentBeforeSearch``를 그대로 돌려줍니다.
         /// 이미 보여준 후보가 있으면 이어지는 페이지가 실패하더라도 목록을 유지합니다.
         /// 후보를 고른 뒤의 조회 실패도 목록을 덮지 않고 ``toast``로만 알립니다.
         var contentState: ContentState {
             guard mode == .searching else { return .guide }
-            if rows.isEmpty == false { return .results }
+            if rows.isEmpty == false {
+                return .results(rows: rows, keyword: query?.rawValue ?? "", generation: requestGeneration)
+            }
             if let failure { return .failure(failure) }
-            return hasNoSearchResult ? .noResult : .loading
+            return isAwaitingFirstCandidates ? contentBeforeSearch : .noResult
         }
 
         /// 모든 유형에서 검색 결과가 없어 전체 검색 결과 없음 상태를 노출해야 하는지 여부입니다.
@@ -241,7 +256,11 @@ public struct PhotoBoothSearchFeature {
             case let .didSelectCandidate(candidate):
                 // 조회 중에도 목록을 누를 수 있으므로 여기서 막습니다.
                 // 먼저 고른 후보의 조회를 끝까지 살려 두어 나중에 눌린 셀이 결과를 가로채지 않게 합니다.
-                guard state.mode == .searching, state.isFetchingSearchResult == false else { return .none }
+                // 새 검색의 첫 후보를 기다리는 동안 노출 중인 직전 목록도 고를 수 없습니다.
+                guard state.mode == .searching,
+                      state.isFetchingSearchResult == false,
+                      state.isAwaitingFirstCandidates == false
+                else { return .none }
                 state.isFetchingSearchResult = true
                 let generation = state.requestGeneration
                 // 서버가 사용자 위치를 기준으로 거리를 계산하므로 기준 좌표를 함께 넘깁니다.
@@ -312,6 +331,8 @@ public struct PhotoBoothSearchFeature {
 
 private extension PhotoBoothSearchFeature.State {
     mutating func beginSearch(query: PhotoBoothSearchQuery) {
+        // 목록을 비우기 전에 지금 본문을 남겨, 첫 후보가 올 때까지 이어서 노출합니다.
+        contentBeforeSearch = contentState
         requestGeneration &+= 1
         mode = .searching
         self.query = query
@@ -396,6 +417,7 @@ private extension PhotoBoothSearchFeature.State {
     }
 
     mutating func resetSearch() {
+        contentBeforeSearch = .guide
         requestGeneration &+= 1
         mode = .inactive
         query = nil

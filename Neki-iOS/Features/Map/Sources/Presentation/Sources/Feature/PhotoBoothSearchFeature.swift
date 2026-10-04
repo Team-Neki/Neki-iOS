@@ -169,6 +169,7 @@ public struct PhotoBoothSearchFeature {
     public enum Action: BindableAction {
         case binding(BindingAction<State>)
         case submitSearch
+        /// 검색어로 새 검색을 시작합니다. 지도에 반영 중인 검색어로 검색 화면을 다시 열 때 상위 화면(지도)이 보냅니다.
         case beginSearch(PhotoBoothSearchQuery)
         case fetchNextCandidatePage
         case candidatePageResponse(Result<PhotoBoothSearchCandidatePage, PhotoBoothSearchFailure>, generation: Int)
@@ -205,38 +206,13 @@ public struct PhotoBoothSearchFeature {
             case .submitSearch:
                 let keyword = state.searchText
                 guard keyword.isEmpty == false else { return .none }
-                return .send(.beginSearch(PhotoBoothSearchQuery(rawValue: keyword)))
+                return beginSearch(&state, query: PhotoBoothSearchQuery(rawValue: keyword))
 
             case let .beginSearch(query):
-                beginSearch(&state, query: query)
-                return .concatenate(
-                    .merge(
-                        .cancel(id: CancelID.candidatePage),
-                        .cancel(id: CancelID.searchResult)
-                    ),
-                    .send(.fetchNextCandidatePage)
-                )
+                return beginSearch(&state, query: query)
 
             case .fetchNextCandidatePage:
-                guard state.mode == .searching,
-                      state.isFetching == false,
-                      let query = state.query,
-                      let type = state.pendingType
-                else { return .none }
-                let page = state.pagination(for: type).nextPage
-                let generation = state.requestGeneration
-                state.isFetching = true
-                // 실패한 뒤 다시 스크롤하면 같은 페이지를 다시 시도합니다.
-                state.failure = nil
-                return .run { send in
-                    do {
-                        let response = try await photoBoothClient.searchCandidates(query, type, page)
-                        await send(.candidatePageResponse(.success(response), generation: generation))
-                    } catch is CancellationError { return } catch {
-                        await send(.candidatePageResponse(.failure(PhotoBoothSearchFailure(from: error)), generation: generation))
-                    }
-                }
-                .cancellable(id: CancelID.candidatePage)
+                return fetchNextCandidatePage(&state)
 
             case let .candidatePageResponse(.success(page), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
@@ -245,7 +221,7 @@ public struct PhotoBoothSearchFeature {
                 // 새 셀이 생기지 않은 페이지(빈 페이지, 이미 담은 후보만 온 페이지)는
                 // 스크롤 트리거가 발생하지 않으므로 다음 종류로 이어 부릅니다.
                 guard hasNewCandidates == false, state.pendingType != nil else { return .none }
-                return .send(.fetchNextCandidatePage)
+                return fetchNextCandidatePage(&state)
 
             case let .candidatePageResponse(.failure(failure), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
@@ -330,7 +306,8 @@ public struct PhotoBoothSearchFeature {
 // MARK: - PhotoBoothSearchFeature + Transition
 
 private extension PhotoBoothSearchFeature {
-    func beginSearch(_ state: inout State, query: PhotoBoothSearchQuery) {
+    /// 새 검색을 시작합니다. 진행 중이던 요청을 취소하고 첫 후보 페이지를 요청합니다.
+    func beginSearch(_ state: inout State, query: PhotoBoothSearchQuery) -> Effect<Action> {
         // 목록을 비우기 전에 지금 본문을 남겨, 첫 후보가 올 때까지 이어서 노출합니다.
         state.contentBeforeSearch = state.contentState
         state.requestGeneration &+= 1
@@ -348,6 +325,36 @@ private extension PhotoBoothSearchFeature {
         state.failure = nil
         // 새 검색을 시작하면 직전 검색에서 남은 실패 알림은 더 이상 볼 이유가 없습니다.
         state.toast = nil
+        return .concatenate(
+            .merge(
+                .cancel(id: CancelID.candidatePage),
+                .cancel(id: CancelID.searchResult)
+            ),
+            fetchNextCandidatePage(&state)
+        )
+    }
+
+    /// 이어서 채울 종류의 다음 후보 페이지를 요청합니다. 이미 요청 중이거나 모든 종류를 소진했으면 요청하지 않습니다.
+    func fetchNextCandidatePage(_ state: inout State) -> Effect<Action> {
+        guard state.mode == .searching,
+              state.isFetching == false,
+              let query = state.query,
+              let type = state.pendingType
+        else { return .none }
+        let page = state.pagination(for: type).nextPage
+        let generation = state.requestGeneration
+        state.isFetching = true
+        // 실패한 뒤 다시 스크롤하면 같은 페이지를 다시 시도합니다.
+        state.failure = nil
+        return .run { send in
+            do {
+                let response = try await photoBoothClient.searchCandidates(query, type, page)
+                await send(.candidatePageResponse(.success(response), generation: generation))
+            } catch is CancellationError { return } catch {
+                await send(.candidatePageResponse(.failure(PhotoBoothSearchFailure(from: error)), generation: generation))
+            }
+        }
+        .cancellable(id: CancelID.candidatePage)
     }
 
     /// 받은 페이지를 가까운 순으로 세워 목록 끝에 이어붙이고, 새로 담은 후보가 있는지 알려 줍니다.

@@ -14,11 +14,11 @@ final class PhotoBoothDistanceFormatter {
     
     init(locale: Locale = .current) {
         let formatter = MeasurementFormatter()
-        formatter.unitOptions = .naturalScale
+        formatter.unitOptions = .providedUnit
         formatter.locale = locale
         
         let numberFormatter = NumberFormatter()
-        numberFormatter.minimumFractionDigits = 1
+        numberFormatter.minimumFractionDigits = 0
         numberFormatter.maximumFractionDigits = 1
         formatter.numberFormatter = numberFormatter
         
@@ -40,7 +40,7 @@ extension PhotoBoothDistanceFormatter: DistanceFormatting {
     func distance(from meters: Double) -> GeographicDistance { .init(meters: meters) }
     
     func string(from distance: GeographicDistance) -> String {
-        let measurement = Measurement(value: distance.meters, unit: UnitLength.meters)
+        let measurement = Measurement(value: distance.meters, unit: distance.meters >= 1000 ? UnitLength.kilometers : UnitLength.meters)
         return measurementFormatter.string(from: measurement)
     }
 }

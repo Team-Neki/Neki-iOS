@@ -592,12 +592,13 @@ public struct MapFeature {
 
             case let .favoritePhotoBoothsResponse(.success(photoBooths), shouldLogViewEvent, generation):
                 guard generation == state.favoriteFetchGeneration else { return .none }
+                updateFavoriteSortCoordinate(&state.photoBoothListState, coordinate: state.isLocationAuthorized ? state.userGeographicCoordinate : nil)
                 let favoriteBooths = mergedFavoriteBooths(from: photoBooths, state: state)
                 let favoriteBoothCount = favoriteBooths.count
                 let viewEventEffect: Effect<Action> = shouldLogViewEvent
                     ? .run { _ in await analytics.logEvent(MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: favoriteBoothCount)) }
                     : .none
-                return .merge(
+                return .concatenate(
                     .send(.photoBoothListAction(.setFavoriteBooths(favoriteBooths))),
                     .send(.photoBoothListAction(.setFavoriteBoothCount(favoriteBoothCount))),
                     .send(.startBackgroundCalculation),
@@ -1000,6 +1001,12 @@ private extension MapFeature {
 
         updateFavoriteBoothList(&state.photoBoothListState, with: updatedPhotoBooth)
         updateFavoriteBoothCount(&state.photoBoothListState)
+    }
+
+    func updateFavoriteSortCoordinate(_ state: inout PhotoBoothListFeature.State, coordinate: GeographicCoordinate?) {
+        guard state.favoriteSortCoordinate != coordinate else { return }
+        state.favoriteSortCoordinate = coordinate
+        state.favoriteDistances.removeAll()
     }
 
     func updateFavoriteBoothList(_ state: inout PhotoBoothListFeature.State, with photoBooth: PhotoBooth) {

@@ -33,7 +33,7 @@ struct SearchPhotoBoothDTO: Decodable {
             name: branchName,
             coordinate: .init(latitude: latitude, longitude: longitude),
             address: address,
-            nearbyDistance: distance,
+            nearbyDistance: distance.map(GeographicDistance.init),
             isFavorite: favorite ?? false
         )
     }

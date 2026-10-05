@@ -34,7 +34,7 @@ enum PhotoBoothListPreviewData {
             name: "사당역점",
             coordinate: GeographicCoordinate(latitude: 37.4765, longitude: 126.9816),
             address: "서울특별시 동작구 사당동",
-            nearbyDistance: 300 + index * 140,
+            nearbyDistance: GeographicDistance(meters: 300 + index * 140),
             isFavorite: index == 1
         )
     }

@@ -20,8 +20,6 @@ struct NearPhotoBoothListSheet: View {
     @State private var favoriteRemovalReferenceBooths: IdentifiedArrayOf<PhotoBooth> = []
     @State private var delayedFavoriteTasks: [PhotoBooth.ID: Task<Void, Never>] = [:]
     
-    @Dependency(\.distanceFormatterClient) var distanceFormatterClient
-
     private let brandNameFormatter = PhotoBoothNameFormatter()
 
     private enum Constants {
@@ -372,16 +370,20 @@ private extension NearPhotoBoothListSheet {
                         .foregroundStyle(.gray600)
                         .lineLimit(1)
 
-                    // 거리는 검색 결과 카드에만 있는 요소입니다. 지도 영역 조회 목록은 시안에 거리가 없어 두지 않습니다.
-                    if store.isSearchResultPresented, let distance = photoBooth.nearbyDistance {
-                        Rectangle()
-                            .fill(.gray100)
-                            .frame(width: 1, height: 10)
-                        
-                        Text(distanceFormatterClient.string(distance: distance))
-                            .nekiFont(.body14SemiBold)
-                            .foregroundStyle(.gray700)
-                            .fixedSize()
+                    if store.isSearchResultPresented {
+                        PhotoBoothDistanceLabel(
+                            coordinate: photoBooth.coordinate,
+                            source: nil,
+                            measuredDistance: photoBooth.nearbyDistance
+                        )
+                        .equatable()
+                    } else if store.selectedTab == .favorite, let source = store.favoriteSortCoordinate {
+                        PhotoBoothDistanceLabel(
+                            coordinate: photoBooth.coordinate,
+                            source: source,
+                            measuredDistance: store.favoriteDistances[photoBooth.coordinate]
+                        )
+                        .equatable()
                     }
                 }
             }

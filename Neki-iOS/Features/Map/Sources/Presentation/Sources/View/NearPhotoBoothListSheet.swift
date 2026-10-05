@@ -325,10 +325,11 @@ private extension NearPhotoBoothListSheet {
             
             HStack(spacing: 8) {
                 Button {
-                    // TODO: 저장순 정렬 액션 연결
+                    store.send(.selectFavoriteSortOrder(.saved))
                 } label: {
                     Text("저장순")
-                    // TODO: 저장순 정렬 상태라면 gray700 색상, caption12semibold 폰트 / 저장순 정렬 상태가 아니라면 gray300, caption12regular 폰트
+                        .foregroundStyle(store.favoriteSortOrder == .saved ? .gray700 : .gray300)
+                        .nekiFont(store.favoriteSortOrder == .saved ? .caption12SemiBold : .caption12Regular)
                 }
                 
                 Rectangle()
@@ -337,10 +338,11 @@ private extension NearPhotoBoothListSheet {
                     .fixedSize()
                 
                 Button {
-                    // TODO: 거리순 정렬 액션 연결
+                    store.send(.selectFavoriteSortOrder(.distance))
                 } label: {
                     Text("거리순")
-                    // TODO: 거리순 정렬 상태라면 gray700 색상, caption12semibold 폰트 / 거리순 정렬 상태가 아니라면 gray300, caption12regular 폰트
+                        .foregroundStyle(store.favoriteSortOrder == .distance ? .gray700 : .gray300)
+                        .nekiFont(store.favoriteSortOrder == .distance ? .caption12SemiBold : .caption12Regular)
                 }
             }
         }

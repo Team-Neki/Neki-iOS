@@ -235,9 +235,7 @@ private extension NearPhotoBoothListSheet {
     var favoritePhotoBoothListSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                favoriteBoothCountText
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
+                favoriteBoothsListHeader
 
                 if displayedFavoriteBooths.isEmpty {
                     unavailableView("저장한 포토부스가 없어요.")
@@ -305,20 +303,46 @@ private extension NearPhotoBoothListSheet {
         .padding(.vertical, 8)
     }
 
-    var favoriteBoothCountText: some View {
-        HStack(spacing: 0) {
-            Text("저장한 포토부스 총 ")
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray300)
+    var favoriteBoothsListHeader: some View {
+        HStack {
+            HStack(spacing: 0) {
+                Text("저장한 포토부스 총 ")
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray300)
 
-            Text("\(store.favoriteBoothCount)")
-                .nekiFont(.body14SemiBold)
-                .foregroundStyle(.gray400)
+                Text("\(store.favoriteBoothCount)")
+                    .nekiFont(.body14SemiBold)
+                    .foregroundStyle(.gray400)
 
-            Text("곳")
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray300)
+                Text("곳")
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray300)
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Button {
+                    // TODO: 저장순 정렬 액션 연결
+                } label: {
+                    Text("저장순")
+                    // TODO: 저장순 정렬 상태라면 gray700 색상, caption12semibold 폰트 / 저장순 정렬 상태가 아니라면 gray300, caption12regular 폰트
+                }
+                
+                Rectangle()
+                    .foregroundStyle(.gray75)
+                    .frame(width: 1)
+                    .fixedSize()
+                
+                Button {
+                    // TODO: 거리순 정렬 액션 연결
+                } label: {
+                    Text("거리순")
+                    // TODO: 거리순 정렬 상태라면 gray700 색상, caption12semibold 폰트 / 거리순 정렬 상태가 아니라면 gray300, caption12regular 폰트
+                }
+            }
         }
+        .padding(.horizontal, 20)
     }
 
     @ViewBuilder

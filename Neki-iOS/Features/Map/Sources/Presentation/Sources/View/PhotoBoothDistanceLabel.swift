@@ -18,25 +18,44 @@ struct PhotoBoothDistanceLabel: View, Equatable {
     let measuredDistance: GeographicDistance?
 
     @Dependency(\.distanceFormatterClient) private var distanceFormatter
+    
+    init(
+        coordinate: GeographicCoordinate,
+        source: GeographicCoordinate?,
+        measuredDistance: GeographicDistance?
+    ) {
+        self.coordinate = coordinate
+        self.source = source
+        self.measuredDistance = measuredDistance
+    }
 
     var body: some View {
-        if let distance = measuredDistance ?? source.map({ distanceFormatter.distance($0, coordinate) }),
-           distance.meters.isFinite, distance.meters >= .zero {
-            let text = distanceFormatter.string(distance: distance)
-            if text.isEmpty == false {
-                Rectangle()
-                    .fill(.gray100)
-                    .frame(width: 1, height: 10)
+        if let text = distanceText {
+            Rectangle()
+                .fill(.gray100)
+                .frame(width: 1, height: 10)
 
-                Text(text)
-                    .nekiFont(.body14SemiBold)
-                    .foregroundStyle(.gray700)
-                    .fixedSize()
-            }
+            Text(text)
+                .nekiFont(.body14SemiBold)
+                .foregroundStyle(.gray700)
+                .fixedSize()
         }
     }
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.coordinate == rhs.coordinate && lhs.source == rhs.source && lhs.measuredDistance == rhs.measuredDistance
+    }
+}
+
+
+// MARK: - PhotoBoothDistanceLabel + Presentation
+
+private extension PhotoBoothDistanceLabel {
+    var distanceText: String? {
+        guard let distance = measuredDistance ?? source.map({ distanceFormatter.distance($0, coordinate) }),
+              distance.meters.isFinite, distance.meters >= .zero else { return nil }
+        let text = distanceFormatter.string(distance: distance)
+        guard text.isEmpty == false else { return nil }
+        return text
     }
 }

@@ -372,21 +372,7 @@ private extension NearPhotoBoothListSheet {
                         .foregroundStyle(.gray600)
                         .lineLimit(1)
 
-                    if store.isSearchResultPresented {
-                        PhotoBoothDistanceLabel(
-                            coordinate: photoBooth.coordinate,
-                            source: nil,
-                            measuredDistance: photoBooth.nearbyDistance
-                        )
-                        .equatable()
-                    } else if store.selectedTab == .favorite, let source = store.favoriteSortCoordinate {
-                        PhotoBoothDistanceLabel(
-                            coordinate: photoBooth.coordinate,
-                            source: source,
-                            measuredDistance: store.favoriteDistances[photoBooth.coordinate]
-                        )
-                        .equatable()
-                    }
+                    photoBoothDistanceLabel(photoBooth)
                 }
             }
             
@@ -404,6 +390,22 @@ private extension NearPhotoBoothListSheet {
         .onTapGesture { store.send(.didTapBooth(photoBooth)) }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
+    }
+
+    func photoBoothDistanceLabel(_ photoBooth: PhotoBooth) -> some View {
+        // 지역 목록은 서버의 카메라 중심 기준 거리, 즐겨찾기는 사용자 위치 기준 거리를 사용합니다.
+        let usesUserLocation = store.isSearchResultPresented == false && store.selectedTab == .favorite
+        let source = usesUserLocation ? store.favoriteSortCoordinate : nil
+        let measuredDistance = usesUserLocation
+            ? source.flatMap { _ in store.favoriteDistances[photoBooth.coordinate] }
+            : photoBooth.nearbyDistance
+
+        return PhotoBoothDistanceLabel(
+            coordinate: photoBooth.coordinate,
+            source: source,
+            measuredDistance: measuredDistance
+        )
+        .equatable()
     }
 
     func unavailableView(_ message: String) -> some View {

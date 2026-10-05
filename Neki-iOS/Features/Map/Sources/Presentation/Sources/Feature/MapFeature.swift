@@ -774,6 +774,18 @@ public struct MapFeature {
                     )
                 }
 
+            case let .photoBoothListAction(.selectFavoriteSortOrder(order)):
+                if order == .distance {
+                    guard state.isLocationAuthorized, let coordinate = state.userGeographicCoordinate else {
+                        return .send(.presentPermissionAlert)
+                    }
+                    guard state.photoBoothListState.favoriteSortOrder != order else { return .none }
+                    updateFavoriteSortCoordinate(&state.photoBoothListState, coordinate: coordinate)
+                }
+                guard state.photoBoothListState.favoriteSortOrder != order else { return .none }
+                state.photoBoothListState.favoriteSortOrder = order
+                return .send(.startBackgroundCalculation)
+
             case let .photoBoothListAction(.delegate(.didTapFavorite(photoBooth))):
                 return .send(.didTapFavorite(photoBooth))
 

@@ -19,6 +19,8 @@ struct NearPhotoBoothListSheet: View {
     @State private var pendingFavoriteRemovalBooths: IdentifiedArrayOf<PhotoBooth> = []
     @State private var favoriteRemovalReferenceBooths: IdentifiedArrayOf<PhotoBooth> = []
     @State private var delayedFavoriteTasks: [PhotoBooth.ID: Task<Void, Never>] = [:]
+    
+    @Dependency(\.distanceFormatterClient) var distanceFormatterClient
 
     private let brandNameFormatter = PhotoBoothNameFormatter()
 
@@ -373,8 +375,8 @@ private extension NearPhotoBoothListSheet {
                         Rectangle()
                             .fill(.gray100)
                             .frame(width: 1, height: 10)
-
-                        Text(distance.distanceString)
+                        
+                        Text(distanceFormatterClient.string(distance: distance))
                             .nekiFont(.body14SemiBold)
                             .foregroundStyle(.gray700)
                             .fixedSize()

@@ -304,7 +304,7 @@ private extension NearPhotoBoothListSheet {
     }
 
     var favoriteBoothsListHeader: some View {
-        HStack {
+        HStack(alignment: .center) {
             HStack(spacing: 0) {
                 Text("저장한 포토부스 총 ")
                     .nekiFont(.body14Medium)
@@ -328,6 +328,7 @@ private extension NearPhotoBoothListSheet {
                     Text("저장순")
                         .foregroundStyle(store.favoriteSortOrder == .saved ? .gray700 : .gray300)
                         .nekiFont(store.favoriteSortOrder == .saved ? .caption12SemiBold : .caption12Regular)
+                        .frame(width: 38, height: 22)
                 }
                 
                 Rectangle()
@@ -341,6 +342,7 @@ private extension NearPhotoBoothListSheet {
                     Text("거리순")
                         .foregroundStyle(store.favoriteSortOrder == .distance ? .gray700 : .gray300)
                         .nekiFont(store.favoriteSortOrder == .distance ? .caption12SemiBold : .caption12Regular)
+                        .frame(width: 38, height: 22)
                 }
             }
         }

@@ -615,6 +615,8 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewTouchDelegate {
 public struct NaverMapView: View {
     @Bindable var store: StoreOf<MapFeature>
     
+    @Dependency(\.distanceFormatterClient) var formatterClient
+    
     public init(store: StoreOf<MapFeature>) {
         self.store = store
     }
@@ -725,7 +727,7 @@ private extension NaverMapView {
                             .frame(width: 1, height: 10)
                             .foregroundStyle(.gray100)
                         
-                        Text(photoBooth.nearbyDistance?.distanceString ?? "")
+                        Text(formatterClient.string(distance: photoBooth.nearbyDistance))
                             .nekiFont(.body14SemiBold)
                             .foregroundStyle(.gray700)
                     }

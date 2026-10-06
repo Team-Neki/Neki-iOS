@@ -14,7 +14,7 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
     public let name: String
     public let coordinate: GeographicCoordinate
     public let address: String
-    public let nearbyDistance: Int?
+    public let nearbyDistance: GeographicDistance?
     public let detailInformationURL: URL?
     public var isFavorite: Bool
     
@@ -24,7 +24,7 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
         name: String,
         coordinate: GeographicCoordinate,
         address: String,
-        nearbyDistance: Int? = nil,
+        nearbyDistance: GeographicDistance? = nil,
         detailInformationURL: URL? = nil,
         isFavorite: Bool = false
     ) {

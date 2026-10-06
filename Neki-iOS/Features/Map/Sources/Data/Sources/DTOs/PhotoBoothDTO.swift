@@ -29,7 +29,7 @@ struct PhotoBoothDTO: Decodable {
             name: branchName,
             coordinate: .init(latitude: latitude, longitude: longitude),
             address: address,
-            nearbyDistance: nearbyDistance,
+            nearbyDistance: nearbyDistance.map(GeographicDistance.init),
             isFavorite: isFavorite ?? false
         )
     }

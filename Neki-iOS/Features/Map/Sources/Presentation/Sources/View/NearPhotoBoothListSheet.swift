@@ -19,7 +19,7 @@ struct NearPhotoBoothListSheet: View {
     @State private var pendingFavoriteRemovalBooths: IdentifiedArrayOf<PhotoBooth> = []
     @State private var favoriteRemovalReferenceBooths: IdentifiedArrayOf<PhotoBooth> = []
     @State private var delayedFavoriteTasks: [PhotoBooth.ID: Task<Void, Never>] = [:]
-
+    
     private let brandNameFormatter = PhotoBoothNameFormatter()
 
     private enum Constants {
@@ -218,7 +218,7 @@ private extension NearPhotoBoothListSheet {
     var nearByPhotoBoothListSection: some View {
         Section {
             if store.visibleBooths.isEmpty {
-                unavailableView("이 지역에 네컷 사진관이 없어요!")
+                unavailableView("지금 보고 있는 곳에는 네컷 사진관이 없어요\n지도를 살짝 옮겨볼까요?")
             } else {
                 LazyVStack(alignment: .leading, spacing: .zero) {
                     ForEach(store.visibleBooths) { photoBooth in
@@ -235,9 +235,7 @@ private extension NearPhotoBoothListSheet {
     var favoritePhotoBoothListSection: some View {
         Section {
             VStack(alignment: .leading, spacing: 12) {
-                favoriteBoothCountText
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
+                favoriteBoothsListHeader
 
                 if displayedFavoriteBooths.isEmpty {
                     unavailableView("저장한 포토부스가 없어요.")
@@ -305,20 +303,50 @@ private extension NearPhotoBoothListSheet {
         .padding(.vertical, 8)
     }
 
-    var favoriteBoothCountText: some View {
-        HStack(spacing: 0) {
-            Text("저장한 포토부스 총 ")
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray300)
+    var favoriteBoothsListHeader: some View {
+        HStack(alignment: .center) {
+            HStack(spacing: 0) {
+                Text("저장한 포토부스 총 ")
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray300)
 
-            Text("\(store.favoriteBoothCount)")
-                .nekiFont(.body14SemiBold)
-                .foregroundStyle(.gray400)
+                Text("\(store.favoriteBoothCount)")
+                    .nekiFont(.body14SemiBold)
+                    .foregroundStyle(.gray400)
 
-            Text("곳")
-                .nekiFont(.body14Medium)
-                .foregroundStyle(.gray300)
+                Text("곳")
+                    .nekiFont(.body14Medium)
+                    .foregroundStyle(.gray300)
+            }
+            
+            Spacer()
+            
+            HStack(spacing: 8) {
+                Button {
+                    store.send(.selectFavoriteSortOrder(.saved))
+                } label: {
+                    Text("저장순")
+                        .foregroundStyle(store.favoriteSortOrder == .saved ? .gray700 : .gray300)
+                        .nekiFont(store.favoriteSortOrder == .saved ? .caption12SemiBold : .caption12Regular)
+                        .frame(width: 38, height: 22)
+                }
+                
+                Rectangle()
+                    .foregroundStyle(.gray75)
+                    .frame(width: 1)
+                    .fixedSize()
+                
+                Button {
+                    store.send(.selectFavoriteSortOrder(.distance))
+                } label: {
+                    Text("거리순")
+                        .foregroundStyle(store.favoriteSortOrder == .distance ? .gray700 : .gray300)
+                        .nekiFont(store.favoriteSortOrder == .distance ? .caption12SemiBold : .caption12Regular)
+                        .frame(width: 38, height: 22)
+                }
+            }
         }
+        .padding(.horizontal, 20)
     }
 
     @ViewBuilder
@@ -344,17 +372,7 @@ private extension NearPhotoBoothListSheet {
                         .foregroundStyle(.gray600)
                         .lineLimit(1)
 
-                    // 거리는 검색 결과 카드에만 있는 요소입니다. 지도 영역 조회 목록은 시안에 거리가 없어 두지 않습니다.
-                    if store.isSearchResultPresented, let distance = photoBooth.nearbyDistance {
-                        Rectangle()
-                            .fill(.gray100)
-                            .frame(width: 1, height: 10)
-
-                        Text(distance.distanceString)
-                            .nekiFont(.body14SemiBold)
-                            .foregroundStyle(.gray700)
-                            .fixedSize()
-                    }
+                    photoBoothDistanceLabel(photoBooth)
                 }
             }
             
@@ -374,6 +392,22 @@ private extension NearPhotoBoothListSheet {
         .padding(.vertical, 8)
     }
 
+    func photoBoothDistanceLabel(_ photoBooth: PhotoBooth) -> some View {
+        // 지역 목록은 서버의 카메라 중심 기준 거리, 즐겨찾기는 사용자 위치 기준 거리를 사용합니다.
+        let usesUserLocation = store.isSearchResultPresented == false && store.selectedTab == .favorite
+        let source = usesUserLocation ? store.favoriteSortCoordinate : nil
+        let measuredDistance = usesUserLocation
+            ? source.flatMap { _ in store.favoriteDistances[photoBooth.coordinate] }
+            : photoBooth.nearbyDistance
+
+        return PhotoBoothDistanceLabel(
+            coordinate: photoBooth.coordinate,
+            source: source,
+            measuredDistance: measuredDistance
+        )
+        .equatable()
+    }
+
     func unavailableView(_ message: String) -> some View {
         VStack(alignment: .center, spacing: 12) {
             Image(.iconPlace)
@@ -381,6 +415,8 @@ private extension NearPhotoBoothListSheet {
             Text(message)
                 .nekiFont(.body16Medium)
                 .foregroundStyle(.gray500)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, minHeight: 375, alignment: .center)
     }
@@ -523,53 +559,4 @@ private struct NearPhotoBoothListScrollOffsetPreferenceKey: PreferenceKey {
     ) {
         value = nextValue()
     }
-}
-
-
-// MARK: - Preview
-
-#Preview("검색 결과") {
-    @Previewable @State var detent: NekiSheetDetent = .large
-
-    Color.gray50
-        .ignoresSafeArea()
-        .nekiSheet(selection: $detent) {
-            NearPhotoBoothListSheet(
-                store: PhotoBoothListPreviewData.store(PhotoBoothListPreviewData.searchResultState())
-            )
-        } controllers: {
-            EmptyView()
-        }
-}
-
-#Preview("검색 결과 · 브랜드 선택") {
-    @Previewable @State var detent: NekiSheetDetent = .large
-
-    Color.gray50
-        .ignoresSafeArea()
-        .nekiSheet(selection: $detent) {
-            NearPhotoBoothListSheet(
-                store: PhotoBoothListPreviewData.store(
-                    PhotoBoothListPreviewData.searchResultState(
-                        selecting: [PhotoBoothListPreviewData.brands[1], PhotoBoothListPreviewData.brands[4]]
-                    )
-                )
-            )
-        } controllers: {
-            EmptyView()
-        }
-}
-
-#Preview("지도 영역 목록") {
-    @Previewable @State var detent: NekiSheetDetent = .large
-
-    Color.gray50
-        .ignoresSafeArea()
-        .nekiSheet(selection: $detent) {
-            NearPhotoBoothListSheet(
-                store: PhotoBoothListPreviewData.store(PhotoBoothListPreviewData.nearbyState())
-            )
-        } controllers: {
-            EmptyView()
-        }
 }

@@ -184,7 +184,10 @@ public struct MapFeature {
         case didFinishBackgroundCalculation(
             map: IdentifiedArrayOf<PhotoBooth>,
             list: IdentifiedArrayOf<PhotoBooth>,
-            favoriteList: IdentifiedArrayOf<PhotoBooth>
+            favoriteList: IdentifiedArrayOf<PhotoBooth>,
+            distances: [GeographicCoordinate: GeographicDistance],
+            sortCoordinate: GeographicCoordinate?,
+            sortOrder: PhotoBoothListFeature.FavoriteSortOrder
         )
         case didSelectDirectionApp(DirectionAppType)
         
@@ -214,6 +217,7 @@ public struct MapFeature {
     @Dependency(\.mapClient) private var mapClient
     @Dependency(\.photoBoothClient) private var photoBoothClient
     @Dependency(\.analyticsClient) private var analytics
+    @Dependency(\.distanceFormatterClient) private var distanceFormatter
     @Dependency(\.openURL) private var openURL
     
     public var body: some ReducerOf<Self> {
@@ -592,12 +596,13 @@ public struct MapFeature {
 
             case let .favoritePhotoBoothsResponse(.success(photoBooths), shouldLogViewEvent, generation):
                 guard generation == state.favoriteFetchGeneration else { return .none }
+                updateFavoriteSortCoordinate(&state.photoBoothListState, coordinate: state.isLocationAuthorized ? state.userGeographicCoordinate : nil)
                 let favoriteBooths = mergedFavoriteBooths(from: photoBooths, state: state)
                 let favoriteBoothCount = favoriteBooths.count
                 let viewEventEffect: Effect<Action> = shouldLogViewEvent
                     ? .run { _ in await analytics.logEvent(MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: favoriteBoothCount)) }
                     : .none
-                return .merge(
+                return .concatenate(
                     .send(.photoBoothListAction(.setFavoriteBooths(favoriteBooths))),
                     .send(.photoBoothListAction(.setFavoriteBoothCount(favoriteBoothCount))),
                     .send(.startBackgroundCalculation),
@@ -637,7 +642,17 @@ public struct MapFeature {
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
                 let currentBounds = state.currentBounds
+                let sortOrder = state.photoBoothListState.favoriteSortOrder
+                let sortCoordinate = state.photoBoothListState.favoriteSortCoordinate
+                let cachedDistances = state.photoBoothListState.favoriteDistances
                 return .run { send in
+                    var distances = cachedDistances
+                    if distances.isEmpty == false {
+                        let retainedCoordinates = Set(favoriteBooths.map(\.coordinate))
+                        if distances.keys.allSatisfy({ retainedCoordinates.contains($0) }) == false {
+                            distances = distances.filter { retainedCoordinates.contains($0.key) }
+                        }
+                    }
                     let visibleMapBooths: IdentifiedArrayOf<PhotoBooth>
                     let visibleListBooths: IdentifiedArrayOf<PhotoBooth>
                     let visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth>
@@ -649,13 +664,43 @@ public struct MapFeature {
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
                     )
                     visibleListBooths = Self.visibleListPhotoBooths(mapBooths, activeBrandIDs: activeBrandIDs)
-                    visibleFavoriteBooths = Self.visibleFavoritePhotoBooths(favoriteBooths, activeBrandIDs: activeBrandIDs)
-                    await send(.didFinishBackgroundCalculation(map: visibleMapBooths, list: visibleListBooths, favoriteList: visibleFavoriteBooths))
+                    let filteredFavorites = Self.visibleFavoritePhotoBooths(favoriteBooths, activeBrandIDs: activeBrandIDs)
+                    if sortOrder == .distance, let sortCoordinate {
+                        // 비교할 때마다 거리를 계산하지 않고 지점당 한 번만 계산합니다.
+                        let measuredBooths = filteredFavorites.enumerated().map { index, booth in
+                            let distance: GeographicDistance
+                            if let cachedDistance = distances[booth.coordinate] {
+                                distance = cachedDistance
+                            } else {
+                                distance = distanceFormatter.distance(sortCoordinate, booth.coordinate)
+                                distances[booth.coordinate] = distance
+                            }
+                            let meters = distance.meters.isFinite && distance.meters >= .zero ? distance.meters : .infinity
+                            return (index: index, booth: booth, meters: meters)
+                        }
+                        visibleFavoriteBooths = IdentifiedArray(uniqueElements: measuredBooths.sorted {
+                            $0.meters == $1.meters ? $0.index < $1.index : $0.meters < $1.meters
+                        }.map(\.booth))
+                    } else {
+                        visibleFavoriteBooths = filteredFavorites
+                    }
+                    try Task.checkCancellation()
+                    await send(.didFinishBackgroundCalculation(
+                        map: visibleMapBooths,
+                        list: visibleListBooths,
+                        favoriteList: visibleFavoriteBooths,
+                        distances: distances,
+                        sortCoordinate: sortCoordinate,
+                        sortOrder: sortOrder
+                    ))
                 }
                 .cancellable(id: CancelID.calculation, cancelInFlight: true)
                 
-            case let .didFinishBackgroundCalculation(map, list, favoriteList):
+            case let .didFinishBackgroundCalculation(map, list, favoriteList, distances, sortCoordinate, sortOrder):
+                guard state.photoBoothListState.favoriteSortCoordinate == sortCoordinate,
+                      state.photoBoothListState.favoriteSortOrder == sortOrder else { return .none }
                 state.visiblePhotoBooths = map
+                state.photoBoothListState.favoriteDistances = distances
                 return .merge(
                     .send(.photoBoothListAction(.setVisibleBooths(list))),
                     .send(.photoBoothListAction(.setVisibleFavoriteBooths(favoriteList)))
@@ -728,6 +773,21 @@ public struct MapFeature {
                         )
                     )
                 }
+
+            case let .photoBoothListAction(.selectFavoriteSortOrder(order)):
+                switch order {
+                case .distance:
+                    guard state.isLocationAuthorized, let coordinate = state.userGeographicCoordinate else {
+                        return .send(.presentPermissionAlert)
+                    }
+                    guard state.photoBoothListState.favoriteSortOrder != order ||
+                          state.photoBoothListState.favoriteSortCoordinate != coordinate else { return .none }
+                    updateFavoriteSortCoordinate(&state.photoBoothListState, coordinate: coordinate)
+                case .saved:
+                    guard state.photoBoothListState.favoriteSortOrder != order else { return .none }
+                }
+                state.photoBoothListState.favoriteSortOrder = order
+                return .send(.startBackgroundCalculation)
 
             case let .photoBoothListAction(.delegate(.didTapFavorite(photoBooth))):
                 return .send(.didTapFavorite(photoBooth))
@@ -1000,6 +1060,19 @@ private extension MapFeature {
 
         updateFavoriteBoothList(&state.photoBoothListState, with: updatedPhotoBooth)
         updateFavoriteBoothCount(&state.photoBoothListState)
+    }
+
+    func updateFavoriteSortCoordinate(_ state: inout PhotoBoothListFeature.State, coordinate: GeographicCoordinate?) {
+        // 조회·정렬 시점에 좌표가 없으면 실제 목록 순서와 선택 표시를 함께 저장순으로 맞춥니다.
+        guard let coordinate else {
+            state.favoriteSortOrder = .saved
+            state.favoriteSortCoordinate = nil
+            state.favoriteDistances.removeAll()
+            return
+        }
+        guard state.favoriteSortCoordinate != coordinate else { return }
+        state.favoriteSortCoordinate = coordinate
+        state.favoriteDistances.removeAll()
     }
 
     func updateFavoriteBoothList(_ state: inout PhotoBoothListFeature.State, with photoBooth: PhotoBooth) {

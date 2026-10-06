@@ -10,6 +10,11 @@ import ComposableArchitecture
 
 @Reducer
 public struct PhotoBoothListFeature {
+    public enum FavoriteSortOrder: Equatable {
+        case saved
+        case distance
+    }
+
     public enum ListTab: CaseIterable, Identifiable {
         case nearby
         case favorite
@@ -72,6 +77,11 @@ public struct PhotoBoothListFeature {
         var isSearchResultBrandFilterSheetPresented: Bool = false
 
         var selectedTab: ListTab = .nearby
+        var favoriteSortOrder: FavoriteSortOrder = .saved
+        /// 위치 변화마다 목록이 재정렬되지 않도록 조회·정렬 시점의 좌표를 유지합니다.
+        var favoriteSortCoordinate: GeographicCoordinate?
+        /// 동일 기준 좌표에서 필터 변경 시 거리를 재계산하지 않습니다.
+        var favoriteDistances: [GeographicCoordinate: GeographicDistance] = [:]
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         var favoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -89,6 +99,7 @@ public struct PhotoBoothListFeature {
         // View Actions
         case selectFilterOption(PhotoBoothBrand)
         case selectTab(ListTab)
+        case selectFavoriteSortOrder(FavoriteSortOrder)
         case toggleTooltip
         case didTapFavorite(PhotoBooth)
         case didTapBrandReorderButton

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Dependencies
 
 /// 검색 후보 목록에서 후보 한 건을 표시하는 셀입니다.
 ///
@@ -16,6 +17,8 @@ struct PhotoBoothSearchCandidateCell: View {
     private let distance: Int?
     private let showsDivider: Bool
     private let action: () -> Void
+    
+    @Dependency(\.distanceFormatterClient) var distanceFormattingClient
 
     private enum Metrics {
         static let horizontalPadding: CGFloat = 20
@@ -79,7 +82,7 @@ private extension PhotoBoothSearchCandidateCell {
             }
 
             if let distance {
-                Text(distance.distanceString)
+                Text(distanceFormattingClient.string(distance: .init(meters: distance)))
                     .nekiFont(.body14Regular)
                     .foregroundStyle(.gray500)
                     .lineLimit(1)

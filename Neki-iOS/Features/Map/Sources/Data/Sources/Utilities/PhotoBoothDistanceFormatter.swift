@@ -40,8 +40,9 @@ extension PhotoBoothDistanceFormatter: DistanceFormatting {
     func distance(from meters: Double) -> GeographicDistance { .init(meters: meters) }
     
     func string(from distance: GeographicDistance) -> String {
-        let measurement = Measurement(value: distance.meters, unit: distance.meters >= 1000 ? UnitLength.kilometers : UnitLength.meters)
-        return measurementFormatter.string(from: measurement)
+        let isOverKilometer: Bool = distance.meters >= 1000
+        let measurement = Measurement(value: distance.meters, unit: UnitLength.meters)
+        return measurementFormatter.string(from: isOverKilometer ? measurement.converted(to: .kilometers) : measurement)
     }
 }
 

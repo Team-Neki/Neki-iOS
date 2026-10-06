@@ -775,14 +775,17 @@ public struct MapFeature {
                 }
 
             case let .photoBoothListAction(.selectFavoriteSortOrder(order)):
-                if order == .distance {
+                switch order {
+                case .distance:
                     guard state.isLocationAuthorized, let coordinate = state.userGeographicCoordinate else {
                         return .send(.presentPermissionAlert)
                     }
-                    guard state.photoBoothListState.favoriteSortOrder != order else { return .none }
+                    guard state.photoBoothListState.favoriteSortOrder != order ||
+                          state.photoBoothListState.favoriteSortCoordinate != coordinate else { return .none }
                     updateFavoriteSortCoordinate(&state.photoBoothListState, coordinate: coordinate)
+                case .saved:
+                    guard state.photoBoothListState.favoriteSortOrder != order else { return .none }
                 }
-                guard state.photoBoothListState.favoriteSortOrder != order else { return .none }
                 state.photoBoothListState.favoriteSortOrder = order
                 return .send(.startBackgroundCalculation)
 
@@ -1060,6 +1063,13 @@ private extension MapFeature {
     }
 
     func updateFavoriteSortCoordinate(_ state: inout PhotoBoothListFeature.State, coordinate: GeographicCoordinate?) {
+        // 조회·정렬 시점에 좌표가 없으면 실제 목록 순서와 선택 표시를 함께 저장순으로 맞춥니다.
+        guard let coordinate else {
+            state.favoriteSortOrder = .saved
+            state.favoriteSortCoordinate = nil
+            state.favoriteDistances.removeAll()
+            return
+        }
         guard state.favoriteSortCoordinate != coordinate else { return }
         state.favoriteSortCoordinate = coordinate
         state.favoriteDistances.removeAll()

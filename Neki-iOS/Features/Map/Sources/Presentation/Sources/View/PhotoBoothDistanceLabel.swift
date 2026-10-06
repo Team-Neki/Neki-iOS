@@ -31,14 +31,17 @@ struct PhotoBoothDistanceLabel: View, Equatable {
 
     var body: some View {
         if let text = distanceText {
-            Rectangle()
-                .fill(.gray100)
-                .frame(width: 1, height: 10)
-
-            Text(text)
-                .nekiFont(.body14SemiBold)
-                .foregroundStyle(.gray700)
-                .fixedSize()
+            HStack(spacing: 6) {
+                Rectangle()
+                    .fill(.gray100)
+                    .frame(width: 1, height: 10)
+                
+                Text(text)
+                    .nekiFont(.body14SemiBold)
+                    .foregroundStyle(.gray700)
+                    .fixedSize()
+            }
+            .lineLimit(1)
         }
     }
 
@@ -53,7 +56,8 @@ struct PhotoBoothDistanceLabel: View, Equatable {
 private extension PhotoBoothDistanceLabel {
     var distanceText: String? {
         guard let distance = measuredDistance ?? source.map({ distanceFormatter.distance($0, coordinate) }),
-              distance.meters.isFinite, distance.meters >= .zero else { return nil }
+              distance.meters.isFinite, distance.meters >= .zero
+        else { return nil }
         let text = distanceFormatter.string(distance: distance)
         guard text.isEmpty == false else { return nil }
         return text

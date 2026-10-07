@@ -48,28 +48,33 @@ protocol PhotoBoothRepository {
         size: Int
     ) async throws -> PhotoBoothSearchCandidatePage
 
-    /// 고른 지역·역에 속한 포토부스 목록을 가져옵니다.
+    /// 고른 검색 후보에 속한 포토부스 목록을 가져옵니다.
     ///
-    /// 시군구를 고르면 그 아래 읍면동까지 포함하며, 역 주변 반경은 수집 단계에서 미리 계산된
-    /// 값이라 클라이언트가 조정할 수 없습니다.
+    /// 지역을 고르면 그 아래 구역까지, 지하철역을 고르면 역 반경 1km 안을, 포토부스를 고르면 그 지점 하나를 담습니다.
+    /// 자동완성에 나온 지점이라도 지도에서 숨긴 지점이면 비어 있을 수 있습니다.
     /// - Parameters:
-    ///   - target: 사용자가 고른 지역 또는 지하철역
+    ///   - keyword: 고른 후보의 `keyword`
+    ///   - filterGroup: 고른 후보가 속한 자동완성 응답의 조회 조건
     ///   - userCoordinate: 거리 계산의 기준이 되는 사용자 현재 위치. `nil`이면 거리가 내려오지 않습니다.
     /// - Returns: 기준 위치가 있으면 가까운 순, 없으면 브랜드와 지점 이름 순으로 정렬된 포토부스 배열
     /// - Throws: 실패는 ``PhotoBoothSearchFailure``로 전달합니다. 취소는 `CancellationError`로 그대로 전달합니다.
     func readSearchResultPhotoBooths(
-        target: PhotoBoothSearchTarget,
+        keyword: String,
+        filterGroup: PhotoBoothSearchFilterGroup,
         userCoordinate: GeographicCoordinate?
     ) async throws -> [PhotoBooth]
 
-    /// 고른 지역·역의 부스 목록에서 실제로 쓸 수 있는 브랜드 필터를 가져옵니다.
+    /// 고른 검색 후보의 부스 목록에서 실제로 쓸 수 있는 브랜드 필터를 가져옵니다.
     ///
     /// 그 범위에 없는 브랜드를 눌러 빈 화면을 보는 일이 없도록, 목록에 있는 브랜드만 내려옵니다.
-    /// - Parameter target: 사용자가 고른 지역 또는 지하철역
+    /// - Parameters:
+    ///   - keyword: 고른 후보의 `keyword`
+    ///   - filterGroup: 고른 후보가 속한 자동완성 응답의 조회 조건
     /// - Returns: 사용자별 브랜드 정렬 순서를 유지한 브랜드 필터 배열
     /// - Throws: 실패는 ``PhotoBoothSearchFailure``로 전달합니다. 취소는 `CancellationError`로 그대로 전달합니다.
     func readSearchResultBrandFilters(
-        target: PhotoBoothSearchTarget
+        keyword: String,
+        filterGroup: PhotoBoothSearchFilterGroup
     ) async throws -> [PhotoBoothSearchBrandFilter]
 }
 

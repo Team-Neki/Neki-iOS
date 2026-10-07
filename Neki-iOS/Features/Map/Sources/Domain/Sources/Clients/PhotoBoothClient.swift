@@ -24,7 +24,8 @@ public struct PhotoBoothClient {
     public var searchCandidates: @Sendable (_ query: PhotoBoothSearchQuery, _ type: PhotoBoothSearchCandidateType, _ page: Int) async throws -> PhotoBoothSearchCandidatePage
     /// 사용자가 선택한 검색 후보에 대응하는 포토부스 조회
     ///
-    /// 포토부스 후보는 검색 응답에 지도에 필요한 값이 모두 들어 있어 네트워크 호출 없이 자기 자신을 반환합니다.
+    /// 세 종류 모두 후보의 `keyword`와 `filterGroup`으로 부스 목록을 조회합니다.
+    /// 포토부스 후보는 그 지점 하나가 오지만, 지도에서 숨긴 지점이면 빈 배열입니다.
     /// `userCoordinate`는 응답에 담길 거리의 기준이며, 위치를 알 수 없으면 `nil`을 전달해 거리를 받지 않습니다.
     public var fetchSearchPhotoBooths: @Sendable (_ candidate: PhotoBoothSearchCandidate, _ userCoordinate: GeographicCoordinate?) async throws -> [PhotoBooth]
     /// 사용자가 선택한 검색 후보의 부스 목록에서 쓸 수 있는 브랜드 필터 조회
@@ -66,33 +67,18 @@ extension PhotoBoothClient: DependencyKey {
             )
         }
         client.fetchSearchPhotoBooths = { candidate, userCoordinate in
-            switch candidate {
-            case let .region(region):
-                return try await photoBoothRepository.readSearchResultPhotoBooths(
-                    target: .region(code: region.code),
-                    userCoordinate: userCoordinate
-                )
-
-            case let .subwayStation(station):
-                return try await photoBoothRepository.readSearchResultPhotoBooths(
-                    target: .subwayStation(name: station.name, lineName: station.lineName),
-                    userCoordinate: userCoordinate
-                )
-
-            case let .photoBooth(photoBooth):
-                return [photoBooth]
-            }
+            try await photoBoothRepository.readSearchResultPhotoBooths(
+                keyword: candidate.keyword,
+                filterGroup: candidate.filterGroup,
+                userCoordinate: userCoordinate
+            )
         }
         client.fetchSearchBrandFilters = { candidate in
-            switch candidate {
-            case let .region(region):
+            switch candidate.type {
+            case .region, .subwayStation:
                 return try await photoBoothRepository.readSearchResultBrandFilters(
-                    target: .region(code: region.code)
-                )
-
-            case let .subwayStation(station):
-                return try await photoBoothRepository.readSearchResultBrandFilters(
-                    target: .subwayStation(name: station.name, lineName: station.lineName)
+                    keyword: candidate.keyword,
+                    filterGroup: candidate.filterGroup
                 )
 
             case .photoBooth:

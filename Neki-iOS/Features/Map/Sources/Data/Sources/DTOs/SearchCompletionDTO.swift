@@ -20,6 +20,16 @@ enum SearchCompletionDTO {
         /// 검색어로 정해지는 값이라 같은 응답의 후보가 모두 함께 씁니다.
         let filterGroup: SearchFilterGroupDTO
 
+        /// 후보 페이지로 변환합니다. 응답의 조회 조건을 후보마다 담아 고른 후보만으로 부스 목록을 조회할 수 있게 합니다.
+        func toEntity(type: PhotoBoothSearchCandidateType) -> PhotoBoothSearchCandidatePage {
+            let filterGroup = filterGroup.toEntity()
+            return PhotoBoothSearchCandidatePage(
+                type: type,
+                candidates: items.map { $0.toEntity(type: type, filterGroup: filterGroup) },
+                hasNext: hasNext
+            )
+        }
+
         struct Item: Decodable {
             /// 화면에 그대로 표시하고, 고르면 부스 목록·필터 요청에 그대로 넘기는 값입니다.
             let keyword: String
@@ -27,6 +37,19 @@ enum SearchCompletionDTO {
             ///
             /// 역·부스 자동완성에 기준 위치를 담았을 때만 내려오고, 지역은 항상 `null`입니다.
             let distanceKm: Double?
+
+            func toEntity(
+                type: PhotoBoothSearchCandidateType,
+                filterGroup: PhotoBoothSearchFilterGroup
+            ) -> PhotoBoothSearchCandidate {
+                PhotoBoothSearchCandidate(
+                    type: type,
+                    keyword: keyword,
+                    filterGroup: filterGroup,
+                    // 앱의 다른 거리와 같은 m 단위로 바꿉니다. 0.1km 단위라 반올림해 소수 오차를 없앱니다.
+                    distance: distanceKm.map { GeographicDistance(meters: ($0 * 1000).rounded()) }
+                )
+            }
         }
     }
 }

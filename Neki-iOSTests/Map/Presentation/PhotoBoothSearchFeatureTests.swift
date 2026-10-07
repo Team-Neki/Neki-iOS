@@ -67,7 +67,7 @@ struct PhotoBoothSearchFeatureTests {
             .init(type: .subwayStation, page: 0),
             .init(type: .photoBooth, page: 0)
         ])
-        #expect(store.state.rows.map(\.candidate.type) == [.region, .region, .photoBooth, .photoBooth, .photoBooth])
+        #expect(store.state.rows.map(\.type) == [.region, .region, .photoBooth, .photoBooth, .photoBooth])
     }
 
     @Test("이미 요청 중이면 트리거가 여러 번 와도 한 번만 요청한다")
@@ -161,108 +161,30 @@ struct PhotoBoothSearchFeatureTests {
         await submitSearch(on: store)
         await exhaustAllTypes(on: store)
 
-        #expect(store.state.rows.map(\.candidate.type) == [.region, .subwayStation, .photoBooth])
+        #expect(store.state.rows.map(\.type) == [.region, .subwayStation, .photoBooth])
     }
 
-    @Test("거리는 위치에 동의하고 좌표가 있는 후보에만 노출한다")
-    func rows_showDistanceOnlyWhenCoordinateIsAvailable() async {
-        let store = makeStore(pages: [
-            .region: [makeRegionPage(count: 1, hasNext: false)],
-            .subwayStation: [makeStationPage(count: 1, hasNext: false)],
-            .photoBooth: [makePhotoBoothPage(count: 1, hasNext: false)]
-        ])
-
-        await store.send(.setUserCoordinate(.init(latitude: 37.4979, longitude: 127.0276)))
-        await submitSearch(on: store)
-        await exhaustAllTypes(on: store)
-
-        let distancesByType = Dictionary(
-            uniqueKeysWithValues: store.state.rows.map { ($0.candidate.type, $0.distance) }
-        )
-        // 지역은 정책상 거리를 노출하지 않고, 지하철역은 검색 응답에 좌표가 없어 계산할 수 없습니다.
-        #expect(distancesByType[.region] == .some(nil))
-        #expect(distancesByType[.subwayStation] == .some(nil))
-        #expect(distancesByType[.photoBooth]??.isMultiple(of: 1) == true)
-    }
-
-    @Test("위치에 동의하지 않아도 기본 좌표를 기준으로 거리를 노출한다")
-    func rows_showDistanceFromDefaultOriginWhenLocationIsNotAuthorized() async {
-        let store = makeStore(pages: [
-            .region: [makeRegionPage(count: 0, hasNext: false)],
-            .subwayStation: [makeStationPage(count: 0, hasNext: false)],
-            .photoBooth: [makePhotoBoothPage(coordinates: [.init(latitude: 37.5000, longitude: 127.0276)])]
-        ])
-
-        await submitSearch(on: store)
-
-        // 요청 시점에 위치를 몰라도 거리를 비우지 않고 기본 지점을 기준으로 세웁니다.
-        #expect(store.state.userCoordinate == nil)
-        #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
-        #expect(store.state.rows.first?.distance != nil)
-    }
-
-    @Test("종류 순서를 지키면서 좌표가 있는 후보를 가까운 순으로 세운다")
-    func rows_sortCandidatesWithCoordinateByDistance() async {
-        let store = makeStore(pages: [
-            .region: [makeRegionPage(count: 1, hasNext: false)],
-            .subwayStation: [makeStationPage(count: 1, hasNext: false)],
-            .photoBooth: [makePhotoBoothPage(coordinates: [
-                .init(latitude: 37.6000, longitude: 127.0276),
-                .init(latitude: 37.5000, longitude: 127.0276),
-                .init(latitude: 37.5500, longitude: 127.0276)
-            ])]
-        ])
-
-        await store.send(.setUserCoordinate(.init(latitude: 37.4979, longitude: 127.0276)))
-        await submitSearch(on: store)
-        await exhaustAllTypes(on: store)
-
-        // 후보 검색은 기준 위치를 받지 않아 서버 순서가 거리순이 아니므로 클라이언트가 다시 세웁니다.
-        // 종류 사이의 순서는 정책이라 거리로 뒤섞지 않습니다.
-        #expect(store.state.rows.map(\.id) == [
-            "region:1168000000",
-            "station:강남:2호선",
-            "photoBooth:1",
-            "photoBooth:2",
-            "photoBooth:0"
-        ])
-    }
-
-    @Test("다음 페이지는 그 페이지 안에서만 세워 이미 보여준 후보 사이로 끼어들지 않는다")
-    func rows_sortWithinEachPageWithoutReorderingShownCandidates() async {
+    @Test("종류 안에서는 서버가 내려준 순서와 거리를 그대로 노출한다")
+    func rows_keepServerOrderAndDistanceWithinType() async {
         let store = makeStore(pages: [
             .photoBooth: [
-                makePhotoBoothPage(
-                    coordinates: [
-                        .init(latitude: 37.6000, longitude: 127.0276),
-                        .init(latitude: 37.5000, longitude: 127.0276)
-                    ],
-                    firstID: 0,
-                    hasNext: true
-                ),
-                makePhotoBoothPage(
-                    coordinates: [
-                        .init(latitude: 37.5500, longitude: 127.0276),
-                        .init(latitude: 37.4980, longitude: 127.0276)
-                    ],
-                    firstID: 2,
-                    hasNext: false
-                )
+                makePhotoBoothPage(distances: [500, 100], hasNext: true),
+                makePhotoBoothPage(distances: [300, 50], firstIndex: 2, hasNext: false)
             ]
         ])
 
-        await store.send(.setUserCoordinate(.init(latitude: 37.4979, longitude: 127.0276)))
         await submitSearch(on: store)
         await store.send(.fetchNextCandidatePage)
         await settle(store)
 
-        // 두 번째 페이지에 가장 가까운 후보(photoBooth:3)가 있어도 첫 페이지 위로 올라오지 않습니다.
-        #expect(store.state.rows.map(\.id) == [
-            "photoBooth:1",
-            "photoBooth:0",
-            "photoBooth:3",
-            "photoBooth:2"
+        // 서버가 일치도를 먼저 따져 세우므로 거리가 뒤섞여 보여도 클라이언트가 다시 세우지 않습니다.
+        #expect(store.state.rows.map(\.keyword) == [
+            "포토이즘 강남1호점",
+            "포토이즘 강남2호점",
+            "포토이즘 강남3호점",
+            "포토이즘 강남4호점"
         ])
+        #expect(store.state.rows.map(\.distance?.meters) == [500, 100, 300, 50])
     }
 
     @Test("페이지에 걸쳐 같은 후보가 내려와도 목록에 한 번만 담는다")
@@ -297,62 +219,25 @@ struct PhotoBoothSearchFeatureTests {
         await submitSearch(on: store)
 
         #expect(await log.requests == [.init(type: .region, page: 0), .init(type: .subwayStation, page: 0)])
-        #expect(store.state.rows.map(\.candidate.type) == [.subwayStation])
+        #expect(store.state.rows.map(\.type) == [.subwayStation])
     }
 
-    @Test("거리 기준은 검색을 시작한 시점의 위치로 고정한다")
-    func rows_keepDistanceOriginFixedAtSearchTime() async {
-        let store = makeStore(pages: [
-            .photoBooth: [makePhotoBoothPage(coordinates: [.init(latitude: 37.5000, longitude: 127.0276)])]
-        ])
-
-        await store.send(.setUserCoordinate(.init(latitude: 37.4979, longitude: 127.0276)))
-        await submitSearch(on: store)
-        let distanceAtSearchTime = store.state.rows.first?.distance
-
-        // 검색 도중 위치가 갱신되어도 이미 보고 있는 목록의 거리는 흔들리지 않습니다.
-        await store.send(.setUserCoordinate(.init(latitude: 37.4000, longitude: 127.0276)))
-
-        #expect(distanceAtSearchTime != nil)
-        #expect(store.state.rows.first?.distance == distanceAtSearchTime)
-    }
-
-    @Test("검색 도중 도착한 좌표는 이 검색에 반영하지 않고 다음 검색 요청의 기준으로 쓴다")
-    func rows_repinDistanceOriginOnNextSearchRequest() async {
-        let store = makeStore(pages: [
-            .photoBooth: [makePhotoBoothPage(coordinates: [.init(latitude: 37.5000, longitude: 127.0276)])]
-        ])
+    @Test("거리 기준 좌표는 검색 도중 바뀌지 않고 다음 검색을 요청할 때 그 시점의 위치로 다시 세운다")
+    func distanceOrigin_staysPinnedUntilNextSearchRequest() async {
+        let store = makeStore(pages: [.photoBooth: [makePhotoBoothPage(count: 1, hasNext: false)]])
 
         // 첫 위치를 받기 전에 검색을 요청하면 기본 좌표로 기준을 세웁니다.
         await submitSearch(on: store)
-        let defaultOriginDistance = store.state.rows.first?.distance
         #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
 
-        // 검색 도중 좌표가 도착해도 보고 있는 목록의 거리는 흔들리지 않습니다.
-        await store.send(.setUserCoordinate(.init(latitude: 37.4000, longitude: 127.0276)))
+        // 검색 도중 좌표가 도착해도 이 검색의 기준은 그대로입니다.
+        let arrivedCoordinate = GeographicCoordinate(latitude: 37.4000, longitude: 127.0276)
+        await store.send(.setUserCoordinate(arrivedCoordinate))
         #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
-        #expect(store.state.rows.first?.distance == defaultOriginDistance)
 
         // 다음 검색을 요청하면 그 시점의 위치로 기준을 다시 세웁니다.
         await submitSearch(on: store)
-        #expect(store.state.distanceOrigin == .init(latitude: 37.4000, longitude: 127.0276))
-        #expect(store.state.rows.first?.distance != defaultOriginDistance)
-    }
-
-    @Test("위치를 몰라도 기본 좌표를 기준으로 가까운 순으로 세운다")
-    func rows_sortByDefaultOriginWhenUserCoordinateIsUnknown() async {
-        let store = makeStore(pages: [
-            .photoBooth: [makePhotoBoothPage(coordinates: [
-                .init(latitude: 37.6000, longitude: 127.0276),
-                .init(latitude: 37.5000, longitude: 127.0276),
-                .init(latitude: 37.5500, longitude: 127.0276)
-            ])]
-        ])
-
-        await submitSearch(on: store)
-
-        #expect(store.state.userCoordinate == nil)
-        #expect(store.state.rows.map(\.id) == ["photoBooth:1", "photoBooth:2", "photoBooth:0"])
+        #expect(store.state.distanceOrigin == arrivedCoordinate)
     }
 
     @Test("첫 화면을 채우는 후보 요청 동안 로딩을 노출한다")
@@ -396,7 +281,7 @@ struct PhotoBoothSearchFeatureTests {
     func didSelectCandidate_whileAwaitingNewSearch_ignoresPreviousCandidate() async {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
         await submitSearch(on: store)
-        guard let previousCandidate = store.state.rows.first?.candidate else {
+        guard let previousCandidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -467,7 +352,7 @@ struct PhotoBoothSearchFeatureTests {
         )
 
         await submitSearch(on: store)
-        guard let candidate = store.state.rows.first?.candidate else {
+        guard let candidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -491,7 +376,7 @@ struct PhotoBoothSearchFeatureTests {
         )
 
         await submitSearch(on: store)
-        guard let candidate = store.state.rows.first?.candidate else {
+        guard let candidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -518,7 +403,7 @@ struct PhotoBoothSearchFeatureTests {
 
         // 검색 도중 위치가 갱신되어도 이 검색의 기준은 바뀌지 않습니다.
         await store.send(.setUserCoordinate(.init(latitude: 37.4000, longitude: 127.0276)))
-        guard let candidate = store.state.rows.first?.candidate else {
+        guard let candidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -528,6 +413,28 @@ struct PhotoBoothSearchFeatureTests {
 
         // 후보 목록과 결과 목록의 거리가 어긋나지 않도록 같은 기준을 씁니다.
         #expect(requestedCoordinate.value == searchTimeCoordinate)
+    }
+
+    @Test("위치를 모르면 기본 좌표를 부스 조회의 기준으로 넘긴다")
+    func didSelectCandidate_whenUserCoordinateIsUnknown_sendsDefaultOrigin() async {
+        let requestedCoordinate = LockIsolated<GeographicCoordinate?>(nil)
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]])
+        store.dependencies.photoBoothClient.fetchSearchPhotoBooths = { _, coordinate in
+            requestedCoordinate.setValue(coordinate)
+            return []
+        }
+
+        await submitSearch(on: store)
+        guard let candidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+
+        await store.send(.didSelectCandidate(candidate))
+        await store.receive(\.delegate)
+
+        // 위치 권한에 동의하지 않았어도 거리를 비워 두지 않도록 기본 좌표를 기준으로 넘깁니다.
+        #expect(requestedCoordinate.value == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
     }
 
     @Test("부스 조회가 진행 중이면 다른 후보를 골라도 다시 조회하지 않는다")
@@ -542,7 +449,7 @@ struct PhotoBoothSearchFeatureTests {
         }
 
         await submitSearch(on: store)
-        let candidates = store.state.rows.map(\.candidate)
+        let candidates = store.state.rows
         guard let firstCandidate = candidates.first,
               let secondCandidate = candidates.last,
               firstCandidate != secondCandidate
@@ -573,7 +480,7 @@ struct PhotoBoothSearchFeatureTests {
         store.dependencies.photoBoothClient.fetchSearchBrandFilters = { _ in throw BrandFilterError() }
 
         await submitSearch(on: store)
-        guard let candidate = store.state.rows.first?.candidate else {
+        guard let candidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -594,7 +501,7 @@ struct PhotoBoothSearchFeatureTests {
         )
 
         await submitSearch(on: store)
-        guard let candidate = store.state.rows.first?.candidate else {
+        guard let candidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -613,7 +520,7 @@ struct PhotoBoothSearchFeatureTests {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]])
 
         await submitSearch(on: store)
-        guard let candidate = store.state.rows.first?.candidate else {
+        guard let candidate = store.state.rows.first else {
             Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
             return
         }
@@ -802,7 +709,7 @@ private extension PhotoBoothSearchFeatureTests {
         PhotoBoothSearchCandidatePage(
             type: .region,
             candidates: (firstIndex..<(firstIndex + count)).map { index in
-                .region(.init(code: "116800000\(index)", name: "강남구", fullName: "서울특별시 강남구"))
+                PhotoBoothSearchCandidate(type: .region, keyword: "서울특별시 강남구 역삼\(index + 1)동", filterGroup: .init())
             },
             hasNext: hasNext
         )
@@ -815,31 +722,28 @@ private extension PhotoBoothSearchFeatureTests {
         PhotoBoothSearchCandidatePage(
             type: .subwayStation,
             candidates: (firstIndex..<(firstIndex + count)).map { index in
-                .subwayStation(.init(name: "강남", lineName: "\(index + 2)호선"))
+                PhotoBoothSearchCandidate(type: .subwayStation, keyword: "강남역 \(index + 2)호선", filterGroup: .init())
             },
             hasNext: hasNext
         )
     }
 
-    /// 좌표만 달리한 부스 후보 페이지입니다. 거리 정렬을 확인하는 데 씁니다.
+    /// 거리만 달리한 부스 후보 페이지입니다. 서버 순서를 그대로 지키는지 확인하는 데 씁니다.
     ///
     /// 페이지끼리 식별자가 겹치지 않도록 시작 번호를 받습니다.
     func makePhotoBoothPage(
-        coordinates: [GeographicCoordinate],
-        firstID: Int = 0,
-        hasNext: Bool = false
+        distances: [Int],
+        firstIndex: Int = 0,
+        hasNext: Bool
     ) -> PhotoBoothSearchCandidatePage {
         PhotoBoothSearchCandidatePage(
             type: .photoBooth,
-            candidates: coordinates.enumerated().map { index, coordinate in
-                .photoBooth(
-                    PhotoBooth(
-                        id: firstID + index,
-                        brand: PhotoBoothBrand(id: 1, name: "포토이즘", englishName: "PHOTOISM", imageURL: nil),
-                        name: "강남\(firstID + index + 1)호점",
-                        coordinate: coordinate,
-                        address: "서울 강남구 강남대로102길 16"
-                    )
+            candidates: distances.enumerated().map { offset, meters in
+                PhotoBoothSearchCandidate(
+                    type: .photoBooth,
+                    keyword: "포토이즘 강남\(firstIndex + offset + 1)호점",
+                    filterGroup: .init(),
+                    distance: GeographicDistance(meters: meters)
                 )
             },
             hasNext: hasNext
@@ -850,15 +754,7 @@ private extension PhotoBoothSearchFeatureTests {
         PhotoBoothSearchCandidatePage(
             type: .photoBooth,
             candidates: (0..<count).map { index in
-                .photoBooth(
-                    PhotoBooth(
-                        id: index,
-                        brand: PhotoBoothBrand(id: 1, name: "포토이즘", englishName: "PHOTOISM", imageURL: nil),
-                        name: "강남\(index + 1)호점",
-                        coordinate: .init(latitude: 37.5021077, longitude: 127.0271830),
-                        address: "서울 강남구 강남대로102길 16"
-                    )
-                )
+                PhotoBoothSearchCandidate(type: .photoBooth, keyword: "포토이즘 강남\(index + 1)호점", filterGroup: .init())
             },
             hasNext: hasNext
         )

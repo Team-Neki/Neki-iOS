@@ -96,7 +96,7 @@ private extension PhotoBoothSearchView {
     /// 지역 → 지하철역 → 포토부스 순서로 정렬된 검색 후보를 유형 구분 없이 한 목록으로 노출합니다.
     ///
     /// 앞선 유형을 모두 불러온 뒤 다음 유형으로 넘어가므로 새 후보는 항상 목록 끝에 이어집니다.
-    func candidateList(rows: [PhotoBoothSearchFeature.Row], keyword: String) -> some View {
+    func candidateList(rows: [PhotoBoothSearchCandidate], keyword: String) -> some View {
         let lastRowID = rows.last?.id
         // 마지막 셀에서 부르면 요청이 오가는 동안 목록이 바닥에서 멈추므로 몇 셀 앞에서 미리 부릅니다.
         // 목록이 임계값보다 짧으면 첫 셀이 곧 미리 부를 셀입니다.
@@ -106,12 +106,11 @@ private extension PhotoBoothSearchView {
             LazyVStack(spacing: Metrics.cellSpacing) {
                 ForEach(rows) { row in
                     PhotoBoothSearchCandidateCell(
-                        candidate: row.candidate,
+                        candidate: row,
                         keyword: keyword,
-                        distance: row.distance,
                         showsDivider: row.id != lastRowID
                     ) {
-                        store.send(.didSelectCandidate(row.candidate))
+                        store.send(.didSelectCandidate(row))
                     }
                     .onAppear {
                         // 페이지가 붙으면 미리 부를 셀이 이미 화면에 떠 있을 수 있어 마지막 셀을 예비 트리거로 둡니다.

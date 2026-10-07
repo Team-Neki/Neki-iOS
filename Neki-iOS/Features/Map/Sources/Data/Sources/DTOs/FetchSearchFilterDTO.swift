@@ -7,12 +7,27 @@
 
 import Foundation
 
-/// 고른 지역·역의 목록에서 쓸 수 있는 필터 조회
+/// 고른 검색 후보의 목록에서 쓸 수 있는 필터 조회
 ///
-/// 요청 body가 부스 목록 조회와 완전히 같아 같은 타입을 그대로 씁니다.
-/// 필터 집계는 거리를 쓰지 않아 서버가 `userLocation`을 무시하므로 담지 않고 보냅니다.
+/// 부스 목록 조회와 같은 `keyword`와 `filterGroup`을 보냅니다.
+/// 정의되지 않은 필드를 담으면 `D-01`이라, 부스 목록 요청과 달리 `userLocation`을 담을 수 없도록 요청 타입을 따로 둡니다.
 enum FetchSearchFilterDTO {
-    typealias Request = FetchSearchResultPhotoBoothsDTO.Request
+    struct Request: Encodable {
+        /// 고른 후보의 `keyword`입니다. 가공하지 않고 그대로 보냅니다.
+        let keyword: String
+        /// 고른 후보가 속한 자동완성 응답의 조회 조건입니다. 조건이 없어도 `{}`로 담아야 합니다.
+        let filterGroup: SearchFilterGroupDTO
+
+        /// 고른 후보의 값을 그대로 담은 요청을 만듭니다.
+        ///
+        /// - Parameters:
+        ///   - keyword: 고른 후보의 `keyword`
+        ///   - filterGroup: 고른 후보가 속한 자동완성 응답의 조회 조건
+        init(keyword: String, filterGroup: PhotoBoothSearchFilterGroup) {
+            self.keyword = keyword
+            self.filterGroup = SearchFilterGroupDTO(filterGroup)
+        }
+    }
 
     struct Response: Decodable {
         let brandFilters: [BrandFilter]

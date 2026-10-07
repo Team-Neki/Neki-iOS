@@ -32,7 +32,7 @@ public struct PhotoBoothSearchFeature {
         /// 이미 담은 후보의 식별자입니다. 페이지 사이의 중복을 걸러내는 데 씁니다.
         private var candidateIDs: Set<PhotoBoothSearchCandidate.ID> = []
 
-        /// 노출할 순서로 세운 한 페이지를 목록 끝에 이어붙이고, 새로 담은 후보가 있는지 알려 줍니다.
+        /// 한 페이지를 서버가 내려준 순서 그대로 목록 끝에 이어붙이고, 새로 담은 후보가 있는지 알려 줍니다.
         ///
         /// 페이징 도중 서버 데이터가 바뀌면 같은 후보가 두 페이지에 걸쳐 내려올 수 있습니다.
         /// 목록은 후보 식별자로 셀을 구분하므로 중복이 섞이면 화면이 깨져 여기서 걸러냅니다.
@@ -46,15 +46,6 @@ public struct PhotoBoothSearchFeature {
             isExhausted = hasNext == false || newCandidates.isEmpty
             return newCandidates.isEmpty == false
         }
-    }
-
-    /// 검색 결과 목록에 노출할 후보 한 건입니다.
-    struct Row: Equatable, Identifiable {
-        let candidate: PhotoBoothSearchCandidate
-        /// 사용자 현재 위치로부터의 거리(m). 노출하지 않는 경우 `nil`입니다.
-        let distance: Int?
-
-        var id: String { candidate.id }
     }
 
     @ObservableState
@@ -76,7 +67,7 @@ public struct PhotoBoothSearchFeature {
             /// - rows: 노출할 후보
             /// - keyword: 후보 이름에서 강조할 검색어
             /// - generation: 목록을 불러온 검색의 요청 차수. 같은 검색어라도 새로 검색할 때마다 달라집니다.
-            case results(rows: [Row], keyword: String, generation: Int)
+            case results(rows: [PhotoBoothSearchCandidate], keyword: String, generation: Int)
             /// 모든 유형에서 결과가 없음
             case noResult
             /// 요청 실패
@@ -104,8 +95,8 @@ public struct PhotoBoothSearchFeature {
         var photoBooth = TypePagination()
         /// 지역 → 지하철역 → 포토부스 순서로 이어붙인 검색 후보입니다.
         ///
-        /// 목록이 길어질 수 있어 페이지가 도착하거나 기준 위치가 바뀔 때만 다시 만듭니다.
-        var rows: [Row] = []
+        /// 목록이 길어질 수 있어 페이지가 도착할 때만 다시 만듭니다.
+        var rows: [PhotoBoothSearchCandidate] = []
         var isFetching: Bool = false
         /// 후보를 선택한 뒤 부스 조회가 진행 중인지 여부입니다.
         var isFetchingSearchResult: Bool = false
@@ -357,32 +348,25 @@ private extension PhotoBoothSearchFeature {
         .cancellable(id: CancelID.candidatePage)
     }
 
-    /// 받은 페이지를 가까운 순으로 세워 목록 끝에 이어붙이고, 새로 담은 후보가 있는지 알려 줍니다.
+    /// 받은 페이지를 목록 끝에 이어붙이고, 새로 담은 후보가 있는지 알려 줍니다.
     ///
-    /// 후보 검색 API는 기준 위치를 받지 않아 서버가 거리순으로 내려주지 않으므로 클라이언트가 세웁니다.
-    /// 이미 보여준 후보 사이로 끼어들면 스크롤이 밀리므로 새로 받은 페이지 안에서만 세웁니다.
+    /// 종류 안의 순서는 서버가 정해 내려주므로 클라이언트가 다시 세우지 않습니다.
+    /// 부스는 일치도를 거리보다 먼저 따지므로, 거리순으로 다시 세우면 더 맞는 후보가 뒤로 밀립니다.
     func appendCandidatePage(_ state: inout State, page: PhotoBoothSearchCandidatePage) -> Bool {
-        let pageCandidates = State.nearestFirst(page.candidates, from: state.userLocation)
         let hasNewCandidates: Bool
         switch page.type {
-        case .region: hasNewCandidates = state.region.append(pageCandidates, hasNext: page.hasNext)
-        case .subwayStation: hasNewCandidates = state.station.append(pageCandidates, hasNext: page.hasNext)
-        case .photoBooth: hasNewCandidates = state.photoBooth.append(pageCandidates, hasNext: page.hasNext)
+        case .region: hasNewCandidates = state.region.append(page.candidates, hasNext: page.hasNext)
+        case .subwayStation: hasNewCandidates = state.station.append(page.candidates, hasNext: page.hasNext)
+        case .photoBooth: hasNewCandidates = state.photoBooth.append(page.candidates, hasNext: page.hasNext)
         }
         guard hasNewCandidates else { return false }
         rebuildRows(&state)
         return true
     }
 
-    /// 정책 순서로 후보를 이어붙이고 각 후보에 노출할 거리를 채웁니다.
-    ///
-    /// 노출 순서는 페이지를 받을 때 정해지므로 여기서는 거리만 다시 계산합니다.
+    /// 정책 순서로 종류별 후보를 이어붙입니다.
     func rebuildRows(_ state: inout State) {
-        let userLocation = state.userLocation
-        let rows: [Row] = PhotoBoothSearchCandidateType.displayOrdered
-            .flatMap { state.pagination(for: $0).candidates }
-            .map { .init(candidate: $0, distance: State.distance(to: $0, from: userLocation)) }
-        state.rows = rows
+        state.rows = PhotoBoothSearchCandidateType.displayOrdered.flatMap { state.pagination(for: $0).candidates }
     }
 
     func resetSearch(_ state: inout State) {
@@ -399,50 +383,6 @@ private extension PhotoBoothSearchFeature {
         state.isFetchingSearchResult = false
         state.failure = nil
         state.toast = nil
-    }
-}
-
-
-// MARK: - PhotoBoothSearchFeature.State + Distance
-
-private extension PhotoBoothSearchFeature.State {
-    /// 거리 계산의 기준이 되는 위치입니다. 검색을 요청한 시점에 고정한 좌표를 씁니다.
-    var userLocation: CLLocation {
-        CLLocation(latitude: distanceOrigin.latitude, longitude: distanceOrigin.longitude)
-    }
-
-    /// 한 페이지를 가까운 순으로 세운 후보입니다.
-    ///
-    /// 거리를 알 수 없는 후보(위치 미동의, 좌표가 없는 종류)는 서버가 내려준 순서를 그대로 지키고,
-    /// 거리가 같으면 먼저 내려온 후보를 앞에 둡니다.
-    static func nearestFirst(
-        _ candidates: [PhotoBoothSearchCandidate],
-        from userLocation: CLLocation
-    ) -> [PhotoBoothSearchCandidate] {
-        let distances = candidates.map { distance(to: $0, from: userLocation) }
-        guard distances.contains(where: { $0 != nil }) else { return candidates }
-        return candidates.indices
-            .sorted { lhs, rhs in
-                switch (distances[lhs], distances[rhs]) {
-                case let (lhsDistance?, rhsDistance?):
-                    lhsDistance == rhsDistance ? lhs < rhs : lhsDistance < rhsDistance
-                case (_?, nil): true
-                case (nil, _?): false
-                case (nil, nil): lhs < rhs
-                }
-            }
-            .map { candidates[$0] }
-    }
-
-    /// 정책상 노출해야 하는 거리(m)입니다.
-    ///
-    /// 거리를 노출하지 않는 종류(지역)이거나 후보에 기준 좌표가 없으면(지하철역) `nil`입니다.
-    static func distance(to candidate: PhotoBoothSearchCandidate, from userLocation: CLLocation) -> Int? {
-        guard candidate.type.providesDistance,
-              let coordinate = candidate.coordinate
-        else { return nil }
-        let candidateLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        return Int(userLocation.distance(from: candidateLocation).rounded())
     }
 }
 

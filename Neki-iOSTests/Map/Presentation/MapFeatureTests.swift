@@ -42,7 +42,7 @@ struct MapFeatureTests {
     @Test("부스를 직접 고른 검색은 탭과 필터를 그대로 두고, 검색을 끝내면 지도 탭 첫 진입 값으로 되돌린다")
     func didTapClearSearchButton_afterPhotoBoothCandidate_resetsToInitialValues() {
         let store = makeStore()
-        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: .photoBooth(searchedPhotoBooth), result: photoBoothResult))))
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
         #expect(store.photoBoothListState.selectedTab == .favorite)
         #expect(store.photoBoothListState.filteredBrands == [photoism])
         #expect(store.isFavoriteMarkerFilterEnabled)
@@ -55,6 +55,35 @@ struct MapFeatureTests {
         #expect(store.isFavoriteMarkerFilterEnabled == false)
     }
 
+    @Test("부스 후보를 고르면 조회한 그 지점을 선택하고 결과 시트는 띄우지 않는다")
+    func didSelectSearchResult_withSinglePhotoBooth_selectsPhotoBooth() {
+        let store = makeStore()
+
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+
+        #expect(store.selectedBooth == searchedPhotoBooth)
+        #expect(store.photoBoothListState.isSearchResultPresented == false)
+    }
+
+    @Test(
+        "부스 후보의 조회 결과가 없거나 한 지점으로 좁혀지지 않으면 지역·역처럼 결과 시트로 보여 준다",
+        arguments: [0, 2]
+    )
+    func didSelectSearchResult_withoutSinglePhotoBooth_presentsSearchResult(photoBoothCount: Int) {
+        let store = makeStore()
+        // 지도에서 숨긴 지점이면 0건이, 같은 이름의 지점이 있으면 여러 건이 올 수 있습니다.
+        let photoBooths = (0..<photoBoothCount).map { makePhotoBooth(id: $0 + 1) }
+
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(
+            candidate: photoBoothCandidate,
+            result: PhotoBoothSearchResult(photoBooths: photoBooths, brandFilters: [])
+        ))))
+
+        #expect(store.selectedBooth == nil)
+        #expect(store.photoBoothListState.isSearchResultPresented)
+        #expect(Array(store.photoBooths) == photoBooths)
+    }
+
     @Test("재탐색 버튼이 떠 있을 때 부스든 지역이든 검색 결과를 고르면 버튼을 내린다", arguments: [true, false])
     func didSelectSearchResult_hidesExploreHereButton(selectsPhotoBooth: Bool) {
         let store = makeStore()
@@ -62,7 +91,7 @@ struct MapFeatureTests {
         #expect(store.isExploreHereButtonVisible)
 
         if selectsPhotoBooth {
-            store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: .photoBooth(searchedPhotoBooth), result: photoBoothResult))))
+            store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
         } else {
             store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: regionCandidate, result: regionResult))))
         }
@@ -115,13 +144,21 @@ private extension MapFeatureTests {
     }
 
     var searchedPhotoBooth: PhotoBooth {
+        makePhotoBooth(id: 1)
+    }
+
+    func makePhotoBooth(id: PhotoBooth.ID) -> PhotoBooth {
         PhotoBooth(
-            id: 1,
+            id: id,
             brand: life4cut,
-            name: "강남1호점",
+            name: "강남\(id)호점",
             coordinate: .init(latitude: 37.5021077, longitude: 127.0271830),
             address: "서울 강남구 강남대로102길 16"
         )
+    }
+
+    var photoBoothCandidate: PhotoBoothSearchCandidate {
+        PhotoBoothSearchCandidate(type: .photoBooth, keyword: "인생네컷 강남1호점", filterGroup: .init())
     }
 
     var photoBoothResult: PhotoBoothSearchResult {
@@ -129,7 +166,7 @@ private extension MapFeatureTests {
     }
 
     var regionCandidate: PhotoBoothSearchCandidate {
-        .region(.init(code: "1168000000", name: "강남구", fullName: "서울특별시 강남구"))
+        PhotoBoothSearchCandidate(type: .region, keyword: "서울특별시 강남구", filterGroup: .init())
     }
 
     var regionResult: PhotoBoothSearchResult {

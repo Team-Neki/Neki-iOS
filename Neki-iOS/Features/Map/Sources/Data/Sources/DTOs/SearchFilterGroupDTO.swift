@@ -37,3 +37,25 @@ struct SearchFilterGroupDTO: Codable {
         let type: String
     }
 }
+
+
+// MARK: - SearchFilterGroupDTO + Entity
+
+extension SearchFilterGroupDTO {
+    /// 고른 후보의 조회 조건을 요청에 담을 모양으로 되돌립니다.
+    ///
+    /// 받을 때 없던 조건은 키째 빼므로, 조건이 하나도 없으면 `{}`로 보냅니다.
+    init(_ filterGroup: PhotoBoothSearchFilterGroup) {
+        self.init(
+            brandFilter: filterGroup.brandIDs.map { BrandFilter(brands: $0.map(Brand.init(brandID:))) },
+            sortFilter: filterGroup.sortType.map(SortFilter.init(type:))
+        )
+    }
+
+    func toEntity() -> PhotoBoothSearchFilterGroup {
+        PhotoBoothSearchFilterGroup(
+            brandIDs: brandFilter?.brands?.map(\.brandID),
+            sortType: sortFilter?.type
+        )
+    }
+}

@@ -7,54 +7,33 @@
 
 import Foundation
 
-/// 고른 지역·역의 부스 목록 조회
+/// 고른 검색 후보의 부스 목록 조회
 ///
-/// 목록과 필터 칩이 같은 요청 body를 쓰므로, 필터를 붙일 때 이 요청을 그대로 재사용합니다.
+/// 필터 칩도 같은 `keyword`와 `filterGroup`으로 조회하지만, 필터 요청은 `userLocation`을 받지 않아 요청 타입을 따로 둡니다.
 enum FetchSearchResultPhotoBoothsDTO {
     struct Request: Encodable {
-        /// 지역을 고른 경우에만 채웁니다.
-        let regionFilter: RegionFilter?
-        /// 지하철역을 고른 경우에만 채웁니다.
-        let stationFilter: StationFilter?
-        let brandFilter: PhotoBoothBrandFilterDTO
+        /// 고른 후보의 `keyword`입니다. 가공하지 않고 그대로 보냅니다.
+        let keyword: String
+        /// 고른 후보가 속한 자동완성 응답의 조회 조건입니다. 조건이 없어도 `{}`로 담아야 합니다.
+        let filterGroup: SearchFilterGroupDTO
         /// 거리 계산의 기준이 되는 사용자 현재 위치입니다.
         ///
-        /// 주지 않으면 응답의 `distance`가 `null`이고 정렬이 브랜드, 지점 이름 순으로 바뀝니다.
+        /// 주지 않으면 키째 빠지고, 응답의 `distance`가 `null`이며 정렬이 브랜드, 지점 이름 순으로 바뀝니다.
         let userLocation: GeographicCoordinate?
 
-        struct RegionFilter: Encodable {
-            /// 지역 검색 응답의 법정동코드
-            let code: String
-        }
-
-        struct StationFilter: Encodable {
-            /// 지하철역 검색 응답의 역명
-            let name: String
-            /// 지하철역 검색 응답의 노선명
-            let lineName: String
-        }
-
-        /// 고른 대상에 해당하는 필터만 채운 요청을 만듭니다.
+        /// 고른 후보의 값을 그대로 담은 요청을 만듭니다.
         ///
         /// - Parameters:
-        ///   - target: 사용자가 고른 지역 또는 지하철역
+        ///   - keyword: 고른 후보의 `keyword`
+        ///   - filterGroup: 고른 후보가 속한 자동완성 응답의 조회 조건
         ///   - userCoordinate: 사용자 현재 위치. 위치를 알 수 없으면 `nil`을 전달합니다.
-        ///   - brandIDs: 조회할 브랜드. 비어 있으면 모든 브랜드입니다.
         init(
-            target: PhotoBoothSearchTarget,
-            userCoordinate: GeographicCoordinate?,
-            brandIDs: [Int] = []
+            keyword: String,
+            filterGroup: PhotoBoothSearchFilterGroup,
+            userCoordinate: GeographicCoordinate?
         ) {
-            switch target {
-            case let .region(code):
-                self.regionFilter = RegionFilter(code: code)
-                self.stationFilter = nil
-
-            case let .subwayStation(name, lineName):
-                self.regionFilter = nil
-                self.stationFilter = StationFilter(name: name, lineName: lineName)
-            }
-            self.brandFilter = PhotoBoothBrandFilterDTO(brandIDs: brandIDs)
+            self.keyword = keyword
+            self.filterGroup = SearchFilterGroupDTO(filterGroup)
             self.userLocation = userCoordinate
         }
     }

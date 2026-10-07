@@ -181,7 +181,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return brands
     }
 
-    /// 후보 종류(지역·지하철역·포토부스)에 맞는 검색 API를 호출해 후보 페이지로 변환합니다.
+    /// 후보 종류(지역·지하철역·포토부스)에 맞는 자동완성 API를 호출해 후보 페이지로 변환합니다.
     func searchCandidates(
         keyword: String,
         type: PhotoBoothSearchCandidateType,
@@ -189,39 +189,14 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         size: Int
     ) async throws -> PhotoBoothSearchCandidatePage {
         do {
-            switch type {
-            case .region:
-                let endpoint = MapEndpoint.searchRegions(keyword: keyword, page: page, size: size)
-                let responseDTO: BaseResponseDTO<SearchRegionsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-                guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-                return PhotoBoothSearchCandidatePage(
-                    type: .region,
-                    candidates: data.items.map { .region($0.toEntity()) },
-                    hasNext: data.hasNext
-                )
-
-            case .subwayStation:
-                let endpoint = MapEndpoint.searchStations(keyword: keyword, page: page, size: size)
-                let responseDTO: BaseResponseDTO<SearchStationsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-                guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-                return PhotoBoothSearchCandidatePage(
-                    type: .subwayStation,
-                    candidates: data.items.map { .subwayStation($0.toEntity()) },
-                    hasNext: data.hasNext
-                )
-
-            case .photoBooth:
-                let brands = try await ensureBrandsLoadedByCode()
-                let endpoint = MapEndpoint.searchPhotoBooths(keyword: keyword, page: page, size: size)
-                let responseDTO: BaseResponseDTO<SearchPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
-                guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-                let photoBooths = photoBoothsApplyingFavoriteState(searchPhotoBooths(from: data.items, brands: brands))
-                return PhotoBoothSearchCandidatePage(
-                    type: .photoBooth,
-                    candidates: photoBooths.map { .photoBooth($0) },
-                    hasNext: data.hasNext
-                )
+            let endpoint: MapEndpoint = switch type {
+            case .region: .searchCompletionRegions(keyword: keyword, page: page, size: size)
+            case .subwayStation: .searchCompletionStations(keyword: keyword, page: page, size: size, origin: nil)
+            case .photoBooth: .searchCompletionPhotoBooths(keyword: keyword, page: page, size: size, origin: nil)
             }
+            let responseDTO: BaseResponseDTO<SearchCompletionDTO.Response> = try await networkProvider.request(endpoint: endpoint)
+            guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
+            return data.toEntity(type: type)
         } catch let error as CancellationError {
             throw error
         } catch {
@@ -229,14 +204,19 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         }
     }
 
-    /// 고른 지역·역에 속한 포토부스 목록을 조회하고 즐겨찾기 상태를 반영합니다.
+    /// 고른 검색 후보에 속한 포토부스 목록을 조회하고 즐겨찾기 상태를 반영합니다.
     func readSearchResultPhotoBooths(
-        target: PhotoBoothSearchTarget,
+        keyword: String,
+        filterGroup: PhotoBoothSearchFilterGroup,
         userCoordinate: GeographicCoordinate?
     ) async throws -> [PhotoBooth] {
         do {
             let brands = try await ensureBrandsLoadedByCode()
-            let requestDTO = FetchSearchResultPhotoBoothsDTO.Request(target: target, userCoordinate: userCoordinate)
+            let requestDTO = FetchSearchResultPhotoBoothsDTO.Request(
+                keyword: keyword,
+                filterGroup: filterGroup,
+                userCoordinate: userCoordinate
+            )
             let endpoint = MapEndpoint.searchResultPhotoBooths(dto: requestDTO)
             let responseDTO: BaseResponseDTO<FetchSearchResultPhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let items = responseDTO.data?.photoBooths else { throw NetworkError.responseDecodingError }
@@ -248,14 +228,14 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         }
     }
 
-    /// 고른 지역·역의 부스 목록에서 쓸 수 있는 브랜드 필터를 조회합니다.
+    /// 고른 검색 후보의 부스 목록에서 쓸 수 있는 브랜드 필터를 조회합니다.
     func readSearchResultBrandFilters(
-        target: PhotoBoothSearchTarget
+        keyword: String,
+        filterGroup: PhotoBoothSearchFilterGroup
     ) async throws -> [PhotoBoothSearchBrandFilter] {
         do {
             let brands = try await ensureBrandsLoadedByCode()
-            // 필터 집계는 거리를 쓰지 않아 서버가 기준 위치를 무시하므로 담지 않습니다.
-            let requestDTO = FetchSearchFilterDTO.Request(target: target, userCoordinate: nil)
+            let requestDTO = FetchSearchFilterDTO.Request(keyword: keyword, filterGroup: filterGroup)
             let endpoint = MapEndpoint.searchFilter(dto: requestDTO)
             let responseDTO: BaseResponseDTO<FetchSearchFilterDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let items = responseDTO.data?.brandFilters else { throw NetworkError.responseDecodingError }

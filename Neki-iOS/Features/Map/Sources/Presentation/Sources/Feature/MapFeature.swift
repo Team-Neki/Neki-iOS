@@ -804,9 +804,10 @@ public struct MapFeature {
                 state.isExploreHereButtonVisible = false
                 let photoBooths = result.photoBooths
 
-                // 부스를 직접 고르면 추가 조회 없이 그 지점만 선택합니다. 나머지 마커는 그대로 둡니다.
+                // 부스를 고르면 조회한 그 지점만 선택합니다. 나머지 마커는 그대로 둡니다.
                 // 지도에 한 지점만 찍는 경로라 필터 칩도 그대로 둡니다.
-                if case let .photoBooth(photoBooth) = candidate {
+                // 지도에서 숨긴 지점이라 결과가 없거나 한 지점으로 좁혀지지 않으면 지역·역처럼 결과 시트로 보여 줍니다.
+                if candidate.type == .photoBooth, photoBooths.count == 1, let photoBooth = photoBooths.first {
                     selectPhotoBooth(&state, photoBooth: photoBooth)
                     if state.photoBooths[id: photoBooth.id] == nil {
                         state.photoBooths.append(photoBooth)

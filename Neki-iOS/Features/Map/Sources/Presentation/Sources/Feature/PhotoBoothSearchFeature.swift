@@ -14,8 +14,8 @@ public struct PhotoBoothSearchFeature {
     enum Constants {
         /// 사용자 위치를 알 수 없을 때 거리 표기의 기준으로 쓰는 좌표입니다.
         ///
-        /// 위치 권한에 동의하지 않았거나 첫 좌표를 아직 받지 못했어도 거리를 비워 두지 않고
-        /// 이 좌표를 기준으로 계산합니다. 지도가 위치 없이 여는 시작 지점과 같은 곳이라
+        /// 위치 권한에 동의하지 않았거나 첫 좌표를 아직 받지 못했어도 거리를 비워 두지 않도록
+        /// 이 좌표를 서버에 기준으로 넘깁니다. 지도가 위치 없이 여는 시작 지점과 같은 곳이라
         /// ``MapFeature/Constants/defaultInitialPosition``을 그대로 옮겨 씁니다.
         static let defaultDistanceOrigin = GeographicCoordinate(
             latitude: MapFeature.Constants.defaultInitialPosition.coordinate.latitude,
@@ -79,12 +79,13 @@ public struct PhotoBoothSearchFeature {
         var query: PhotoBoothSearchQuery?
         /// 상위 화면(지도)이 전달한 가장 최근의 사용자 현재 위치입니다. 위치 권한에 동의하지 않았으면 `nil`입니다.
         ///
-        /// 후보 목록의 거리 표기에는 이 값을 직접 쓰지 않습니다. 검색을 요청할 때 ``distanceOrigin``으로 옮겨 고정합니다.
+        /// 서버에 넘기는 거리 기준에는 이 값을 직접 쓰지 않습니다. 검색을 요청할 때 ``distanceOrigin``으로 옮겨 고정합니다.
         var userCoordinate: GeographicCoordinate?
-        /// 거리 표기의 기준으로 고정한 좌표입니다. 검색을 요청한 시점의 현재 위치를 그대로 씁니다.
+        /// 거리 계산의 기준으로 서버에 넘기는 좌표입니다. 검색을 요청한 시점의 현재 위치를 그대로 씁니다.
         ///
-        /// 위치는 계속 갱신되지만 그때마다 목록 전체의 거리를 다시 계산하면 낭비이고,
-        /// 이미 보고 있는 목록의 거리가 흔들려 읽기도 어렵습니다.
+        /// 역·부스 자동완성과 고른 후보의 부스 목록 조회에 같은 값을 넘깁니다.
+        /// 위치는 계속 갱신되지만, 페이지마다 기준이 바뀌면 서버가 거리로 세운 후보 순서가 페이지 사이에서 어긋나고
+        /// 후보 목록과 결과 목록의 거리도 서로 맞지 않습니다.
         /// 그래서 한 검색이 끝날 때까지는 이 값을 바꾸지 않고, 다음 검색을 요청할 때 그 시점의 위치로 다시 세웁니다.
         ///
         /// 요청 시점에 위치를 알 수 없으면 ``Constants/defaultDistanceOrigin``으로 세워 거리를 비워 두지 않습니다.
@@ -334,12 +335,14 @@ private extension PhotoBoothSearchFeature {
         else { return .none }
         let page = state.pagination(for: type).nextPage
         let generation = state.requestGeneration
+        // 서버가 이 좌표로 거리를 계산해 후보를 세우므로, 한 검색의 모든 페이지에 검색 시점에 고정한 같은 기준을 넘깁니다.
+        let origin = state.distanceOrigin
         state.isFetching = true
         // 실패한 뒤 다시 스크롤하면 같은 페이지를 다시 시도합니다.
         state.failure = nil
         return .run { send in
             do {
-                let response = try await photoBoothClient.searchCandidates(query, type, page)
+                let response = try await photoBoothClient.searchCandidates(query, type, page, origin)
                 await send(.candidatePageResponse(.success(response), generation: generation))
             } catch is CancellationError { return } catch {
                 await send(.candidatePageResponse(.failure(PhotoBoothSearchFailure(from: error)), generation: generation))

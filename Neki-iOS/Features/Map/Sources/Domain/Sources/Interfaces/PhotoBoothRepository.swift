@@ -39,13 +39,16 @@ protocol PhotoBoothRepository {
     ///   - type: 조회할 후보의 종류
     ///   - page: 0부터 시작하는 페이지 번호
     ///   - size: 한 페이지에 담을 후보 수
-    /// - Returns: 서버 순서를 유지한 후보 페이지
+    ///   - origin: 거리 계산의 기준 좌표. 지하철역·포토부스 후보에만 거리가 담기고, 지역은 거리를 내려주지 않아 넘기지 않습니다.
+    ///     `nil`이면 거리가 내려오지 않습니다.
+    /// - Returns: 서버 순서를 유지한 후보 페이지. 기준 좌표가 있으면 지하철역은 가까운 순, 포토부스는 일치도가 같은 후보 사이에서 가까운 순입니다.
     /// - Throws: 실패는 ``PhotoBoothSearchFailure``로 전달합니다. 취소는 `CancellationError`로 그대로 전달합니다.
     func searchCandidates(
         keyword: String,
         type: PhotoBoothSearchCandidateType,
         page: Int,
-        size: Int
+        size: Int,
+        origin: GeographicCoordinate?
     ) async throws -> PhotoBoothSearchCandidatePage
 
     /// 고른 검색 후보에 속한 포토부스 목록을 가져옵니다.

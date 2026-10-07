@@ -276,7 +276,7 @@ public struct MapFeature {
                     state.isUserTrackingMode = false
                     state.initialExplorationState = .readyForDefaultLocation
                     updateCameraPosition(&state, to: Constants.defaultInitialPosition.coordinate)
-                    // 위치에 동의하지 않으면 검색 결과에 거리를 노출하지 않습니다.
+                    // 위치에 동의하지 않으면 다음 검색부터 기본 좌표를 거리 기준으로 씁니다.
                     return .merge(
                         .send(.attemptInitialExploration),
                         .send(.photoBoothSearchAction(.setUserCoordinate(nil)))

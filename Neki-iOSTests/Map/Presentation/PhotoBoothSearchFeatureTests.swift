@@ -301,7 +301,7 @@ struct PhotoBoothSearchFeatureTests {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
         await submitSearch(on: store)
 
-        store.dependencies.photoBoothClient.searchCandidates = { _, _, _ in
+        store.dependencies.photoBoothClient.searchCandidates = { _, _, _, _ in
             throw NetworkError.responseDecodingError
         }
         await store.send(.binding(.set(\.searchText, "홍대")))
@@ -413,6 +413,44 @@ struct PhotoBoothSearchFeatureTests {
 
         // 후보 목록과 결과 목록의 거리가 어긋나지 않도록 같은 기준을 씁니다.
         #expect(requestedCoordinate.value == searchTimeCoordinate)
+    }
+
+    @Test("후보 페이지는 모두 검색을 요청한 시점에 고정한 기준 좌표로 요청한다")
+    func fetchNextCandidatePage_sendsPinnedDistanceOrigin() async {
+        let log = SearchRequestLog()
+        let store = makeStore(log: log, pages: [
+            .subwayStation: [
+                makeStationPage(count: 20, hasNext: true),
+                makeStationPage(count: 1, firstIndex: 20, hasNext: false)
+            ]
+        ])
+
+        let searchTimeCoordinate = GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)
+        await store.send(.setUserCoordinate(searchTimeCoordinate))
+        await submitSearch(on: store)
+
+        // 검색 도중 위치가 갱신되어도 다음 페이지는 같은 기준으로 요청해야 서버가 거리로 세운 순서가 페이지 사이에서 이어집니다.
+        await store.send(.setUserCoordinate(.init(latitude: 37.4000, longitude: 127.0276)))
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(await log.requests == [
+            .init(type: .region, page: 0),
+            .init(type: .subwayStation, page: 0),
+            .init(type: .subwayStation, page: 1)
+        ])
+        #expect(await log.origins == [searchTimeCoordinate, searchTimeCoordinate, searchTimeCoordinate])
+    }
+
+    @Test("위치를 모르면 기본 좌표를 후보 요청의 기준으로 넘긴다")
+    func fetchNextCandidatePage_whenUserCoordinateIsUnknown_sendsDefaultOrigin() async {
+        let log = SearchRequestLog()
+        let store = makeStore(log: log, pages: [.region: [makeRegionPage(count: 1, hasNext: false)]])
+
+        await submitSearch(on: store)
+
+        // 위치 권한에 동의하지 않았어도 거리를 비워 두지 않도록 기본 좌표를 기준으로 넘깁니다.
+        #expect(await log.origins == [PhotoBoothSearchFeature.Constants.defaultDistanceOrigin])
     }
 
     @Test("위치를 모르면 기본 좌표를 부스 조회의 기준으로 넘긴다")
@@ -599,9 +637,12 @@ private struct SearchRequest: Equatable {
 
 private actor SearchRequestLog {
     private(set) var requests: [SearchRequest] = []
+    /// 요청마다 넘긴 거리 기준 좌표입니다. ``requests``와 같은 순서입니다.
+    private(set) var origins: [GeographicCoordinate?] = []
 
-    func record(type: PhotoBoothSearchCandidateType, page: Int) {
+    func record(type: PhotoBoothSearchCandidateType, page: Int, origin: GeographicCoordinate?) {
         requests.append(SearchRequest(type: type, page: page))
+        origins.append(origin)
     }
 }
 
@@ -648,8 +689,8 @@ private extension PhotoBoothSearchFeatureTests {
         let store = TestStore(initialState: PhotoBoothSearchFeature.State()) {
             PhotoBoothSearchFeature()
         } withDependencies: {
-            $0.photoBoothClient.searchCandidates = { _, type, page in
-                await log.record(type: type, page: page)
+            $0.photoBoothClient.searchCandidates = { _, type, page, origin in
+                await log.record(type: type, page: page, origin: origin)
                 if let candidateResponseDelay { try await Task.sleep(for: candidateResponseDelay) }
                 if let candidateError { throw candidateError }
                 guard let typePages = pages[type], page < typePages.count else {
@@ -676,7 +717,7 @@ private extension PhotoBoothSearchFeatureTests {
 
     /// 응답을 붙잡아 둔 채 새 검색을 제출해, 첫 후보를 기다리는 상태로 만듭니다.
     func submitPendingSearch(on store: TestStoreOf<PhotoBoothSearchFeature>, keyword: String) async {
-        store.dependencies.photoBoothClient.searchCandidates = { _, type, _ in
+        store.dependencies.photoBoothClient.searchCandidates = { _, type, _, _ in
             try await Task.sleep(for: .seconds(60))
             return PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
         }

@@ -21,7 +21,9 @@ public struct PhotoBoothClient {
     /// 브랜드 필터칩 노출 순서 변경
     public var updateBrandOrder: @Sendable (_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand]
     /// 검색어에 대응하는 특정 종류의 검색 후보 페이지 조회
-    public var searchCandidates: @Sendable (_ query: PhotoBoothSearchQuery, _ type: PhotoBoothSearchCandidateType, _ page: Int) async throws -> PhotoBoothSearchCandidatePage
+    ///
+    /// `origin`은 지하철역·포토부스 후보에 담길 거리의 기준이며, 지역은 거리를 내려주지 않아 쓰지 않습니다.
+    public var searchCandidates: @Sendable (_ query: PhotoBoothSearchQuery, _ type: PhotoBoothSearchCandidateType, _ page: Int, _ origin: GeographicCoordinate?) async throws -> PhotoBoothSearchCandidatePage
     /// 사용자가 선택한 검색 후보에 대응하는 포토부스 조회
     ///
     /// 세 종류 모두 후보의 `keyword`와 `filterGroup`으로 부스 목록을 조회합니다.
@@ -58,12 +60,13 @@ extension PhotoBoothClient: DependencyKey {
         client.updateBrandOrder = { brands in
             try await photoBoothRepository.updateBrandOrder(brands)
         }
-        client.searchCandidates = { query, type, page in
+        client.searchCandidates = { query, type, page, origin in
             try await photoBoothRepository.searchCandidates(
                 keyword: query.rawValue,
                 type: type,
                 page: page,
-                size: PhotoBoothSearchPaging.size
+                size: PhotoBoothSearchPaging.size,
+                origin: origin
             )
         }
         client.fetchSearchPhotoBooths = { candidate, userCoordinate in

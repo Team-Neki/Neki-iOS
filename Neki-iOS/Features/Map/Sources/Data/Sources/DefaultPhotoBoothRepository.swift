@@ -186,13 +186,14 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         keyword: String,
         type: PhotoBoothSearchCandidateType,
         page: Int,
-        size: Int
+        size: Int,
+        origin: GeographicCoordinate?
     ) async throws -> PhotoBoothSearchCandidatePage {
         do {
             let endpoint: MapEndpoint = switch type {
             case .region: .searchCompletionRegions(keyword: keyword, page: page, size: size)
-            case .subwayStation: .searchCompletionStations(keyword: keyword, page: page, size: size, origin: nil)
-            case .photoBooth: .searchCompletionPhotoBooths(keyword: keyword, page: page, size: size, origin: nil)
+            case .subwayStation: .searchCompletionStations(keyword: keyword, page: page, size: size, origin: origin)
+            case .photoBooth: .searchCompletionPhotoBooths(keyword: keyword, page: page, size: size, origin: origin)
             }
             let responseDTO: BaseResponseDTO<SearchCompletionDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }

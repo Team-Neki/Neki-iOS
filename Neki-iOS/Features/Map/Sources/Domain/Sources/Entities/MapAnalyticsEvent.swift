@@ -18,10 +18,19 @@ enum MapAnalyticsEvent {
         candidateType: MapSearchCandidateType,
         candidateName: String
     )
-    /// 후보 추가 페이지의 정상 응답을 기록합니다. page는 2 이상이며 개수는 해당 페이지 기준입니다.
-    /// 동일 페이지 중복 집계 방지는 수집 호출부에서 처리합니다.
+    /// 후보 유형별 추가 페이지의 정상 응답을 기록합니다. 최초 페이지와 요청 실패는 제외합니다.
+    ///
+    /// - Parameters:
+    ///   - query: 추가 조회에 사용한 검색어 원문입니다.
+    ///   - candidateType: 추가 조회한 후보 유형입니다.
+    ///   - page: 해당 후보 유형의 페이지 번호이며 2부터 기록합니다.
+    ///   - pageResultCount: 해당 후보 유형의 해당 페이지에서 반환된 결과 수입니다.
+    ///   - hasNextPage: 해당 후보 유형의 다음 페이지 존재 여부입니다.
+    /// - Note: 수집 호출부에서 동일 검색의 후보 유형·페이지별 중복 집계를 방지합니다.
+    ///   검색어와 페이지 번호가 같아도 후보 유형이 다르면 별도로 기록합니다.
     case mapSearchLoadMore(
         query: String,
+        candidateType: MapSearchCandidateType,
         page: Int,
         pageResultCount: Int,
         hasNextPage: Bool
@@ -79,9 +88,10 @@ extension MapAnalyticsEvent: AnalyticsEvent {
                 .candidateType: .string(candidateType.rawValue),
                 .candidateName: .string(candidateName)
             ]
-        case let .mapSearchLoadMore(query, page, pageResultCount, hasNextPage):
+        case let .mapSearchLoadMore(query, candidateType, page, pageResultCount, hasNextPage):
             return [
                 .query: .string(query),
+                .candidateType: .string(candidateType.rawValue),
                 .page: .integer(page),
                 .pageResultCount: .integer(pageResultCount),
                 .hasNextPage: .boolean(hasNextPage)

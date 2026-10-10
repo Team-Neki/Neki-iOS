@@ -111,6 +111,93 @@ struct MapFeatureTests {
         store.send(.cameraMotionStarted)
         #expect(store.isExploreHereButtonVisible)
     }
+
+    @Test("부스 하나를 바로 고른 검색에서 상세를 닫으면 검색을 끝내지 않고 그 검색어로 검색 화면을 다시 연다")
+    func didTapCloseDetail_afterSinglePhotoBoothSearch_presentsSearch() {
+        let store = makeStore()
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+
+        store.send(.didTapCloseDetail)
+
+        #expect(store.isSearchPresented)
+        #expect(store.selectedBooth == nil)
+        #expect(store.photoBoothSearchState.searchText == "강남")
+        #expect(store.photoBoothSearchState.query?.rawValue == "강남")
+        #expect(store.appliedSearchQuery?.rawValue == "강남")
+    }
+
+    @Test("상세를 닫고 돌아온 검색 화면에서 후보를 고르지 않고 나가면 검색을 끝내고 지도 탭 첫 진입 값으로 되돌린다")
+    func dismissSearch_afterClosingSinglePhotoBoothDetail_endsSearch() {
+        let store = makeStore()
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+        store.send(.didTapCloseDetail)
+
+        store.send(.photoBoothSearchAction(.dismissSearch))
+
+        #expect(store.isSearchPresented == false)
+        #expect(store.appliedSearchQuery == nil)
+        #expect(store.detent == MapFeature.SheetStage.first.detent)
+        #expect(store.photoBoothListState.selectedTab == .nearby)
+        #expect(store.photoBoothListState.filteredBrands.isEmpty)
+        #expect(store.isFavoriteMarkerFilterEnabled == false)
+    }
+
+    @Test("부스 상세를 띄운 채 검색어를 눌러 검색 화면에 들어갔다가 나오면 부스 상세로 돌아온다")
+    func dismissSearch_afterTappingSearchFieldOnPhotoBoothDetail_keepsDetail() {
+        let store = makeStore()
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+        store.send(.didTapSearchField)
+
+        store.send(.photoBoothSearchAction(.dismissSearch))
+
+        #expect(store.selectedBooth == searchedPhotoBooth)
+        #expect(store.appliedSearchQuery?.rawValue == "강남")
+    }
+
+    @Test(
+        "지역이나 여러 지점으로 나온 부스처럼 결과 시트로 보여 준 검색은 상세를 닫으면 결과 시트로 돌아간다",
+        arguments: [false, true]
+    )
+    func didTapCloseDetail_afterSearchResultSheet_returnsToSearchResult(isPhotoBoothCandidate: Bool) {
+        let store = makeStore()
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
+        store.send(.didTapBooth(searchedPhotoBooth))
+
+        store.send(.didTapCloseDetail)
+
+        #expect(store.isSearchPresented == false)
+        #expect(store.detent == MapFeature.SheetStage.second.detent)
+        #expect(store.photoBoothListState.isSearchResultPresented)
+    }
+
+    @Test(
+        "결과 시트를 보다가 검색어를 눌러 검색 화면에 들어갔다가 나오면 검색을 끝내지 않는다",
+        arguments: [false, true]
+    )
+    func dismissSearch_afterTappingSearchFieldOnSearchResult_keepsSearch(isPhotoBoothCandidate: Bool) {
+        let store = makeStore()
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
+        store.send(.didTapSearchField)
+
+        store.send(.photoBoothSearchAction(.dismissSearch))
+
+        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.photoBoothListState.isSearchResultPresented)
+    }
+
+    @Test("부스 하나를 바로 고른 뒤 지역으로 다시 검색하면 상세를 닫을 때 결과 시트로 돌아간다")
+    func didTapCloseDetail_afterResearchingRegionFromSinglePhotoBooth_returnsToSearchResult() {
+        let store = makeStore()
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+        store.send(.didTapSearchField)
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: regionCandidate, result: regionResult))))
+        store.send(.didTapBooth(searchedPhotoBooth))
+
+        store.send(.didTapCloseDetail)
+
+        #expect(store.isSearchPresented == false)
+        #expect(store.detent == MapFeature.SheetStage.second.detent)
+    }
 }
 
 
@@ -132,6 +219,10 @@ private extension MapFeatureTests {
             MapFeature()
         } withDependencies: {
             $0.analyticsClient.logEvent = { _ in }
+            // 검색 화면을 다시 열면 지도에 반영 중인 검색어로 후보를 다시 요청하므로 빈 페이지로 응답합니다.
+            $0.photoBoothClient.searchCandidates = { _, type, _, _ in
+                PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
+            }
         }
     }
 
@@ -174,5 +265,17 @@ private extension MapFeatureTests {
             photoBooths: [searchedPhotoBooth],
             brandFilters: [PhotoBoothSearchBrandFilter(brand: life4cut, count: 1)]
         )
+    }
+
+    /// 같은 이름의 지점이 여러 곳이라 부스 후보인데도 결과 시트로 보여 주는 조회 결과입니다.
+    var multiplePhotoBoothResult: PhotoBoothSearchResult {
+        PhotoBoothSearchResult(photoBooths: [makePhotoBooth(id: 1), makePhotoBooth(id: 2)], brandFilters: [])
+    }
+
+    /// 결과 시트로 보여 주는 검색 결과를 고릅니다. 지역 후보 또는 여러 지점으로 나온 부스 후보입니다.
+    func selectSearchResultSheet(in store: StoreOf<MapFeature>, isPhotoBoothCandidate: Bool) {
+        let candidate = isPhotoBoothCandidate ? photoBoothCandidate : regionCandidate
+        let result = isPhotoBoothCandidate ? multiplePhotoBoothResult : regionResult
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: candidate, result: result))))
     }
 }

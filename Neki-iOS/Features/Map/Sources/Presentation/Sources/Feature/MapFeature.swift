@@ -92,6 +92,11 @@ public struct MapFeature {
         ///
         /// 상단 검색 필드를 검색 완료 형태로 유지하고, 검색 화면으로 되돌아갈 때 그대로 다시 검색합니다.
         var appliedSearchQuery: PhotoBoothSearchQuery?
+        /// 지도에 반영 중인 검색이 부스 하나를 바로 선택한 검색인지 여부입니다.
+        ///
+        /// 이 검색은 결과 시트 없이 부스 상세만 띄우므로, 상세를 닫으면 그 부스를 고른 검색 화면으로 돌아갑니다.
+        /// 지역·역 검색이나 한 지점으로 좁혀지지 않은 부스 검색은 결과 시트로 돌아가므로 `false`입니다.
+        var isSinglePhotoBoothSearchApplied: Bool = false
         var isPermissionAlertPresented: Bool = false
         var initialExplorationState: MapInitialExplorationState = .awaitingPermission
         
@@ -381,21 +386,10 @@ public struct MapFeature {
                 return .none
                 
             case .didTapSearchField:
-                state.isSearchPresented = true
-                // 지도에 반영 중인 검색이 있으면 그 검색어로 되돌려 후보 목록부터 다시 보여 줍니다.
-                // 화면이 뜨기 전에 검색어가 자리해야 검색 완료 형태로 열리므로 이펙트로 미루지 않습니다.
-                guard let query = state.appliedSearchQuery else { return .none }
-                state.photoBoothSearchState.searchText = query.rawValue
-                return .send(.photoBoothSearchAction(.beginSearch(query)))
+                return presentSearch(&state)
 
             case .didTapClearSearchButton:
-                // 검색을 끝내면 검색 결과를 지우고 시트 높이와 탭·필터를 지도 탭에 처음 들어왔을 때의 값으로 되돌립니다.
-                // 카메라는 옮기지 않으므로 보고 있던 지역을 다시 조회해 이 지역 목록을 채웁니다.
-                clearAppliedSearch(&state)
-                resetTabAndFilters(&state)
-                resetToMapMode(&state, for: .first)
-                guard let bounds = state.currentBounds else { return .none }
-                return .send(.fetchPhotoBooths(bounds: bounds))
+                return endSearch(&state)
 
             case .didTapExploreHereButton:
                 guard let bounds = state.currentBounds else { return .none }
@@ -723,6 +717,13 @@ public struct MapFeature {
                 return .none
                 
             case .didTapCloseDetail:
+                // 부스 하나를 바로 고른 검색은 돌아갈 결과 시트가 없으므로, 상세를 닫으면 그 부스를 고른 검색 화면으로 돌아갑니다.
+                // 검색은 끝내지 않으므로 다른 후보를 고르면 그 결과로 바로 바뀝니다.
+                // 시트는 검색 화면에 가려지며, 후보를 고르지 않고 나가면 검색을 끝내면서 어차피 처음 높이가 됩니다.
+                if state.isSinglePhotoBoothSearchApplied {
+                    resetToMapMode(&state, for: .first)
+                    return presentSearch(&state)
+                }
                 resetToMapMode(&state, for: .second)
                 return .none
                 
@@ -794,7 +795,10 @@ public struct MapFeature {
 
             case .photoBoothSearchAction(.dismissSearch):
                 state.isSearchPresented = false
-                return .none
+                // 부스 상세를 닫고 돌아온 검색 화면에서 다른 후보를 고르지 않고 나가면 지도에 남길 결과가 없으므로 검색을 끝냅니다.
+                // 후보를 고른 직후에도 이 액션이 오지만, 그때는 부스가 선택돼 있거나 결과 시트 검색이라 해당하지 않습니다.
+                guard state.isSinglePhotoBoothSearchApplied, state.selectedBooth == nil else { return .none }
+                return endSearch(&state)
 
             case let .photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate, result))):
                 state.isSearchPresented = false
@@ -808,6 +812,8 @@ public struct MapFeature {
                 // 지도에 한 지점만 찍는 경로라 필터 칩도 그대로 둡니다.
                 // 지도에서 숨긴 지점이라 결과가 없거나 한 지점으로 좁혀지지 않으면 지역·역처럼 결과 시트로 보여 줍니다.
                 if candidate.type == .photoBooth, photoBooths.count == 1, let photoBooth = photoBooths.first {
+                    // 돌아갈 결과 시트가 없으므로 상세를 닫으면 이 검색 화면으로 돌아가도록 표시해 둡니다.
+                    state.isSinglePhotoBoothSearchApplied = true
                     selectPhotoBooth(&state, photoBooth: photoBooth)
                     if state.photoBooths[id: photoBooth.id] == nil {
                         state.photoBooths.append(photoBooth)
@@ -817,6 +823,9 @@ public struct MapFeature {
                         .send(.startBackgroundCalculation)
                     )
                 }
+
+                // 부스를 바로 고른 검색에서 다시 검색해 넘어와도 상세를 닫으면 이 결과 시트로 돌아오게 합니다.
+                state.isSinglePhotoBoothSearchApplied = false
 
                 // 지역과 지하철역은 응답 자체가 지도에 그릴 목록이므로 영역 조회를 대신합니다.
                 // 서버가 보여 줄 영역을 주지 않아 목록으로 직접 정하며, 0건이면 지도를 옮기지 않습니다.
@@ -1018,6 +1027,7 @@ private extension MapFeature {
     /// 지도에 반영 중인 검색을 지우고 검색 이전의 목록 구성으로 되돌립니다.
     func clearAppliedSearch(_ state: inout State) {
         state.appliedSearchQuery = nil
+        state.isSinglePhotoBoothSearchApplied = false
         state.photoBoothListState.isSearchResultPresented = false
         state.photoBoothListState.isSearchResultBrandFilterSheetPresented = false
         state.photoBoothListState.searchResultBrandFilters = nil
@@ -1030,6 +1040,28 @@ private extension MapFeature {
         state.photoBoothListState.selectedTab = .nearby
         state.photoBoothListState.filteredBrands = []
         state.isFavoriteMarkerFilterEnabled = false
+    }
+
+    /// 검색 화면을 띄웁니다.
+    ///
+    /// 지도에 반영 중인 검색이 있으면 그 검색어로 되돌려 후보 목록부터 다시 보여 줍니다.
+    /// 화면이 뜨기 전에 검색어가 자리해야 검색 완료 형태로 열리므로 이펙트로 미루지 않습니다.
+    func presentSearch(_ state: inout State) -> Effect<Action> {
+        state.isSearchPresented = true
+        guard let query = state.appliedSearchQuery else { return .none }
+        state.photoBoothSearchState.searchText = query.rawValue
+        return .send(.photoBoothSearchAction(.beginSearch(query)))
+    }
+
+    /// 검색을 끝내고 시트 높이와 탭·필터를 지도 탭에 처음 들어왔을 때의 값으로 되돌립니다.
+    ///
+    /// 카메라는 옮기지 않으므로 보고 있던 지역을 다시 조회해 이 지역 목록을 채웁니다.
+    func endSearch(_ state: inout State) -> Effect<Action> {
+        clearAppliedSearch(&state)
+        resetTabAndFilters(&state)
+        resetToMapMode(&state, for: .first)
+        guard let bounds = state.currentBounds else { return .none }
+        return .send(.fetchPhotoBooths(bounds: bounds))
     }
 
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {

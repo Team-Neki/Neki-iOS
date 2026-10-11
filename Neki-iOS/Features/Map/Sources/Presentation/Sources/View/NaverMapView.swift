@@ -89,6 +89,8 @@ struct NaverMapRepresentable: UIViewRepresentable {
         )
         
         updateContentInset(uiView.mapView)
+        // 인셋을 바꾸면 SDK가 위치 추적 모드를 풀어 버리므로, 추적 중이면 바뀐 콘텐츠 영역을 기준으로 다시 켭니다.
+        updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
     }
 }
 

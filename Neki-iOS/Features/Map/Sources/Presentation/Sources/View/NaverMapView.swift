@@ -123,16 +123,21 @@ private extension NaverMapRepresentable {
         }
     }
     
+    /// 카메라를 한 지점으로 옮깁니다.
+    ///
+    /// 마커나 시트 갱신처럼 카메라와 무관한 이유로도 이 메서드가 다시 불리므로,
+    /// 이미 반영한 요청인지 세대로 가려내 같은 요청을 거듭 적용하지 않습니다.
     func updateCameraPosition(_ mapView: NMFMapView, context: Context) {
-        guard let cameraPosition = store.cameraPosition,
-              cameraPosition != context.coordinator.lastCameraPosition
+        let request = store.cameraMoveRequest
+        guard let coordinate = request.coordinate,
+              request.generation != context.coordinator.appliedCameraMoveGeneration
         else { return }
-        let nmapCameraPosition = NMGLatLng(lat: cameraPosition.latitude, lng: cameraPosition.longitude)
-        let cameraUpdate = NMFCameraUpdate(scrollTo: nmapCameraPosition)
+        context.coordinator.appliedCameraMoveGeneration = request.generation
+
+        let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: coordinate.latitude, lng: coordinate.longitude))
         cameraUpdate.animation = .linear
         cameraUpdate.animationDuration = Constants.animationDuration
         mapView.moveCamera(cameraUpdate)
-        context.coordinator.lastCameraPosition = cameraPosition
     }
 
     /// 여러 지점을 한 화면에 담도록 카메라를 영역에 맞춥니다.
@@ -184,7 +189,7 @@ extension NaverMapRepresentable {
         typealias BoothID = Int
         typealias BrandID = Int
         
-        var lastCameraPosition: GeographicCoordinate?
+        var appliedCameraMoveGeneration: UInt?
         var appliedCameraFitGeneration: UInt?
         var isMapLoaded: Bool = false
         

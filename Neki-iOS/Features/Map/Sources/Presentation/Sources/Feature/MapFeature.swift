@@ -31,10 +31,35 @@ public struct MapFeature {
         }
     }
 
+    /// 카메라를 한 지점으로 옮겨 달라는 요청입니다.
+    ///
+    /// 부스를 고르거나 현재 위치로 돌아갈 때처럼 한 지점을 화면 가운데에 두어야 하는 경우에 씁니다.
+    /// 영역에 맞추는 ``CameraFitRequest``와 동시에 채우지 않습니다.
+    ///
+    /// 좌표만으로는 같은 지점으로 다시 옮겨 달라는 요청을 구분할 수 없어 세대를 함께 둡니다.
+    /// 지도를 옮긴 뒤 같은 부스를 다시 골라도 새 세대라 카메라가 다시 옮겨집니다.
+    /// 카메라가 멈춘 위치는 ``State/currentBounds``로만 받고 이 요청에 되돌려 쓰지 않습니다.
+    /// 되돌려 쓰면 지도가 그 값을 새 요청으로 보고, 진행 중인 이동을 멈춘 자리로 되돌립니다.
+    struct CameraMoveRequest: Equatable {
+        private(set) var generation: UInt = .zero
+        private(set) var coordinate: GeographicCoordinate?
+
+        /// 새 지점 이동을 요청합니다.
+        mutating func move(to coordinate: GeographicCoordinate) {
+            generation &+= 1
+            self.coordinate = coordinate
+        }
+
+        /// 옮길 지점이 없음을 표시합니다.
+        mutating func clear() {
+            coordinate = nil
+        }
+    }
+
     /// 카메라를 한 지점이 아니라 특정 영역에 맞춰 달라는 요청입니다.
     ///
     /// 검색 결과처럼 여러 지점을 한 화면에 담아야 하는 경우에 씁니다.
-    /// 한 지점으로 옮기는 ``State/cameraPosition``과 동시에 채우지 않습니다.
+    /// 한 지점으로 옮기는 ``CameraMoveRequest``와 동시에 채우지 않습니다.
     ///
     /// 좌표만으로는 서로 다른 두 요청을 구분할 수 없어 세대를 함께 둡니다.
     /// 검색 뒤 지도를 옮기고 같은 검색을 다시 해도 새 세대라 카메라가 다시 맞춰집니다.
@@ -101,7 +126,7 @@ public struct MapFeature {
         var initialExplorationState: MapInitialExplorationState = .awaitingPermission
         
         // Map State
-        var cameraPosition: GeographicCoordinate?
+        var cameraMoveRequest = CameraMoveRequest()
         var cameraFitRequest = CameraFitRequest()
         var currentBounds: GeographicBoundingBox?
         var lastExploredLocation: CLLocation?
@@ -309,7 +334,6 @@ public struct MapFeature {
                 // MARK: - User Location Interaction
             case let .mapLoaded(bounds):
                 state.currentBounds = bounds
-                state.cameraPosition = bounds.center
                 return .merge(
                     .send(.attemptInitialExploration),
                     .send(.startBackgroundCalculation)
@@ -374,7 +398,6 @@ public struct MapFeature {
                 
             case let .cameraMotionEnded(bounds):
                 state.currentBounds = bounds
-                state.cameraPosition = bounds.center
                 return .merge(
                     .send(.attemptInitialExploration),
                     .send(.startBackgroundCalculation)
@@ -1067,7 +1090,7 @@ private extension MapFeature {
     func resetToMapMode(_ state: inout State, for stage: SheetStage) {
         state.selectedBooth = nil
         state.detent = stage.detent
-        state.cameraPosition = nil
+        state.cameraMoveRequest.clear()
         state.cameraFitRequest.clear()
     }
 
@@ -1075,7 +1098,7 @@ private extension MapFeature {
         state.selectedBooth = photoBooth
         state.detent = SheetStage.photoBoothSelected.detent
         state.cameraFitRequest.clear()
-        state.cameraPosition = photoBooth.coordinate
+        state.cameraMoveRequest.move(to: photoBooth.coordinate)
     }
     
     func updatePhotoBoothFavoriteState(_ state: inout State, photoBooth: PhotoBooth, isFavorite: Bool) {
@@ -1134,7 +1157,7 @@ private extension MapFeature {
 
     func updateCameraPosition(_ state: inout State, to coordinate: CLLocationCoordinate2D) {
         state.cameraFitRequest.clear()
-        state.cameraPosition = .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        state.cameraMoveRequest.move(to: .init(latitude: coordinate.latitude, longitude: coordinate.longitude))
     }
     
     func checkIfRegionChanged(from lastLocation: CLLocation?, to currentLocation: CLLocation) -> Bool {

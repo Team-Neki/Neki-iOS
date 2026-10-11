@@ -198,6 +198,45 @@ struct MapFeatureTests {
         #expect(store.isSearchPresented == false)
         #expect(store.detent == MapFeature.SheetStage.second.detent)
     }
+
+    @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
+    func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
+        let store = makeStore()
+        store.send(.didTapBooth(searchedPhotoBooth))
+        let firstGeneration = store.cameraMoveRequest.generation
+
+        store.send(.didTapBoothCard)
+
+        #expect(store.cameraMoveRequest.generation == firstGeneration + 1)
+        #expect(store.cameraMoveRequest.coordinate == searchedPhotoBooth.coordinate)
+    }
+
+    @Test("카메라가 멈춘 위치는 이동 요청에 되돌려 쓰지 않는다")
+    func cameraStopped_keepsMoveRequest() {
+        let store = makeStore()
+        store.send(.didTapBooth(searchedPhotoBooth))
+        let request = store.cameraMoveRequest
+        let stoppedBounds = GeographicBoundingBox(minLatitude: 37.49, minLongitude: 127.02, maxLatitude: 37.50, maxLongitude: 127.03)
+
+        store.send(.mapLoaded(stoppedBounds))
+        store.send(.cameraMotionEnded(stoppedBounds))
+
+        #expect(store.cameraMoveRequest == request)
+        #expect(store.currentBounds == stoppedBounds)
+    }
+
+    @Test("지점 이동과 영역 맞춤 요청은 나중에 들어온 것만 남긴다")
+    func moveAndFitRequests_keepOnlyLatest() {
+        let store = makeStore()
+        store.send(.didTapBooth(searchedPhotoBooth))
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: regionCandidate, result: regionResult))))
+        #expect(store.cameraMoveRequest.coordinate == nil)
+        #expect(store.cameraFitRequest.bounds != nil)
+
+        store.send(.didTapBooth(searchedPhotoBooth))
+        #expect(store.cameraMoveRequest.coordinate == searchedPhotoBooth.coordinate)
+        #expect(store.cameraFitRequest.bounds == nil)
+    }
 }
 
 

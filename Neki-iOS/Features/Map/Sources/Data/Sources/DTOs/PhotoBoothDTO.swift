@@ -8,7 +8,7 @@
 import Foundation
 
 struct PhotoBoothDTO: Decodable {
-    let id: Int
+    let id: String
     let brandName: String
     let branchName: String
     let address: String
@@ -24,7 +24,7 @@ struct PhotoBoothDTO: Decodable {
     
     func toEntity(brand: PhotoBoothBrand) -> PhotoBooth {
         PhotoBooth(
-            id: String(id),
+            id: id,
             brand: brand,
             name: branchName,
             coordinate: .init(latitude: latitude, longitude: longitude),

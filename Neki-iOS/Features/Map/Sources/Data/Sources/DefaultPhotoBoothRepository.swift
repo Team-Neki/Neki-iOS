@@ -154,7 +154,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let endpoint = MapEndpoint.fetchFavorites
         let responseDTO: BaseResponseDTO<FetchFavoritePhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         guard let items = responseDTO.data?.items else { throw NetworkError.responseDecodingError }
-        let serverFavoriteIDs = items.map { String($0.id) }
+        let serverFavoriteIDs = items.map(\.id)
         let photoBooths = items.compactMap { dto -> PhotoBooth? in
             guard let brand = brands[dto.brandName] else { return nil }
             var photoBooth = dto.toEntity(brand: brand)

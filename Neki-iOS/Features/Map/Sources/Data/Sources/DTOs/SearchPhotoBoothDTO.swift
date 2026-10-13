@@ -9,7 +9,7 @@ import Foundation
 
 /// 검색 결과 부스 조회가 내려주는 포토부스 지점입니다.
 ///
-/// 기존 지도 조회(`/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
+/// 기존 지도 조회(`/v2/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
 /// 브랜드 이름 대신 코드로 브랜드를 매칭하기 위해 ``PhotoBoothDTO``와 분리했습니다.
 struct SearchPhotoBoothDTO: Decodable {
     let id: Int

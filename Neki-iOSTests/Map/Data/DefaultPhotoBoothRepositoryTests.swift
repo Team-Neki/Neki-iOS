@@ -174,6 +174,57 @@ struct DefaultPhotoBoothRepositoryTests {
         #expect(photoBooths.map(\.id) == ["source:PHOTOISM:1768232303", "source:PHOTOISM:1768232304"])
         #expect(photoBooths.map(\.isFavorite) == [true, false])
     }
+
+    @Test("즐겨찾기 목록을 받기 전에는 지도 부스 응답의 favorite으로 하트를 켠다")
+    func readPhotoBooths_beforeFavoritesLoaded_usesFavoriteOfResponse() async throws {
+        let networkProvider = RecordingNetworkProviderStub(responses: [
+            "/photo-booths/brand": """
+            {
+              "resultCode": "D-0",
+              "message": "OK",
+              "data": [{ "id": 1, "name": "포토이즘", "code": "PHOTOISM", "imageUrl": "" }]
+            }
+            """,
+            "/v2/photo-booths/polygon": """
+            {
+              "resultCode": "D-0",
+              "message": "OK",
+              "data": {
+                "items": [
+                  {
+                    "id": "source:PHOTOISM:1768232303",
+                    "brandName": "포토이즘",
+                    "branchName": "강남1호점",
+                    "address": "서울 강남구 강남대로 396",
+                    "longitude": 127.0276,
+                    "latitude": 37.4979,
+                    "favorite": true
+                  },
+                  {
+                    "id": "source:PHOTOISM:1768232304",
+                    "brandName": "포토이즘",
+                    "branchName": "강남2호점",
+                    "address": "서울 강남구 테헤란로 101",
+                    "longitude": 127.0281,
+                    "latitude": 37.4985,
+                    "favorite": false
+                  }
+                ]
+              }
+            }
+            """
+        ])
+        let repository = makeRepository(networkProvider: networkProvider)
+        let bounds = GeographicBoundingBox(minLatitude: 37.49, minLongitude: 127.02, maxLatitude: 37.51, maxLongitude: 127.04)
+
+        var photoBooths: [PhotoBooth] = []
+        for try await chunk in await repository.readPhotoBooths(in: bounds) {
+            photoBooths += chunk
+        }
+
+        #expect(photoBooths.map(\.id) == ["source:PHOTOISM:1768232303", "source:PHOTOISM:1768232304"])
+        #expect(photoBooths.map(\.isFavorite) == [true, false])
+    }
 }
 
 private extension DefaultPhotoBoothRepositoryTests {

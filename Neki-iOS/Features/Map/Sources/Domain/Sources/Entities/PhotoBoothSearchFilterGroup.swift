@@ -14,7 +14,7 @@ import Foundation
 public struct PhotoBoothSearchFilterGroup: Equatable, Sendable {
     /// 조회할 브랜드입니다. `nil`이거나 비어 있으면 모든 브랜드를 조회합니다.
     public let brandIDs: [PhotoBoothBrand.ID]?
-    /// 정렬 방식입니다. `nil`이면 서버의 기본 정렬을 따르며, 지금은 기본 정렬(`DEFAULT`)만 있습니다.
+    /// 정렬 방식입니다. `nil`이면 기본 정렬로 조회합니다.
     public let sortType: String?
 
     /// 조회 조건을 생성합니다. 아무 값도 주지 않으면 조건이 없는 상태입니다.

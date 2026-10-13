@@ -10,7 +10,7 @@ import Foundation
 enum MapEndpoint {
     case polygon(dto: FetchPhotoBoothsDTO.Request)
     case point(dto: FetchNearbyPhotoBoothsDTO.Request)
-    case updateFavorite(id: Int, dto: TogglePhotoBoothFavoriteDTO)
+    case updateFavorite(id: PhotoBooth.ID, dto: TogglePhotoBoothFavoriteDTO)
     case fetchFavorites
     case fetchBrands
     case updateBrandOrder(dto: UpdatePhotoBoothBrandOrderDTO.Request)

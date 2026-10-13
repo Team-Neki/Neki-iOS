@@ -140,7 +140,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return stream
     }
     
-    func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
+    func updatePhotoBoothFavorite(id: PhotoBooth.ID, isFavorite: Bool) async throws {
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)
@@ -154,7 +154,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         let endpoint = MapEndpoint.fetchFavorites
         let responseDTO: BaseResponseDTO<FetchFavoritePhotoBoothsDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         guard let items = responseDTO.data?.items else { throw NetworkError.responseDecodingError }
-        let serverFavoriteIDs = items.map(\.id)
+        let serverFavoriteIDs = items.map { String($0.id) }
         let photoBooths = items.compactMap { dto -> PhotoBooth? in
             guard let brand = brands[dto.brandName] else { return nil }
             var photoBooth = dto.toEntity(brand: brand)

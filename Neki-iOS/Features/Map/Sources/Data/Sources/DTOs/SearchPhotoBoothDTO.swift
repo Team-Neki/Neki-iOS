@@ -28,7 +28,7 @@ struct SearchPhotoBoothDTO: Decodable {
 
     func toEntity(brand: PhotoBoothBrand) -> PhotoBooth {
         PhotoBooth(
-            id: id,
+            id: String(id),
             brand: brand,
             name: branchName,
             coordinate: .init(latitude: latitude, longitude: longitude),

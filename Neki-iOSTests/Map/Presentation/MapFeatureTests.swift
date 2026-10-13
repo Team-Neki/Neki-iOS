@@ -199,6 +199,18 @@ struct MapFeatureTests {
         #expect(store.detent == MapFeature.SheetStage.second.detent)
     }
 
+    @Test("부스 하나를 바로 고른 검색이라도 열린 상세가 없으면 빈 지도를 눌러도 검색 화면을 열지 않는다")
+    func didTapCloseDetail_withoutDetailAfterSinglePhotoBoothSearch_keepsMap() {
+        let store = makeStore()
+        store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+        // 검색 화면을 거치지 않고 상세만 닫힌 상태를 만듭니다.
+        store.send(.didTapGoBackToMapButton)
+
+        store.send(.didTapCloseDetail)
+
+        #expect(store.isSearchPresented == false)
+    }
+
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
     func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
         let store = makeStore()

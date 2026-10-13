@@ -743,7 +743,8 @@ public struct MapFeature {
                 // 부스 하나를 바로 고른 검색은 돌아갈 결과 시트가 없으므로, 상세를 닫으면 그 부스를 고른 검색 화면으로 돌아갑니다.
                 // 검색은 끝내지 않으므로 다른 후보를 고르면 그 결과로 바로 바뀝니다.
                 // 시트는 검색 화면에 가려지며, 후보를 고르지 않고 나가면 검색을 끝내면서 어차피 처음 높이가 됩니다.
-                if state.isSinglePhotoBoothSearchApplied {
+                // 빈 지도를 눌러도 이 액션이 오므로, 닫을 상세가 있을 때만 검색 화면으로 돌아갑니다.
+                if state.isSinglePhotoBoothSearchApplied, state.selectedBooth != nil {
                     resetToMapMode(&state, for: .first)
                     return presentSearch(&state)
                 }

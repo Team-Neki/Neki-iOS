@@ -14,7 +14,6 @@ import Dependencies
 struct PhotoBoothSearchCandidateCell: View {
     private let candidate: PhotoBoothSearchCandidate
     private let keyword: String
-    private let distance: Int?
     private let showsDivider: Bool
     private let action: () -> Void
     
@@ -36,21 +35,18 @@ struct PhotoBoothSearchCandidateCell: View {
     /// 검색 후보 셀을 생성합니다.
     ///
     /// - Parameters:
-    ///   - candidate: 표시할 검색 후보
+    ///   - candidate: 표시할 검색 후보. 거리가 있으면 이름 옆에 함께 표시합니다.
     ///   - keyword: 이름에서 강조할 검색어. 비어 있으면 강조하지 않습니다.
-    ///   - distance: 현재 위치로부터의 거리(m). `nil`이면 거리를 표시하지 않습니다.
     ///   - showsDivider: 셀 하단에 구분선을 표시할지 여부. 목록의 마지막 셀에서는 `false`를 전달합니다.
     ///   - action: 셀을 선택했을 때 실행할 동작
     init(
         candidate: PhotoBoothSearchCandidate,
         keyword: String,
-        distance: Int? = nil,
         showsDivider: Bool = true,
         action: @escaping () -> Void
     ) {
         self.candidate = candidate
         self.keyword = keyword
-        self.distance = distance
         self.showsDivider = showsDivider
         self.action = action
     }
@@ -81,8 +77,8 @@ private extension PhotoBoothSearchCandidateCell {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if let distance {
-                Text(distanceFormattingClient.string(distance: .init(meters: distance)))
+            if let distance = candidate.distance {
+                Text(distanceFormattingClient.string(distance: distance))
                     .nekiFont(.body14Regular)
                     .foregroundStyle(.gray500)
                     .lineLimit(1)
@@ -112,7 +108,7 @@ private extension PhotoBoothSearchCandidateCell {
 
     /// 검색어와 일치하는 구간을 굵은 서체로 강조한 후보 이름입니다.
     var highlightedName: AttributedString {
-        let displayName = candidate.displayName
+        let displayName = candidate.keyword
         var name = AttributedString(displayName)
 
         guard let highlightRange = highlightRange(in: displayName),
@@ -126,27 +122,15 @@ private extension PhotoBoothSearchCandidateCell {
 
     /// 표시 이름에서 강조할 구간입니다.
     ///
-    /// 서버는 지역명·역명뿐 아니라 브랜드명과 지점명으로도 접두 일치를 판정하므로, 어떤 필드가
-    /// 맞았는지는 응답만 봐서는 알 수 없습니다. 표시 이름 안에서 검색어를 그대로 찾으면 어느 필드가
-    /// 맞았든 그 자리를 짚을 수 있어 이 방법을 먼저 시도합니다.
+    /// 서버는 지역명·역명뿐 아니라 브랜드명·지점명·주소로도 후보를 찾으므로, 어느 부분이
+    /// 맞았는지는 응답만 봐서는 알 수 없습니다. 표시 이름 안에서 검색어를 그대로 찾으면 어느 부분이
+    /// 맞았든 그 자리를 짚을 수 있어 이 구간만 강조합니다.
     ///
-    /// 서버가 검색어를 다듬어 대조했다면(`강남역` → `강남`) 표시 이름에 검색어가 그대로 없으므로,
-    /// 서버가 대조한 이름(`matchedName`)이 시작하는 지점부터 검색어 길이만큼을 강조합니다.
-    /// 검색어가 그 이름보다 길면 이름 끝까지만 강조합니다.
+    /// 서버가 검색어를 다듬거나 낱말 순서와 상관없이 찾은 후보(`서울 강남` → `서울특별시 강남구`)는
+    /// 표시 이름에 검색어가 그대로 없으므로 강조하지 않습니다.
     func highlightRange(in displayName: String) -> Range<String.Index>? {
         guard keyword.isEmpty == false else { return nil }
-
-        if let keywordRange = displayName.range(of: keyword, options: .caseInsensitive) {
-            return keywordRange
-        }
-
-        guard let matchedRange = displayName.range(of: candidate.matchedName) else { return nil }
-        let matchedEnd = displayName.index(
-            matchedRange.lowerBound,
-            offsetBy: keyword.count,
-            limitedBy: matchedRange.upperBound
-        ) ?? matchedRange.upperBound
-        return matchedRange.lowerBound..<matchedEnd
+        return displayName.range(of: keyword, options: .caseInsensitive)
     }
 }
 
@@ -173,33 +157,33 @@ private extension PhotoBoothSearchCandidateType {
 #Preview {
     VStack(spacing: 12) {
         PhotoBoothSearchCandidateCell(
-            candidate: .region(.init(code: "1168000000", name: "강남구", fullName: "서울특별시 강남구")),
+            candidate: .init(type: .region, keyword: "서울특별시 강남구", filterGroup: .init()),
             keyword: ""
         ) {}
 
         PhotoBoothSearchCandidateCell(
-            candidate: .region(.init(code: "4817010300", name: "강남동", fullName: "경상남도 진주시 강남동")),
+            candidate: .init(type: .region, keyword: "경상남도 진주시 강남동", filterGroup: .init()),
             keyword: "강남"
         ) {}
 
         PhotoBoothSearchCandidateCell(
-            candidate: .subwayStation(.init(name: "강남", lineName: "2호선")),
-            keyword: "강남",
-            distance: 16_000
+            candidate: .init(
+                type: .subwayStation,
+                keyword: "강남역 2호선",
+                filterGroup: .init(),
+                distance: .init(meters: 16_000)
+            ),
+            keyword: "강남"
         ) {}
 
         PhotoBoothSearchCandidateCell(
-            candidate: .photoBooth(
-                .init(
-                    id: 2560,
-                    brand: .init(id: 1, name: "포토이즘", englishName: "PHOTOISM", imageURL: nil),
-                    name: "강남1호점",
-                    coordinate: .init(latitude: 37.5021077, longitude: 127.0271830),
-                    address: "서울 강남구 강남대로102길 16"
-                )
+            candidate: .init(
+                type: .photoBooth,
+                keyword: "포토이즘 강남1호점",
+                filterGroup: .init(),
+                distance: .init(meters: 32_400)
             ),
             keyword: "강남",
-            distance: 32_400,
             showsDivider: false
         ) {}
     }

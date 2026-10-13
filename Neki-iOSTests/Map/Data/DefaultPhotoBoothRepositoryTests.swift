@@ -19,7 +19,7 @@ struct DefaultPhotoBoothRepositoryTests {
         let repository = makeRepository(networkProvider: networkProvider)
 
         await #expect(throws: PhotoBoothSearchFailure.network) {
-            try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10)
+            try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10, origin: nil)
         }
     }
 
@@ -28,7 +28,7 @@ struct DefaultPhotoBoothRepositoryTests {
         let repository = makeRepository(networkProvider: ThrowingNetworkProviderStub(error: NetworkError.networkFail))
 
         await #expect(throws: PhotoBoothSearchFailure.unknown) {
-            try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10)
+            try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10, origin: nil)
         }
     }
 
@@ -37,8 +37,67 @@ struct DefaultPhotoBoothRepositoryTests {
         let repository = makeRepository(networkProvider: ThrowingNetworkProviderStub(error: CancellationError()))
 
         await #expect(throws: CancellationError.self) {
-            try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10)
+            try await repository.searchCandidates(keyword: "홍대", type: .region, page: .zero, size: 10, origin: nil)
         }
+    }
+
+    @Test(
+        "자동완성은 종류에 맞는 경로로 요청하고 응답을 그 종류의 후보로 바꾼다",
+        arguments: zip(
+            [PhotoBoothSearchCandidateType.region, .subwayStation, .photoBooth],
+            ["/search/completion/regions", "/search/completion/stations", "/search/completion/photo-booths"]
+        )
+    )
+    func searchCandidates_requestsCompletionPathOfType(type: PhotoBoothSearchCandidateType, path: String) async throws {
+        let networkProvider = RecordingNetworkProviderStub(responses: [
+            path: """
+            {
+              "resultCode": "D-0",
+              "message": "OK",
+              "data": {
+                "items": [{ "keyword": "강남", "distanceKm": null }],
+                "hasNext": false,
+                "totalCount": 1,
+                "filterGroup": {}
+              }
+            }
+            """
+        ])
+        let repository = makeRepository(networkProvider: networkProvider)
+
+        let page = try await repository.searchCandidates(keyword: "강남", type: type, page: .zero, size: 20, origin: nil)
+
+        #expect(await networkProvider.requestedPaths == [path])
+        #expect(page.type == type)
+        #expect(page.candidates.map(\.type) == [type])
+    }
+
+    @Test(
+        "기준 좌표는 역·부스 자동완성에만 위도·경도로 담고 지역 자동완성에는 담지 않는다",
+        arguments: zip([PhotoBoothSearchCandidateType.region, .subwayStation, .photoBooth], [false, true, true])
+    )
+    func searchCandidates_sendsOriginOnlyForStationsAndPhotoBooths(type: PhotoBoothSearchCandidateType, sendsOrigin: Bool) async throws {
+        let emptyResponse = """
+        {
+          "resultCode": "D-0",
+          "message": "OK",
+          "data": { "items": [], "hasNext": false, "totalCount": 0, "filterGroup": {} }
+        }
+        """
+        let networkProvider = RecordingNetworkProviderStub(responses: [
+            "/search/completion/regions": emptyResponse,
+            "/search/completion/stations": emptyResponse,
+            "/search/completion/photo-booths": emptyResponse
+        ])
+        let repository = makeRepository(networkProvider: networkProvider)
+        let origin = GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)
+
+        _ = try await repository.searchCandidates(keyword: "강남", type: type, page: .zero, size: 20, origin: origin)
+
+        // 지역은 거리를 내려주지 않으므로 위치를 보내지 않습니다.
+        let query = try #require(await networkProvider.requestedQueries.first ?? nil)
+        #expect(query["latitude"] == (sendsOrigin ? "37.4979" : nil))
+        #expect(query["longitude"] == (sendsOrigin ? "127.0276" : nil))
     }
 }
 
@@ -69,5 +128,31 @@ private actor ThrowingNetworkProviderStub: NetworkProvider {
 
     func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
         throw error
+    }
+}
+
+/// 받은 요청의 경로와 쿼리를 기록하고, 경로마다 준비한 응답 JSON을 돌려주는 스텁입니다.
+private actor RecordingNetworkProviderStub: NetworkProvider {
+    private let responses: [String: String]
+    private(set) var requestedPaths: [String] = []
+    private(set) var requestedQueries: [[String: String]?] = []
+
+    init(responses: [String: String]) {
+        self.responses = responses
+    }
+
+    func requestVoid(endpoint: Endpoint) async throws {
+        throw NetworkError.networkFail
+    }
+
+    func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData> {
+        throw NetworkError.networkFail
+    }
+
+    func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
+        requestedPaths.append(endpoint.path)
+        requestedQueries.append(endpoint.queryParameters)
+        guard let response = responses[endpoint.path] else { throw NetworkError.networkFail }
+        return try JSONDecoder().decode(BaseResponseDTO<T>.self, from: Data(response.utf8))
     }
 }

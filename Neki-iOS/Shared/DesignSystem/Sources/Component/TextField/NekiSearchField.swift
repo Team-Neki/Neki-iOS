@@ -47,6 +47,8 @@ public struct NekiSearchField: View {
 
     /// 검색어를 입력받는 검색 필드를 생성합니다.
     ///
+    /// 버튼 밖의 여백을 눌러도 텍스트 필드에 포커스를 줍니다.
+    ///
     /// - Parameters:
     ///   - text: 사용자가 입력 중인 검색어
     ///   - phase: 검색 필드의 단계. 입력 중에는 `.editing`, 제출한 검색어로 결과를 보는 동안에는 `.submitted`를 전달합니다.
@@ -98,7 +100,7 @@ public struct NekiSearchField: View {
     ///
     /// 입력은 검색 화면에서 하고 결과 화면에서는 검색어만 보여 주는 자리에 사용합니다.
     /// 검색어를 여기서 고치지 않으므로 검색어를 바인딩이 아닌 값으로 받고 포커스를 받지 않습니다.
-    /// 뒤로가기·검색어·검색 버튼은 모두 검색어를 다시 입력하러 가는 하나의 동작으로 이어집니다.
+    /// 뒤로가기·검색어·검색 버튼과 버튼 밖의 여백은 모두 검색어를 다시 입력하러 가는 하나의 동작으로 이어집니다.
     ///
     /// - Parameters:
     ///   - keyword: 검색을 완료한 검색어
@@ -185,7 +187,8 @@ private extension NekiSearchField {
             }
         }
 
-        /// 진입점은 필드 전체가 하나의 버튼입니다. 그 외에는 필드 안의 버튼과 텍스트 필드가 각자 입력을 받습니다.
+        /// 진입점은 필드 전체가 하나의 버튼입니다.
+        /// 그 외에는 필드 안의 버튼과 텍스트 필드가 각자 입력을 받고, 그 밖을 누른 탭은 필드가 받습니다.
         var isTappableAsWhole: Bool {
             switch self {
             case .entry: true
@@ -217,6 +220,10 @@ private extension NekiSearchField {
 // MARK: - NekiSearchField + Subviews
 
 private extension NekiSearchField {
+    /// 안쪽 버튼과 텍스트 필드가 받지 않은 탭은 필드가 받아, 여백을 눌러도 반응합니다.
+    ///
+    /// 필드의 탭은 안쪽 버튼의 탭보다 우선순위가 낮아서, 버튼을 누르면 버튼의 동작만 실행됩니다.
+    /// 진입점은 필드 전체를 덮은 버튼이 탭을 받으므로 필드의 탭을 끕니다.
     var field: some View {
         HStack(spacing: Metrics.spacing) {
             leading
@@ -226,6 +233,11 @@ private extension NekiSearchField {
             trailing
         }
         .searchFieldContainer(variant.decoration)
+        .contentShape(.capsule)
+        .gesture(
+            TapGesture().onEnded { tapField() },
+            including: variant.isTappableAsWhole ? .subviews : .all
+        )
     }
 
     /// 진입점에서 필드 전체를 덮는 버튼입니다.
@@ -242,6 +254,18 @@ private extension NekiSearchField {
                     .contentShape(.capsule)
             }
             .buttonStyle(PressReportingButtonStyle(isPressed: $isPressed))
+        }
+    }
+
+    /// 안쪽 버튼과 텍스트 필드가 받지 않은 탭을 받았을 때 실행합니다.
+    ///
+    /// 검색 완료 형태는 검색어를 다시 입력하러 가고, 입력 형태는 텍스트 필드에 포커스를 줘 입력을 시작합니다.
+    func tapField() {
+        switch variant {
+        case .entry, .completed:
+            onTap?()
+        case .input:
+            isFocused?.wrappedValue = true
         }
     }
 

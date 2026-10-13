@@ -99,6 +99,82 @@ struct DefaultPhotoBoothRepositoryTests {
         #expect(query["latitude"] == (sendsOrigin ? "37.4979" : nil))
         #expect(query["longitude"] == (sendsOrigin ? "127.0276" : nil))
     }
+
+    @Test("V2 즐겨찾기 목록과 같은 문자열 ID로 온 검색 결과 부스는 하트를 켠 채로 돌려준다")
+    func readSearchResultPhotoBooths_keepsFavoriteOfPhotoBoothInV2Favorites() async throws {
+        let networkProvider = RecordingNetworkProviderStub(responses: [
+            "/photo-booths/brand": """
+            {
+              "resultCode": "D-0",
+              "message": "OK",
+              "data": [{ "id": 1, "name": "포토이즘", "code": "PHOTOISM", "imageUrl": "" }]
+            }
+            """,
+            "/v2/photo-booths/favorite": """
+            {
+              "resultCode": "D-0",
+              "message": "OK",
+              "data": {
+                "items": [
+                  {
+                    "id": "source:PHOTOISM:1768232303",
+                    "brandName": "포토이즘",
+                    "branchName": "강남1호점",
+                    "address": "서울 강남구 강남대로 396",
+                    "longitude": 127.0276,
+                    "latitude": 37.4979,
+                    "isFavorite": true
+                  }
+                ]
+              }
+            }
+            """,
+            "/search/photo-booths": """
+            {
+              "resultCode": "D-0",
+              "message": "OK",
+              "data": {
+                "items": [
+                  {
+                    "id": "source:PHOTOISM:1768232303",
+                    "brandName": "포토이즘",
+                    "brandCode": "PHOTOISM",
+                    "branchName": "강남1호점",
+                    "address": "서울 강남구 강남대로 396",
+                    "latitude": 37.4979,
+                    "longitude": 127.0276,
+                    "distance": null,
+                    "favorite": true
+                  },
+                  {
+                    "id": "source:PHOTOISM:1768232304",
+                    "brandName": "포토이즘",
+                    "brandCode": "PHOTOISM",
+                    "branchName": "강남2호점",
+                    "address": "서울 강남구 테헤란로 101",
+                    "latitude": 37.4985,
+                    "longitude": 127.0281,
+                    "distance": null,
+                    "favorite": false
+                  }
+                ]
+              }
+            }
+            """
+        ])
+        let repository = makeRepository(networkProvider: networkProvider)
+
+        // 지도 화면이 나타나면 즐겨찾기 목록으로 캐시를 채우고, 그 뒤의 검색 결과 하트는 이 캐시를 따릅니다.
+        _ = try await repository.readFavoritePhotoBooths()
+        let photoBooths = try await repository.readSearchResultPhotoBooths(
+            keyword: "강남역 2호선",
+            filterGroup: PhotoBoothSearchFilterGroup(),
+            userCoordinate: nil
+        )
+
+        #expect(photoBooths.map(\.id) == ["source:PHOTOISM:1768232303", "source:PHOTOISM:1768232304"])
+        #expect(photoBooths.map(\.isFavorite) == [true, false])
+    }
 }
 
 private extension DefaultPhotoBoothRepositoryTests {

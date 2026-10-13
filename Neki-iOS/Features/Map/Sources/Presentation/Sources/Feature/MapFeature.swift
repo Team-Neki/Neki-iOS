@@ -340,7 +340,10 @@ public struct MapFeature {
                 )
                 
             case .didTapCurrentLocationButton:
-                resetToMapMode(&state, for: .first)
+                // 검색 결과를 보는 동안에는 현위치로 옮겨도 검색 모드를 유지하므로, 시트와 상세를 지도 모드로 되돌리지 않고 카메라만 옮깁니다.
+                if state.appliedSearchQuery == nil {
+                    resetToMapMode(&state, for: .first)
+                }
                 switch state.locationAuthorizationStatus {
                 case .notDetermined:
                     return .send(.requestPermission)

@@ -6,6 +6,7 @@
 //
 
 import ComposableArchitecture
+import CoreLocation
 import Foundation
 import Testing
 @testable import Neki_iOS
@@ -211,6 +212,37 @@ struct MapFeatureTests {
         #expect(store.isSearchPresented == false)
     }
 
+    @Test(
+        "검색 결과를 보는 중에 현위치 버튼을 누르면 검색과 시트 높이를 그대로 두고, 위치를 따라가도 검색을 유지한다",
+        arguments: [false, true]
+    )
+    func didTapCurrentLocationButton_whileSearching_keepsSearch(isPhotoBoothCandidate: Bool) {
+        let store = makeStore()
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
+
+        store.send(.didTapCurrentLocationButton)
+        store.send(.updateUserLocation(.success(userLocation)))
+
+        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.photoBoothListState.isSearchResultPresented)
+        #expect(store.detent == MapFeature.SheetStage.second.detent)
+        #expect(store.isUserTrackingMode)
+        #expect(store.cameraMoveRequest.coordinate == userCoordinate)
+    }
+
+    @Test("검색 중이 아니면 현위치 버튼을 누를 때 시트를 처음 높이로 내린다")
+    func didTapCurrentLocationButton_withoutSearch_resetsSheet() {
+        let store = makeStore()
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+        store.send(.binding(.set(\.detent, MapFeature.SheetStage.second.detent)))
+
+        store.send(.didTapCurrentLocationButton)
+
+        #expect(store.detent == MapFeature.SheetStage.first.detent)
+        #expect(store.isUserTrackingMode)
+    }
+
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
     func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
         let store = makeStore()
@@ -274,7 +306,17 @@ private extension MapFeatureTests {
             $0.photoBoothClient.searchCandidates = { _, type, _, _ in
                 PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
             }
+            // 위치 권한을 받으면 위치 추적을 시작하므로 위치를 보내지 않는 스트림으로 둡니다. 위치는 테스트에서 직접 보냅니다.
+            $0.mapClient.trackingLocation = { .finished }
         }
+    }
+
+    var userLocation: CLLocation {
+        CLLocation(latitude: 37.4979, longitude: 127.0276)
+    }
+
+    var userCoordinate: GeographicCoordinate {
+        GeographicCoordinate(latitude: userLocation.coordinate.latitude, longitude: userLocation.coordinate.longitude)
     }
 
     var photoism: PhotoBoothBrand {

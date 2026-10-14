@@ -100,8 +100,8 @@ struct DefaultPhotoBoothRepositoryTests {
         #expect(query["longitude"] == (sendsOrigin ? "127.0276" : nil))
     }
 
-    @Test("V2 즐겨찾기 목록과 같은 문자열 ID로 온 검색 결과 부스는 하트를 켠 채로 돌려준다")
-    func readSearchResultPhotoBooths_keepsFavoriteOfPhotoBoothInV2Favorites() async throws {
+    @Test("V2 즐겨찾기 목록과 같은 문자열 ID로 온 검색 결과 부스는 즐겨찾기 캐시를 따라 하트를 켠다")
+    func readSearchResultPhotoBooths_marksPhotoBoothInV2FavoritesAsFavorite() async throws {
         let networkProvider = RecordingNetworkProviderStub(responses: [
             "/photo-booths/brand": """
             {
@@ -122,8 +122,7 @@ struct DefaultPhotoBoothRepositoryTests {
                     "branchName": "강남1호점",
                     "address": "서울 강남구 강남대로 396",
                     "longitude": 127.0276,
-                    "latitude": 37.4979,
-                    "isFavorite": true
+                    "latitude": 37.4979
                   }
                 ]
               }
@@ -144,7 +143,7 @@ struct DefaultPhotoBoothRepositoryTests {
                     "latitude": 37.4979,
                     "longitude": 127.0276,
                     "distance": null,
-                    "favorite": true
+                    "favorite": false
                   },
                   {
                     "id": "source:PHOTOISM:1768232304",
@@ -164,7 +163,7 @@ struct DefaultPhotoBoothRepositoryTests {
         ])
         let repository = makeRepository(networkProvider: networkProvider)
 
-        // 지도 화면이 나타나면 즐겨찾기 목록으로 캐시를 채우고, 그 뒤의 검색 결과 하트는 이 캐시를 따릅니다.
+        // 지도 화면이 나타나면 즐겨찾기 목록으로 캐시를 채우고, 그 뒤의 검색 결과 하트는 검색 응답 대신 이 캐시를 따릅니다.
         _ = try await repository.readFavoritePhotoBooths()
         let photoBooths = try await repository.readSearchResultPhotoBooths(
             keyword: "강남역 2호선",

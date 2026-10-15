@@ -15,6 +15,16 @@ public struct PhotoBoothListFeature {
         case distance
     }
 
+    /// 검색 결과 시트가 보여 줄 조회 단계입니다.
+    public enum SearchResultPhase: Equatable {
+        /// 고른 후보의 부스 목록을 조회하는 중입니다.
+        case loading
+        /// 조회가 실패했습니다.
+        case failure(PhotoBoothSearchFailure)
+        /// 조회한 결과를 보여 주는 중입니다.
+        case loaded
+    }
+
     public enum ListTab: CaseIterable, Identifiable {
         case nearby
         case favorite
@@ -72,6 +82,11 @@ public struct PhotoBoothListFeature {
         /// 검색 결과는 고른 후보의 범위 전체가 이미 목록이므로 탭 없이 개수, `브랜드` 칩, 결과 목록만 노출합니다.
         /// 지도 영역 조회로 돌아가면 `false`가 되어 다시 탭과 원형 브랜드 칩이 있는 목록으로 돌아갑니다.
         var isSearchResultPresented: Bool = false
+
+        /// 검색 결과를 보여 주는 동안 시트가 보여 줄 조회 단계입니다.
+        ///
+        /// 후보를 고르면 지도로 먼저 돌아와 부스 목록을 조회하므로, 결과가 오기 전에는 로딩을, 조회가 실패하면 실패 문구를 보여 줍니다.
+        var searchResultPhase: SearchResultPhase = .loaded
 
         /// 검색 결과의 `브랜드` 칩으로 여는 브랜드 필터 바텀시트가 떠 있는지 여부입니다.
         var isSearchResultBrandFilterSheetPresented: Bool = false

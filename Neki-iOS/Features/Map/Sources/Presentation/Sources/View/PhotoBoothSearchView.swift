@@ -48,7 +48,6 @@ struct PhotoBoothSearchView: View {
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
                 .padding(.bottom, Metrics.floatingButtonBottomPadding)
         }
-        .nekiToast(item: $store.toast)
         // 지도에서 검색어를 눌러 다시 들어온 경우에는 결과를 가리지 않도록 키보드를 올리지 않습니다.
         .onAppear { isSearchFieldFocused = store.searchText.isEmpty }
     }

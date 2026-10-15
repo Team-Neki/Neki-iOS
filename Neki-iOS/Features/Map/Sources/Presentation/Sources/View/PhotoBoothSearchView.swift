@@ -68,28 +68,22 @@ private extension PhotoBoothSearchView {
                 .id(generation)
 
         case .guide:
-            messageView(
-                inputImage: .iconPlace,
-                title: "어디에서 네컷을 찍을까요?\n브랜드나 지점을 검색해보세요.",
+            PhotoBoothSearchMessageView(
+                image: .iconPlace,
+                title: "어디에서 네컷을 찍을까요?\n브랜드나 지점을 검색해보세요."
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .noResult:
-            messageView(
-                inputImage: .iconNoResult,
-                title: "조건에 맞는 포토부스가 없어요.\n다른 지역이나 브랜드로 검색해보세요.",
+            PhotoBoothSearchMessageView(
+                image: .iconNoResult,
+                title: "조건에 맞는 포토부스가 없어요.\n다른 지역이나 브랜드로 검색해보세요."
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        case .failure(.network):
-            messageView(
-                inputImage: .iconNetworkError,
-                title: "네트워크 연결이 불안정해요\n잠시 후 다시 시도해주세요."
-            )
-
-        case .failure(.unknown):
-            messageView(
-                inputImage: .iconNetworkError,
-                title: "일시적인 오류가 발생했어요\n잠시 후 다시 시도해주세요."
-            )
+        case let .failure(failure):
+            PhotoBoothSearchMessageView(failure: failure)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
@@ -124,26 +118,6 @@ private extension PhotoBoothSearchView {
         }
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
-    }
-
-    func messageView(inputImage: ImageResource = .iconPlace, title: String, caption: String? = nil) -> some View {
-        VStack(spacing: 20) {
-            Image(inputImage)
-
-            VStack(spacing: 8) {
-                Text(title)
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray500)
-
-                if let caption {
-                    Text(caption)
-                        .nekiFont(.caption11Medium)
-                        .foregroundStyle(.gray300)
-                }
-            }
-            .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
 

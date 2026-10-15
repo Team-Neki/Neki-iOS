@@ -19,6 +19,7 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
     let content: () -> Content
     
     private let controllerSpacing: CGFloat = 12
+    private let indicatorAreaHeight: CGFloat = 24
     
     var isControllersVisible: Bool { selection == MapFeature.SheetStage.first.detent || selection == MapFeature.SheetStage.second.detent }
     
@@ -39,6 +40,7 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
                             guard isContentScrollAtTop != isAtTop else { return }
                             isContentScrollAtTop = isAtTop
                         })
+                        .environment(\.nekiSheetVisibleContentHeight, visibleContentHeight(of: layout))
                 }
                 .background(configuration.backgroundColor)
                 .clipShape(PresentationCornerShape(radius: configuration.cornerRadius, corners: [.topLeft, .topRight]))
@@ -77,7 +79,7 @@ private extension NekiSheet {
                 .frame(width: configuration.indicatorSize.width, height: configuration.indicatorSize.height)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 24)
+        .frame(height: indicatorAreaHeight)
         .contentShape(.rect)
         .onTapGesture { withAnimation(configuration.animation) { selection = .large } }
     }
@@ -124,6 +126,14 @@ private extension NekiSheet {
             currentHeight: currentHeight,
             dragOffset: dragOffset
         )
+    }
+
+    /// 시트 내용 중 화면에 드러난 높이입니다.
+    ///
+    /// 끌고 있는 만큼 더하거나 빼고, 손잡이 영역은 뺍니다.
+    func visibleContentHeight(of layout: SheetLayout) -> CGFloat {
+        let visibleSheetHeight = min(max(layout.currentHeight - translation, .zero), layout.maxHeight)
+        return max(visibleSheetHeight - indicatorAreaHeight, .zero)
     }
 
     func shouldHandleSheetDrag(_ value: DragGesture.Value) -> Bool {
@@ -240,6 +250,24 @@ extension EnvironmentValues {
     var nekiSheetScrollStateHandler: NekiSheetScrollStateHandler {
         get { self[NekiSheetScrollStateHandlerKey.self] }
         set { self[NekiSheetScrollStateHandlerKey.self] = newValue }
+    }
+}
+
+
+// MARK: - NekiSheetVisibleContentHeight
+
+private struct NekiSheetVisibleContentHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension EnvironmentValues {
+    /// 시트 내용 중 화면에 드러난 높이입니다. 손잡이 영역은 빼고, 시트를 끄는 동안에도 따라 바뀝니다.
+    ///
+    /// 시트는 가장 높은 높이로 내용을 그린 뒤 아래로 밀어 두므로, 내용 영역의 가운데는 화면 밖에 놓일 수 있습니다.
+    /// 시트 높이와 상관없이 드러난 부분의 가운데에 무언가를 두어야 할 때 씁니다. 시트 밖에서는 `nil`입니다.
+    var nekiSheetVisibleContentHeight: CGFloat? {
+        get { self[NekiSheetVisibleContentHeightKey.self] }
+        set { self[NekiSheetVisibleContentHeightKey.self] = newValue }
     }
 }
 

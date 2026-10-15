@@ -74,6 +74,10 @@ struct NearPhotoBoothListSheet: View {
             isVerticalScrollAtTop = true
             sheetScrollStateHandler.updateIsAtTop(true)
         }
+        .modifier(SearchResultLoadingModifier(
+            isSearchResultPresented: store.isSearchResultPresented,
+            isLoading: isSearchResultLoading
+        ))
         .sheet(isPresented: $store.isSearchResultBrandFilterSheetPresented) {
             PhotoBoothBrandFilterSheet(store: store)
         }
@@ -254,31 +258,44 @@ private extension NearPhotoBoothListSheet {
     }
 
     /// 검색 결과를 탭 없이 개수, `브랜드` 칩, 목록으로 노출합니다.
+    ///
+    /// 결과를 조회하는 동안에는 개수와 칩까지 비워 두고, 로딩 인디케이터는 시트 목록 영역 전체에 겁니다.
+    /// 조회가 실패하면 검색 화면과 같은 실패 문구를 보여 줍니다.
+    @ViewBuilder
     var searchResultPhotoBoothListSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: Constants.searchResultSectionSpacing) {
-                searchResultBoothCountText
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
+        switch store.searchResultPhase {
+        case .loading:
+            EmptyView()
 
-                // 결과에 브랜드가 하나도 없으면 시트를 열어도 고를 게 없으므로 칩을 두지 않습니다.
-                if store.selectableBrands.isEmpty == false {
-                    searchResultBrandFilterChipRow
-                }
+        case let .failure(failure):
+            SearchResultFailureView(failure: failure)
 
-                if store.visibleBooths.isEmpty {
-                    unavailableView("조건에 맞는 포토부스가 없어요.")
-                } else {
-                    LazyVStack(alignment: .leading, spacing: .zero) {
-                        ForEach(store.visibleBooths) { photoBooth in
-                            photoBoothCell(photoBooth)
+        case .loaded:
+            Section {
+                VStack(alignment: .leading, spacing: Constants.searchResultSectionSpacing) {
+                    searchResultBoothCountText
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 20)
+
+                    // 결과에 브랜드가 하나도 없으면 시트를 열어도 고를 게 없으므로 칩을 두지 않습니다.
+                    if store.selectableBrands.isEmpty == false {
+                        searchResultBrandFilterChipRow
+                    }
+
+                    if store.visibleBooths.isEmpty {
+                        unavailableView("조건에 맞는 포토부스가 없어요.")
+                    } else {
+                        LazyVStack(alignment: .leading, spacing: .zero) {
+                            ForEach(store.visibleBooths) { photoBooth in
+                                photoBoothCell(photoBooth)
+                            }
                         }
                     }
                 }
+                .padding(.top, Constants.searchResultTopPadding)
             }
-            .padding(.top, Constants.searchResultTopPadding)
+            .frame(maxHeight: .infinity)
         }
-        .frame(maxHeight: .infinity)
     }
 
     var searchResultBoothCountText: some View {
@@ -425,6 +442,11 @@ private extension NearPhotoBoothListSheet {
         favoriteButtonOverrides[photoBooth.id] ?? photoBooth.isFavorite
     }
 
+    /// 검색 결과를 보여 줄 부스 목록을 조회하는 중인지 여부입니다.
+    var isSearchResultLoading: Bool {
+        store.isSearchResultPresented && store.searchResultPhase == .loading
+    }
+
     func handleFavoriteButtonTap(_ photoBooth: PhotoBooth) {
         guard photoBooth.isFavorite else {
             store.send(.didTapFavorite(photoBooth), animation: Self.FavoriteRemovalEffect.animation)
@@ -544,6 +566,44 @@ private struct SearchResultBrandFilterChipStyle: ButtonStyle {
         .background { Capsule().fill(isHighlighted ? .gray800 : .white) }
         .overlay { Capsule().strokeBorder(isHighlighted ? .gray800 : .gray50, lineWidth: Constants.borderWidth) }
         .opacity(configuration.isPressed ? Constants.pressedOpacity : 1)
+    }
+}
+
+
+// MARK: - SearchResultLoadingModifier
+
+/// 검색 결과를 조회하는 동안 시트에서 드러난 부분의 가운데에 로딩 인디케이터를 띄웁니다.
+///
+/// 시트는 가장 높은 높이로 내용을 그린 뒤 아래로 밀어 두므로, 목록 영역 전체에 로딩을 걸면 인디케이터가 화면 밖에 놓입니다.
+/// 검색 결과를 보는 동안에는 목록 영역을 드러난 높이로 맞춘 뒤 로딩을 걸고, 남는 아래쪽은 비워 시트 안의 배치를 그대로 둡니다.
+/// 드러난 높이는 시트를 끄는 동안 계속 바뀌므로 목록이 아니라 이 수정자에서만 읽습니다.
+private struct SearchResultLoadingModifier: ViewModifier {
+    @Environment(\.nekiSheetVisibleContentHeight) private var visibleContentHeight
+    let isSearchResultPresented: Bool
+    let isLoading: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .frame(height: isSearchResultPresented ? visibleContentHeight : nil, alignment: .top)
+            .nekiLoading(isPresented: isLoading, style: .inline)
+            .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
+
+// MARK: - SearchResultFailureView
+
+/// 검색 결과 조회가 실패했음을 검색 화면과 같은 문구로 알립니다.
+///
+/// 시트 높이와 상관없이 드러난 부분의 가운데에 오도록 드러난 높이만큼 자리를 차지합니다.
+/// 문구보다 낮게 내린 시트에서는 위에서부터 보이도록 그보다 줄이지 않습니다.
+private struct SearchResultFailureView: View {
+    @Environment(\.nekiSheetVisibleContentHeight) private var visibleContentHeight
+    let failure: PhotoBoothSearchFailure
+
+    var body: some View {
+        PhotoBoothSearchMessageView(failure: failure)
+            .frame(maxWidth: .infinity, minHeight: visibleContentHeight)
     }
 }
 

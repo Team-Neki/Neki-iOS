@@ -121,6 +121,31 @@ struct MapEndpointTests {
         ]
         #expect(try bodyObject(of: endpoint) == expectedBody as NSDictionary)
     }
+
+    @Test("지도 부스 조회와 즐겨찾기 목록은 V2 경로로, 브랜드 조회와 순서 변경은 V1 경로로 요청한다")
+    func mapEndpoints_requestPhotoBoothsAndFavoritesFromV2() {
+        let bounds = GeographicBoundingBox(minLatitude: 37.49, minLongitude: 127.02, maxLatitude: 37.51, maxLongitude: 127.04)
+        let endpoints: [(endpoint: MapEndpoint, path: String)] = [
+            (.polygon(dto: .init(bounds: bounds)), "/v2/photo-booths/polygon"),
+            (.point(dto: .init(longitude: 127.0276, latitude: 37.4979, radiusInMeters: 1000)), "/v2/photo-booths/point"),
+            (.fetchFavorites, "/v2/photo-booths/favorite"),
+            (.fetchBrands, "/photo-booths/brand"),
+            (.updateBrandOrder(dto: .init(brandIDs: [1, 2])), "/photo-booths/brand/order")
+        ]
+
+        for (endpoint, path) in endpoints {
+            #expect(endpoint.path == path)
+        }
+    }
+
+    @Test("즐겨찾기 변경은 문자열 부스 ID를 V2 경로에 그대로 담아 PATCH로 요청한다")
+    func updateFavorite_putsStringPhotoBoothIDIntoV2Path() throws {
+        let endpoint = MapEndpoint.updateFavorite(id: "source:PHOTOISM:1768232303", dto: .init(favorite: true))
+
+        #expect(endpoint.path == "/v2/photo-booths/source:PHOTOISM:1768232303/favorite")
+        #expect(endpoint.method == .patch)
+        #expect(try bodyObject(of: endpoint) == ["favorite": true] as NSDictionary)
+    }
 }
 
 

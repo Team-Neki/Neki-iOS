@@ -9,7 +9,7 @@ import Foundation
 
 /// 포토부스 지점 정보
 public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
-    public let id: Int
+    public let id: String
     public let brand: PhotoBoothBrand
     public let name: String
     public let coordinate: GeographicCoordinate
@@ -19,7 +19,7 @@ public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
     public var isFavorite: Bool
     
     public init(
-        id: Int,
+        id: String,
         brand: PhotoBoothBrand,
         name: String,
         coordinate: GeographicCoordinate,

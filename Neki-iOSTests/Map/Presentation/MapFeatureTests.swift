@@ -73,7 +73,7 @@ struct MapFeatureTests {
     func didSelectSearchResult_withoutSinglePhotoBooth_presentsSearchResult(photoBoothCount: Int) {
         let store = makeStore()
         // 지도에서 숨긴 지점이면 0건이, 같은 이름의 지점이 있으면 여러 건이 올 수 있습니다.
-        let photoBooths = (0..<photoBoothCount).map { makePhotoBooth(id: $0 + 1) }
+        let photoBooths = (0..<photoBoothCount).map { makePhotoBooth(id: String($0 + 1)) }
 
         store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(
             candidate: photoBoothCandidate,
@@ -328,7 +328,7 @@ private extension MapFeatureTests {
     }
 
     var searchedPhotoBooth: PhotoBooth {
-        makePhotoBooth(id: 1)
+        makePhotoBooth(id: "1")
     }
 
     func makePhotoBooth(id: PhotoBooth.ID) -> PhotoBooth {
@@ -362,7 +362,7 @@ private extension MapFeatureTests {
 
     /// 같은 이름의 지점이 여러 곳이라 부스 후보인데도 결과 시트로 보여 주는 조회 결과입니다.
     var multiplePhotoBoothResult: PhotoBoothSearchResult {
-        PhotoBoothSearchResult(photoBooths: [makePhotoBooth(id: 1), makePhotoBooth(id: 2)], brandFilters: [])
+        PhotoBoothSearchResult(photoBooths: [makePhotoBooth(id: "1"), makePhotoBooth(id: "2")], brandFilters: [])
     }
 
     /// 결과 시트로 보여 주는 검색 결과를 고릅니다. 지역 후보 또는 여러 지점으로 나온 부스 후보입니다.

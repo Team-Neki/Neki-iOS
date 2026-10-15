@@ -140,7 +140,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
         return stream
     }
     
-    func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws {
+    func updatePhotoBoothFavorite(id: PhotoBooth.ID, isFavorite: Bool) async throws {
         let dto = TogglePhotoBoothFavoriteDTO(favorite: isFavorite)
         let endpoint = MapEndpoint.updateFavorite(id: id, dto: dto)
         let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: endpoint)

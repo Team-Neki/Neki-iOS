@@ -18,7 +18,7 @@ protocol PhotoBoothRepository {
     /// - Parameters:
     ///   - id: 포토부스 지점 식별자
     ///   - isFavorite: 변경할 즐겨찾기 상태
-    func updatePhotoBoothFavorite(id: Int, isFavorite: Bool) async throws
+    func updatePhotoBoothFavorite(id: PhotoBooth.ID, isFavorite: Bool) async throws
 
     /// 서버 기준으로 즐겨찾기한 포토부스 목록을 가져옵니다.
     /// - Returns: 서버에서 내려준 순서의 즐겨찾기 포토부스 배열

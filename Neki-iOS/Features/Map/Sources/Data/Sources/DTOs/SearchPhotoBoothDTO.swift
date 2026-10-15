@@ -9,10 +9,11 @@ import Foundation
 
 /// 검색 결과 부스 조회가 내려주는 포토부스 지점입니다.
 ///
-/// 기존 지도 조회(`/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
+/// 기존 지도 조회(`/v2/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
 /// 브랜드 이름 대신 코드로 브랜드를 매칭하기 위해 ``PhotoBoothDTO``와 분리했습니다.
 struct SearchPhotoBoothDTO: Decodable {
-    let id: Int
+    /// 지도 V2 조회·즐겨찾기와 같은 부스 ID입니다. 즐겨찾기 상태를 맞추는 기준으로 사용합니다.
+    let id: String
     let brandName: String
     /// 브랜드 전체 조회의 `code`와 같은 값입니다. 브랜드를 매칭하는 기준으로 사용합니다.
     let brandCode: String

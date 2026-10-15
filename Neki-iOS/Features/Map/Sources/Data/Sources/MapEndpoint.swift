@@ -10,7 +10,7 @@ import Foundation
 enum MapEndpoint {
     case polygon(dto: FetchPhotoBoothsDTO.Request)
     case point(dto: FetchNearbyPhotoBoothsDTO.Request)
-    case updateFavorite(id: Int, dto: TogglePhotoBoothFavoriteDTO)
+    case updateFavorite(id: PhotoBooth.ID, dto: TogglePhotoBoothFavoriteDTO)
     case fetchFavorites
     case fetchBrands
     case updateBrandOrder(dto: UpdatePhotoBoothBrandOrderDTO.Request)
@@ -42,10 +42,12 @@ extension MapEndpoint: Endpoint {
     
     var path: String {
         switch self {
-        case .polygon: return "/photo-booths/polygon"
-        case .point: return "/photo-booths/point"
-        case let .updateFavorite(id, _): return "/photo-booths/\(id)/favorite"
-        case .fetchFavorites: return "/photo-booths/favorite"
+        // 부스 ID가 검색 부스 목록과 같아야 즐겨찾기 상태를 함께 맞출 수 있으므로, 지도 부스 조회와 즐겨찾기는 V2로 요청합니다.
+        // 브랜드 조회와 순서 변경은 V1 그대로입니다.
+        case .polygon: return "/v2/photo-booths/polygon"
+        case .point: return "/v2/photo-booths/point"
+        case let .updateFavorite(id, _): return "/v2/photo-booths/\(id)/favorite"
+        case .fetchFavorites: return "/v2/photo-booths/favorite"
         case .fetchBrands: return "/photo-booths/brand"
         case .updateBrandOrder: return "/photo-booths/brand/order"
         case .searchCompletionRegions: return "/search/completion/regions"

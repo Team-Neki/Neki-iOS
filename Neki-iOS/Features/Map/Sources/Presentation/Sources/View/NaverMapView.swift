@@ -186,7 +186,7 @@ private extension NaverMapRepresentable {
 extension NaverMapRepresentable {
     @MainActor
     final class Coordinator: NSObject {
-        typealias BoothID = Int
+        typealias BoothID = PhotoBooth.ID
         typealias BrandID = Int
         
         var appliedCameraMoveGeneration: UInt?
@@ -391,12 +391,12 @@ extension NaverMapRepresentable {
             return NMGLatLng(lat: latitude + latitudeOffset, lng: longitude + longitudeOffset)
         }
         
-        func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, expectedID: Int) {
-            guard let currentID = marker.userInfo["identifier"] as? Int, currentID == expectedID else { return }
+        func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, expectedID: BoothID) {
+            guard let currentID = marker.userInfo["identifier"] as? BoothID, currentID == expectedID else { return }
             marker.iconImage = overlay
         }
         
-        func applyDefaultOverlay(to marker: NMFMarker, isSelected: Bool, expectedID: Int) {
+        func applyDefaultOverlay(to marker: NMFMarker, isSelected: Bool, expectedID: BoothID) {
             guard let booth = parent.store.visiblePhotoBooths[id: expectedID] else { return }
             let targetOverlay: NMFOverlayImage
 
@@ -436,11 +436,11 @@ extension NaverMapRepresentable {
     }
     
     final class BoothClusteringKey: NSObject, NMCClusteringKey {
-        let identifier: Int
+        let identifier: PhotoBooth.ID
         let brandID: Int
         let position: NMGLatLng
         
-        init(identifier: Int, brandID: Int, position: NMGLatLng) {
+        init(identifier: PhotoBooth.ID, brandID: Int, position: NMGLatLng) {
             self.identifier = identifier
             self.brandID = brandID
             self.position = position
@@ -459,13 +459,13 @@ extension NaverMapRepresentable {
     }
     
     final class BoothLeafMarkerUpdater: NMCLeafMarkerUpdater {
-        var onLeafTapped: ((Int) -> Void)?
+        var onLeafTapped: ((PhotoBooth.ID) -> Void)?
         var requestImage: ((_ booth: PhotoBooth, _ marker: NMFMarker, _ isSelected: Bool) -> Void)?
         
-        private var boothDataMap: [Int: PhotoBooth] = [:]
-        private var selectedBoothID: Int?
+        private var boothDataMap: [PhotoBooth.ID: PhotoBooth] = [:]
+        private var selectedBoothID: PhotoBooth.ID?
         
-        func updateState(photoBooths: IdentifiedArrayOf<PhotoBooth>, selectedBoothID: Int?) {
+        func updateState(photoBooths: IdentifiedArrayOf<PhotoBooth>, selectedBoothID: PhotoBooth.ID?) {
             boothDataMap = photoBooths.reduce(into: [:]) { $0[$1.id] = $1 }
             self.selectedBoothID = selectedBoothID
         }

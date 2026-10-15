@@ -29,7 +29,7 @@ enum PhotoBoothListPreviewData {
     /// 사당역 주변을 검색한 것처럼 보이는 부스 5곳입니다.
     static let searchResultBooths: [PhotoBooth] = brands.prefix(5).enumerated().map { index, brand in
         PhotoBooth(
-            id: index + 1,
+            id: String(index + 1),
             brand: brand,
             name: "사당역점",
             coordinate: GeographicCoordinate(latitude: 37.4765, longitude: 126.9816),

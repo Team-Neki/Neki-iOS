@@ -13,7 +13,7 @@ public struct PhotoBoothClient {
     /// 지도 영역(bounds) 내의 포토부스 데이터를 가져옵니다.
     public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncThrowingStream<[PhotoBooth], Error>
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
-    public var updatePhotoBoothFavorite: @Sendable (_ id: Int, _ isFavorite: Bool) async throws -> Void
+    public var updatePhotoBoothFavorite: @Sendable (_ id: PhotoBooth.ID, _ isFavorite: Bool) async throws -> Void
     /// 즐겨찾기 포토부스 목록 조회
     public var fetchFavoritePhotoBooths: @Sendable () async throws -> [PhotoBooth]
     /// 지원 브랜드 정보 조회

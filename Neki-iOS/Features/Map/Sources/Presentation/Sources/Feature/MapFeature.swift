@@ -289,14 +289,14 @@ public struct MapFeature {
                 switch status {
                 case .authorizedAlways, .authorizedWhenInUse:
                     state.initialExplorationState = .waitingForUserLocation
-                    return .merge(
-                        .run { send in
-                            for await location in await mapClient.trackingLocation() {
-                                await send(.updateUserLocation(.success(location)))
-                            }
-                        }.cancellable(id: CancelID.locationStream, cancelInFlight: true),
-                        .send(.didTapCurrentLocationButton)
-                    )
+                    // 위치 권한을 받으면 현위치 버튼을 누른 것과 같이 지도 모드로 돌아와 현위치를 따라갑니다.
+                    returnToMapModeUnlessSearching(&state)
+                    followUserLocation(&state)
+                    return .run { send in
+                        for await location in await mapClient.trackingLocation() {
+                            await send(.updateUserLocation(.success(location)))
+                        }
+                    }.cancellable(id: CancelID.locationStream, cancelInFlight: true)
                     
                 case .notDetermined:
                     state.initialExplorationState = .awaitingPermission
@@ -340,18 +340,14 @@ public struct MapFeature {
                 )
                 
             case .didTapCurrentLocationButton:
-                // 검색 결과를 보는 동안에는 현위치로 옮겨도 검색 모드를 유지하므로, 시트와 상세를 지도 모드로 되돌리지 않고 카메라만 옮깁니다.
-                if state.appliedSearchQuery == nil {
-                    resetToMapMode(&state, for: .first)
-                }
+                returnToMapModeUnlessSearching(&state)
                 switch state.locationAuthorizationStatus {
                 case .notDetermined:
                     return .send(.requestPermission)
                 case .restricted, .denied:
                     return .send(.presentPermissionAlert)
                 case .authorizedAlways, .authorizedWhenInUse, .authorized:
-                    state.isUserTrackingMode = true
-                    if let location = state.userLocation { updateCameraPosition(&state, to: location.coordinate) }
+                    followUserLocation(&state)
                     return .none
                 @unknown default:
                     return .none
@@ -1096,6 +1092,22 @@ private extension MapFeature {
         state.detent = stage.detent
         state.cameraMoveRequest.clear()
         state.cameraFitRequest.clear()
+    }
+
+    /// 검색 결과를 보고 있지 않으면 상세를 닫고 시트를 처음 높이로 내려 지도 모드로 되돌립니다.
+    ///
+    /// 검색 결과를 보는 동안에는 현위치로 옮겨도 검색 모드를 유지하므로, 시트와 상세를 그대로 두고 카메라만 옮깁니다.
+    func returnToMapModeUnlessSearching(_ state: inout State) {
+        guard state.appliedSearchQuery == nil else { return }
+        resetToMapMode(&state, for: .first)
+    }
+
+    /// 위치 추적을 켜고, 받아 둔 현위치가 있으면 카메라를 그곳으로 옮깁니다.
+    ///
+    /// 현위치를 아직 받지 못했으면 추적이 켜져 있으므로 위치를 받을 때 옮깁니다.
+    func followUserLocation(_ state: inout State) {
+        state.isUserTrackingMode = true
+        if let location = state.userLocation { updateCameraPosition(&state, to: location.coordinate) }
     }
 
     func selectPhotoBooth(_ state: inout State, photoBooth: PhotoBooth) {

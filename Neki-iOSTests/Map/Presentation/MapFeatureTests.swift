@@ -243,6 +243,35 @@ struct MapFeatureTests {
         #expect(store.isUserTrackingMode)
     }
 
+    @Test("위치 권한을 받으면 검색 중이 아닐 때 상세를 닫고 시트를 처음 높이로 내린 뒤 현위치를 따라간다")
+    func updateLocationAuthorization_withoutSearch_returnsToMapModeAndFollowsUserLocation() {
+        let store = makeStore()
+        store.send(.didTapBooth(searchedPhotoBooth))
+        store.send(.updateUserLocation(.success(userLocation)))
+
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+
+        #expect(store.selectedBooth == nil)
+        #expect(store.detent == MapFeature.SheetStage.first.detent)
+        #expect(store.isUserTrackingMode)
+        #expect(store.cameraMoveRequest.coordinate == userCoordinate)
+    }
+
+    @Test("검색 결과를 보는 중에 위치 권한을 받으면 검색과 시트 높이를 그대로 두고 현위치를 따라간다")
+    func updateLocationAuthorization_whileSearching_keepsSearchAndFollowsUserLocation() {
+        let store = makeStore()
+        store.send(.updateUserLocation(.success(userLocation)))
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: false)
+
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+
+        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.photoBoothListState.isSearchResultPresented)
+        #expect(store.detent == MapFeature.SheetStage.second.detent)
+        #expect(store.isUserTrackingMode)
+        #expect(store.cameraMoveRequest.coordinate == userCoordinate)
+    }
+
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
     func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
         let store = makeStore()

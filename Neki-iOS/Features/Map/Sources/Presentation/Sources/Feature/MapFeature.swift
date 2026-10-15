@@ -162,6 +162,8 @@ public struct MapFeature {
         // View Actions
         case onAppear
         case onDisappear
+        /// 다른 탭에서 지도 탭으로 돌아왔음을 알립니다. 탭 전환을 아는 상위 화면(메인 탭)이 보냅니다.
+        case didEnterTab
         case requestPermission
         case openAppSettings
         case didTapGoBackToMapButton
@@ -278,6 +280,23 @@ public struct MapFeature {
                 
             case .onDisappear:
                 return .cancel(id: CancelID.locationStream)
+                
+            case .didEnterTab:
+                // 다른 탭에서 돌아오면 검색 여부와 관계없이 첫 지도 화면을 보여 줍니다.
+                // 카메라 이동과 지역 조회는 새로 그려진 지도가 위치 권한을 다시 받아 처리하므로, 여기서는 화면 상태만 되돌립니다.
+                if state.appliedSearchQuery != nil {
+                    // 검색 결과를 보고 있었다면 검색 종료(X)와 같이 검색을 지우고 시트 높이와 탭·필터를 첫 진입 값으로 되돌립니다.
+                    clearAppliedSearch(&state)
+                    resetTabAndFilters(&state)
+                    resetToMapMode(&state, for: .first)
+                } else if state.isLocationAuthorized {
+                    // 검색 중이 아니면 목록 탭·필터·하트는 그대로 둡니다.
+                    // 위치 권한이 없으면 카메라만 기본 위치로 옮기므로 상세와 시트 높이도 그대로 둡니다.
+                    resetToMapMode(&state, for: .first)
+                }
+                // 검색 화면을 띄운 채로 탭이 바뀌었다면 그 화면도 닫습니다.
+                guard state.isSearchPresented else { return .none }
+                return .send(.photoBoothSearchAction(.dismissSearch))
                 
                 // MARK: - Permission Flow
             case .requestPermission:

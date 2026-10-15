@@ -272,6 +272,73 @@ struct MapFeatureTests {
         #expect(store.cameraMoveRequest.coordinate == userCoordinate)
     }
 
+    @Test(
+        "검색 결과를 보다가 다른 탭에서 돌아오면 검색을 끝내고 상세·시트 높이와 탭·필터를 지도 탭 첫 진입 값으로 되돌린다",
+        arguments: [false, true]
+    )
+    func didEnterTab_whileSearching_endsSearchAndResetsToInitialValues(isSinglePhotoBoothSearch: Bool) {
+        let store = makeStore()
+        if isSinglePhotoBoothSearch {
+            // 부스를 바로 고른 검색은 탭과 필터를 그대로 두므로, 저장한 포토부스 탭·포토이즘 필터·하트가 켜진 채로 남습니다.
+            store.send(.photoBoothSearchAction(.delegate(.didSelectSearchResult(candidate: photoBoothCandidate, result: photoBoothResult))))
+        } else {
+            selectSearchResultSheet(in: store, isPhotoBoothCandidate: false)
+            store.send(.photoBoothListAction(.selectFilterOption(life4cut)))
+            store.send(.didTapFavoriteMarkerFilterButton)
+        }
+
+        store.send(.didEnterTab)
+
+        #expect(store.appliedSearchQuery == nil)
+        #expect(store.isSinglePhotoBoothSearchApplied == false)
+        #expect(store.selectedBooth == nil)
+        #expect(store.detent == MapFeature.SheetStage.first.detent)
+        #expect(store.photoBoothListState.isSearchResultPresented == false)
+        #expect(store.photoBoothListState.selectedTab == .nearby)
+        #expect(store.photoBoothListState.filteredBrands.isEmpty)
+        #expect(store.isFavoriteMarkerFilterEnabled == false)
+    }
+
+    @Test("검색 중이 아니면 다른 탭에서 돌아올 때 탭·필터·하트는 그대로 두고, 위치 권한이 있으면 상세를 닫고 시트를 처음 높이로 내린다")
+    func didEnterTab_withoutSearch_keepsTabAndFilters() {
+        let store = makeStore()
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+        store.send(.didTapBooth(searchedPhotoBooth))
+
+        store.send(.didEnterTab)
+
+        #expect(store.selectedBooth == nil)
+        #expect(store.detent == MapFeature.SheetStage.first.detent)
+        #expect(store.photoBoothListState.selectedTab == .favorite)
+        #expect(store.photoBoothListState.filteredBrands == [photoism])
+        #expect(store.isFavoriteMarkerFilterEnabled)
+    }
+
+    @Test("위치 권한이 없으면 검색 중이 아닐 때 다른 탭에서 돌아와도 상세와 시트 높이를 그대로 둔다")
+    func didEnterTab_withoutLocationAuthorization_keepsDetail() {
+        let store = makeStore()
+        store.send(.updateLocationAuthorization(.denied))
+        store.send(.didTapBooth(searchedPhotoBooth))
+
+        store.send(.didEnterTab)
+
+        #expect(store.selectedBooth == searchedPhotoBooth)
+        #expect(store.detent == MapFeature.SheetStage.photoBoothSelected.detent)
+    }
+
+    @Test("검색 화면을 띄운 채로 탭이 바뀌었다가 돌아오면 검색 화면을 닫고 검색어를 비운다")
+    func didEnterTab_whileSearchPresented_dismissesSearch() {
+        let store = makeStore()
+        store.send(.didTapSearchField)
+        store.send(.photoBoothSearchAction(.binding(.set(\.searchText, "홍대"))))
+
+        store.send(.didEnterTab)
+
+        #expect(store.isSearchPresented == false)
+        #expect(store.photoBoothSearchState.searchText.isEmpty)
+        #expect(store.photoBoothSearchState.mode == .inactive)
+    }
+
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
     func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
         let store = makeStore()

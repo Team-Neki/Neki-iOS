@@ -454,11 +454,17 @@ private extension NearPhotoBoothListSheet {
 
     func photoBoothDistanceLabel(_ photoBooth: PhotoBooth) -> some View {
         // 지역 목록은 서버의 카메라 중심 기준 거리, 즐겨찾기는 사용자 위치 기준 거리를 사용합니다.
+        // 검색 결과는 서버가 검색 기준 좌표로 잰 거리를 쓰되, 위치를 모른 채 검색했으면 표기하지 않습니다.
         let usesUserLocation = store.isSearchResultPresented == false && store.selectedTab == .favorite
         let source = usesUserLocation ? store.favoriteSortCoordinate : nil
-        let measuredDistance = usesUserLocation
-            ? source.flatMap { _ in store.favoriteDistances[photoBooth.coordinate] }
-            : photoBooth.nearbyDistance
+        let measuredDistance: GeographicDistance?
+        if usesUserLocation {
+            measuredDistance = source.flatMap { _ in store.favoriteDistances[photoBooth.coordinate] }
+        } else if store.isSearchResultPresented, store.isSearchResultDistanceVisible == false {
+            measuredDistance = nil
+        } else {
+            measuredDistance = photoBooth.nearbyDistance
+        }
 
         return PhotoBoothDistanceLabel(
             coordinate: photoBooth.coordinate,

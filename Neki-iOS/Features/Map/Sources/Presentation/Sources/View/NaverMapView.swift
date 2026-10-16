@@ -728,13 +728,16 @@ private extension NaverMapView {
                             .foregroundStyle(.gray600)
                             .lineLimit(1)
                         
-                        Rectangle()
-                            .frame(width: 1, height: 10)
-                            .foregroundStyle(.gray100)
-                        
-                        Text(formatterClient.string(distance: photoBooth.nearbyDistance))
-                            .nekiFont(.body14SemiBold)
-                            .foregroundStyle(.gray700)
+                        // 위치를 모른 채 검색한 결과처럼 거리를 표기하지 않을 때는 구분선도 함께 뺍니다.
+                        if store.isSelectedBoothDistanceVisible, let distance = photoBooth.nearbyDistance {
+                            Rectangle()
+                                .frame(width: 1, height: 10)
+                                .foregroundStyle(.gray100)
+                            
+                            Text(formatterClient.string(distance: distance))
+                                .nekiFont(.body14SemiBold)
+                                .foregroundStyle(.gray700)
+                        }
                     }
                 }
                 

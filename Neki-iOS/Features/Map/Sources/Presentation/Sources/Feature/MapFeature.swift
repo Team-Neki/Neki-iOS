@@ -144,6 +144,12 @@ public struct MapFeature {
                 && photoBoothListState.searchResultPhase == .loaded
                 && photoBooths.isEmpty
         }
+        /// 부스 상세에 거리를 표기할지 여부입니다.
+        ///
+        /// 검색 결과를 보는 동안의 거리는 서버가 검색 기준 좌표로 잰 값이라, 위치를 모른 채 검색했으면 표기하지 않습니다.
+        var isSelectedBoothDistanceVisible: Bool {
+            appliedSearchQuery == nil || photoBoothListState.isSearchResultDistanceVisible
+        }
         var isPermissionAlertPresented: Bool = false
         var initialExplorationState: MapInitialExplorationState = .awaitingPermission
         
@@ -876,7 +882,7 @@ public struct MapFeature {
                 guard state.isSinglePhotoBoothSearchApplied, state.selectedBooth == nil else { return .none }
                 return endSearch(&state)
 
-            case let .photoBoothSearchAction(.delegate(.didSelectCandidate(candidate, query, distanceOrigin))):
+            case let .photoBoothSearchAction(.delegate(.didSelectCandidate(candidate, query, distanceOrigin, isDistanceVisible))):
                 // 후보를 고르면 검색 화면을 바로 닫고, 지도에서 부스 목록을 조회하는 동안 시트에 로딩을 띄웁니다.
                 state.isSearchPresented = false
                 state.isUserTrackingMode = false
@@ -893,6 +899,8 @@ public struct MapFeature {
                 state.photoBoothListState.isSearchResultPresented = true
                 state.photoBoothListState.searchResultPhase = .loading
                 state.photoBoothListState.searchResultBrandFilters = nil
+                // 결과의 거리도 후보와 같은 기준 좌표로 재므로, 위치를 모른 채 검색했으면 후보처럼 표기하지 않습니다.
+                state.photoBoothListState.isSearchResultDistanceVisible = isDistanceVisible
                 if candidate.type != .photoBooth {
                     // 지역·역 검색 결과에는 기존 탭과 필터를 섞지 않습니다.
                     // 좁혀진 칩에 없는 브랜드가 선택된 채로 남으면 목록이 통째로 비고,
@@ -1130,6 +1138,7 @@ private extension MapFeature {
         state.searchResultFetchGeneration &+= 1
         state.photoBoothListState.isSearchResultPresented = false
         state.photoBoothListState.searchResultPhase = .loaded
+        state.photoBoothListState.isSearchResultDistanceVisible = false
         state.photoBoothListState.isSearchResultBrandFilterSheetPresented = false
         state.photoBoothListState.searchResultBrandFilters = nil
     }

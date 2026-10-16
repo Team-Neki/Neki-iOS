@@ -14,6 +14,7 @@ import Dependencies
 struct PhotoBoothSearchCandidateCell: View {
     private let candidate: PhotoBoothSearchCandidate
     private let keyword: String
+    private let showsDistance: Bool
     private let showsDivider: Bool
     private let action: () -> Void
     
@@ -35,18 +36,21 @@ struct PhotoBoothSearchCandidateCell: View {
     /// 검색 후보 셀을 생성합니다.
     ///
     /// - Parameters:
-    ///   - candidate: 표시할 검색 후보. 거리가 있으면 이름 옆에 함께 표시합니다.
+    ///   - candidate: 표시할 검색 후보. 거리가 있으면 `showsDistance`에 따라 이름 옆에 함께 표시합니다.
     ///   - keyword: 이름에서 강조할 검색어. 비어 있으면 강조하지 않습니다.
+    ///   - showsDistance: 후보의 거리를 표시할지 여부. 위치를 모른 채 검색해 기본 좌표에서 잰 거리면 `false`를 전달합니다.
     ///   - showsDivider: 셀 하단에 구분선을 표시할지 여부. 목록의 마지막 셀에서는 `false`를 전달합니다.
     ///   - action: 셀을 선택했을 때 실행할 동작
     init(
         candidate: PhotoBoothSearchCandidate,
         keyword: String,
+        showsDistance: Bool = true,
         showsDivider: Bool = true,
         action: @escaping () -> Void
     ) {
         self.candidate = candidate
         self.keyword = keyword
+        self.showsDistance = showsDistance
         self.showsDivider = showsDivider
         self.action = action
     }
@@ -77,7 +81,7 @@ private extension PhotoBoothSearchCandidateCell {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if let distance = candidate.distance {
+            if showsDistance, let distance = candidate.distance {
                 Text(distanceFormattingClient.string(distance: distance))
                     .nekiFont(.body14Regular)
                     .foregroundStyle(.gray500)

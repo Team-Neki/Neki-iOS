@@ -12,11 +12,11 @@ import ComposableArchitecture
 @Reducer
 public struct PhotoBoothSearchFeature {
     enum Constants {
-        /// 사용자 위치를 알 수 없을 때 거리 표기의 기준으로 쓰는 좌표입니다.
+        /// 사용자 위치를 알 수 없을 때 서버에 거리 계산의 기준으로 넘기는 좌표입니다.
         ///
-        /// 위치 권한에 동의하지 않았거나 첫 좌표를 아직 받지 못했어도 거리를 비워 두지 않도록
-        /// 이 좌표를 서버에 기준으로 넘깁니다. 지도가 위치 없이 여는 시작 지점과 같은 곳이라
-        /// ``MapFeature/Constants/defaultInitialPosition``을 그대로 옮겨 씁니다.
+        /// 위치 권한에 동의하지 않았거나 첫 좌표를 아직 받지 못했어도 이 좌표를 서버에 기준으로 넘깁니다.
+        /// 이 좌표로 잰 거리는 사용자 위치에서 잰 거리가 아니므로 화면에는 표기하지 않습니다.
+        /// 지도가 위치 없이 여는 시작 지점과 같은 곳이라 ``MapFeature/Constants/defaultInitialPosition``을 그대로 옮겨 씁니다.
         static let defaultDistanceOrigin = GeographicCoordinate(
             latitude: MapFeature.Constants.defaultInitialPosition.coordinate.latitude,
             longitude: MapFeature.Constants.defaultInitialPosition.coordinate.longitude
@@ -67,7 +67,8 @@ public struct PhotoBoothSearchFeature {
             /// - rows: 노출할 후보
             /// - keyword: 후보 이름에서 강조할 검색어
             /// - generation: 목록을 불러온 검색의 요청 차수. 같은 검색어라도 새로 검색할 때마다 달라집니다.
-            case results(rows: [PhotoBoothSearchCandidate], keyword: String, generation: Int)
+            /// - isDistanceVisible: 후보 옆에 거리를 표기할지 여부. 목록을 불러온 검색이 사용자 위치를 기준으로 했을 때만 표기합니다.
+            case results(rows: [PhotoBoothSearchCandidate], keyword: String, generation: Int, isDistanceVisible: Bool)
             /// 모든 유형에서 결과가 없음
             case noResult
             /// 요청 실패
@@ -88,9 +89,14 @@ public struct PhotoBoothSearchFeature {
         /// 후보 목록과 결과 목록의 거리도 서로 맞지 않습니다.
         /// 그래서 한 검색이 끝날 때까지는 이 값을 바꾸지 않고, 다음 검색을 요청할 때 그 시점의 위치로 다시 세웁니다.
         ///
-        /// 요청 시점에 위치를 알 수 없으면 ``Constants/defaultDistanceOrigin``으로 세워 거리를 비워 두지 않습니다.
+        /// 요청 시점에 위치를 알 수 없으면 ``Constants/defaultDistanceOrigin``으로 세우고, 서버가 내려준 거리는 표기하지 않습니다.
         /// - Note: 검색 중 이동을 거리에 반영할지는 정책이 정해지지 않아, 지금은 검색 시점으로 고정합니다.
         var distanceOrigin: GeographicCoordinate = Constants.defaultDistanceOrigin
+        /// 후보와 결과에 거리를 표기할지 여부입니다. ``distanceOrigin``과 함께 검색을 요청할 때 고정합니다.
+        ///
+        /// 요청 시점에 위치를 알 수 없어 기본 좌표로 기준을 세웠으면, 서버가 내려준 거리는 사용자 위치가 아니라
+        /// 기본 좌표에서 잰 거리이므로 표기하지 않습니다.
+        var isDistanceVisible: Bool = false
         var region = TypePagination()
         var station = TypePagination()
         var photoBooth = TypePagination()
@@ -131,7 +137,12 @@ public struct PhotoBoothSearchFeature {
         var contentState: ContentState {
             guard mode == .searching else { return .guide }
             if rows.isEmpty == false {
-                return .results(rows: rows, keyword: query?.rawValue ?? "", generation: requestGeneration)
+                return .results(
+                    rows: rows,
+                    keyword: query?.rawValue ?? "",
+                    generation: requestGeneration,
+                    isDistanceVisible: isDistanceVisible
+                )
             }
             if let failure { return .failure(failure) }
             return isAwaitingFirstCandidates ? contentBeforeSearch : .noResult
@@ -171,11 +182,12 @@ public struct PhotoBoothSearchFeature {
             /// 사용자가 고른 후보와, 지도가 그 후보로 부스 목록을 조회할 때 쓸 값입니다.
             ///
             /// 검색 화면은 후보를 고르면 바로 닫히고 조회는 지도가 맡습니다.
-            /// 화면을 닫으면 검색어와 기준 좌표가 비워지므로 함께 넘깁니다.
+            /// 화면을 닫으면 검색어와 기준 좌표, 거리 표기 여부가 비워지므로 함께 넘깁니다.
             case didSelectCandidate(
                 candidate: PhotoBoothSearchCandidate,
                 query: PhotoBoothSearchQuery,
-                distanceOrigin: GeographicCoordinate
+                distanceOrigin: GeographicCoordinate,
+                isDistanceVisible: Bool
             )
         }
     }
@@ -229,10 +241,12 @@ public struct PhotoBoothSearchFeature {
                 else { return .none }
                 // 고른 후보의 부스 목록은 지도가 조회합니다. 검색 화면을 바로 닫고 조회하는 동안 지도에 로딩을 띄우기 위해서입니다.
                 // 서버가 이 좌표로 거리를 계산하므로, 후보 목록과 결과 목록의 거리가 어긋나지 않도록 최신 위치가 아니라 고정한 기준을 넘깁니다.
+                // 결과 목록도 후보 목록과 같은 기준이라 거리 표기 여부를 함께 넘깁니다.
                 return .send(.delegate(.didSelectCandidate(
                     candidate: candidate,
                     query: query,
-                    distanceOrigin: state.distanceOrigin
+                    distanceOrigin: state.distanceOrigin,
+                    isDistanceVisible: state.isDistanceVisible
                 )))
 
             case let .setUserCoordinate(coordinate):
@@ -267,8 +281,10 @@ private extension PhotoBoothSearchFeature {
         state.mode = .searching
         state.query = query
         // 이 검색이 끝날 때까지 거리 표기의 기준으로 쓸 좌표를 여기서 고정합니다.
-        // 요청 시점에 위치를 모르면 기본 좌표로 세우고, 그 뒤 좌표가 도착해도 이 검색에는 반영하지 않습니다.
+        // 요청 시점에 위치를 모르면 기본 좌표로 세우되, 그 좌표로 잰 거리는 표기하지 않습니다.
+        // 그 뒤 좌표가 도착해도 이 검색에는 반영하지 않습니다.
         state.distanceOrigin = state.userCoordinate ?? Constants.defaultDistanceOrigin
+        state.isDistanceVisible = state.userCoordinate != nil
         state.region = .init()
         state.station = .init()
         state.photoBooth = .init()
@@ -333,6 +349,7 @@ private extension PhotoBoothSearchFeature {
         state.mode = .inactive
         state.query = nil
         state.distanceOrigin = Constants.defaultDistanceOrigin
+        state.isDistanceVisible = false
         state.region = .init()
         state.station = .init()
         state.photoBooth = .init()

@@ -134,7 +134,7 @@ struct PhotoBoothSearchFeatureTests {
         let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]])
 
         await submitSearch(on: store)
-        guard case let .results(rows, keyword, firstGeneration) = store.state.contentState else {
+        guard case let .results(rows, keyword, firstGeneration, _) = store.state.contentState else {
             Issue.record("후보 목록 상태가 아닙니다")
             return
         }
@@ -143,7 +143,7 @@ struct PhotoBoothSearchFeatureTests {
 
         // 같은 검색어로 다시 검색해도 새 목록은 직전 목록과 구분되어야 스크롤이 처음부터 시작합니다.
         await submitSearch(on: store)
-        guard case let .results(_, _, secondGeneration) = store.state.contentState else {
+        guard case let .results(_, _, secondGeneration, _) = store.state.contentState else {
             Issue.record("다시 검색한 뒤 후보 목록 상태가 아닙니다")
             return
         }
@@ -238,6 +238,24 @@ struct PhotoBoothSearchFeatureTests {
         // 다음 검색을 요청하면 그 시점의 위치로 기준을 다시 세웁니다.
         await submitSearch(on: store)
         #expect(store.state.distanceOrigin == arrivedCoordinate)
+    }
+
+    @Test("위치를 모른 채 검색하면 기본 좌표로 잰 거리를 후보에 표기하지 않고, 위치를 받은 뒤 다음 검색부터 표기한다")
+    func isDistanceVisible_whenUserCoordinateWasUnknownAtSearch_hidesDistanceUntilNextSearch() async {
+        let store = makeStore(pages: [.photoBooth: [makePhotoBoothPage(distances: [500], hasNext: false)]])
+
+        // 위치를 모른 채 검색하면 서버에는 기본 좌표를 넘기되, 그 좌표로 잰 거리는 사용자 위치에서 잰 거리가 아니라 표기하지 않습니다.
+        await submitSearch(on: store)
+        #expect(store.state.distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
+        #expect(store.state.contentState.isDistanceVisible == false)
+
+        // 검색 도중 위치를 받아도 이 검색의 거리는 여전히 기본 좌표로 잰 값이라 표기하지 않습니다.
+        await store.send(.setUserCoordinate(GeographicCoordinate(latitude: 37.4000, longitude: 127.0276)))
+        #expect(store.state.contentState.isDistanceVisible == false)
+
+        // 다음 검색부터는 받은 위치로 거리를 재므로 표기합니다.
+        await submitSearch(on: store)
+        #expect(store.state.contentState.isDistanceVisible == true)
     }
 
     @Test("첫 화면을 채우는 후보 요청 동안 로딩을 노출한다")
@@ -359,15 +377,16 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.didSelectCandidate(candidate))
         await settle(store)
 
-        // 부스 목록은 지도가 조회하므로, 검색 화면을 닫으면 비워질 검색어와 기준 좌표를 함께 넘깁니다.
+        // 부스 목록은 지도가 조회하므로, 검색 화면을 닫으면 비워질 검색어와 기준 좌표, 거리 표기 여부를 함께 넘깁니다.
         #expect(delegates.value == [.didSelectCandidate(
             candidate: candidate,
             query: PhotoBoothSearchQuery(rawValue: "강남"),
-            distanceOrigin: PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
+            distanceOrigin: PhotoBoothSearchFeature.Constants.defaultDistanceOrigin,
+            isDistanceVisible: false
         )])
     }
 
-    @Test("후보를 고르면 검색을 요청한 시점에 고정한 기준 좌표를 지도로 넘긴다")
+    @Test("후보를 고르면 검색을 요청한 시점에 고정한 기준 좌표와 거리 표기 여부를 지도로 넘긴다")
     func didSelectCandidate_delegatesPinnedDistanceOrigin() async {
         let delegates = LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]>([])
         let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], delegates: delegates)
@@ -387,11 +406,13 @@ struct PhotoBoothSearchFeatureTests {
         await settle(store)
 
         // 후보 목록과 결과 목록의 거리가 어긋나지 않도록 지도도 같은 기준으로 조회하게 합니다.
-        guard case let .didSelectCandidate(_, _, distanceOrigin) = delegates.value.first else {
+        // 검색할 때 위치를 알았으므로 결과에도 거리를 표기합니다.
+        guard case let .didSelectCandidate(_, _, distanceOrigin, isDistanceVisible) = delegates.value.first else {
             Issue.record("후보 선택을 지도로 넘기지 않았습니다")
             return
         }
         #expect(distanceOrigin == searchTimeCoordinate)
+        #expect(isDistanceVisible)
     }
 
     @Test("후보 페이지는 모두 검색을 요청한 시점에 고정한 기준 좌표로 요청한다")
@@ -428,11 +449,11 @@ struct PhotoBoothSearchFeatureTests {
 
         await submitSearch(on: store)
 
-        // 위치 권한에 동의하지 않았어도 거리를 비워 두지 않도록 기본 좌표를 기준으로 넘깁니다.
+        // 위치를 몰라도 서버에는 기본 좌표를 기준으로 넘깁니다. 그 좌표로 잰 거리는 화면에 표기하지 않습니다.
         #expect(await log.origins == [PhotoBoothSearchFeature.Constants.defaultDistanceOrigin])
     }
 
-    @Test("위치를 모르면 기본 좌표를 기준 좌표로 지도에 넘긴다")
+    @Test("위치를 모르면 기본 좌표를 기준 좌표로 넘기고, 결과에 거리를 표기하지 않도록 지도에 알린다")
     func didSelectCandidate_whenUserCoordinateIsUnknown_delegatesDefaultOrigin() async {
         let delegates = LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]>([])
         let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], delegates: delegates)
@@ -446,12 +467,13 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.didSelectCandidate(candidate))
         await settle(store)
 
-        // 위치 권한에 동의하지 않았어도 거리를 비워 두지 않도록 기본 좌표를 기준으로 넘깁니다.
-        guard case let .didSelectCandidate(_, _, distanceOrigin) = delegates.value.first else {
+        // 위치를 몰라도 서버에는 기본 좌표를 기준으로 넘기되, 그 좌표로 잰 거리는 결과에도 표기하지 않습니다.
+        guard case let .didSelectCandidate(_, _, distanceOrigin, isDistanceVisible) = delegates.value.first else {
             Issue.record("후보 선택을 지도로 넘기지 않았습니다")
             return
         }
         #expect(distanceOrigin == PhotoBoothSearchFeature.Constants.defaultDistanceOrigin)
+        #expect(isDistanceVisible == false)
     }
 
     @Test("빈 검색어는 요청하지 않는다")
@@ -509,6 +531,12 @@ private extension PhotoBoothSearchFeature.State.ContentState {
     var isResults: Bool {
         guard case .results = self else { return false }
         return true
+    }
+
+    /// 후보 목록에 거리를 표기하는지 여부입니다. 후보 목록을 노출하는 상태가 아니면 `nil`입니다.
+    var isDistanceVisible: Bool? {
+        guard case let .results(_, _, _, isDistanceVisible) = self else { return nil }
+        return isDistanceVisible
     }
 }
 

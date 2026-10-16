@@ -492,7 +492,7 @@ struct MapFeatureTests {
             }
         }
 
-        await selectCandidate(regionCandidate, distanceOrigin: userCoordinate, in: store).finish()
+        await selectCandidate(regionCandidate, distanceOrigin: userCoordinate, isDistanceVisible: true, in: store).finish()
 
         // 요청 body가 같아 고른 후보 그대로 필터도 함께 조회합니다.
         #expect(photoBoothRequests.value == [regionCandidate])
@@ -540,6 +540,30 @@ struct MapFeatureTests {
         #expect(store.detent == MapFeature.SheetStage.second.detent)
         // 상단 검색 필드를 누르면 이 검색어로 검색 화면에 돌아가 다시 고를 수 있습니다.
         #expect(store.appliedSearchQuery == searchQuery)
+    }
+
+    @Test(
+        "위치를 모른 채 고른 후보의 결과는 결과 목록과 부스 상세에 거리를 표기하지 않고, 검색을 끝내면 부스 상세에 다시 표기한다",
+        arguments: [false, true], [false, true]
+    )
+    func searchResultDistance_followsDistanceVisibilityOfSearch(isPhotoBoothCandidate: Bool, isDistanceVisible: Bool) {
+        let store = makeStore()
+        let candidate = isPhotoBoothCandidate ? photoBoothCandidate : regionCandidate
+        let result = isPhotoBoothCandidate ? photoBoothResult : regionResult
+        selectCandidate(candidate, isDistanceVisible: isDistanceVisible, in: store)
+        store.send(.searchResultResponse(.success(result), candidate: candidate, generation: store.searchResultFetchGeneration))
+        // 부스를 바로 고른 검색은 결과가 오면 상세를 띄우고, 지역 검색은 결과 목록에서 부스를 골라 상세를 엽니다.
+        if isPhotoBoothCandidate == false {
+            store.send(.photoBoothListAction(.didTapBooth(searchedPhotoBooth)))
+        }
+
+        #expect(store.selectedBooth == searchedPhotoBooth)
+        #expect(store.photoBoothListState.isSearchResultDistanceVisible == isDistanceVisible)
+        #expect(store.isSelectedBoothDistanceVisible == isDistanceVisible)
+
+        // 검색을 끝내면 지도 영역 조회의 거리로 돌아가므로 다시 표기합니다.
+        store.send(.didTapClearSearchButton)
+        #expect(store.isSelectedBoothDistanceVisible)
     }
 
     @Test("필터 조회가 실패하면 부스 목록도 반영하지 않고 시트에 실패를 띄운다")
@@ -662,16 +686,20 @@ private extension MapFeatureTests {
     }
 
     /// 검색 화면에서 후보를 고릅니다. 지도는 이때부터 그 후보의 부스 목록을 조회합니다.
+    ///
+    /// 기준 좌표와 거리 표기 여부를 주지 않으면 위치를 모른 채 검색한 것처럼 기본 좌표로 넘기고 거리를 표기하지 않습니다.
     @discardableResult
     func selectCandidate(
         _ candidate: PhotoBoothSearchCandidate,
         distanceOrigin: GeographicCoordinate = PhotoBoothSearchFeature.Constants.defaultDistanceOrigin,
+        isDistanceVisible: Bool = false,
         in store: StoreOf<MapFeature>
     ) -> StoreTask {
         store.send(.photoBoothSearchAction(.delegate(.didSelectCandidate(
             candidate: candidate,
             query: searchQuery,
-            distanceOrigin: distanceOrigin
+            distanceOrigin: distanceOrigin,
+            isDistanceVisible: isDistanceVisible
         ))))
     }
 

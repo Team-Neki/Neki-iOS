@@ -61,8 +61,8 @@ private extension PhotoBoothSearchView {
     @ViewBuilder
     var content: some View {
         switch store.contentState {
-        case let .results(rows, keyword, generation):
-            candidateList(rows: rows, keyword: keyword)
+        case let .results(rows, keyword, generation, isDistanceVisible):
+            candidateList(rows: rows, keyword: keyword, isDistanceVisible: isDistanceVisible)
                 // 새 검색의 목록이 직전 목록의 스크롤 위치를 물려받지 않도록 검색마다 스크롤을 새로 만듭니다.
                 .id(generation)
 
@@ -89,7 +89,7 @@ private extension PhotoBoothSearchView {
     /// 지역 → 지하철역 → 포토부스 순서로 정렬된 검색 후보를 유형 구분 없이 한 목록으로 노출합니다.
     ///
     /// 앞선 유형을 모두 불러온 뒤 다음 유형으로 넘어가므로 새 후보는 항상 목록 끝에 이어집니다.
-    func candidateList(rows: [PhotoBoothSearchCandidate], keyword: String) -> some View {
+    func candidateList(rows: [PhotoBoothSearchCandidate], keyword: String, isDistanceVisible: Bool) -> some View {
         let lastRowID = rows.last?.id
         // 마지막 셀에서 부르면 요청이 오가는 동안 목록이 바닥에서 멈추므로 몇 셀 앞에서 미리 부릅니다.
         // 목록이 임계값보다 짧으면 첫 셀이 곧 미리 부를 셀입니다.
@@ -101,6 +101,7 @@ private extension PhotoBoothSearchView {
                     PhotoBoothSearchCandidateCell(
                         candidate: row,
                         keyword: keyword,
+                        showsDistance: isDistanceVisible,
                         showsDivider: row.id != lastRowID
                     ) {
                         store.send(.didSelectCandidate(row))

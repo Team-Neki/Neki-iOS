@@ -96,6 +96,12 @@ public struct PhotoBoothListFeature {
         /// 후보를 고르면 지도로 먼저 돌아와 부스 목록을 조회하므로, 결과가 오기 전에는 로딩을, 조회가 실패하면 실패 문구를 보여 줍니다.
         var searchResultPhase: SearchResultPhase = .loaded
 
+        /// 검색 결과에 거리를 표기할지 여부입니다.
+        ///
+        /// 검색 결과의 거리는 서버가 검색 화면이 고정한 기준 좌표로 잰 값입니다.
+        /// 위치를 모른 채 검색해 기본 좌표로 쟀으면 사용자 위치에서 잰 거리가 아니므로 표기하지 않습니다.
+        var isSearchResultDistanceVisible: Bool = false
+
         /// 검색 결과의 `브랜드` 칩으로 여는 브랜드 필터 바텀시트가 떠 있는지 여부입니다.
         var isSearchResultBrandFilterSheetPresented: Bool = false
 

@@ -21,7 +21,12 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
     private let controllerSpacing: CGFloat = 12
     private let indicatorAreaHeight: CGFloat = 24
     
-    var isControllersVisible: Bool { selection == MapFeature.SheetStage.first.detent || selection == MapFeature.SheetStage.second.detent }
+    /// 시트 위에 지도 버튼을 띄우는 높이인지 여부입니다. 결과 없음 높이에서도 띄워 현위치로 옮길 수 있게 합니다.
+    var isControllersVisible: Bool {
+        selection == MapFeature.SheetStage.first.detent
+            || selection == MapFeature.SheetStage.second.detent
+            || selection == MapFeature.SheetStage.emptySearchResult.detent
+    }
     
     public var body: some View {
         GeometryReader { proxy in

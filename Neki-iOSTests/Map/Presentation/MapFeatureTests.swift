@@ -346,7 +346,7 @@ struct MapFeatureTests {
     @Test("지역·역 검색 결과가 0곳이면 결과 없음 높이로 올리고, 그 동안에는 두 번째 높이 대신 결과 없음 높이로 끌어 맞춘다")
     func emptySearchResult_usesEmptySearchResultHeight() {
         let store = makeStore()
-        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultMessagePresented: false))
 
         selectSearchResult(regionCandidate, result: PhotoBoothSearchResult(photoBooths: [], brandFilters: []), in: store)
 
@@ -359,7 +359,7 @@ struct MapFeatureTests {
         #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
 
         store.send(.didTapClearSearchButton)
-        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultMessagePresented: false))
     }
 
     @Test("검색 결과가 있으면 지금처럼 두 번째 높이로 보여 주고 끌어 맞추는 높이도 바꾸지 않는다")
@@ -369,7 +369,7 @@ struct MapFeatureTests {
         selectSearchResult(regionCandidate, result: regionResult, in: store)
 
         #expect(store.detent == MapFeature.SheetStage.second.detent)
-        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultMessagePresented: false))
     }
 
     @Test(
@@ -384,7 +384,7 @@ struct MapFeatureTests {
         // 응답을 반영한 직후라 목록 계산 이펙트는 아직 끝나지 않았습니다.
         let result = isPhotoBoothCandidate ? multiplePhotoBoothResult : regionResult
         #expect(Array(store.photoBoothListState.visibleBooths) == result.photoBooths)
-        #expect(store.isSearchResultEmpty == false)
+        #expect(store.isSearchResultMessagePresented == false)
     }
 
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
@@ -525,7 +525,7 @@ struct MapFeatureTests {
     }
 
     @Test(
-        "조회가 실패하면 검색어를 남긴 채 시트에 실패를 띄우고, 가장 낮은 높이에서 기다리던 부스 후보는 결과 시트 높이로 올린다",
+        "조회가 실패하면 검색어를 남긴 채 시트에 실패를 띄우고, 부스 후보든 지역 후보든 결과 없음과 같은 높이로 올린다",
         arguments: [false, true]
     )
     func searchResultResponse_withFailure_showsFailureInSheet(isPhotoBoothCandidate: Bool) {
@@ -537,9 +537,32 @@ struct MapFeatureTests {
 
         #expect(store.photoBoothListState.isSearchResultPresented)
         #expect(store.photoBoothListState.searchResultPhase == .failure(.network))
-        #expect(store.detent == MapFeature.SheetStage.second.detent)
+        #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
+        // 실패 문구를 보여 주는 동안에는 두 번째 높이 대신 결과 없음 높이로 끌어 맞춥니다.
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultMessagePresented: true))
         // 상단 검색 필드를 누르면 이 검색어로 검색 화면에 돌아가 다시 고를 수 있습니다.
         #expect(store.appliedSearchQuery == searchQuery)
+    }
+
+    @Test("로딩 중에 지도에서 연 부스 상세는 조회가 실패해도 그대로 두고, 상세를 닫으면 결과 없음 높이로 실패를 보여 준다")
+    func searchResultResponse_withFailure_whileDetailIsOpen_keepsDetail() {
+        let store = makeStore()
+        selectCandidate(regionCandidate, in: store)
+        // 검색 중에도 화면 안의 즐겨찾기 마커는 지도에 남아 있어 눌러 상세를 열 수 있습니다.
+        store.send(.didTapBooth(searchedPhotoBooth))
+
+        store.send(.searchResultResponse(
+            .failure(.network),
+            candidate: regionCandidate,
+            generation: store.searchResultFetchGeneration
+        ))
+
+        #expect(store.selectedBooth == searchedPhotoBooth)
+        #expect(store.detent == MapFeature.SheetStage.photoBoothSelected.detent)
+
+        store.send(.didTapCloseDetail)
+        #expect(store.selectedBooth == nil)
+        #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
     }
 
     @Test(

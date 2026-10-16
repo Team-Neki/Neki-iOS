@@ -1204,7 +1204,9 @@ private extension MapFeature {
         resetTabAndFilters(&state)
         state.photoBooths = IdentifiedArray(uniqueElements: photoBooths)
         state.visiblePhotoBooths = []
-        state.photoBoothListState.visibleBooths = []
+        // 바로 위에서 필터를 풀었으므로 목록은 계산하지 않아도 결과 그대로입니다.
+        // 계산이 끝날 때까지 비워 두면 그 사이 시트가 0곳과 결과 없음 안내를 그리므로 바로 채웁니다. 지도 마커는 영역 계산을 기다립니다.
+        state.photoBoothListState.visibleBooths = state.photoBooths
         return .send(.startBackgroundCalculation)
     }
 

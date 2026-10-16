@@ -372,6 +372,21 @@ struct MapFeatureTests {
         #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
     }
 
+    @Test(
+        "검색 결과가 오면 목록 계산을 기다리지 않고 결과 목록을 바로 채워, 결과가 있는데 0곳으로 보이는 순간이 없다",
+        arguments: [false, true]
+    )
+    func searchResultResponse_fillsVisibleBoothsImmediately(isPhotoBoothCandidate: Bool) {
+        let store = makeStore()
+
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
+
+        // 응답을 반영한 직후라 목록 계산 이펙트는 아직 끝나지 않았습니다.
+        let result = isPhotoBoothCandidate ? multiplePhotoBoothResult : regionResult
+        #expect(Array(store.photoBoothListState.visibleBooths) == result.photoBooths)
+        #expect(store.isSearchResultEmpty == false)
+    }
+
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
     func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
         let store = makeStore()

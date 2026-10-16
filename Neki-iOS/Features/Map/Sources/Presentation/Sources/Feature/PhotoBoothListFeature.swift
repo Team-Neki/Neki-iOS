@@ -76,6 +76,14 @@ public struct PhotoBoothListFeature {
             guard remainingCount > .zero else { return firstBrand.name }
             return "\(firstBrand.name) 외 \(remainingCount)개"
         }
+
+        /// 검색 결과의 `브랜드` 칩에서 강조색으로 적을 브랜드 이름입니다. 고른 브랜드가 없으면 `nil`입니다.
+        ///
+        /// ``searchResultBrandFilterChipTitle`` 맨 앞의 첫 브랜드 이름이며, 뒤에 붙는 나머지 개수는 강조하지 않습니다.
+        var searchResultBrandFilterChipBrandName: String? {
+            guard filteredBrands.isEmpty == false else { return nil }
+            return selectableBrands.first { filteredBrands.contains($0) }?.name
+        }
         
         /// 검색 결과를 보여 주는 중인지 여부입니다.
         ///

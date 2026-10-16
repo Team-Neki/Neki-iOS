@@ -28,6 +28,8 @@ struct NearPhotoBoothListSheet: View {
         /// 시트 손잡이(24pt)와 검색 결과 첫 줄 사이의 간격입니다.
         static let searchResultTopPadding: CGFloat = 4
         static let searchResultSectionSpacing: CGFloat = 4
+        /// 검색 결과가 없다는 안내 위의 여백입니다. 칩 줄 아래 간격과 별도로 둡니다.
+        static let emptySearchResultTopPadding: CGFloat = 50
     }
 
     private enum FavoriteRemovalEffect {
@@ -43,31 +45,13 @@ struct NearPhotoBoothListSheet: View {
     init(store: StoreOf<PhotoBoothListFeature>) { self.store = store }
     
     var body: some View {
-        ScrollView(.vertical) {
-            verticalScrollTopReader
-
-            if store.isSearchResultPresented {
-                searchResultPhotoBoothListSection
-            } else {
-                photoBoothBrandFilterOptionsSection
-
-                VStack(spacing: 12) {
-                    listTabBar
-
-                    Group {
-                        switch store.selectedTab {
-                        case .nearby:
-                            nearByPhotoBoothListSection
-                        case .favorite:
-                            favoritePhotoBoothListSection
-                        }
-                    }
-                }
+        VStack(spacing: .zero) {
+            // 검색 결과의 개수와 `브랜드` 칩은 목록을 스크롤해도 자리를 지킵니다.
+            if isSearchResultHeaderPresented {
+                searchResultHeader
             }
-        }
-        .coordinateSpace(name: Constants.verticalScrollCoordinateSpaceName)
-        .onPreferenceChange(NearPhotoBoothListScrollOffsetPreferenceKey.self) { offset in
-            updateVerticalScrollTopState(offset)
+
+            listScrollView
         }
         .onChange(of: store.isSearchResultPresented) { _, _ in
             // 목록을 통째로 갈아 끼우면 스크롤이 맨 위로 돌아가므로 시트가 아는 위치도 함께 맞춥니다.
@@ -98,6 +82,35 @@ struct NearPhotoBoothListSheet: View {
 // MARK: - NearPhotoBoothListSheet + Subviews
 
 private extension NearPhotoBoothListSheet {
+    var listScrollView: some View {
+        ScrollView(.vertical) {
+            verticalScrollTopReader
+
+            if store.isSearchResultPresented {
+                searchResultPhotoBoothListSection
+            } else {
+                photoBoothBrandFilterOptionsSection
+
+                VStack(spacing: 12) {
+                    listTabBar
+
+                    Group {
+                        switch store.selectedTab {
+                        case .nearby:
+                            nearByPhotoBoothListSection
+                        case .favorite:
+                            favoritePhotoBoothListSection
+                        }
+                    }
+                }
+            }
+        }
+        .coordinateSpace(name: Constants.verticalScrollCoordinateSpaceName)
+        .onPreferenceChange(NearPhotoBoothListScrollOffsetPreferenceKey.self) { offset in
+            updateVerticalScrollTopState(offset)
+        }
+    }
+
     var verticalScrollTopReader: some View {
         GeometryReader { proxy in
             Color.clear
@@ -257,10 +270,29 @@ private extension NearPhotoBoothListSheet {
         .frame(maxHeight: .infinity)
     }
 
-    /// 검색 결과를 탭 없이 개수, `브랜드` 칩, 목록으로 노출합니다.
+    /// 검색 결과의 개수와 `브랜드` 칩입니다. 목록과 달리 스크롤하지 않습니다.
+    var searchResultHeader: some View {
+        VStack(alignment: .leading, spacing: Constants.searchResultSectionSpacing) {
+            searchResultBoothCountText
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20)
+
+            // 결과에 브랜드가 하나도 없으면 시트를 열어도 고를 게 없으므로 칩을 두지 않습니다.
+            if store.selectableBrands.isEmpty == false {
+                searchResultBrandFilterChipRow
+            } else if store.visibleBooths.isEmpty {
+                // 결과가 0곳이면 칩은 숨기되 자리는 남겨, 결과 없음 안내가 칩이 있을 때와 같은 위치에 오게 합니다.
+                searchResultBrandFilterChipRow
+                    .hidden()
+            }
+        }
+        .padding(.top, Constants.searchResultTopPadding)
+    }
+
+    /// 검색 결과를 탭 없이 목록으로 노출합니다. 개수와 `브랜드` 칩은 스크롤하지 않도록 ``searchResultHeader``에 둡니다.
     ///
     /// 결과를 조회하는 동안에는 개수와 칩까지 비워 두고, 로딩 인디케이터는 시트 목록 영역 전체에 겁니다.
-    /// 조회가 실패하면 검색 화면과 같은 실패 문구를 보여 줍니다.
+    /// 조회가 실패하면 검색 화면과 같은 실패 문구를, 결과가 없으면 검색 화면과 같은 결과 없음 아이콘을 보여 줍니다.
     @ViewBuilder
     var searchResultPhotoBoothListSection: some View {
         switch store.searchResultPhase {
@@ -271,53 +303,64 @@ private extension NearPhotoBoothListSheet {
             SearchResultFailureView(failure: failure)
 
         case .loaded:
-            Section {
-                VStack(alignment: .leading, spacing: Constants.searchResultSectionSpacing) {
-                    searchResultBoothCountText
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 20)
-
-                    // 결과에 브랜드가 하나도 없으면 시트를 열어도 고를 게 없으므로 칩을 두지 않습니다.
-                    if store.selectableBrands.isEmpty == false {
-                        searchResultBrandFilterChipRow
-                    }
-
-                    if store.visibleBooths.isEmpty {
-                        unavailableView("조건에 맞는 포토부스가 없어요.")
-                    } else {
-                        LazyVStack(alignment: .leading, spacing: .zero) {
-                            ForEach(store.visibleBooths) { photoBooth in
-                                photoBoothCell(photoBooth)
-                            }
-                        }
+            if store.visibleBooths.isEmpty {
+                PhotoBoothSearchMessageView(
+                    image: .iconNoResult,
+                    title: "이 주변에는 아직 포토부스가 없어요.\n다른 곳을 검색해보세요!"
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.top, Constants.searchResultSectionSpacing + Constants.emptySearchResultTopPadding)
+            } else {
+                LazyVStack(alignment: .leading, spacing: .zero) {
+                    ForEach(store.visibleBooths) { photoBooth in
+                        photoBoothCell(photoBooth)
                     }
                 }
-                .padding(.top, Constants.searchResultTopPadding)
+                .padding(.top, Constants.searchResultSectionSpacing)
             }
-            .frame(maxHeight: .infinity)
         }
     }
 
     var searchResultBoothCountText: some View {
-        Text("\(store.visibleBooths.count)곳의 포토부스를 찾았어요.")
-            .nekiFont(.body14SemiBold)
-            .foregroundStyle(.gray600)
+        Text(searchResultBoothCountTitle)
+            .nekiFont(.body14Medium)
+            .foregroundStyle(.gray400)
+    }
+
+    /// 개수만 굵은 서체와 진한 색으로 강조한 검색 결과 개수 문구입니다.
+    var searchResultBoothCountTitle: AttributedString {
+        var count = AttributedString("\(store.visibleBooths.count)")
+        count.font = .neki(.body14SemiBold)
+        count.foregroundColor = Color.gray600
+        return count + AttributedString("곳의 포토부스를 찾았어요.")
     }
 
     /// 브랜드 필터 바텀시트를 여는 칩입니다.
     ///
-    /// 고른 브랜드가 없으면 `브랜드`, 있으면 첫 브랜드 이름(둘 이상이면 나머지 개수까지)을 적고 채워진 모양이 됩니다.
+    /// 고른 브랜드가 없으면 `브랜드`, 있으면 첫 브랜드 이름(둘 이상이면 나머지 개수까지)을 적고 첫 브랜드 이름을 강조색으로 칠합니다.
     var searchResultBrandFilterChipRow: some View {
         HStack(spacing: .zero) {
-            Button(store.searchResultBrandFilterChipTitle) {
+            Button {
                 store.send(.didTapSearchResultBrandFilterChip)
+            } label: {
+                searchResultBrandFilterChipLabel
             }
-            .buttonStyle(SearchResultBrandFilterChipStyle(isHighlighted: store.filteredBrands.isEmpty == false))
+            .buttonStyle(SearchResultBrandFilterChipStyle())
 
             Spacer(minLength: .zero)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 8)
+    }
+
+    /// 브랜드 필터 칩의 문구입니다. 고른 브랜드가 있으면 첫 브랜드 이름만 강조색으로 칠하고, 나머지 개수는 칩의 기본 색으로 둡니다.
+    var searchResultBrandFilterChipLabel: Text {
+        var title = AttributedString(store.searchResultBrandFilterChipTitle)
+        if let brandName = store.searchResultBrandFilterChipBrandName,
+           let brandNameRange = title.range(of: brandName) {
+            title[brandNameRange].foregroundColor = Color.primary500
+        }
+        return Text(title)
     }
 
     var favoriteBoothsListHeader: some View {
@@ -447,6 +490,11 @@ private extension NearPhotoBoothListSheet {
         store.isSearchResultPresented && store.searchResultPhase == .loading
     }
 
+    /// 검색 결과의 개수와 `브랜드` 칩을 목록 위에 둘지 여부입니다. 조회하는 동안이나 실패했을 때는 두지 않습니다.
+    var isSearchResultHeaderPresented: Bool {
+        store.isSearchResultPresented && store.searchResultPhase == .loaded
+    }
+
     func handleFavoriteButtonTap(_ photoBooth: PhotoBooth) {
         guard photoBooth.isFavorite else {
             store.send(.didTapFavorite(photoBooth), animation: Self.FavoriteRemovalEffect.animation)
@@ -538,10 +586,8 @@ private extension NearPhotoBoothListSheet {
 /// 검색 결과 위에 놓이는 외곽선 형태의 드롭다운 칩입니다.
 ///
 /// 디자인 시스템의 `NekiChipButtonStyle`(회색 채움, 20pt 화살표)과 달리 흰 바탕에 1.2pt 테두리와 24pt 화살표를 씁니다.
-/// 브랜드가 하나라도 골라져 있으면 채워진 모양으로 바뀌어 필터가 걸려 있음을 알립니다.
+/// 브랜드를 골라도 모양은 그대로이고, 라벨이 첫 브랜드 이름을 강조색으로 적어 필터가 걸려 있음을 알립니다.
 private struct SearchResultBrandFilterChipStyle: ButtonStyle {
-    let isHighlighted: Bool
-
     private enum Constants {
         static let borderWidth: CGFloat = 1.2
         static let leadingPadding: CGFloat = 12
@@ -554,17 +600,17 @@ private struct SearchResultBrandFilterChipStyle: ButtonStyle {
         HStack(spacing: .zero) {
             configuration.label
                 .nekiFont(.body14SemiBold)
-                .foregroundStyle(isHighlighted ? .white : .gray600)
+                .foregroundStyle(.gray600)
 
             Image(.iconChevronDown)
                 .renderingMode(.template)
-                .foregroundStyle(isHighlighted ? .white : .gray400)
+                .foregroundStyle(.gray400)
         }
         .padding(.leading, Constants.leadingPadding)
         .padding(.trailing, Constants.trailingPadding)
         .padding(.vertical, Constants.verticalPadding)
-        .background { Capsule().fill(isHighlighted ? .gray800 : .white) }
-        .overlay { Capsule().strokeBorder(isHighlighted ? .gray800 : .gray50, lineWidth: Constants.borderWidth) }
+        .background { Capsule().fill(.white) }
+        .overlay { Capsule().strokeBorder(.gray50, lineWidth: Constants.borderWidth) }
         .opacity(configuration.isPressed ? Constants.pressedOpacity : 1)
     }
 }

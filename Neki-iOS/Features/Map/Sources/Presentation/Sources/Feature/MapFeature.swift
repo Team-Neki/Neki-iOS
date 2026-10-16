@@ -176,6 +176,11 @@ public struct MapFeature {
         var isUserTrackingMode: Bool = false
         var locationAuthorizationNeeded: Bool = true
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
+        /// 지도가 보인 뒤 처음 받는 위치 권한으로 첫 지도 화면을 다시 탐색해야 하는지 여부입니다.
+        ///
+        /// 지도가 보이면 켜고, 그 뒤 처음 받은 권한으로 탐색을 시작하면서 끕니다.
+        /// 권한 스트림은 구독하자마자 현재 권한을 보내므로, 다시 그린 지도가 시트 높이를 반영한 뒤에 탐색이 시작됩니다.
+        var shouldExploreOnNextAuthorization: Bool = false
         
         // Data
         var photoBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -308,6 +313,11 @@ public struct MapFeature {
                 
                 // MARK: - Life Cycle & Streams
             case .onAppear:
+                // 지도가 보일 때마다 두 흐름을 나눠 시작합니다.
+                // - 첫 지도 화면: 권한을 다시 받으면 그 권한에 맞춰 현위치(권한이 없으면 기본 위치)로 돌아가 그 영역을 조회합니다.
+                //   바로 탐색하면 다시 그린 지도가 시트 높이를 반영하기 전에 카메라를 옮겨 위치가 어긋나므로, 다음 권한을 받을 때 시작합니다.
+                // - 위치 권한 확인: 그 뒤로는 권한이 바뀌었을 때만 첫 지도 화면을 다시 탐색합니다.
+                state.shouldExploreOnNextAuthorization = true
                 return .merge(
                     .send(.loadBrands),
                     .send(.fetchFavoritePhotoBooths(shouldLogViewEvent: false)),
@@ -328,7 +338,7 @@ public struct MapFeature {
                 
             case .didEnterTab:
                 // 다른 탭에서 돌아오면 검색 여부와 관계없이 첫 지도 화면을 보여 줍니다.
-                // 카메라 이동과 지역 조회는 새로 그려진 지도가 위치 권한을 다시 받아 처리하므로, 여기서는 화면 상태만 되돌립니다.
+                // 카메라 이동과 지역 조회는 다시 그려진 지도가 onAppear 뒤 처음 받은 위치 권한으로 첫 지도 화면을 탐색하며 처리하므로, 여기서는 화면 상태만 되돌립니다.
                 if state.appliedSearchQuery != nil {
                     // 검색 결과를 보고 있었다면 검색 종료(X)와 같이 검색을 지우고 시트 높이와 탭·필터를 첫 진입 값으로 되돌립니다.
                     clearAppliedSearch(&state)
@@ -351,35 +361,39 @@ public struct MapFeature {
                 return .run { _ in await mapClient.requestLocationAuthorization() }
                 
             case .updateLocationAuthorization(let status):
+                // 지도가 보인 뒤 처음 받은 권한이거나 권한이 바뀌었을 때만 첫 지도 화면을 탐색합니다.
+                // 같은 권한을 다시 받았다고 보고 있던 상세를 닫거나 카메라를 옮기지 않습니다.
+                let shouldExplore = state.shouldExploreOnNextAuthorization || state.locationAuthorizationStatus != status
+                state.shouldExploreOnNextAuthorization = false
                 state.locationAuthorizationStatus = status
+                let initialExploration: Effect<Action> = shouldExplore ? beginInitialExploration(&state) : .none
                 switch status {
                 case .authorizedAlways, .authorizedWhenInUse:
-                    state.initialExplorationState = .waitingForUserLocation
-                    // 위치 권한을 받으면 현위치 버튼을 누른 것과 같이 지도 모드로 돌아와 현위치를 따라갑니다.
-                    returnToMapModeUnlessSearching(&state)
-                    followUserLocation(&state)
-                    return .run { send in
-                        for await location in await mapClient.trackingLocation() {
-                            await send(.updateUserLocation(.success(location)))
-                        }
-                    }.cancellable(id: CancelID.locationStream, cancelInFlight: true)
+                    // 현위치는 지도가 보이는 동안만 받습니다. 지도가 사라지면 onDisappear가 멈추므로 권한을 받을 때마다 다시 시작합니다.
+                    return .merge(
+                        initialExploration,
+                        .run { send in
+                            for await location in await mapClient.trackingLocation() {
+                                await send(.updateUserLocation(.success(location)))
+                            }
+                        }.cancellable(id: CancelID.locationStream, cancelInFlight: true)
+                    )
                     
                 case .notDetermined:
-                    state.initialExplorationState = .awaitingPermission
-                    return state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
+                    return .merge(
+                        initialExploration,
+                        state.locationAuthorizationNeeded ? .send(.requestPermission) : .none
+                    )
                     
                 case .denied, .restricted:
-                    state.isUserTrackingMode = false
-                    state.initialExplorationState = .readyForDefaultLocation
-                    updateCameraPosition(&state, to: Constants.defaultInitialPosition.coordinate)
                     // 위치에 동의하지 않으면 다음 검색부터 기본 좌표를 거리 기준으로 씁니다.
                     return .merge(
-                        .send(.attemptInitialExploration),
+                        initialExploration,
                         .send(.photoBoothSearchAction(.setUserCoordinate(nil)))
                     )
                     
                 @unknown default:
-                    return .none
+                    return initialExploration
                 }
                 
             case .presentPermissionAlert:
@@ -1247,6 +1261,33 @@ private extension MapFeature {
     func returnToMapModeUnlessSearching(_ state: inout State) {
         guard state.appliedSearchQuery == nil else { return }
         resetToMapMode(&state, for: .first)
+    }
+
+    /// 받아 둔 위치 권한에 맞춰 첫 지도 화면을 다시 탐색합니다.
+    ///
+    /// 권한이 있으면 현위치 버튼을 누른 것과 같이 지도 모드로 돌아와 현위치를 따라가고, 현위치를 받으면 그 영역을 조회합니다.
+    /// 권한이 없으면 기본 위치로 옮겨 그 영역을 조회하고, 아직 정하지 않았으면 권한을 정할 때까지 기다립니다.
+    func beginInitialExploration(_ state: inout State) -> Effect<Action> {
+        switch state.locationAuthorizationStatus {
+        case .authorizedAlways, .authorizedWhenInUse:
+            state.initialExplorationState = .waitingForUserLocation
+            returnToMapModeUnlessSearching(&state)
+            followUserLocation(&state)
+            return .none
+            
+        case .notDetermined:
+            state.initialExplorationState = .awaitingPermission
+            return .none
+            
+        case .denied, .restricted:
+            state.isUserTrackingMode = false
+            state.initialExplorationState = .readyForDefaultLocation
+            updateCameraPosition(&state, to: Constants.defaultInitialPosition.coordinate)
+            return .send(.attemptInitialExploration)
+            
+        @unknown default:
+            return .none
+        }
     }
 
     /// 위치 추적을 켜고, 받아 둔 현위치가 있으면 카메라를 그곳으로 옮깁니다.

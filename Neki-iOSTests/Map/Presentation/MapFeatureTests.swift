@@ -330,6 +330,53 @@ struct MapFeatureTests {
         #expect(store.detent == MapFeature.SheetStage.photoBoothSelected.detent)
     }
 
+    @Test("지도가 보이는 동안 같은 위치 권한을 다시 받으면 첫 지도 화면을 다시 탐색하지 않고, 지도가 다시 보인 뒤 처음 받은 권한으로는 다시 탐색한다")
+    func updateLocationAuthorization_exploresOnlyAfterAppearOrChange() {
+        let store = makeAppearableStore()
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+        store.send(.updateUserLocation(.success(userLocation)))
+        store.send(.mapLoaded(bounds(centeredAt: userCoordinate)))
+        #expect(store.initialExplorationState == .completed)
+
+        // 지도가 보이는 동안 같은 권한을 다시 받아도 보고 있던 상세를 닫거나 첫 지도 화면을 다시 탐색하지 않습니다.
+        store.send(.didTapBooth(searchedPhotoBooth))
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+        #expect(store.initialExplorationState == .completed)
+        #expect(store.selectedBooth == searchedPhotoBooth)
+
+        // 다시 그린 지도가 시트 높이를 반영한 뒤에 탐색하도록, 지도가 보인 것만으로는 탐색하지 않고 다음 권한을 기다립니다.
+        store.send(.onAppear)
+        #expect(store.initialExplorationState == .completed)
+
+        // 지도가 보인 뒤 처음 받은 권한으로 상세를 닫고 현위치로 돌아가 첫 지도 화면을 다시 탐색합니다.
+        store.send(.updateLocationAuthorization(.authorizedWhenInUse))
+        #expect(store.initialExplorationState == .waitingForUserLocation)
+        #expect(store.selectedBooth == nil)
+        #expect(store.isUserTrackingMode)
+        #expect(store.cameraMoveRequest.coordinate == userCoordinate)
+    }
+
+    @Test("위치 권한이 없으면 지도가 다시 보인 뒤 처음 받은 권한으로 기본 위치 영역을 다시 조회하고, 상세는 그대로 둔다")
+    func updateLocationAuthorization_afterAppear_withoutLocationAuthorization_refetchesDefaultArea() {
+        let store = makeAppearableStore()
+        let defaultCoordinate = PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
+        store.send(.updateLocationAuthorization(.denied))
+        store.send(.mapLoaded(bounds(centeredAt: defaultCoordinate)))
+        #expect(store.initialExplorationState == .completed)
+        let fetchGeneration = store.photoBoothFetchContext.generation
+
+        // 지도가 보이는 동안 같은 권한을 다시 받아도 기본 위치 영역을 다시 조회하지 않습니다.
+        store.send(.updateLocationAuthorization(.denied))
+        #expect(store.photoBoothFetchContext.generation == fetchGeneration)
+
+        store.send(.didTapBooth(searchedPhotoBooth))
+        store.send(.onAppear)
+        store.send(.updateLocationAuthorization(.denied))
+
+        #expect(store.photoBoothFetchContext.generation == fetchGeneration + 1)
+        #expect(store.selectedBooth == searchedPhotoBooth)
+    }
+
     @Test("검색 화면을 띄운 채로 탭이 바뀌었다가 돌아오면 검색 화면을 닫고 검색어를 비운다")
     func didEnterTab_whileSearchPresented_dismissesSearch() {
         let store = makeStore()
@@ -750,6 +797,26 @@ private extension MapFeatureTests {
             $0.mapClient.trackingLocation = { .finished }
             updateDependencies(&$0)
         }
+    }
+
+    /// 지도가 보일 때 하는 브랜드·즐겨찾기 조회와 권한 구독을 바로 끝내는 지도 스토어입니다.
+    func makeAppearableStore() -> StoreOf<MapFeature> {
+        makeStore {
+            $0.photoBoothClient.loadBrands = { [] }
+            $0.photoBoothClient.fetchFavoritePhotoBooths = { [] }
+            $0.mapClient.locationAuthorizationStatus = { .finished }
+            $0.mapClient.checkSDKAuthorizationStatus = { .finished }
+        }
+    }
+
+    /// 가운데가 주어진 좌표인 지도 범위입니다. 첫 지도 화면 탐색은 카메라가 목표 근처에 있어야 조회하므로 목표를 가운데에 둡니다.
+    func bounds(centeredAt coordinate: GeographicCoordinate) -> GeographicBoundingBox {
+        GeographicBoundingBox(
+            minLatitude: coordinate.latitude - 0.005,
+            minLongitude: coordinate.longitude - 0.005,
+            maxLatitude: coordinate.latitude + 0.005,
+            maxLongitude: coordinate.longitude + 0.005
+        )
     }
 
     /// 검색 화면에서 `강남`을 검색해 후보를 골랐을 때 지도로 넘어오는 검색어입니다.

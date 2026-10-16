@@ -655,6 +655,7 @@ public struct NaverMapView: View {
             mapControllers()
         }
         .nekiSheetBottomInset()
+        .nekiSheetDetents(store.sheetDetents)
         .overlay(alignment: .bottom) {
             if case .large = store.detent {
                 ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton, animation: .default) }

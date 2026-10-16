@@ -216,6 +216,13 @@ public extension View {
     func nekiSheetBottomInset(_ height: CGFloat = .screenTabBarHeight) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.bottomInset = height }
     }
+
+    /// 시트를 끌어 맞출 수 있는 높이를 정합니다.
+    ///
+    /// - Parameter detents: 끌어 맞출 높이. 지금 높이(`selection`)를 포함해야 그 높이로 그립니다.
+    func nekiSheetDetents(_ detents: Set<NekiSheetDetent>) -> some View {
+        transformEnvironment(\.sheetConfiguration) { $0.detents = detents }
+    }
     
     /// 뷰 영역의 높이를 확인합니다.
     func measureHeight(perform action: @escaping (CGFloat) -> Void) -> some View {

@@ -83,7 +83,9 @@ struct MapFeatureTests {
 
         #expect(store.selectedBooth == nil)
         #expect(store.photoBoothListState.isSearchResultPresented)
-        #expect(store.detent == MapFeature.SheetStage.second.detent)
+        // 0건이면 결과가 없다는 안내가 다 보이도록 결과 없음 높이로 올립니다.
+        let expectedStage: MapFeature.SheetStage = photoBoothCount == .zero ? .emptySearchResult : .second
+        #expect(store.detent == expectedStage.detent)
         #expect(Array(store.photoBooths) == photoBooths)
     }
 
@@ -339,6 +341,35 @@ struct MapFeatureTests {
         #expect(store.isSearchPresented == false)
         #expect(store.photoBoothSearchState.searchText.isEmpty)
         #expect(store.photoBoothSearchState.mode == .inactive)
+    }
+
+    @Test("지역·역 검색 결과가 0곳이면 결과 없음 높이로 올리고, 그 동안에는 두 번째 높이 대신 결과 없음 높이로 끌어 맞춘다")
+    func emptySearchResult_usesEmptySearchResultHeight() {
+        let store = makeStore()
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
+
+        selectSearchResult(regionCandidate, result: PhotoBoothSearchResult(photoBooths: [], brandFilters: []), in: store)
+
+        #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
+        #expect(store.sheetDetents.contains(MapFeature.SheetStage.emptySearchResult.detent))
+        #expect(store.sheetDetents.contains(MapFeature.SheetStage.second.detent) == false)
+
+        // 빈 지도를 눌러도 결과 없음 높이를 그대로 둡니다.
+        store.send(.didTapCloseDetail)
+        #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
+
+        store.send(.didTapClearSearchButton)
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
+    }
+
+    @Test("검색 결과가 있으면 지금처럼 두 번째 높이로 보여 주고 끌어 맞추는 높이도 바꾸지 않는다")
+    func searchResult_withPhotoBooths_keepsSecondHeight() {
+        let store = makeStore()
+
+        selectSearchResult(regionCandidate, result: regionResult, in: store)
+
+        #expect(store.detent == MapFeature.SheetStage.second.detent)
+        #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultEmpty: false))
     }
 
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")

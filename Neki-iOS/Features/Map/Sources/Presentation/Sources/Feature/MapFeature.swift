@@ -20,6 +20,11 @@ public struct MapFeature {
     
     enum SheetStage {
         case first, second, third, photoBoothSelected
+        /// 검색 결과가 0곳일 때의 높이입니다.
+        ///
+        /// 결과 없음 시안(375×812)에서 시트 위쪽이 369pt에 오도록 맞춘 비율입니다.
+        /// 결과가 없다는 안내가 탭바에 가리지 않도록 ``second``보다 높게 둡니다.
+        case emptySearchResult
         
         var detent: NekiSheetDetent {
             switch self {
@@ -27,7 +32,15 @@ public struct MapFeature {
             case .second: return .fraction(0.305)
             case .third: return .large
             case .photoBoothSelected: return .hidden
+            case .emptySearchResult: return .fraction(0.532)
             }
+        }
+
+        /// 시트를 끌어 맞출 수 있는 높이입니다.
+        ///
+        /// 시트는 지금 높이를 이 목록에서 가장 가까운 높이로 그리므로, 검색 결과가 0곳인 동안에는 ``second`` 대신 ``emptySearchResult``를 넣습니다.
+        static func detents(isSearchResultEmpty: Bool) -> Set<NekiSheetDetent> {
+            Set([Self.third, isSearchResultEmpty ? .emptySearchResult : .second, .first, .photoBoothSelected].map(\.detent))
         }
     }
 
@@ -111,6 +124,8 @@ public struct MapFeature {
         // UI Control
         var isSDKAuthSuccessful: Bool = false
         var detent: NekiSheetDetent = SheetStage.first.detent
+        /// 시트를 끌어 맞출 수 있는 높이입니다. 검색 결과가 0곳인 동안에는 결과 없음 높이로 맞춥니다.
+        var sheetDetents: Set<NekiSheetDetent> { SheetStage.detents(isSearchResultEmpty: isSearchResultEmpty) }
         var isExploreHereButtonVisible: Bool = false
         var isSearchPresented: Bool = false
         /// 지도에 반영 중인 검색어입니다. 검색 결과를 보고 있지 않으면 `nil`입니다.
@@ -122,6 +137,13 @@ public struct MapFeature {
         /// 이 검색은 결과 시트 없이 부스 상세만 띄우므로, 상세를 닫으면 그 부스를 고른 검색 화면으로 돌아갑니다.
         /// 지역·역 검색이나 한 지점으로 좁혀지지 않은 부스 검색은 결과 시트로 돌아가므로 `false`입니다.
         var isSinglePhotoBoothSearchApplied: Bool = false
+        /// 지도에 반영한 검색 결과가 0곳인지 여부입니다. 결과를 조회하는 중이거나 조회에 실패했으면 `false`입니다.
+        var isSearchResultEmpty: Bool {
+            appliedSearchQuery != nil
+                && photoBoothListState.isSearchResultPresented
+                && photoBoothListState.searchResultPhase == .loaded
+                && photoBooths.isEmpty
+        }
         var isPermissionAlertPresented: Bool = false
         var initialExplorationState: MapInitialExplorationState = .awaitingPermission
         
@@ -777,7 +799,8 @@ public struct MapFeature {
                     resetToMapMode(&state, for: .first)
                     return presentSearch(&state)
                 }
-                resetToMapMode(&state, for: .second)
+                // 결과가 0곳인 검색에서 빈 지도를 눌렀다면 결과 없음 높이를 그대로 둡니다.
+                resetToMapMode(&state, for: state.isSearchResultEmpty ? .emptySearchResult : .second)
                 return .none
                 
             case .didTapDirectionAppsButton:
@@ -1169,7 +1192,8 @@ private extension MapFeature {
 
         // 지역과 지하철역은 응답 자체가 지도에 그릴 목록이므로 영역 조회를 대신합니다.
         // 서버가 보여 줄 영역을 주지 않아 목록으로 직접 정하며, 0건이면 지도를 옮기지 않습니다.
-        resetToMapMode(&state, for: .second)
+        // 0건이면 결과가 없다는 안내가 다 보이도록 결과 없음 높이로 올립니다.
+        resetToMapMode(&state, for: photoBooths.isEmpty ? .emptySearchResult : .second)
         if let bounds = Self.searchResultBounds(of: photoBooths) {
             state.cameraFitRequest.fit(to: bounds)
         }

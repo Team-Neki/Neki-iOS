@@ -184,6 +184,7 @@ public struct MapFeature {
         /// 고른 검색 후보로 부스 목록을 조회한 차수입니다.
         ///
         /// 결과가 오기 전에 다른 후보를 고르거나 검색을 끝내면 차수가 바뀌어, 늦게 온 응답이 지금 화면을 덮지 않습니다.
+        /// 배경 계산도 시작할 때의 차수를 함께 넘겨, 그 사이 검색을 시작하거나 끝냈으면 결과를 버립니다.
         var searchResultFetchGeneration: UInt = .zero
         
         var selectedBooth: PhotoBooth?
@@ -261,7 +262,8 @@ public struct MapFeature {
             favoriteList: IdentifiedArrayOf<PhotoBooth>,
             distances: [GeographicCoordinate: GeographicDistance],
             sortCoordinate: GeographicCoordinate?,
-            sortOrder: PhotoBoothListFeature.FavoriteSortOrder
+            sortOrder: PhotoBoothListFeature.FavoriteSortOrder,
+            searchResultFetchGeneration: UInt
         )
         case didSelectDirectionApp(DirectionAppType)
         
@@ -726,6 +728,8 @@ public struct MapFeature {
                 let sortOrder = state.photoBoothListState.favoriteSortOrder
                 let sortCoordinate = state.photoBoothListState.favoriteSortCoordinate
                 let cachedDistances = state.photoBoothListState.favoriteDistances
+                // 계산하는 동안 검색을 시작하거나 끝내면 지도에 그릴 부스가 바뀌므로, 지금 검색 차수를 함께 넘겨 늦게 끝난 계산을 걸러냅니다.
+                let searchResultFetchGeneration = state.searchResultFetchGeneration
                 return .run { send in
                     var distances = cachedDistances
                     if distances.isEmpty == false {
@@ -772,13 +776,16 @@ public struct MapFeature {
                         favoriteList: visibleFavoriteBooths,
                         distances: distances,
                         sortCoordinate: sortCoordinate,
-                        sortOrder: sortOrder
+                        sortOrder: sortOrder,
+                        searchResultFetchGeneration: searchResultFetchGeneration
                     ))
                 }
                 .cancellable(id: CancelID.calculation, cancelInFlight: true)
                 
-            case let .didFinishBackgroundCalculation(map, list, favoriteList, distances, sortCoordinate, sortOrder):
-                guard state.photoBoothListState.favoriteSortCoordinate == sortCoordinate,
+            case let .didFinishBackgroundCalculation(map, list, favoriteList, distances, sortCoordinate, sortOrder, searchResultFetchGeneration):
+                // 계산을 시작한 뒤 검색을 시작하거나 끝냈다면 이전 부스로 계산한 결과이므로, 검색 결과나 지도 영역 목록을 덮지 않도록 버립니다.
+                guard state.searchResultFetchGeneration == searchResultFetchGeneration,
+                      state.photoBoothListState.favoriteSortCoordinate == sortCoordinate,
                       state.photoBoothListState.favoriteSortOrder == sortOrder else { return .none }
                 state.visiblePhotoBooths = map
                 state.photoBoothListState.favoriteDistances = distances

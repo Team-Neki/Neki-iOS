@@ -387,6 +387,42 @@ struct MapFeatureTests {
         #expect(store.isSearchResultMessagePresented == false)
     }
 
+    @Test("검색을 시작하기 전에 시작한 배경 계산이 늦게 끝나면 검색 결과를 덮지 않고, 검색 중에 시작한 계산은 반영한다")
+    func didFinishBackgroundCalculation_startedBeforeSearch_isIgnored() {
+        let store = makeStore()
+        // 후보를 고르기 전에 시작한 계산은 그때의 검색 차수를 들고 있습니다.
+        let generationBeforeSearch = store.searchResultFetchGeneration
+        selectSearchResult(regionCandidate, result: regionResult, in: store)
+
+        let staleBooth = makePhotoBooth(id: "9")
+        store.send(.didFinishBackgroundCalculation(
+            map: [staleBooth],
+            list: [staleBooth],
+            favoriteList: [],
+            distances: [:],
+            sortCoordinate: store.photoBoothListState.favoriteSortCoordinate,
+            sortOrder: store.photoBoothListState.favoriteSortOrder,
+            searchResultFetchGeneration: generationBeforeSearch
+        ))
+
+        #expect(Array(store.photoBoothListState.visibleBooths) == regionResult.photoBooths)
+        #expect(store.visiblePhotoBooths[id: staleBooth.id] == nil)
+
+        let currentBooth = makePhotoBooth(id: "8")
+        store.send(.didFinishBackgroundCalculation(
+            map: [currentBooth],
+            list: [currentBooth],
+            favoriteList: [],
+            distances: [:],
+            sortCoordinate: store.photoBoothListState.favoriteSortCoordinate,
+            sortOrder: store.photoBoothListState.favoriteSortOrder,
+            searchResultFetchGeneration: store.searchResultFetchGeneration
+        ))
+
+        #expect(Array(store.photoBoothListState.visibleBooths) == [currentBooth])
+        #expect(store.visiblePhotoBooths[id: currentBooth.id] != nil)
+    }
+
     @Test("같은 부스를 다시 골라도 새 이동 요청을 만들어, 지도를 옮긴 뒤에도 그 부스로 다시 옮긴다")
     func selectingSamePhotoBoothAgain_issuesNewMoveRequest() {
         let store = makeStore()

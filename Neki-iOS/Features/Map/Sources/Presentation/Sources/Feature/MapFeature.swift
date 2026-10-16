@@ -149,6 +149,8 @@ public struct MapFeature {
             case .loaded: return photoBooths.isEmpty
             }
         }
+        /// 지도 버튼 중 즐겨찾기 마커 필터(하트) 버튼을 보여 줄지 여부입니다. 검색 결과를 보는 동안에는 숨깁니다.
+        var isFavoriteMarkerFilterButtonVisible: Bool { appliedSearchQuery == nil }
         /// 부스 상세에 거리를 표기할지 여부입니다.
         ///
         /// 검색 결과를 보는 동안의 거리는 서버가 검색 기준 좌표로 잰 값이라, 위치를 모른 채 검색했으면 표기하지 않습니다.

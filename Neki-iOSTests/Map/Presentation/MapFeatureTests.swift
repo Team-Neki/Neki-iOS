@@ -565,6 +565,19 @@ struct MapFeatureTests {
         #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
     }
 
+    @Test("검색 결과를 보는 동안에는 즐겨찾기 마커 필터 버튼을 숨기고, 검색을 끝내면 다시 보여 준다", arguments: [false, true])
+    func isFavoriteMarkerFilterButtonVisible_isFalseWhileSearchIsApplied(isPhotoBoothCandidate: Bool) {
+        let store = makeStore()
+        #expect(store.isFavoriteMarkerFilterButtonVisible)
+
+        // 결과를 기다리는 동안에도 검색 결과를 보는 중이라 숨깁니다.
+        selectCandidate(isPhotoBoothCandidate ? photoBoothCandidate : regionCandidate, in: store)
+        #expect(store.isFavoriteMarkerFilterButtonVisible == false)
+
+        store.send(.didTapClearSearchButton)
+        #expect(store.isFavoriteMarkerFilterButtonVisible)
+    }
+
     @Test(
         "위치를 모른 채 고른 후보의 결과는 결과 목록과 부스 상세에 거리를 표기하지 않고, 검색을 끝내면 부스 상세에 다시 표기한다",
         arguments: [false, true], [false, true]

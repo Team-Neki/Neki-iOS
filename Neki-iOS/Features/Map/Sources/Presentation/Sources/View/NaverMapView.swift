@@ -776,10 +776,17 @@ private extension NaverMapView {
         HStack {
             VStack(spacing: 8) {
                 if selectedBooth == nil {
-                    favoriteControlButton(
+                    let favoriteButton = favoriteControlButton(
                         isSelected: store.isFavoriteMarkerFilterEnabled,
                         action: { store.send(.didTapFavoriteMarkerFilterButton) }
                     )
+                    // 검색 결과를 보는 동안에는 숨기되 자리는 남깁니다.
+                    // 시트는 버튼 묶음의 높이를 재서 위치를 정하므로, 검색을 시작하고 끝낼 때 그 높이가 바뀌지 않게 합니다.
+                    if store.isFavoriteMarkerFilterButtonVisible {
+                        favoriteButton
+                    } else {
+                        favoriteButton.hidden()
+                    }
                     
                     Button {
                         store.send(.didTapCurrentLocationButton)

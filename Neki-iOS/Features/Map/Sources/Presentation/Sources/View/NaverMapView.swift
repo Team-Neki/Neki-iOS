@@ -72,9 +72,6 @@ struct NaverMapRepresentable: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
-        // 현위치 모드 업데이트
-        updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
-        
         // State 변경 시 카메라 이동
         if context.coordinator.isMapLoaded {
             updateCameraPosition(uiView.mapView, context: context)
@@ -89,7 +86,7 @@ struct NaverMapRepresentable: UIViewRepresentable {
         )
         
         updateContentInset(uiView.mapView)
-        // 인셋을 바꾸면 SDK가 위치 추적 모드를 풀어 버리므로, 추적 중이면 바뀐 콘텐츠 영역을 기준으로 다시 켭니다.
+        // 현위치 모드는 인셋을 반영한 뒤에 맞춥니다. 인셋을 바꾸면 SDK가 위치 추적 모드를 풀어 버리기 때문입니다.
         updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
     }
 }
@@ -658,6 +655,7 @@ public struct NaverMapView: View {
             mapControllers()
         }
         .nekiSheetBottomInset()
+        .nekiSheetDetents(store.sheetDetents)
         .overlay(alignment: .bottom) {
             if case .large = store.detent {
                 ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton, animation: .default) }
@@ -730,13 +728,16 @@ private extension NaverMapView {
                             .foregroundStyle(.gray600)
                             .lineLimit(1)
                         
-                        Rectangle()
-                            .frame(width: 1, height: 10)
-                            .foregroundStyle(.gray100)
-                        
-                        Text(formatterClient.string(distance: photoBooth.nearbyDistance))
-                            .nekiFont(.body14SemiBold)
-                            .foregroundStyle(.gray700)
+                        // 위치를 모른 채 검색한 결과처럼 거리를 표기하지 않을 때는 구분선도 함께 뺍니다.
+                        if store.isSelectedBoothDistanceVisible, let distance = photoBooth.nearbyDistance {
+                            Rectangle()
+                                .frame(width: 1, height: 10)
+                                .foregroundStyle(.gray100)
+                            
+                            Text(formatterClient.string(distance: distance))
+                                .nekiFont(.body14SemiBold)
+                                .foregroundStyle(.gray700)
+                        }
                     }
                 }
                 
@@ -775,10 +776,17 @@ private extension NaverMapView {
         HStack {
             VStack(spacing: 8) {
                 if selectedBooth == nil {
-                    favoriteControlButton(
+                    let favoriteButton = favoriteControlButton(
                         isSelected: store.isFavoriteMarkerFilterEnabled,
                         action: { store.send(.didTapFavoriteMarkerFilterButton) }
                     )
+                    // 검색 결과를 보는 동안에는 숨기되 자리는 남깁니다.
+                    // 시트는 버튼 묶음의 높이를 재서 위치를 정하므로, 검색을 시작하고 끝낼 때 그 높이가 바뀌지 않게 합니다.
+                    if store.isFavoriteMarkerFilterButtonVisible {
+                        favoriteButton
+                    } else {
+                        favoriteButton.hidden()
+                    }
                     
                     Button {
                         store.send(.didTapCurrentLocationButton)

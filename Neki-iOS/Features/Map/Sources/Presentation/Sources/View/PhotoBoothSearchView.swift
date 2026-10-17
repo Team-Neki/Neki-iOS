@@ -48,7 +48,6 @@ struct PhotoBoothSearchView: View {
                 .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
                 .padding(.bottom, Metrics.floatingButtonBottomPadding)
         }
-        .nekiToast(item: $store.toast)
         // 지도에서 검색어를 눌러 다시 들어온 경우에는 결과를 가리지 않도록 키보드를 올리지 않습니다.
         .onAppear { isSearchFieldFocused = store.searchText.isEmpty }
     }
@@ -62,41 +61,35 @@ private extension PhotoBoothSearchView {
     @ViewBuilder
     var content: some View {
         switch store.contentState {
-        case let .results(rows, keyword, generation):
-            candidateList(rows: rows, keyword: keyword)
+        case let .results(rows, keyword, generation, isDistanceVisible):
+            candidateList(rows: rows, keyword: keyword, isDistanceVisible: isDistanceVisible)
                 // 새 검색의 목록이 직전 목록의 스크롤 위치를 물려받지 않도록 검색마다 스크롤을 새로 만듭니다.
                 .id(generation)
 
         case .guide:
-            messageView(
-                inputImage: .iconPlace,
-                title: "어디에서 네컷을 찍을까요?\n브랜드나 지점을 검색해보세요.",
+            PhotoBoothSearchMessageView(
+                image: .iconPlace,
+                title: "어디에서 네컷을 찍을까요?\n브랜드나 지점을 검색해보세요."
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
         case .noResult:
-            messageView(
-                inputImage: .iconNoResult,
-                title: "조건에 맞는 포토부스가 없어요.\n다른 지역이나 브랜드로 검색해보세요.",
+            PhotoBoothSearchMessageView(
+                image: .iconNoResult,
+                title: "조건에 맞는 포토부스가 없어요.\n다른 지역이나 브랜드로 검색해보세요."
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-        case .failure(.network):
-            messageView(
-                inputImage: .iconNetworkError,
-                title: "네트워크 연결이 불안정해요\n잠시 후 다시 시도해주세요."
-            )
-
-        case .failure(.unknown):
-            messageView(
-                inputImage: .iconNetworkError,
-                title: "일시적인 오류가 발생했어요\n잠시 후 다시 시도해주세요."
-            )
+        case let .failure(failure):
+            PhotoBoothSearchMessageView(failure: failure)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 
     /// 지역 → 지하철역 → 포토부스 순서로 정렬된 검색 후보를 유형 구분 없이 한 목록으로 노출합니다.
     ///
     /// 앞선 유형을 모두 불러온 뒤 다음 유형으로 넘어가므로 새 후보는 항상 목록 끝에 이어집니다.
-    func candidateList(rows: [PhotoBoothSearchCandidate], keyword: String) -> some View {
+    func candidateList(rows: [PhotoBoothSearchCandidate], keyword: String, isDistanceVisible: Bool) -> some View {
         let lastRowID = rows.last?.id
         // 마지막 셀에서 부르면 요청이 오가는 동안 목록이 바닥에서 멈추므로 몇 셀 앞에서 미리 부릅니다.
         // 목록이 임계값보다 짧으면 첫 셀이 곧 미리 부를 셀입니다.
@@ -108,6 +101,7 @@ private extension PhotoBoothSearchView {
                     PhotoBoothSearchCandidateCell(
                         candidate: row,
                         keyword: keyword,
+                        showsDistance: isDistanceVisible,
                         showsDivider: row.id != lastRowID
                     ) {
                         store.send(.didSelectCandidate(row))
@@ -124,26 +118,6 @@ private extension PhotoBoothSearchView {
         }
         .scrollDismissesKeyboard(.immediately)
         .scrollIndicators(.hidden)
-    }
-
-    func messageView(inputImage: ImageResource = .iconPlace, title: String, caption: String? = nil) -> some View {
-        VStack(spacing: 20) {
-            Image(inputImage)
-
-            VStack(spacing: 8) {
-                Text(title)
-                    .nekiFont(.body16Medium)
-                    .foregroundStyle(.gray500)
-
-                if let caption {
-                    Text(caption)
-                        .nekiFont(.caption11Medium)
-                        .foregroundStyle(.gray300)
-                }
-            }
-            .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
     }
 }
 

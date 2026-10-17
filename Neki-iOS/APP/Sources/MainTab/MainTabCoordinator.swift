@@ -129,7 +129,7 @@ struct MainTabCoordinator {
                 return .send(.tabChanged(state.selectedTab))
                 
             case let .tabChanged(tab):
-                return .run { _ in
+                let logEffect: Effect<Action> = .run { _ in
                     switch tab {
                     case .archive: await analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
                     case .pose: await analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
@@ -137,6 +137,9 @@ struct MainTabCoordinator {
                     default: break
                     }
                 }
+                // 지도 탭으로 돌아오면 첫 지도 화면으로 되돌리도록 지도에 알립니다. 초기화는 지도가 맡습니다.
+                guard tab == .map else { return logEffect }
+                return .merge(logEffect, .send(.map(.root(.didEnterTab))))
                 
             case .onTapAddButton:
                 state.destination = .uploadSelection

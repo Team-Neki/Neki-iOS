@@ -151,6 +151,10 @@ public struct MapFeature {
         }
         /// 지도 버튼 중 즐겨찾기 마커 필터(하트) 버튼을 보여 줄지 여부입니다. 검색 결과를 보는 동안에는 숨깁니다.
         var isFavoriteMarkerFilterButtonVisible: Bool { appliedSearchQuery == nil }
+        /// 지도에 즐겨찾기 마커를 함께 그릴지 여부입니다.
+        ///
+        /// 검색 결과를 조회하는 동안에는 결과로 바뀔 지도를 비워 두므로, 보고 있던 지역의 즐겨찾기 마커도 그리지 않습니다.
+        var isFavoriteMarkerVisible: Bool { photoBoothListState.searchResultPhase != .loading }
         /// 부스 상세에 거리를 표기할지 여부입니다.
         ///
         /// 검색 결과를 보는 동안의 거리는 서버가 검색 기준 좌표로 잰 값이라, 위치를 모른 채 검색했으면 표기하지 않습니다.
@@ -713,7 +717,7 @@ public struct MapFeature {
 
             case .refreshVisibleMapPhotoBooths:
                 let mapBooths = state.photoBooths
-                let favoriteBooths = state.photoBoothListState.favoriteBooths
+                let favoriteBooths = state.isFavoriteMarkerVisible ? state.photoBoothListState.favoriteBooths : []
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let currentBounds = state.currentBounds
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
@@ -736,6 +740,8 @@ public struct MapFeature {
             case .startBackgroundCalculation:
                 let mapBooths = state.photoBooths
                 let favoriteBooths = state.photoBoothListState.favoriteBooths
+                // 저장한 목록과 거리는 그대로 계산하고, 지도에 그릴 즐겨찾기만 걸러 냅니다.
+                let favoriteMarkerBooths: IdentifiedArrayOf<PhotoBooth> = state.isFavoriteMarkerVisible ? favoriteBooths : []
                 let activeBrandIDs = Self.activeBrandIDs(from: state.photoBoothListState.filteredBrands)
                 let isFavoriteMarkerFilterEnabled = state.isFavoriteMarkerFilterEnabled
                 let currentBounds = state.currentBounds
@@ -757,7 +763,7 @@ public struct MapFeature {
                     let visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth>
                     visibleMapBooths = Self.visibleMapPhotoBooths(
                         mapBooths: mapBooths,
-                        favoriteBooths: favoriteBooths,
+                        favoriteBooths: favoriteMarkerBooths,
                         activeBrandIDs: activeBrandIDs,
                         currentBounds: currentBounds,
                         isFavoriteMarkerFilterEnabled: isFavoriteMarkerFilterEnabled
@@ -938,6 +944,7 @@ public struct MapFeature {
                 }
 
                 // 결과로 바뀔 기존 마커와 목록은 비웁니다. 남겨 두면 로딩 중에 눌러 연 상세가 결과와 함께 닫히는 꼬임이 생깁니다.
+                // 결과가 올 때까지는 보고 있던 지역의 즐겨찾기 마커도 그리지 않습니다(`isFavoriteMarkerVisible`).
                 // 이 조회가 영역 조회를 대신하므로, 진행 중인 영역 조회 결과가 덮어쓰지 않도록 세대를 무효화하고 취소합니다.
                 state.photoBoothFetchContext.invalidate()
                 state.photoBooths = []
@@ -967,9 +974,11 @@ public struct MapFeature {
                 return .merge(
                     .cancel(id: CancelID.mapFetch),
                     .cancel(id: CancelID.mapChunkProcessing),
+                    // 진행 중이던 마커 계산이 비운 마커를 다시 채우지 않도록 멈춥니다. 마커는 결과가 오면 다시 계산합니다.
+                    .cancel(id: CancelID.calculation),
+                    .cancel(id: CancelID.mapMarkerViewportCalculation),
                     // 넘겨받은 검색어와 기준 좌표만 남기고 검색 화면은 처음 상태로 비웁니다.
                     .send(.photoBoothSearchAction(.dismissSearch)),
-                    .send(.startBackgroundCalculation),
                     fetchEffect
                 )
 
@@ -982,11 +991,9 @@ public struct MapFeature {
                 // 실패해도 상단 검색 필드에 검색어가 남아 있어, 누르면 그 검색어로 검색 화면에 돌아가 다시 고를 수 있습니다.
                 state.photoBoothListState.searchResultPhase = .failure(failure)
                 // 실패 문구도 결과 없음 안내와 같은 높이로 보여 줍니다.
-                // 로딩 중에 지도에서 고른 부스 상세가 떠 있으면 그대로 두고, 상세를 닫을 때 이 높이로 돌아옵니다.
-                if state.selectedBooth == nil {
-                    state.detent = SheetStage.emptySearchResult.detent
-                }
-                return .none
+                state.detent = SheetStage.emptySearchResult.detent
+                // 조회가 끝났으므로 결과를 기다리는 동안 그리지 않던 즐겨찾기 마커를 다시 그립니다.
+                return .send(.startBackgroundCalculation)
 
             case .photoBoothListAction(.delegate(.didTapBrandReorderButton)):
                 return .send(.delegate(.routeToBrandReorder(state.photoBoothListState.brands)))

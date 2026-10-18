@@ -627,25 +627,64 @@ struct MapFeatureTests {
         #expect(store.appliedSearchQuery == searchQuery)
     }
 
-    @Test("로딩 중에 지도에서 연 부스 상세는 조회가 실패해도 그대로 두고, 상세를 닫으면 결과 없음 높이로 실패를 보여 준다")
-    func searchResultResponse_withFailure_whileDetailIsOpen_keepsDetail() {
+    @Test("조회가 실패한 뒤 지도에서 연 부스 상세를 닫으면 결과 없음 높이로 실패를 보여 준다")
+    func didTapCloseDetail_afterSearchResultFailure_returnsToEmptySearchResultHeight() {
         let store = makeStore()
         selectCandidate(regionCandidate, in: store)
-        // 검색 중에도 화면 안의 즐겨찾기 마커는 지도에 남아 있어 눌러 상세를 열 수 있습니다.
-        store.send(.didTapBooth(searchedPhotoBooth))
-
         store.send(.searchResultResponse(
             .failure(.network),
             candidate: regionCandidate,
             generation: store.searchResultFetchGeneration
         ))
 
-        #expect(store.selectedBooth == searchedPhotoBooth)
+        // 조회가 끝나면 화면 안의 즐겨찾기 마커를 다시 그리므로 눌러 상세를 열 수 있습니다.
+        store.send(.didTapBooth(favoritePhotoBooth))
+        #expect(store.selectedBooth == favoritePhotoBooth)
         #expect(store.detent == MapFeature.SheetStage.photoBoothSelected.detent)
 
         store.send(.didTapCloseDetail)
         #expect(store.selectedBooth == nil)
         #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
+    }
+
+    @Test("후보를 고르면 결과가 올 때까지 카메라가 움직여도 보고 있던 지역의 즐겨찾기 마커를 그리지 않고, 결과가 오면 결과와 함께 그린다")
+    func didSelectCandidate_hidesFavoriteMarkersUntilResult() async {
+        let store = makeStore()
+        await showFavoritePhotoBooth(in: store)
+        #expect(store.visiblePhotoBooths[id: favoritePhotoBooth.id] != nil)
+
+        selectCandidate(regionCandidate, in: store)
+        #expect(store.visiblePhotoBooths.isEmpty)
+
+        // 후보를 고르며 바뀐 시트 높이로 인셋이 바뀌거나 지도를 옮기면 카메라 이벤트가 옵니다.
+        let viewportBounds = bounds(centeredAt: favoritePhotoBooth.coordinate)
+        await store.send(.cameraMotionChanged(viewportBounds)).finish()
+        await store.send(.cameraMotionEnded(viewportBounds)).finish()
+        #expect(store.visiblePhotoBooths.isEmpty)
+
+        await store.send(.searchResultResponse(
+            .success(regionResult),
+            candidate: regionCandidate,
+            generation: store.searchResultFetchGeneration
+        )).finish()
+        #expect(store.visiblePhotoBooths[id: searchedPhotoBooth.id] != nil)
+        #expect(store.visiblePhotoBooths[id: favoritePhotoBooth.id] != nil)
+    }
+
+    @Test("후보를 고른 뒤 조회가 실패하면 결과를 기다리는 동안 그리지 않던 즐겨찾기 마커를 다시 그린다")
+    func searchResultResponse_withFailure_showsFavoriteMarkersAgain() async {
+        let store = makeStore()
+        await showFavoritePhotoBooth(in: store)
+        selectCandidate(regionCandidate, in: store)
+        #expect(store.visiblePhotoBooths.isEmpty)
+
+        await store.send(.searchResultResponse(
+            .failure(.network),
+            candidate: regionCandidate,
+            generation: store.searchResultFetchGeneration
+        )).finish()
+
+        #expect(Array(store.visiblePhotoBooths) == [favoritePhotoBooth])
     }
 
     @Test("검색 결과를 보는 동안에는 즐겨찾기 마커 필터 버튼을 숨기고, 검색을 끝내면 다시 보여 준다", arguments: [false, true])
@@ -874,6 +913,30 @@ private extension MapFeatureTests {
 
     var searchedPhotoBooth: PhotoBooth {
         makePhotoBooth(id: "1")
+    }
+
+    /// 저장한 포토부스입니다. 검색 결과 부스와 같은 자리에 있고, 지도 스토어가 골라 둔 포토이즘이라 검색 전에도 지도에 그려집니다.
+    var favoritePhotoBooth: PhotoBooth {
+        PhotoBooth(
+            id: "7",
+            brand: photoism,
+            name: "강남7호점",
+            coordinate: searchedPhotoBooth.coordinate,
+            address: searchedPhotoBooth.address,
+            isFavorite: true
+        )
+    }
+
+    /// 저장한 포토부스 하나가 화면 안에 그려진 지도로 만듭니다.
+    ///
+    /// 위치 권한을 받기 전이라 카메라가 멈춰도 첫 지도 화면을 조회하지 않으므로, 즐겨찾기 응답과 마커 계산만 기다립니다.
+    func showFavoritePhotoBooth(in store: StoreOf<MapFeature>) async {
+        await store.send(.cameraMotionEnded(bounds(centeredAt: favoritePhotoBooth.coordinate))).finish()
+        await store.send(.favoritePhotoBoothsResponse(
+            .success([favoritePhotoBooth]),
+            shouldLogViewEvent: false,
+            generation: store.favoriteFetchGeneration
+        )).finish()
     }
 
     func makePhotoBooth(id: PhotoBooth.ID) -> PhotoBooth {

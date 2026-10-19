@@ -51,7 +51,9 @@ App Store Connect API Key는 현재 Team에 속하고 두 앱에 접근할 수 �
 
 GitHub App은 `Team-Neki/Neki-fastlane-match-repo`에만 설치하고 Repository Contents 읽기 권한만 부여합니다. 워크플로는 실행 시점에 1시간 이내로 유효한 Installation Token을 생성하며 Job 종료 시 폐기합니다. Match 저장소에는 개발기와 상용기 앱 및 Share Extension의 App Store 프로파일이 모두 포함되어야 합니다.
 
-현재 Team의 서명 자산은 Match 저장소의 `team-P85DW78LYM` 브랜치에서 관리합니다. 해당 브랜치에는 Apple Distribution identity 1개와 개발기·상용기 앱 및 Share Extension용 App Store 프로파일 4개가 포함되어 있으며, Fastlane readonly 동기화로 검증됐습니다. 기존 `release` 브랜치는 이전 자산 보존 용도로만 두고 CI에서 사용하지 않습니다.
+현재 Team의 서명 자산은 Match 저장소의 `team-P85DW78LYM` 브랜치에서 관리합니다. 해당 브랜치에는 Apple Distribution identity 1개와 개발기·상용기 앱 및 Share Extension용 App Store 프로파일 4개가 포함되어 있어야 합니다. 기존 `release` 브랜치는 이전 자산 보존 용도로만 두고 CI에서 사용하지 않습니다.
+
+배포 인증서의 `.p12`는 Match 암호화 외에 별도 PKCS#12 비밀번호를 설정하지 않은 상태로 저장해야 합니다. 인증서를 갱신한 뒤에는 연결 검증을 실행해 임시 키체인에 Team ID와 개인키가 포함된 code-signing identity가 실제로 설치되는지 확인합니다. Match는 `.p12` 가져오기 실패 후에도 프로파일 설치를 계속할 수 있으므로, Fastlane 검증은 사용할 수 있는 identity가 없으면 명시적으로 실패합니다.
 
 ## Version policy
 

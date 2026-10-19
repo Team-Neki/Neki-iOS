@@ -30,7 +30,11 @@ enum OverlappingMarkerLayout {
     /// 2~3개의 일반적인 중첩은 작은 원 하나로 처리하고, 과밀 그룹은 여러 원으로 확장합니다.
     private static let firstRingCapacity = 8
 
-    static func offsets(count: Int, markerSize: CGSize, minimumGap: CGFloat) -> [CGPoint] {
+    static func offsets(
+        count: Int,
+        markerSize: CGSize,
+        minimumGap: CGFloat
+    ) -> [CGPoint] {
         guard count > 1,
               markerSize.width.isFinite,
               markerSize.height.isFinite,
@@ -59,7 +63,13 @@ enum OverlappingMarkerLayout {
                 minimumGap: minimumGap,
                 existingOffsets: result
             )
-            result.append(contentsOf: offsets(count: itemCount, radius: radius, startAngle: startAngle))
+            result.append(
+                contentsOf: offsets(
+                    count: itemCount,
+                    radius: radius,
+                    startAngle: startAngle
+                )
+            )
 
             remainingCount -= itemCount
             ringIndex += 1
@@ -79,7 +89,11 @@ enum OverlappingMarkerLayout {
         var upperBound = max(markerSize.width, markerSize.height)
 
         while hasCollision(
-            offsets: existingOffsets + offsets(count: itemCount, radius: upperBound, startAngle: startAngle),
+            offsets: existingOffsets + offsets(
+                count: itemCount,
+                radius: upperBound,
+                startAngle: startAngle
+            ),
             markerSize: markerSize,
             minimumGap: minimumGap
         ) {
@@ -93,7 +107,11 @@ enum OverlappingMarkerLayout {
                 radius: candidate,
                 startAngle: startAngle
             )
-            if hasCollision(offsets: candidateOffsets, markerSize: markerSize, minimumGap: minimumGap) {
+            if hasCollision(
+                offsets: candidateOffsets,
+                markerSize: markerSize,
+                minimumGap: minimumGap
+            ) {
                 lowerBound = candidate
             } else {
                 upperBound = candidate
@@ -103,7 +121,11 @@ enum OverlappingMarkerLayout {
         return upperBound
     }
 
-    private static func offsets(count: Int, radius: CGFloat, startAngle: Double) -> [CGPoint] {
+    private static func offsets(
+        count: Int,
+        radius: CGFloat,
+        startAngle: Double
+    ) -> [CGPoint] {
         (0..<count).map { index in
             let angle = startAngle + 2 * .pi * Double(index) / Double(count)
             return CGPoint(
@@ -113,7 +135,11 @@ enum OverlappingMarkerLayout {
         }
     }
 
-    private static func hasCollision(offsets: [CGPoint], markerSize: CGSize, minimumGap: CGFloat) -> Bool {
+    private static func hasCollision(
+        offsets: [CGPoint],
+        markerSize: CGSize,
+        minimumGap: CGFloat
+    ) -> Bool {
         let frames = offsets.map {
             // NMFMarker의 기본 앵커 (0.5, 1.0)를 기준으로 실제 아이콘 영역을 계산합니다.
             CGRect(

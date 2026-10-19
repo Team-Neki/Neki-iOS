@@ -268,7 +268,11 @@ extension NaverMapRepresentable {
                 self?.parent.store.send(.didTapBooth(booth))
             }
             controller.onMarkerImageRequested = { [weak self] booth, marker, isSelected in
-                self?.loadMarkerImage(for: booth, marker: marker, isSelected: isSelected)
+                self?.loadMarkerImage(
+                    for: booth,
+                    marker: marker,
+                    isSelected: isSelected
+                )
             }
             controller.onMarkerImageCancellationRequested = { [weak self] boothID in
                 self?.markerImageTasks.removeValue(forKey: boothID)?.cancel()
@@ -304,7 +308,11 @@ extension NaverMapRepresentable {
             }
             
             leafUpdater.requestImage = { [weak self] booth, marker, isSelected in
-                self?.loadMarkerImage(for: booth, marker: marker, isSelected: isSelected)
+                self?.loadMarkerImage(
+                    for: booth,
+                    marker: marker,
+                    isSelected: isSelected
+                )
             }
         }
         
@@ -476,7 +484,11 @@ extension NaverMapRepresentable {
                     keysToRemove.append(oldKey)
                 }
                 let position = NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-                let key = BoothClusteringKey(identifier: booth.id, brandID: booth.brand.id, position: position)
+                let key = BoothClusteringKey(
+                    identifier: booth.id,
+                    brandID: booth.brand.id,
+                    position: position
+                )
                 keysToAdd[key] = NSNumber(value: booth.brand.id)
                 currentKeyByID[booth.id] = key
                 clusteredMarkerStateByID[booth.id] = state

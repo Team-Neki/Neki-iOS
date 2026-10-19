@@ -88,11 +88,7 @@ final class OverlappingMarkerController {
             let selectionAffectsMarker = selectionChanged
                 && (booth.id == newSelectedBoothID || booth.id == selectedBoothID)
             if isNew || markerChanged || selectionAffectsMarker || (visibilityChanged && newIsExpanded) {
-                update(
-                    marker,
-                    for: booth,
-                    isSelected: booth.id == newSelectedBoothID
-                )
+                update(marker, for: booth, isSelected: booth.id == newSelectedBoothID)
             }
             markerStateByID[booth.id] = state
             marker.mapView = newIsExpanded ? mapView : nil
@@ -126,9 +122,7 @@ final class OverlappingMarkerController {
         }
     }
 
-    private func makePositionedMarkers(
-        groups: [GeographicCoordinate: [BoothID]]
-    ) -> [GeographicCoordinate: [PositionedMarker]] {
+    private func makePositionedMarkers(groups: [GeographicCoordinate: [BoothID]]) -> [GeographicCoordinate: [PositionedMarker]] {
         groups.mapValues { boothIDs in
             let offsets = OverlappingMarkerLayout.offsets(
                 count: boothIDs.count,
@@ -148,11 +142,7 @@ final class OverlappingMarkerController {
         return marker
     }
 
-    private func update(
-        _ marker: NMFMarker,
-        for booth: PhotoBooth,
-        isSelected: Bool
-    ) {
+    private func update(_ marker: NMFMarker, for booth: PhotoBooth, isSelected: Bool) {
         BoothMarkerConfigurator.configure(
             marker,
             for: booth,
@@ -166,10 +156,6 @@ final class OverlappingMarkerController {
             self?.onMarkerTapped?(id)
             return true
         }
-        onMarkerImageRequested?(
-            booth,
-            marker,
-            isSelected
-        )
+        onMarkerImageRequested?(booth, marker, isSelected)
     }
 }

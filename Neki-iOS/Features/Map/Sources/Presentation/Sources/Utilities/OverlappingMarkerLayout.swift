@@ -30,11 +30,7 @@ enum OverlappingMarkerLayout {
     /// 2~3개의 일반적인 중첩은 작은 원 하나로 처리하고, 과밀 그룹은 여러 원으로 확장합니다.
     private static let firstRingCapacity = 8
 
-    static func offsets(
-        count: Int,
-        markerSize: CGSize,
-        minimumGap: CGFloat
-    ) -> [CGPoint] {
+    static func offsets(count: Int, markerSize: CGSize, minimumGap: CGFloat) -> [CGPoint] {
         guard count > 1,
               markerSize.width.isFinite,
               markerSize.height.isFinite,
@@ -63,13 +59,7 @@ enum OverlappingMarkerLayout {
                 minimumGap: minimumGap,
                 existingOffsets: result
             )
-            result.append(
-                contentsOf: offsets(
-                    count: itemCount,
-                    radius: radius,
-                    startAngle: startAngle
-                )
-            )
+            result.append(contentsOf: offsets(count: itemCount, radius: radius, startAngle: startAngle))
 
             remainingCount -= itemCount
             ringIndex += 1
@@ -107,11 +97,7 @@ enum OverlappingMarkerLayout {
                 radius: candidate,
                 startAngle: startAngle
             )
-            if hasCollision(
-                offsets: candidateOffsets,
-                markerSize: markerSize,
-                minimumGap: minimumGap
-            ) {
+            if hasCollision(offsets: candidateOffsets, markerSize: markerSize, minimumGap: minimumGap) {
                 lowerBound = candidate
             } else {
                 upperBound = candidate
@@ -121,11 +107,7 @@ enum OverlappingMarkerLayout {
         return upperBound
     }
 
-    private static func offsets(
-        count: Int,
-        radius: CGFloat,
-        startAngle: Double
-    ) -> [CGPoint] {
+    private static func offsets(count: Int, radius: CGFloat, startAngle: Double) -> [CGPoint] {
         (0..<count).map { index in
             let angle = startAngle + 2 * .pi * Double(index) / Double(count)
             return CGPoint(

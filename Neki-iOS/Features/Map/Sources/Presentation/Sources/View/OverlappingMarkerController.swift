@@ -136,9 +136,7 @@ final class OverlappingMarkerController {
     }
 
     private func makeMarker(for booth: PhotoBooth) -> NMFMarker {
-        let marker = NMFMarker(
-            position: NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-        )
+        let marker = NMFMarker(position: NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude))
         return marker
     }
 

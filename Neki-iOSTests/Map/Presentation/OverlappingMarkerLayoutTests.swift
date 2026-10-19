@@ -26,13 +26,7 @@ struct OverlappingMarkerLayoutTests {
 
     @Test("단독 마커는 원본 화면 좌표를 유지한다")
     func singleMarker_staysAtOrigin() {
-        #expect(
-            OverlappingMarkerLayout.offsets(
-                count: 1,
-                markerSize: markerSize,
-                minimumGap: minimumGap
-            ) == [.zero]
-        )
+        #expect(OverlappingMarkerLayout.offsets(count: 1, markerSize: markerSize, minimumGap: minimumGap) == [.zero])
     }
 
     @Test("동일 좌표 2·3·7·8개와 과밀 그룹의 실제 아이콘 영역이 겹치지 않는다", arguments: [2, 3, 7, 8, 9, 24])
@@ -96,15 +90,9 @@ struct OverlappingMarkerLayoutTests {
     @Test("마커와 무관한 상세 정보 변경은 표현 상태를 갱신하지 않는다")
     func nonVisualBoothChanges_keepMarkerPresentationState() {
         let original = makePhotoBooth(address: "기존 주소", nearbyDistance: nil)
-        let changed = makePhotoBooth(
-            address: "변경된 주소",
-            nearbyDistance: GeographicDistance(meters: 120)
-        )
+        let changed = makePhotoBooth(address: "변경된 주소", nearbyDistance: GeographicDistance(meters: 120))
 
-        #expect(
-            PhotoBoothMarkerPresentationState(booth: original)
-                == PhotoBoothMarkerPresentationState(booth: changed)
-        )
+        #expect(PhotoBoothMarkerPresentationState(booth: original) == PhotoBoothMarkerPresentationState(booth: changed))
     }
 
     @Test("즐겨찾기 변경은 마커 표현 상태를 갱신한다")
@@ -112,26 +100,15 @@ struct OverlappingMarkerLayoutTests {
         let normal = makePhotoBooth(isFavorite: false)
         let favorite = makePhotoBooth(isFavorite: true)
 
-        #expect(
-            PhotoBoothMarkerPresentationState(booth: normal)
-                != PhotoBoothMarkerPresentationState(booth: favorite)
-        )
+        #expect(PhotoBoothMarkerPresentationState(booth: normal) != PhotoBoothMarkerPresentationState(booth: favorite))
     }
 
     private func groups(_ markers: [Marker]) -> [Coordinate: [String]] {
-        OverlappingMarkerGroupResolver.groups(
-            elements: markers,
-            id: \.id,
-            coordinate: \.coordinate
-        )
+        OverlappingMarkerGroupResolver.groups(elements: markers, id: \.id, coordinate: \.coordinate)
     }
 
     private func makeOffsets(count: Int) -> [CGPoint] {
-        OverlappingMarkerLayout.offsets(
-            count: count,
-            markerSize: markerSize,
-            minimumGap: minimumGap
-        )
+        OverlappingMarkerLayout.offsets(count: count, markerSize: markerSize, minimumGap: minimumGap)
     }
 
     private func markerFrame(at offset: CGPoint) -> CGRect {

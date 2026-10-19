@@ -92,11 +92,7 @@ enum OverlappingMarkerLayout {
 
         for _ in 0..<20 {
             let candidate = (lowerBound + upperBound) / 2
-            let candidateOffsets = existingOffsets + offsets(
-                count: itemCount,
-                radius: candidate,
-                startAngle: startAngle
-            )
+            let candidateOffsets = existingOffsets + offsets(count: itemCount, radius: candidate, startAngle: startAngle)
             if hasCollision(offsets: candidateOffsets, markerSize: markerSize, minimumGap: minimumGap) {
                 lowerBound = candidate
             } else {
@@ -110,10 +106,7 @@ enum OverlappingMarkerLayout {
     private static func offsets(count: Int, radius: CGFloat, startAngle: Double) -> [CGPoint] {
         (0..<count).map { index in
             let angle = startAngle + 2 * .pi * Double(index) / Double(count)
-            return CGPoint(
-                x: radius * CGFloat(cos(angle)),
-                y: radius * CGFloat(sin(angle))
-            )
+            return CGPoint(x: radius * CGFloat(cos(angle)), y: radius * CGFloat(sin(angle)))
         }
     }
 

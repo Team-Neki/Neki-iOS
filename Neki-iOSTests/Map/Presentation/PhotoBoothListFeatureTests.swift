@@ -85,6 +85,15 @@ struct PhotoBoothListFeatureTests {
 
         #expect(state.searchResultBrandFilterChipTitle == "인생네컷 외 1개")
     }
+
+    @Test("브랜드 칩에서 강조하는 이름은 칩 문구 맨 앞의 첫 브랜드뿐이고, 고른 브랜드가 없으면 강조하지 않는다")
+    func searchResultBrandFilterChipBrandName_isFirstSelectedBrandOnly() {
+        #expect(makeSearchResultState().searchResultBrandFilterChipBrandName == nil)
+
+        let state = makeSearchResultState(selecting: [searchResultBrands[2], searchResultBrands[1]])
+        #expect(state.searchResultBrandFilterChipBrandName == "인생네컷")
+        #expect(state.searchResultBrandFilterChipTitle.hasPrefix("인생네컷"))
+    }
 }
 
 

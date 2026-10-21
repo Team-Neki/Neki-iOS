@@ -791,8 +791,10 @@ private extension NaverMapView {
                     Button {
                         store.send(.didTapCurrentLocationButton)
                     } label: {
+                        // 비활성 아이콘은 28pt 아이콘 영역 가운데에 놓이는 그림만 담고 있어, 활성 아이콘과 같은 영역에 맞춥니다.
                         Image(store.isUserTrackingMode ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
-                            .padding(8)
+                            .frame(width: 28, height: 28)
+                            .padding(6)
                             .background(.white)
                             .clipShape(.circle)
                     }
@@ -813,13 +815,13 @@ private extension NaverMapView {
             }
         }
         .padding(.horizontal, 20)
-        .shadow(color: .gray400, radius: 8, y: 4)
+        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
     }
     
     func favoriteControlButton(isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(isSelected ? .iconHeart28Fill : .iconHeart28Gray)
-                .padding(8)
+            Image(isSelected ? .iconHeart28Fill : .iconMapButtonHeart)
+                .padding(6)
                 .background(.white)
                 .clipShape(.circle)
         }

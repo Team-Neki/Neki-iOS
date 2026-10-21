@@ -182,10 +182,9 @@ public struct PhotoBoothSearchFeature {
             /// 사용자가 고른 후보와, 지도가 그 후보로 부스 목록을 조회할 때 쓸 값입니다.
             ///
             /// 검색 화면은 후보를 고르면 바로 닫히고 조회는 지도가 맡습니다.
-            /// 화면을 닫으면 검색어와 기준 좌표, 거리 표기 여부가 비워지므로 함께 넘깁니다.
+            /// 화면을 닫으면 기준 좌표와 거리 표기 여부가 비워지므로 함께 넘깁니다.
             case didSelectCandidate(
                 candidate: PhotoBoothSearchCandidate,
-                query: PhotoBoothSearchQuery,
                 distanceOrigin: GeographicCoordinate,
                 isDistanceVisible: Bool
             )
@@ -235,16 +234,12 @@ public struct PhotoBoothSearchFeature {
 
             case let .didSelectCandidate(candidate):
                 // 새 검색의 첫 후보를 기다리는 동안 노출 중인 직전 목록은 고를 수 없습니다.
-                guard state.mode == .searching,
-                      state.isAwaitingFirstCandidates == false,
-                      let query = state.query
-                else { return .none }
+                guard state.mode == .searching, state.isAwaitingFirstCandidates == false else { return .none }
                 // 고른 후보의 부스 목록은 지도가 조회합니다. 검색 화면을 바로 닫고 조회하는 동안 지도에 로딩을 띄우기 위해서입니다.
                 // 서버가 이 좌표로 거리를 계산하므로, 후보 목록과 결과 목록의 거리가 어긋나지 않도록 최신 위치가 아니라 고정한 기준을 넘깁니다.
                 // 결과 목록도 후보 목록과 같은 기준이라 거리 표기 여부를 함께 넘깁니다.
                 return .send(.delegate(.didSelectCandidate(
                     candidate: candidate,
-                    query: query,
                     distanceOrigin: state.distanceOrigin,
                     isDistanceVisible: state.isDistanceVisible
                 )))

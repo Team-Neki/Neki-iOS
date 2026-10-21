@@ -117,7 +117,7 @@ struct MapFeatureTests {
         #expect(store.isExploreHereButtonVisible)
     }
 
-    @Test("부스 하나를 바로 고른 검색에서 상세를 닫으면 검색을 끝내지 않고 그 검색어로 검색 화면을 다시 연다")
+    @Test("부스 하나를 바로 고른 검색에서 상세를 닫으면 검색을 끝내지 않고 고른 부스의 이름으로 검색 화면을 다시 연다")
     func didTapCloseDetail_afterSinglePhotoBoothSearch_presentsSearch() {
         let store = makeStore()
         selectSearchResult(photoBoothCandidate, result: photoBoothResult, in: store)
@@ -126,9 +126,9 @@ struct MapFeatureTests {
 
         #expect(store.isSearchPresented)
         #expect(store.selectedBooth == nil)
-        #expect(store.photoBoothSearchState.searchText == "강남")
-        #expect(store.photoBoothSearchState.query?.rawValue == "강남")
-        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.photoBoothSearchState.searchText == photoBoothCandidate.keyword)
+        #expect(store.photoBoothSearchState.query?.rawValue == photoBoothCandidate.keyword)
+        #expect(store.appliedSearchQuery?.rawValue == photoBoothCandidate.keyword)
     }
 
     @Test("상세를 닫고 돌아온 검색 화면에서 후보를 고르지 않고 나가면 검색을 끝내고 지도 탭 첫 진입 값으로 되돌린다")
@@ -156,7 +156,7 @@ struct MapFeatureTests {
         store.send(.photoBoothSearchAction(.dismissSearch))
 
         #expect(store.selectedBooth == searchedPhotoBooth)
-        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.appliedSearchQuery?.rawValue == photoBoothCandidate.keyword)
     }
 
     @Test(
@@ -186,7 +186,7 @@ struct MapFeatureTests {
 
         store.send(.photoBoothSearchAction(.dismissSearch))
 
-        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.appliedSearchQuery?.rawValue == searchResultSheetCandidate(isPhotoBoothCandidate: isPhotoBoothCandidate).keyword)
         #expect(store.photoBoothListState.isSearchResultPresented)
     }
 
@@ -228,7 +228,7 @@ struct MapFeatureTests {
         store.send(.didTapCurrentLocationButton)
         store.send(.updateUserLocation(.success(userLocation)))
 
-        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.appliedSearchQuery?.rawValue == searchResultSheetCandidate(isPhotoBoothCandidate: isPhotoBoothCandidate).keyword)
         #expect(store.photoBoothListState.isSearchResultPresented)
         #expect(store.detent == MapFeature.SheetStage.second.detent)
         #expect(store.isUserTrackingMode)
@@ -269,7 +269,7 @@ struct MapFeatureTests {
 
         store.send(.updateLocationAuthorization(.authorizedWhenInUse))
 
-        #expect(store.appliedSearchQuery?.rawValue == "강남")
+        #expect(store.appliedSearchQuery?.rawValue == regionCandidate.keyword)
         #expect(store.photoBoothListState.isSearchResultPresented)
         #expect(store.detent == MapFeature.SheetStage.second.detent)
         #expect(store.isUserTrackingMode)
@@ -517,13 +517,27 @@ struct MapFeatureTests {
         selectCandidate(regionCandidate, in: store)
 
         #expect(store.isSearchPresented == false)
-        #expect(store.appliedSearchQuery == searchQuery)
+        #expect(store.appliedSearchQuery?.rawValue == regionCandidate.keyword)
         #expect(store.detent == MapFeature.SheetStage.second.detent)
         #expect(store.photoBoothListState.isSearchResultPresented)
         #expect(store.photoBoothListState.searchResultPhase == .loading)
         // 지역·역 검색 결과에는 기존 탭과 필터를 섞지 않습니다.
         #expect(store.photoBoothListState.selectedTab == .nearby)
         #expect(store.photoBoothListState.filteredBrands.isEmpty)
+    }
+
+    @Test("후보를 고르면 상단 검색 필드에 입력한 검색어 대신 고른 후보의 이름을 남기고, 검색 필드를 누르면 그 이름으로 다시 검색한다")
+    func didSelectCandidate_appliesCandidateKeyword() {
+        let store = makeStore()
+        store.send(.didTapSearchField)
+        store.send(.photoBoothSearchAction(.binding(.set(\.searchText, "강남"))))
+
+        selectSearchResult(regionCandidate, result: regionResult, in: store)
+        #expect(store.appliedSearchQuery?.rawValue == regionCandidate.keyword)
+
+        store.send(.didTapSearchField)
+        #expect(store.photoBoothSearchState.searchText == regionCandidate.keyword)
+        #expect(store.photoBoothSearchState.query?.rawValue == regionCandidate.keyword)
     }
 
     @Test("포토부스 후보를 고르면 열려 있던 상세를 닫고, 결과가 오기 전까지 시트를 가장 낮은 높이에 두고 로딩을 띄운다")
@@ -623,8 +637,8 @@ struct MapFeatureTests {
         #expect(store.detent == MapFeature.SheetStage.emptySearchResult.detent)
         // 실패 문구를 보여 주는 동안에는 두 번째 높이 대신 결과 없음 높이로 끌어 맞춥니다.
         #expect(store.sheetDetents == MapFeature.SheetStage.detents(isSearchResultMessagePresented: true))
-        // 상단 검색 필드를 누르면 이 검색어로 검색 화면에 돌아가 다시 고를 수 있습니다.
-        #expect(store.appliedSearchQuery == searchQuery)
+        // 상단 검색 필드를 누르면 고른 후보의 이름으로 검색 화면에 돌아가 다시 고를 수 있습니다.
+        #expect(store.appliedSearchQuery?.rawValue == candidate.keyword)
     }
 
     @Test("조회가 실패한 뒤 지도에서 연 부스 상세를 닫으면 결과 없음 높이로 실패를 보여 준다")
@@ -858,11 +872,6 @@ private extension MapFeatureTests {
         )
     }
 
-    /// 검색 화면에서 `강남`을 검색해 후보를 골랐을 때 지도로 넘어오는 검색어입니다.
-    var searchQuery: PhotoBoothSearchQuery {
-        PhotoBoothSearchQuery(rawValue: "강남")
-    }
-
     /// 검색 화면에서 후보를 고릅니다. 지도는 이때부터 그 후보의 부스 목록을 조회합니다.
     ///
     /// 기준 좌표와 거리 표기 여부를 주지 않으면 위치를 모른 채 검색한 것처럼 기본 좌표로 넘기고 거리를 표기하지 않습니다.
@@ -875,7 +884,6 @@ private extension MapFeatureTests {
     ) -> StoreTask {
         store.send(.photoBoothSearchAction(.delegate(.didSelectCandidate(
             candidate: candidate,
-            query: searchQuery,
             distanceOrigin: distanceOrigin,
             isDistanceVisible: isDistanceVisible
         ))))
@@ -973,9 +981,14 @@ private extension MapFeatureTests {
         PhotoBoothSearchResult(photoBooths: [makePhotoBooth(id: "1"), makePhotoBooth(id: "2")], brandFilters: [])
     }
 
+    /// 결과 시트로 보여 주는 검색 결과의 후보입니다. 지역 후보 또는 여러 지점으로 나온 부스 후보입니다.
+    func searchResultSheetCandidate(isPhotoBoothCandidate: Bool) -> PhotoBoothSearchCandidate {
+        isPhotoBoothCandidate ? photoBoothCandidate : regionCandidate
+    }
+
     /// 결과 시트로 보여 주는 검색 결과를 고릅니다. 지역 후보 또는 여러 지점으로 나온 부스 후보입니다.
     func selectSearchResultSheet(in store: StoreOf<MapFeature>, isPhotoBoothCandidate: Bool) {
-        let candidate = isPhotoBoothCandidate ? photoBoothCandidate : regionCandidate
+        let candidate = searchResultSheetCandidate(isPhotoBoothCandidate: isPhotoBoothCandidate)
         let result = isPhotoBoothCandidate ? multiplePhotoBoothResult : regionResult
         selectSearchResult(candidate, result: result, in: store)
     }

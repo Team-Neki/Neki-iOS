@@ -363,8 +363,8 @@ struct PhotoBoothSearchFeatureTests {
         #expect(store.state.isAwaitingFirstCandidates == false)
     }
 
-    @Test("후보를 고르면 직접 조회하지 않고 고른 후보와 검색어를 지도로 넘긴다")
-    func didSelectCandidate_delegatesCandidateWithQuery() async {
+    @Test("후보를 고르면 직접 조회하지 않고 고른 후보를 지도로 넘긴다")
+    func didSelectCandidate_delegatesCandidate() async {
         let delegates = LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]>([])
         let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], delegates: delegates)
 
@@ -377,10 +377,9 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.didSelectCandidate(candidate))
         await settle(store)
 
-        // 부스 목록은 지도가 조회하므로, 검색 화면을 닫으면 비워질 검색어와 기준 좌표, 거리 표기 여부를 함께 넘깁니다.
+        // 부스 목록은 지도가 조회하므로, 검색 화면을 닫으면 비워질 기준 좌표와 거리 표기 여부를 함께 넘깁니다.
         #expect(delegates.value == [.didSelectCandidate(
             candidate: candidate,
-            query: PhotoBoothSearchQuery(rawValue: "강남"),
             distanceOrigin: PhotoBoothSearchFeature.Constants.defaultDistanceOrigin,
             isDistanceVisible: false
         )])
@@ -407,7 +406,7 @@ struct PhotoBoothSearchFeatureTests {
 
         // 후보 목록과 결과 목록의 거리가 어긋나지 않도록 지도도 같은 기준으로 조회하게 합니다.
         // 검색할 때 위치를 알았으므로 결과에도 거리를 표기합니다.
-        guard case let .didSelectCandidate(_, _, distanceOrigin, isDistanceVisible) = delegates.value.first else {
+        guard case let .didSelectCandidate(_, distanceOrigin, isDistanceVisible) = delegates.value.first else {
             Issue.record("후보 선택을 지도로 넘기지 않았습니다")
             return
         }
@@ -468,7 +467,7 @@ struct PhotoBoothSearchFeatureTests {
         await settle(store)
 
         // 위치를 몰라도 서버에는 기본 좌표를 기준으로 넘기되, 그 좌표로 잰 거리는 결과에도 표기하지 않습니다.
-        guard case let .didSelectCandidate(_, _, distanceOrigin, isDistanceVisible) = delegates.value.first else {
+        guard case let .didSelectCandidate(_, distanceOrigin, isDistanceVisible) = delegates.value.first else {
             Issue.record("후보 선택을 지도로 넘기지 않았습니다")
             return
         }

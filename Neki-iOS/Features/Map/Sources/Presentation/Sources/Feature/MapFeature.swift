@@ -131,7 +131,7 @@ public struct MapFeature {
         }
         var isExploreHereButtonVisible: Bool = false
         var isSearchPresented: Bool = false
-        /// 지도에 반영 중인 검색어입니다. 검색 결과를 보고 있지 않으면 `nil`입니다.
+        /// 지도에 반영 중인 검색어로, 고른 후보의 이름입니다. 검색 결과를 보고 있지 않으면 `nil`입니다.
         ///
         /// 상단 검색 필드를 검색 완료 형태로 유지하고, 검색 화면으로 되돌아갈 때 그대로 다시 검색합니다.
         var appliedSearchQuery: PhotoBoothSearchQuery?
@@ -916,12 +916,12 @@ public struct MapFeature {
                 guard state.isSinglePhotoBoothSearchApplied, state.selectedBooth == nil else { return .none }
                 return endSearch(&state)
 
-            case let .photoBoothSearchAction(.delegate(.didSelectCandidate(candidate, query, distanceOrigin, isDistanceVisible))):
+            case let .photoBoothSearchAction(.delegate(.didSelectCandidate(candidate, distanceOrigin, isDistanceVisible))):
                 // 후보를 고르면 검색 화면을 바로 닫고, 지도에서 부스 목록을 조회하는 동안 시트에 로딩을 띄웁니다.
                 state.isSearchPresented = false
                 state.isUserTrackingMode = false
-                // 결과를 보는 동안 상단 검색 필드에 검색어를 검색 완료 형태로 남기고, 재탐색 버튼은 내립니다.
-                state.appliedSearchQuery = query
+                // 결과를 보는 동안 상단 검색 필드에 입력한 검색어 대신 고른 후보의 이름을 검색 완료 형태로 남기고, 재탐색 버튼은 내립니다.
+                state.appliedSearchQuery = PhotoBoothSearchQuery(rawValue: candidate.keyword)
                 state.isExploreHereButtonVisible = false
                 // 한 지점으로 좁혀지는지는 결과가 와야 알 수 있습니다.
                 // 부스를 바로 고른 검색에서 다시 검색해 넘어와도 결과가 오기 전에는 결과 시트 검색으로 둡니다.

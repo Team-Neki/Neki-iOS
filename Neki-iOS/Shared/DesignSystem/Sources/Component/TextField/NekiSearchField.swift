@@ -187,6 +187,14 @@ private extension NekiSearchField {
             }
         }
 
+        /// 제출하거나 완료한 검색어 옆의 검색 아이콘은 입력 중보다 연하게 표시합니다.
+        var searchIcon: ImageResource {
+            switch self {
+            case .entry, .input(.editing): .iconSearch
+            case .input(.submitted), .completed: .iconSearchGray
+            }
+        }
+
         /// 진입점은 필드 전체가 하나의 버튼입니다.
         /// 그 외에는 필드 안의 버튼과 텍스트 필드가 각자 입력을 받고, 그 밖을 누른 탭은 필드가 받습니다.
         var isTappableAsWhole: Bool {
@@ -276,7 +284,7 @@ private extension NekiSearchField {
         case .entry:
             iconImage(.iconNeki)
         case .input, .completed:
-            icon(.iconChevronLeft) { onBack?() }
+            icon(.iconChevronLeft24) { onBack?() }
         }
     }
 
@@ -311,13 +319,13 @@ private extension NekiSearchField {
     var trailing: some View {
         switch variant {
         case .entry:
-            iconImage(.iconSearch)
+            iconImage(variant.searchIcon)
         case .input:
-            icon(.iconSearch) { onSubmit?() }
+            icon(variant.searchIcon) { onSubmit?() }
         case .completed:
-            icon(.iconSearch) { onSubmit?() }
+            icon(variant.searchIcon) { onSubmit?() }
 
-            icon(.iconXmarkBlack) { onClear?() }
+            icon(.iconXmark24Black) { onClear?() }
         }
     }
 
@@ -349,9 +357,12 @@ private extension NekiSearchField {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// 아이콘을 원래 크기로 아이콘 영역(24pt) 가운데에 그립니다.
+    ///
+    /// 검색 필드의 아이콘은 이 크기로 그린 에셋이라 늘리거나 줄이지 않습니다.
+    /// 그림 부분만 담은 에셋(`icon_search_gray`)도 디자인처럼 영역 가운데에 놓입니다.
     func iconImage(_ icon: ImageResource) -> some View {
         Image(icon)
-            .resizable()
             .frame(width: Metrics.iconSize, height: Metrics.iconSize)
     }
 

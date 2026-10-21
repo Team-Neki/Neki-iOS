@@ -141,14 +141,17 @@ final class OverlappingMarkerController {
     }
 
     private func update(_ marker: NMFMarker, for booth: PhotoBooth, isSelected: Bool) {
-        BoothMarkerConfigurator.configure(
+        PhotoBoothMarkerConfigurator.configure(
             marker,
             for: booth,
             isSelected: isSelected,
-            captionColorHex: configuration.captionColorHex,
-            captionTextSize: configuration.captionTextSize,
-            normalZIndex: configuration.normalZIndex,
-            selectedZIndex: configuration.selectedZIndex
+            style: PhotoBoothMarkerStyle(
+                captionColorHex: configuration.captionColorHex,
+                captionTextSize: configuration.captionTextSize,
+                normalZIndex: configuration.normalZIndex,
+                selectedZIndex: configuration.selectedZIndex
+            ),
+            collisionPolicy: .overlapping
         )
         marker.touchHandler = { [weak self, id = booth.id] _ in
             self?.onMarkerTapped?(id)

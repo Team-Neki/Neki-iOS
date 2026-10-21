@@ -351,6 +351,7 @@ extension NaverMapRepresentable {
                     guard let overlay = renderedOverlay, Task.isCancelled == false else { return }
                     
                     await MainActor.run {
+                        guard self.markerImageRequestIDs[booth.id] == requestID else { return }
                         self.overlayImageCache.setObject(overlay, forKey: cacheKey as NSString)
                         self.applyOverlay(to: marker, overlay: overlay, expectedID: booth.id)
                     }
@@ -358,6 +359,7 @@ extension NaverMapRepresentable {
                     guard Task.isCancelled == false else { return }
                     Logger.presentation.error("Brand Image Download Failed for Marker: \(booth.id) - \(error)")
                     await MainActor.run {
+                        guard self.markerImageRequestIDs[booth.id] == requestID else { return }
                         self.applyDefaultOverlay(to: marker, isSelected: isSelected, expectedID: booth.id)
                     }
                 }
@@ -575,14 +577,17 @@ extension NaverMapRepresentable {
             else { return }
             
             let isSelected = (booth.id == selectedBoothID)
-            BoothMarkerConfigurator.configure(
+            PhotoBoothMarkerConfigurator.configure(
                 marker,
                 for: booth,
                 isSelected: isSelected,
-                captionColorHex: Constants.captionColorHex,
-                captionTextSize: Constants.leafCaptionTextSize,
-                normalZIndex: Constants.zIndexNormal,
-                selectedZIndex: Constants.zIndexSelected
+                style: PhotoBoothMarkerStyle(
+                    captionColorHex: Constants.captionColorHex,
+                    captionTextSize: Constants.leafCaptionTextSize,
+                    normalZIndex: Constants.zIndexNormal,
+                    selectedZIndex: Constants.zIndexSelected
+                ),
+                collisionPolicy: .clusteredLeaf
             )
             marker.touchHandler = { [weak self] _ in
                 self?.onLeafTapped?(booth.id)
@@ -632,10 +637,19 @@ extension NaverMapRepresentable {
             }
             
             marker.iconImage = overlayImage
+            marker.userInfo = [:]
             marker.captionText = ""
+            marker.captionColor = .black
+            marker.captionHaloColor = .white
             marker.captionAligns = [NMFAlignType.center]
+            marker.captionTextSize = Constants.leafCaptionTextSize
+            marker.captionOffset = 0
             marker.anchor = CGPoint(x: 0.5, y: 0.5)
             marker.zIndex = 50
+            marker.isHideCollidedSymbols = true
+            marker.isHideCollidedMarkers = false
+            marker.isHideCollidedCaptions = false
+            marker.isForceShowCaption = false
             
             marker.touchHandler = { [weak mapView] overlay in
                 guard let mapView, let marker = overlay as? NMFMarker else { return false }

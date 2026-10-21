@@ -218,8 +218,6 @@ private extension NekiSearchField {
         static let iconSize: CGFloat = 24
         static let horizontalPadding: CGFloat = 16
         static let verticalPadding: CGFloat = 12
-        static let shadowRadius: CGFloat = 4
-        static let shadowOffsetY: CGFloat = 2
         static let pressedOpacity: Double = 0.75
     }
 }
@@ -391,11 +389,7 @@ private struct SearchFieldContainer: ViewModifier {
                     Capsule().strokeBorder(.gray100)
                 }
             }
-            .shadow(
-                color: decoration == .shadow ? .black.opacity(0.25) : .clear,
-                radius: NekiSearchField.Metrics.shadowRadius,
-                y: NekiSearchField.Metrics.shadowOffsetY
-            )
+            .nekiShadow(.button, isVisible: decoration == .shadow)
     }
 }
 

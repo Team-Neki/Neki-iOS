@@ -826,7 +826,7 @@ private extension NaverMapView {
             }
         }
         .padding(.horizontal, 20)
-        .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+        .nekiShadow(.button)
     }
     
     func favoriteControlButton(isSelected: Bool, action: @escaping () -> Void) -> some View {
@@ -854,7 +854,7 @@ private extension NaverMapView {
             .background(
                 Capsule()
                     .fill(.white)
-                    .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    .nekiShadow(.button)
             )
             .overlay {
                 Capsule()

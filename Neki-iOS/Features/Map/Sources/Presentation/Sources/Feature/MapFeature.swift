@@ -29,7 +29,9 @@ public struct MapFeature {
         var detent: NekiSheetDetent {
             switch self {
             case .first: return .fraction(0.134)
-            case .second: return .fraction(0.305)
+            // 기기와 관계없이 시트 하단 여백 위 298pt로 고정합니다.
+            // 저장한 포토부스 탭의 정렬(저장순·거리순)까지 탭바 위로 보이는 높이입니다. 탭바가 시트 아래 12pt를 덮습니다.
+            case .second: return .absolute(298)
             case .third: return .large
             case .photoBoothSelected: return .hidden
             case .emptySearchResult: return .fraction(0.532)

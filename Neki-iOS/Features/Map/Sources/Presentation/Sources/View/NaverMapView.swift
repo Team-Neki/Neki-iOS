@@ -194,8 +194,6 @@ extension NaverMapRepresentable {
         let parent: NaverMapRepresentable
         private let displayScale: CGFloat
         private var lastFavoriteMarkerViewportUpdateTime: TimeInterval = .zero
-        private var isOverlappingMarkerLayoutUpdateScheduled = false
-        private var overlappingMarkerLayoutUpdateGeneration: UInt = .zero
         
         private var markerImageTasks: [BoothID: Task<Void, Never>] = [:]
         private var markerImageRequestIDs: [BoothID: UUID] = [:]
@@ -432,26 +430,7 @@ extension NaverMapRepresentable {
             )
         }
 
-        func scheduleOverlappingMarkerLayoutUpdate(mapView: NMFMapView) {
-            guard lastExpandedOverlappingMarkers == true,
-                  isOverlappingMarkerLayoutUpdateScheduled == false
-            else { return }
-
-            isOverlappingMarkerLayoutUpdateScheduled = true
-            let generation = overlappingMarkerLayoutUpdateGeneration
-            DispatchQueue.main.async { [weak self, weak mapView] in
-                guard let self else { return }
-                self.isOverlappingMarkerLayoutUpdateScheduled = false
-                guard self.overlappingMarkerLayoutUpdateGeneration == generation,
-                      let mapView
-                else { return }
-                self.overlappingMarkerController.updatePositions(mapView: mapView)
-            }
-        }
-
-        func finishOverlappingMarkerLayoutUpdate(mapView: NMFMapView) {
-            overlappingMarkerLayoutUpdateGeneration &+= 1
-            isOverlappingMarkerLayoutUpdateScheduled = false
+        func updateOverlappingMarkerPositionsIfNeeded(mapView: NMFMapView) {
             guard lastExpandedOverlappingMarkers == true else { return }
             overlappingMarkerController.updatePositions(mapView: mapView)
         }
@@ -698,7 +677,7 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     func mapView(_ mapView: NMFMapView, cameraIsChangingByReason reason: Int) {
         let currentTime = CACurrentMediaTime()
         updateOverlappingMarkerModeIfNeeded(mapView: mapView)
-        scheduleOverlappingMarkerLayoutUpdate(mapView: mapView)
+        updateOverlappingMarkerPositionsIfNeeded(mapView: mapView)
         if currentTime - lastFavoriteMarkerViewportUpdateTime >= Constants.favoriteMarkerViewportUpdateInterval {
             lastFavoriteMarkerViewportUpdateTime = currentTime
             parent.store.send(.cameraMotionChanged(mapView.contentBounds.toDomain()))
@@ -707,7 +686,7 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     
     func mapViewCameraIdle(_ mapView: NMFMapView) {
         updateOverlappingMarkerModeIfNeeded(mapView: mapView)
-        finishOverlappingMarkerLayoutUpdate(mapView: mapView)
+        updateOverlappingMarkerPositionsIfNeeded(mapView: mapView)
         let nmapBounds = mapView.contentBounds
         let geographicBounds = nmapBounds.toDomain()
         if isMapLoaded == false {

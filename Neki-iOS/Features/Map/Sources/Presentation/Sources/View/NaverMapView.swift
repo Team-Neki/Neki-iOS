@@ -40,6 +40,12 @@ fileprivate enum Constants {
     static let captionColorHex: UInt = 0x202227
     static let brandClusteringThreshold: Double = 14.0
     static let favoriteMarkerViewportUpdateInterval: TimeInterval = 0.15
+    
+    // Search Field
+    /// 지도 상단 검색 필드를 상단 안전 영역에서 띄우는 높이
+    static let searchFieldTopPadding: CGFloat = 8
+    /// 시트를 가장 높이 올렸을 때 검색 필드 아래에 둘 간격
+    static let sheetSpacingBelowSearchField: CGFloat = 8
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
@@ -618,6 +624,8 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewTouchDelegate {
 
 public struct NaverMapView: View {
     @Bindable var store: StoreOf<MapFeature>
+    /// 지도 상단 검색 필드의 높이입니다. 시트를 가장 높이 올려도 검색 필드를 가리지 않도록 잽니다.
+    @State private var searchFieldHeight: CGFloat = .zero
     
     @Dependency(\.distanceFormatterClient) var formatterClient
     
@@ -641,12 +649,13 @@ public struct NaverMapView: View {
             VStack(spacing: 12) {
                 MapSearchField(store: store)
                     .padding(.horizontal, 20)
+                    .measureHeight { searchFieldHeight = $0 }
 
                 if store.isExploreHereButtonVisible {
                     exploreHereControl
                 }
             }
-            .safeAreaPadding(.top, 8)
+            .safeAreaPadding(.top, Constants.searchFieldTopPadding)
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
@@ -654,6 +663,8 @@ public struct NaverMapView: View {
         } controllers: {
             mapControllers()
         }
+        // 시트를 가장 높이 올려도 검색 필드는 가리지 않고 그 아래에서 멈춥니다.
+        .nekiSheetTopInset(Constants.searchFieldTopPadding + searchFieldHeight + Constants.sheetSpacingBelowSearchField)
         .nekiSheetBottomInset()
         .nekiSheetDetents(store.sheetDetents)
         .overlay(alignment: .bottom) {

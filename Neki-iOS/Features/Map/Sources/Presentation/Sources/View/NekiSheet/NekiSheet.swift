@@ -118,8 +118,9 @@ private extension NekiSheet {
 private extension NekiSheet {
     func layout(in totalHeight: CGFloat) -> SheetLayout {
         let inset = configuration.bottomInset
-        let sortedHeights = configuration.detents.map { $0.resolve(in: totalHeight, inset: inset) }.sorted()
-        let targetHeight = selection.resolve(in: totalHeight, inset: inset)
+        let topInset = configuration.topInset
+        let sortedHeights = configuration.detents.map { $0.resolve(in: totalHeight, inset: inset, topInset: topInset) }.sorted()
+        let targetHeight = selection.resolve(in: totalHeight, inset: inset, topInset: topInset)
         let currentHeight = sortedHeights.min(by: { abs($0 - targetHeight) < abs($1 - targetHeight) }) ?? targetHeight
         let maxHeight = sortedHeights.last ?? totalHeight
         let baseOffset = maxHeight - currentHeight
@@ -171,12 +172,15 @@ private extension NekiSheet {
         }
 
         let inset = configuration.bottomInset
+        let topInset = configuration.topInset
         let predictedHeight = layout.currentHeight - value.translation.height
         let interactiveDetents = configuration.detents.filter { $0 != .hidden }
-        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxyHeight, inset: inset) }
+        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxyHeight, inset: inset, topInset: topInset) }
         let closestHeight = interactiveHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
 
-        guard let newDetent = interactiveDetents.first(where: { abs($0.resolve(in: proxyHeight, inset: inset) - closestHeight) < 1.0 }) else {
+        guard let newDetent = interactiveDetents.first(where: {
+            abs($0.resolve(in: proxyHeight, inset: inset, topInset: topInset) - closestHeight) < 1.0
+        }) else {
             return resetDragState()
         }
 
@@ -220,6 +224,13 @@ public extension View {
     /// - Parameter height: 띄울 높이 (기본값: 현재 디바이스의 탭바 높이)
     func nekiSheetBottomInset(_ height: CGFloat = .screenTabBarHeight) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.bottomInset = height }
+    }
+
+    /// 시트를 가장 높이 올렸을 때(`large`) 위에 여백을 남깁니다.
+    ///
+    /// - Parameter height: 남길 높이. 시트를 그리는 영역(상단 안전 영역 아래)의 위쪽부터 잽니다.
+    func nekiSheetTopInset(_ height: CGFloat) -> some View {
+        transformEnvironment(\.sheetConfiguration) { $0.topInset = height }
     }
 
     /// 시트를 끌어 맞출 수 있는 높이를 정합니다.

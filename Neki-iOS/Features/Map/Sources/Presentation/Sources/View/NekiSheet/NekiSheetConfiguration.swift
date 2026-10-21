@@ -16,6 +16,8 @@ struct NekiSheetConfiguration: Equatable {
     var shadowColor: Color
     var shadowRadius: CGFloat
     var bottomInset: CGFloat
+    /// 시트를 가장 높이 올렸을 때(`large`) 위에 남길 여백입니다.
+    var topInset: CGFloat
     var animation: Animation
     
     init(
@@ -27,6 +29,7 @@ struct NekiSheetConfiguration: Equatable {
         shadowColor: Color = .black.opacity(0.1),
         shadowRadius: CGFloat = 10,
         bottomInset: CGFloat = .zero,
+        topInset: CGFloat = .zero,
         animation: Animation = .interpolatingSpring(stiffness: 300, damping: 30)
     ) {
         self.detents = detents
@@ -37,6 +40,7 @@ struct NekiSheetConfiguration: Equatable {
         self.shadowColor = shadowColor
         self.shadowRadius = shadowRadius
         self.bottomInset = bottomInset
+        self.topInset = topInset
         self.animation = animation
     }
 }

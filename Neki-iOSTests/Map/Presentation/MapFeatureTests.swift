@@ -846,6 +846,25 @@ struct MapFeatureTests {
         ])
     }
 
+    @Test("결과 조회가 실패한 뒤 다시 그린 즐겨찾기 마커를 고르면, 검색어는 남아 있어도 결과가 적용되지 않았으므로 지도 출처를 남긴다")
+    func didTapBooth_afterSearchResultFailure_logsBoothSelectFromMap() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+        await showFavoritePhotoBooth(in: store)
+        selectCandidate(regionCandidate, in: store)
+        await store.send(.searchResultResponse(
+            .failure(.network),
+            candidate: regionCandidate,
+            generation: store.searchResultFetchGeneration
+        )).finish()
+        #expect(store.appliedSearchQuery != nil)
+        #expect(store.visiblePhotoBooths[id: favoritePhotoBooth.id] != nil)
+
+        await store.send(.didTapBooth(favoritePhotoBooth)).finish()
+
+        #expect(events.value == [.boothSelect(brandName: photoism.name, entryPoint: .map, source: .map)])
+    }
+
     @Test("부스 하나로 좁혀진 검색 결과는 상세를 바로 띄워도 부스 선택 이벤트를 보내지 않는다")
     func searchResultResponse_withSinglePhotoBooth_doesNotLogBoothSelect() async {
         let events = LockIsolated<[MapAnalyticsEvent]>([])

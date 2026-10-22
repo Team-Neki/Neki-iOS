@@ -153,8 +153,12 @@ public struct MapFeature {
         }
         /// 지도 버튼 중 즐겨찾기 마커 필터(하트) 버튼을 보여 줄지 여부입니다. 검색 결과를 보는 동안에는 숨깁니다.
         var isFavoriteMarkerFilterButtonVisible: Bool { appliedSearchQuery == nil }
-        /// 부스를 고를 때 지도에 반영 중인 결과의 출처입니다. 검색 결과를 보는 동안이면 검색, 아니면 지도 탐색입니다.
-        var boothSelectionSource: MapBoothSelectionSource { appliedSearchQuery == nil ? .map : .search }
+        /// 부스를 고를 때 지도에 반영 중인 결과의 출처입니다. 검색 결과가 지도에 적용된 동안이면 검색, 아니면 지도 탐색입니다.
+        ///
+        /// 조회에 실패하면 다시 검색할 수 있도록 검색어는 남지만 결과는 적용되지 않았으므로, 이때 고른 즐겨찾기 마커는 지도 탐색으로 셉니다.
+        var boothSelectionSource: MapBoothSelectionSource {
+            appliedSearchQuery != nil && photoBoothListState.searchResultPhase == .loaded ? .search : .map
+        }
         /// 지도에 즐겨찾기 마커를 함께 그릴지 여부입니다.
         ///
         /// 검색 결과를 조회하는 동안에는 결과로 바뀔 지도를 비워 두므로, 보고 있던 지역의 즐겨찾기 마커도 그리지 않습니다.

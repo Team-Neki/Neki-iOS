@@ -38,11 +38,10 @@ enum MapAnalyticsEvent {
     case mapReExplore(hasFilter: Bool, regionChanged: Bool)
     case mapBrandFilterToggle(action: MapFilterAction, selectedCount: Int, brandName: String)
     /// source는 선택 당시 지도에 적용된 결과의 출처입니다.
-    /// 수집 경로 연결 전 기존 호출은 source를 생략하여 기존 전송 파라미터를 유지합니다.
     case boothSelect(
         brandName: String,
         entryPoint: MapEntryPoint,
-        source: MapBoothSelectionSource? = nil
+        source: MapBoothSelectionSource
     )
     case boothFavoriteAdd(boothName: String, brandName: String)
     case boothFavoriteRemove(boothName: String, brandName: String)
@@ -105,12 +104,11 @@ extension MapAnalyticsEvent: AnalyticsEvent {
                 .brandName: .string(brandName)
             ]
         case let .boothSelect(brandName, entryPoint, source):
-            var parameters: [AnalyticsParameterKey: AnalyticsParameterValue] = [
+            return [
                 .brandName: .string(brandName),
-                .entryPoint: .string(entryPoint.rawValue)
+                .entryPoint: .string(entryPoint.rawValue),
+                .source: .string(source.rawValue)
             ]
-            if let source { parameters[.source] = .string(source.rawValue) }
-            return parameters
         case let .boothFavoriteAdd(boothName, brandName):
             return [.boothName: .string(boothName), .brandName: .string(brandName)]
         case let .boothFavoriteRemove(boothName, brandName):

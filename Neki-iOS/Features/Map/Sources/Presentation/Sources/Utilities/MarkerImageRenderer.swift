@@ -36,6 +36,27 @@ private enum MarkerLayout {
 }
 
 enum MarkerImageRenderer {
+    /// 지도 SDK가 실제로 배치하는 아이콘의 pt 크기입니다.
+    ///
+    /// 중첩 마커 배치는 선택·즐겨찾기 상태가 바뀌어도 움직이지 않도록 가장 큰 조합의 크기를 사용합니다.
+    static var maximumRenderedSize: CGSize {
+        renderedSize(isSelected: true, isFavorite: true)
+    }
+
+    static func renderedSize(isSelected: Bool, isFavorite: Bool) -> CGSize {
+        let imageSize = isSelected ? MarkerLayout.selectedImageSize : MarkerLayout.normalImageSize
+        let padding = isSelected ? MarkerLayout.selectedPadding : MarkerLayout.normalPadding
+        let favoriteBadgeSize = isSelected ? MarkerLayout.selectedFavoriteBadgeSize : MarkerLayout.normalFavoriteBadgeSize
+        let bodySize = imageSize + (padding * 2)
+        let badgeOverflow = isFavorite ? favoriteBadgeSize / 2 : .zero
+        let shadowMargin = MarkerLayout.shadowRadius * 4
+
+        return CGSize(
+            width: bodySize + badgeOverflow + shadowMargin * 2,
+            height: bodySize + MarkerLayout.tailHeight - 1 + badgeOverflow + shadowMargin * 2
+        )
+    }
+
     static func render(
         brandImage: UIImage?,
         isSelected: Bool,
@@ -53,14 +74,8 @@ enum MarkerImageRenderer {
         let bodySize = imageSize + (padding * 2)
 
         let badgeOverflow = isFavorite ? favoriteBadgeSize / 2 : .zero
-        let totalWidth = bodySize + badgeOverflow
-        let totalHeight = bodySize + tailSize.height - 1
-        
         let shadowMargin = MarkerLayout.shadowRadius * 4
-        let canvasSize = CGSize(
-            width: totalWidth + shadowMargin * 2,
-            height: totalHeight + badgeOverflow + shadowMargin * 2
-        )
+        let canvasSize = renderedSize(isSelected: isSelected, isFavorite: isFavorite)
         
         let format = UIGraphicsImageRendererFormat()
         format.scale = displayScale

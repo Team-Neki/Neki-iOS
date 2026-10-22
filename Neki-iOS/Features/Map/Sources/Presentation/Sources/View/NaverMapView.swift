@@ -895,7 +895,12 @@ private extension NaverMapView {
                             .padding(6)
                             .background(.white)
                             .clipShape(.circle)
+                            // 버튼은 자기 프레임 안의 터치만 받으므로, 누르는 영역을 44pt로 맞추려고 프레임을 키웁니다.
+                            .frame(width: 44, height: 44)
+                            .contentShape(.rect)
                     }
+                    // 키운 만큼 바깥 여백을 2pt씩 빼서, 버튼 묶음에서는 보이는 원(40pt) 크기만 차지하게 합니다.
+                    .padding(-2)
                 }
             }
             
@@ -922,7 +927,12 @@ private extension NaverMapView {
                 .padding(6)
                 .background(.white)
                 .clipShape(.circle)
+                // 버튼은 자기 프레임 안의 터치만 받으므로, 누르는 영역을 44pt로 맞추려고 프레임을 키웁니다.
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
         }
+        // 키운 만큼 바깥 여백을 2pt씩 빼서, 버튼 묶음에서는 보이는 원(40pt) 크기만 차지하게 합니다.
+        .padding(-2)
     }
     
     var exploreHereControl: some View {

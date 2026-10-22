@@ -196,6 +196,7 @@ public struct PhotoBoothSearchFeature {
     }
 
     @Dependency(\.photoBoothClient) private var photoBoothClient
+    @Dependency(\.analyticsClient) private var analytics
 
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -234,15 +235,28 @@ public struct PhotoBoothSearchFeature {
 
             case let .didSelectCandidate(candidate):
                 // 새 검색의 첫 후보를 기다리는 동안 노출 중인 직전 목록은 고를 수 없습니다.
-                guard state.mode == .searching, state.isAwaitingFirstCandidates == false else { return .none }
+                guard state.mode == .searching,
+                      state.isAwaitingFirstCandidates == false,
+                      let query = state.query
+                else { return .none }
+                // 지도가 곧 검색 화면을 닫으며 검색어를 비우므로 이벤트는 여기서 만들어 둡니다.
+                // 입력창을 고치고 제출하지 않았을 수 있어, 입력창이 아니라 이 목록을 불러온 검색어를 남깁니다.
+                let event = MapAnalyticsEvent.mapSearchCandidateSelect(
+                    query: query.rawValue,
+                    candidateType: candidate.type.analyticsCandidateType,
+                    candidateName: candidate.keyword
+                )
                 // 고른 후보의 부스 목록은 지도가 조회합니다. 검색 화면을 바로 닫고 조회하는 동안 지도에 로딩을 띄우기 위해서입니다.
                 // 서버가 이 좌표로 거리를 계산하므로, 후보 목록과 결과 목록의 거리가 어긋나지 않도록 최신 위치가 아니라 고정한 기준을 넘깁니다.
                 // 결과 목록도 후보 목록과 같은 기준이라 거리 표기 여부를 함께 넘깁니다.
-                return .send(.delegate(.didSelectCandidate(
-                    candidate: candidate,
-                    distanceOrigin: state.distanceOrigin,
-                    isDistanceVisible: state.isDistanceVisible
-                )))
+                return .merge(
+                    .send(.delegate(.didSelectCandidate(
+                        candidate: candidate,
+                        distanceOrigin: state.distanceOrigin,
+                        isDistanceVisible: state.isDistanceVisible
+                    ))),
+                    .run { _ in await analytics.logEvent(event) }
+                )
 
             case let .setUserCoordinate(coordinate):
                 // 거리 표기의 기준은 검색을 요청할 때 고정하므로 여기서는 최신 위치만 받아 둡니다.
@@ -351,6 +365,20 @@ private extension PhotoBoothSearchFeature {
         state.rows = []
         state.isFetching = false
         state.failure = nil
+    }
+}
+
+
+// MARK: - PhotoBoothSearchCandidateType + Analytics
+
+private extension PhotoBoothSearchCandidateType {
+    /// 분석 이벤트에 남기는 후보 유형입니다.
+    var analyticsCandidateType: MapSearchCandidateType {
+        switch self {
+        case .region: .district
+        case .subwayStation: .subwayStation
+        case .photoBooth: .booth
+        }
     }
 }
 

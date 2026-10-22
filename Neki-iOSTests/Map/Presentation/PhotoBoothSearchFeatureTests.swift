@@ -520,6 +520,93 @@ struct PhotoBoothSearchFeatureTests {
         #expect(store.state.contentState.isResults)
         #expect(store.state.rows.count == 2)
     }
+
+    @Test("후보를 고르면 목록을 불러온 검색어와 고른 후보의 유형·이름으로 후보 선택 이벤트를 보낸다")
+    func didSelectCandidate_logsCandidateSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [makeRegionPage(count: 1, hasNext: false)],
+                .subwayStation: [makeStationPage(count: 1, hasNext: false)],
+                .photoBooth: [makePhotoBoothPage(count: 1, hasNext: false)]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+        await exhaustAllTypes(on: store)
+        events.setValue([])
+
+        for candidate in store.state.rows {
+            await store.send(.didSelectCandidate(candidate))
+            await settle(store)
+        }
+
+        #expect(events.value == [
+            .mapSearchCandidateSelect(query: "강남", candidateType: .district, candidateName: "서울특별시 강남구 역삼1동"),
+            .mapSearchCandidateSelect(query: "강남", candidateType: .subwayStation, candidateName: "강남역 2호선"),
+            .mapSearchCandidateSelect(query: "강남", candidateType: .booth, candidateName: "포토이즘 강남1호점")
+        ])
+    }
+
+    @Test("입력창의 검색어를 고치고 제출하지 않은 채 후보를 고르면 목록을 불러온 검색어로 후보 선택 이벤트를 보낸다")
+    func didSelectCandidate_afterEditingSearchText_logsQueryOfList() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], events: events)
+        await submitSearch(on: store)
+        guard let candidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+        await store.send(.binding(.set(\.searchText, "홍대")))
+        events.setValue([])
+
+        await store.send(.didSelectCandidate(candidate))
+        await settle(store)
+
+        #expect(events.value == [
+            .mapSearchCandidateSelect(query: "강남", candidateType: .district, candidateName: candidate.keyword)
+        ])
+    }
+
+    @Test("첫 후보를 기다리는 동안 노출 중인 직전 목록의 후보를 골라도 후보 선택 이벤트를 보내지 않는다")
+    func didSelectCandidate_whileAwaitingNewSearch_doesNotLogCandidateSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]], events: events)
+        await submitSearch(on: store)
+        guard let previousCandidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+        await submitPendingSearch(on: store, keyword: "홍대")
+        events.setValue([])
+
+        await store.send(.didSelectCandidate(previousCandidate))
+        // 붙잡아 둔 요청을 취소하고, 남은 효과가 모두 끝난 뒤에 확인합니다.
+        await store.send(.dismissSearch)
+        await store.finish()
+
+        #expect(events.value.isEmpty)
+    }
+
+    @Test("지도에 반영 중인 검색어로 다시 연 검색 화면에서 후보를 골라도 그 검색어로 후보 선택 이벤트를 보낸다")
+    func didSelectCandidate_afterBeginSearch_logsCandidateSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], events: events)
+        await store.send(.beginSearch(PhotoBoothSearchQuery(rawValue: "서울특별시 강남구")))
+        await settle(store)
+        guard let candidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+        events.setValue([])
+
+        await store.send(.didSelectCandidate(candidate))
+        await settle(store)
+
+        #expect(events.value == [
+            .mapSearchCandidateSelect(query: "서울특별시 강남구", candidateType: .district, candidateName: candidate.keyword)
+        ])
+    }
 }
 
 
@@ -564,7 +651,9 @@ private extension PhotoBoothSearchFeatureTests {
         /// 응답을 붙잡아 후보 페이지 요청이 진행 중인 상태를 만들 때 씁니다.
         candidateResponseDelay: Duration? = nil,
         /// 검색 화면이 상위 화면(지도)으로 넘긴 알림을 받은 순서대로 담습니다.
-        delegates: LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]> = .init([])
+        delegates: LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]> = .init([]),
+        /// 검색 화면이 보낸 분석 이벤트를 보낸 순서대로 담습니다.
+        events: LockIsolated<[MapAnalyticsEvent]> = .init([])
     ) -> TestStoreOf<PhotoBoothSearchFeature> {
         let store = TestStore(initialState: PhotoBoothSearchFeature.State()) {
             CombineReducers {
@@ -585,6 +674,10 @@ private extension PhotoBoothSearchFeatureTests {
                     return PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
                 }
                 return typePages[page]
+            }
+            $0.analyticsClient.logEvent = { event in
+                guard let event = event as? MapAnalyticsEvent else { return }
+                events.withValue { $0.append(event) }
             }
         }
         store.exhaustivity = .off

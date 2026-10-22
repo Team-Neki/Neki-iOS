@@ -133,3 +133,8 @@ extension MapAnalyticsEvent: AnalyticsEvent {
         }
     }
 }
+
+
+// MARK: - MapAnalyticsEvent + Equatable
+
+extension MapAnalyticsEvent: Equatable {}

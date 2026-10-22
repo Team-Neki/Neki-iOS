@@ -810,6 +810,57 @@ struct MapFeatureTests {
         #expect(store.photoBoothListState.searchResultPhase == .loaded)
         #expect(Array(store.photoBooths) == regionResult.photoBooths)
     }
+
+    @Test("지도를 탐색하는 중에 마커나 목록에서 부스를 고르면 부스 선택 이벤트에 지도 출처를 남긴다")
+    func didTapBooth_withoutSearch_logsBoothSelectFromMap() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+
+        await store.send(.didTapBooth(searchedPhotoBooth)).finish()
+        await store.send(.photoBoothListAction(.didTapBooth(searchedPhotoBooth))).finish()
+
+        #expect(events.value == [
+            .boothSelect(brandName: life4cut.name, entryPoint: .map, source: .map),
+            .boothSelect(brandName: life4cut.name, entryPoint: .bottomSheet, source: .map)
+        ])
+    }
+
+    @Test(
+        "검색 결과를 보는 동안 마커나 목록에서 부스를 고르면 검색 출처를 남기고, 검색을 끝낸 뒤에는 다시 지도 출처를 남긴다",
+        arguments: [false, true]
+    )
+    func didTapBooth_whileSearching_logsBoothSelectFromSearch(isPhotoBoothCandidate: Bool) async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
+
+        await store.send(.didTapBooth(searchedPhotoBooth)).finish()
+        await store.send(.photoBoothListAction(.didTapBooth(searchedPhotoBooth))).finish()
+        store.send(.didTapClearSearchButton)
+        await store.send(.didTapBooth(searchedPhotoBooth)).finish()
+
+        #expect(events.value == [
+            .boothSelect(brandName: life4cut.name, entryPoint: .map, source: .search),
+            .boothSelect(brandName: life4cut.name, entryPoint: .bottomSheet, source: .search),
+            .boothSelect(brandName: life4cut.name, entryPoint: .map, source: .map)
+        ])
+    }
+
+    @Test("부스 하나로 좁혀진 검색 결과는 상세를 바로 띄워도 부스 선택 이벤트를 보내지 않는다")
+    func searchResultResponse_withSinglePhotoBooth_doesNotLogBoothSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+        selectCandidate(photoBoothCandidate, in: store)
+
+        await store.send(.searchResultResponse(
+            .success(photoBoothResult),
+            candidate: photoBoothCandidate,
+            generation: store.searchResultFetchGeneration
+        )).finish()
+
+        #expect(store.selectedBooth == searchedPhotoBooth)
+        #expect(events.value.isEmpty)
+    }
 }
 
 
@@ -821,7 +872,9 @@ private extension MapFeatureTests {
     /// `MapFeature.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     /// 리듀서가 곧바로 바꾸는 상태만 확인하므로 이펙트가 뒤이어 보내는 액션은 기다리지 않습니다.
     /// 후보를 고른 뒤의 조회와 영역 조회는 응답을 붙잡아 두므로, 조회 결과는 테스트가 직접 보냅니다.
+    /// 보낸 분석 이벤트는 `events`에 차례로 모읍니다.
     func makeStore(
+        events: LockIsolated<[MapAnalyticsEvent]> = .init([]),
         dependencies updateDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> StoreOf<MapFeature> {
         var state = MapFeature.State()
@@ -832,7 +885,10 @@ private extension MapFeatureTests {
         return Store(initialState: state) {
             MapFeature()
         } withDependencies: {
-            $0.analyticsClient.logEvent = { _ in }
+            $0.analyticsClient.logEvent = { event in
+                guard let event = event as? MapAnalyticsEvent else { return }
+                events.withValue { $0.append(event) }
+            }
             // 검색 화면을 다시 열면 지도에 반영 중인 검색어로 후보를 다시 요청하므로 빈 페이지로 응답합니다.
             $0.photoBoothClient.searchCandidates = { _, type, _, _ in
                 PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)

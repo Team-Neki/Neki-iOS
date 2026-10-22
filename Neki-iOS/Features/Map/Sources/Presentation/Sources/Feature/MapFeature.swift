@@ -153,6 +153,8 @@ public struct MapFeature {
         }
         /// 지도 버튼 중 즐겨찾기 마커 필터(하트) 버튼을 보여 줄지 여부입니다. 검색 결과를 보는 동안에는 숨깁니다.
         var isFavoriteMarkerFilterButtonVisible: Bool { appliedSearchQuery == nil }
+        /// 부스를 고를 때 지도에 반영 중인 결과의 출처입니다. 검색 결과를 보는 동안이면 검색, 아니면 지도 탐색입니다.
+        var boothSelectionSource: MapBoothSelectionSource { appliedSearchQuery == nil ? .map : .search }
         /// 지도에 즐겨찾기 마커를 함께 그릴지 여부입니다.
         ///
         /// 검색 결과를 조회하는 동안에는 결과로 바뀔 지도를 비워 두므로, 보고 있던 지역의 즐겨찾기 마커도 그리지 않습니다.
@@ -823,7 +825,11 @@ public struct MapFeature {
             case .didTapBooth(let photoBooth):
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
-                let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .map)
+                let event = MapAnalyticsEvent.boothSelect(
+                    brandName: photoBooth.brand.name,
+                    entryPoint: .map,
+                    source: state.boothSelectionSource
+                )
                 return .run { _ in await analytics.logEvent(event) }
                 
             case .didTapBoothCard:
@@ -1003,7 +1009,11 @@ public struct MapFeature {
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
-                let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .bottomSheet)
+                let event = MapAnalyticsEvent.boothSelect(
+                    brandName: photoBooth.brand.name,
+                    entryPoint: .bottomSheet,
+                    source: state.boothSelectionSource
+                )
                 return .run { _ in await analytics.logEvent(event) }
                 
             default:
@@ -1230,6 +1240,7 @@ private extension MapFeature {
         // 지도에서 숨긴 지점이라 결과가 없거나 한 지점으로 좁혀지지 않으면 지역·역처럼 결과 시트로 보여 줍니다.
         if candidate.type == .photoBooth, photoBooths.count == 1, let photoBooth = photoBooths.first {
             // 돌아갈 결과 시트가 없으므로 상세를 닫으면 이 검색 화면으로 돌아가도록 표시해 둡니다.
+            // 지도나 목록에서 고른 것이 아니라 부스 선택(booth_select)은 보내지 않습니다. 이 선택은 후보 선택 이벤트의 부스 유형으로 남습니다.
             state.isSinglePhotoBoothSearchApplied = true
             state.photoBoothListState.isSearchResultPresented = false
             selectPhotoBooth(&state, photoBooth: photoBooth)

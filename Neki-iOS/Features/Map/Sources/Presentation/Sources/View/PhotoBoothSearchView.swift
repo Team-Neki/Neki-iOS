@@ -17,7 +17,6 @@ struct PhotoBoothSearchView: View {
         static let searchFieldTopPadding: CGFloat = 8
         static let listTopPadding: CGFloat = 20
         static let cellSpacing: CGFloat = 12
-        static let floatingButtonBottomPadding: CGFloat = 12
         /// 뒤에 이만큼의 셀이 남았을 때 다음 후보 페이지를 미리 부릅니다.
         static let prefetchDistance: Int = 5
     }
@@ -43,11 +42,6 @@ struct PhotoBoothSearchView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.white)
-        .safeAreaInset(edge: .bottom, spacing: .zero) {
-            ChipFloatingButton(.map) { store.send(.dismissSearch) }
-                .nekiShadow(.button)
-                .padding(.bottom, Metrics.floatingButtonBottomPadding)
-        }
         // 지도에서 검색어를 눌러 다시 들어온 경우에는 결과를 가리지 않도록 키보드를 올리지 않습니다.
         .onAppear { isSearchFieldFocused = store.searchText.isEmpty }
     }

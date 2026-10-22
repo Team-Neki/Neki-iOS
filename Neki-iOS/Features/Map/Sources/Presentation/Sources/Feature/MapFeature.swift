@@ -29,7 +29,9 @@ public struct MapFeature {
         var detent: NekiSheetDetent {
             switch self {
             case .first: return .fraction(0.134)
-            case .second: return .fraction(0.305)
+            // 기기와 관계없이 시트 하단 여백 위 298pt로 고정합니다.
+            // 저장한 포토부스 탭의 정렬(저장순·거리순)까지 탭바 위로 보이는 높이입니다. 탭바가 시트 아래 12pt를 덮습니다.
+            case .second: return .absolute(298)
             case .third: return .large
             case .photoBoothSelected: return .hidden
             case .emptySearchResult: return .fraction(0.532)
@@ -131,7 +133,7 @@ public struct MapFeature {
         }
         var isExploreHereButtonVisible: Bool = false
         var isSearchPresented: Bool = false
-        /// 지도에 반영 중인 검색어입니다. 검색 결과를 보고 있지 않으면 `nil`입니다.
+        /// 지도에 반영 중인 검색어로, 고른 후보의 이름입니다. 검색 결과를 보고 있지 않으면 `nil`입니다.
         ///
         /// 상단 검색 필드를 검색 완료 형태로 유지하고, 검색 화면으로 되돌아갈 때 그대로 다시 검색합니다.
         var appliedSearchQuery: PhotoBoothSearchQuery?
@@ -151,6 +153,12 @@ public struct MapFeature {
         }
         /// 지도 버튼 중 즐겨찾기 마커 필터(하트) 버튼을 보여 줄지 여부입니다. 검색 결과를 보는 동안에는 숨깁니다.
         var isFavoriteMarkerFilterButtonVisible: Bool { appliedSearchQuery == nil }
+        /// 부스를 고를 때 지도에 반영 중인 결과의 출처입니다. 검색 결과가 지도에 적용된 동안이면 검색, 아니면 지도 탐색입니다.
+        ///
+        /// 조회에 실패하면 다시 검색할 수 있도록 검색어는 남지만 결과는 적용되지 않았으므로, 이때 고른 즐겨찾기 마커는 지도 탐색으로 셉니다.
+        var boothSelectionSource: MapBoothSelectionSource {
+            appliedSearchQuery != nil && photoBoothListState.searchResultPhase == .loaded ? .search : .map
+        }
         /// 지도에 즐겨찾기 마커를 함께 그릴지 여부입니다.
         ///
         /// 검색 결과를 조회하는 동안에는 결과로 바뀔 지도를 비워 두므로, 보고 있던 지역의 즐겨찾기 마커도 그리지 않습니다.
@@ -492,7 +500,11 @@ public struct MapFeature {
                 return .none
                 
             case .didTapSearchField:
-                return presentSearch(&state)
+                // 닫혀 있던 검색 화면을 열 때만 검색 진입으로 셉니다.
+                let isEnteringSearch = state.isSearchPresented == false
+                let effect = presentSearch(&state)
+                guard isEnteringSearch else { return effect }
+                return .merge(effect, .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapSearchView) })
 
             case .didTapClearSearchButton:
                 return endSearch(&state)
@@ -821,7 +833,11 @@ public struct MapFeature {
             case .didTapBooth(let photoBooth):
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
-                let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .map)
+                let event = MapAnalyticsEvent.boothSelect(
+                    brandName: photoBooth.brand.name,
+                    entryPoint: .map,
+                    source: state.boothSelectionSource
+                )
                 return .run { _ in await analytics.logEvent(event) }
                 
             case .didTapBoothCard:
@@ -837,6 +853,7 @@ public struct MapFeature {
                 // 빈 지도를 눌러도 이 액션이 오므로, 닫을 상세가 있을 때만 검색 화면으로 돌아갑니다.
                 if state.isSinglePhotoBoothSearchApplied, state.selectedBooth != nil {
                     resetToMapMode(&state, for: .first)
+                    // 검색창을 누른 것이 아니므로 검색 진입 이벤트는 보내지 않습니다.
                     return presentSearch(&state)
                 }
                 // 결과가 0곳이거나 조회에 실패한 검색에서 빈 지도를 눌렀다면 결과 없음 높이를 그대로 둡니다.
@@ -916,12 +933,12 @@ public struct MapFeature {
                 guard state.isSinglePhotoBoothSearchApplied, state.selectedBooth == nil else { return .none }
                 return endSearch(&state)
 
-            case let .photoBoothSearchAction(.delegate(.didSelectCandidate(candidate, query, distanceOrigin, isDistanceVisible))):
+            case let .photoBoothSearchAction(.delegate(.didSelectCandidate(candidate, distanceOrigin, isDistanceVisible))):
                 // 후보를 고르면 검색 화면을 바로 닫고, 지도에서 부스 목록을 조회하는 동안 시트에 로딩을 띄웁니다.
                 state.isSearchPresented = false
                 state.isUserTrackingMode = false
-                // 결과를 보는 동안 상단 검색 필드에 검색어를 검색 완료 형태로 남기고, 재탐색 버튼은 내립니다.
-                state.appliedSearchQuery = query
+                // 결과를 보는 동안 상단 검색 필드에 입력한 검색어 대신 고른 후보의 이름을 검색 완료 형태로 남기고, 재탐색 버튼은 내립니다.
+                state.appliedSearchQuery = PhotoBoothSearchQuery(rawValue: candidate.keyword)
                 state.isExploreHereButtonVisible = false
                 // 한 지점으로 좁혀지는지는 결과가 와야 알 수 있습니다.
                 // 부스를 바로 고른 검색에서 다시 검색해 넘어와도 결과가 오기 전에는 결과 시트 검색으로 둡니다.
@@ -1001,7 +1018,11 @@ public struct MapFeature {
             case let .photoBoothListAction(.didTapBooth(photoBooth)):
                 state.isUserTrackingMode = false
                 selectPhotoBooth(&state, photoBooth: photoBooth)
-                let event = MapAnalyticsEvent.boothSelect(brandName: photoBooth.brand.name, entryPoint: .bottomSheet)
+                let event = MapAnalyticsEvent.boothSelect(
+                    brandName: photoBooth.brand.name,
+                    entryPoint: .bottomSheet,
+                    source: state.boothSelectionSource
+                )
                 return .run { _ in await analytics.logEvent(event) }
                 
             default:
@@ -1228,6 +1249,7 @@ private extension MapFeature {
         // 지도에서 숨긴 지점이라 결과가 없거나 한 지점으로 좁혀지지 않으면 지역·역처럼 결과 시트로 보여 줍니다.
         if candidate.type == .photoBooth, photoBooths.count == 1, let photoBooth = photoBooths.first {
             // 돌아갈 결과 시트가 없으므로 상세를 닫으면 이 검색 화면으로 돌아가도록 표시해 둡니다.
+            // 지도나 목록에서 고른 것이 아니라 부스 선택(booth_select)은 보내지 않습니다. 이 선택은 후보 선택 이벤트의 부스 유형으로 남습니다.
             state.isSinglePhotoBoothSearchApplied = true
             state.photoBoothListState.isSearchResultPresented = false
             selectPhotoBooth(&state, photoBooth: photoBooth)

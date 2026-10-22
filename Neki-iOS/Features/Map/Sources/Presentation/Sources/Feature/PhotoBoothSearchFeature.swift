@@ -113,6 +113,11 @@ public struct PhotoBoothSearchFeature {
         /// 새 검색은 후보를 새로 쌓기 위해 목록을 비우지만, 본문은 첫 후보가 올 때까지 이 내용을 이어서 노출해 비지 않게 합니다.
         /// 첫 후보가 온 뒤에는 읽지 않고, 다음 검색을 요청할 때 다시 채웁니다.
         var contentBeforeSearch: ContentState = .guide
+        /// 이번 검색의 결과 이벤트를 아직 보내지 않았는지 여부입니다.
+        ///
+        /// 사용자가 제출한 검색만 세므로, 지도에 반영 중인 검색어로 검색 화면을 다시 열 때는 켜지 않습니다.
+        /// 첫 화면이 정해지면 한 번 보내고 끕니다. 요청이 실패하면 켜 둔 채로 두어, 다시 시도해 응답이 오면 그때 보냅니다.
+        var shouldLogSearchResult: Bool = false
 
         public init() {}
 
@@ -182,10 +187,9 @@ public struct PhotoBoothSearchFeature {
             /// 사용자가 고른 후보와, 지도가 그 후보로 부스 목록을 조회할 때 쓸 값입니다.
             ///
             /// 검색 화면은 후보를 고르면 바로 닫히고 조회는 지도가 맡습니다.
-            /// 화면을 닫으면 검색어와 기준 좌표, 거리 표기 여부가 비워지므로 함께 넘깁니다.
+            /// 화면을 닫으면 기준 좌표와 거리 표기 여부가 비워지므로 함께 넘깁니다.
             case didSelectCandidate(
                 candidate: PhotoBoothSearchCandidate,
-                query: PhotoBoothSearchQuery,
                 distanceOrigin: GeographicCoordinate,
                 isDistanceVisible: Bool
             )
@@ -197,6 +201,7 @@ public struct PhotoBoothSearchFeature {
     }
 
     @Dependency(\.photoBoothClient) private var photoBoothClient
+    @Dependency(\.analyticsClient) private var analytics
 
     public var body: some ReducerOf<Self> {
         BindingReducer()
@@ -210,10 +215,10 @@ public struct PhotoBoothSearchFeature {
             case .submitSearch:
                 let keyword = state.searchText
                 guard keyword.isEmpty == false else { return .none }
-                return beginSearch(&state, query: PhotoBoothSearchQuery(rawValue: keyword))
+                return beginSearch(&state, query: PhotoBoothSearchQuery(rawValue: keyword), isUserSubmitted: true)
 
             case let .beginSearch(query):
-                return beginSearch(&state, query: query)
+                return beginSearch(&state, query: query, isUserSubmitted: false)
 
             case .fetchNextCandidatePage:
                 return fetchNextCandidatePage(&state)
@@ -221,11 +226,14 @@ public struct PhotoBoothSearchFeature {
             case let .candidatePageResponse(.success(page), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
                 state.isFetching = false
+                // 이어붙이면 이 종류의 다음 페이지 번호가 넘어가므로, 추가 조회 이벤트는 이어붙이기 전에 만듭니다.
+                let loadMoreEffect = logLoadMore(state, page: page)
                 let hasNewCandidates = appendCandidatePage(&state, page: page)
+                let logEffect = Effect<Action>.merge(loadMoreEffect, logSearchResultIfDetermined(&state))
                 // 새 셀이 생기지 않은 페이지(빈 페이지, 이미 담은 후보만 온 페이지)는
                 // 스크롤 트리거가 발생하지 않으므로 다음 종류로 이어 부릅니다.
-                guard hasNewCandidates == false, state.pendingType != nil else { return .none }
-                return fetchNextCandidatePage(&state)
+                guard hasNewCandidates == false, state.pendingType != nil else { return logEffect }
+                return .merge(logEffect, fetchNextCandidatePage(&state))
 
             case let .candidatePageResponse(.failure(failure), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
@@ -239,15 +247,24 @@ public struct PhotoBoothSearchFeature {
                       state.isAwaitingFirstCandidates == false,
                       let query = state.query
                 else { return .none }
+                // 지도가 곧 검색 화면을 닫으며 검색어를 비우므로 이벤트는 여기서 만들어 둡니다.
+                // 입력창을 고치고 제출하지 않았을 수 있어, 입력창이 아니라 이 목록을 불러온 검색어를 남깁니다.
+                let event = MapAnalyticsEvent.mapSearchCandidateSelect(
+                    query: query.rawValue,
+                    candidateType: candidate.type.analyticsCandidateType,
+                    candidateName: candidate.keyword
+                )
                 // 고른 후보의 부스 목록은 지도가 조회합니다. 검색 화면을 바로 닫고 조회하는 동안 지도에 로딩을 띄우기 위해서입니다.
                 // 서버가 이 좌표로 거리를 계산하므로, 후보 목록과 결과 목록의 거리가 어긋나지 않도록 최신 위치가 아니라 고정한 기준을 넘깁니다.
                 // 결과 목록도 후보 목록과 같은 기준이라 거리 표기 여부를 함께 넘깁니다.
-                return .send(.delegate(.didSelectCandidate(
-                    candidate: candidate,
-                    query: query,
-                    distanceOrigin: state.distanceOrigin,
-                    isDistanceVisible: state.isDistanceVisible
-                )))
+                return .merge(
+                    .send(.delegate(.didSelectCandidate(
+                        candidate: candidate,
+                        distanceOrigin: state.distanceOrigin,
+                        isDistanceVisible: state.isDistanceVisible
+                    ))),
+                    .run { _ in await analytics.logEvent(event) }
+                )
 
             case let .setUserCoordinate(coordinate):
                 // 거리 표기의 기준은 검색을 요청할 때 고정하므로 여기서는 최신 위치만 받아 둡니다.
@@ -274,7 +291,9 @@ public struct PhotoBoothSearchFeature {
 
 private extension PhotoBoothSearchFeature {
     /// 새 검색을 시작합니다. 진행 중이던 요청을 취소하고 첫 후보 페이지를 요청합니다.
-    func beginSearch(_ state: inout State, query: PhotoBoothSearchQuery) -> Effect<Action> {
+    ///
+    /// - Parameter isUserSubmitted: 사용자가 검색어를 제출한 검색인지 여부. 이 검색만 검색 결과 이벤트로 셉니다.
+    func beginSearch(_ state: inout State, query: PhotoBoothSearchQuery, isUserSubmitted: Bool) -> Effect<Action> {
         // 목록을 비우기 전에 지금 본문을 남겨, 첫 후보가 올 때까지 이어서 노출합니다.
         state.contentBeforeSearch = state.contentState
         state.requestGeneration &+= 1
@@ -291,6 +310,7 @@ private extension PhotoBoothSearchFeature {
         state.rows = []
         state.isFetching = false
         state.failure = nil
+        state.shouldLogSearchResult = isUserSubmitted
         return .concatenate(
             .cancel(id: CancelID.candidatePage),
             fetchNextCandidatePage(&state)
@@ -356,6 +376,61 @@ private extension PhotoBoothSearchFeature {
         state.rows = []
         state.isFetching = false
         state.failure = nil
+        state.shouldLogSearchResult = false
+    }
+}
+
+
+// MARK: - PhotoBoothSearchFeature + Analytics
+
+private extension PhotoBoothSearchFeature {
+    /// 사용자가 제출한 검색의 첫 화면이 정해졌으면 검색 결과 이벤트를 한 번 보냅니다. 후보 페이지를 받은 뒤에 부릅니다.
+    ///
+    /// 후보가 하나라도 오면 `matched`, 세 종류를 모두 불러와도 후보가 없으면 `unmatched`입니다.
+    /// 앞 종류가 비어 다음 종류를 잇는 동안에는 첫 화면이 정해지지 않았으므로 보내지 않습니다.
+    func logSearchResultIfDetermined(_ state: inout State) -> Effect<Action> {
+        guard state.shouldLogSearchResult,
+              state.isAwaitingFirstCandidates == false,
+              let query = state.query
+        else { return .none }
+        state.shouldLogSearchResult = false
+        let event = MapAnalyticsEvent.mapSearchResult(
+            query: query.rawValue,
+            resultStatus: state.rows.isEmpty ? .unmatched : .matched
+        )
+        return .run { _ in await analytics.logEvent(event) }
+    }
+
+    /// 받은 페이지가 그 종류의 두 번째 페이지부터면 추가 조회 이벤트를 보냅니다. 받은 페이지를 이어붙이기 전에 부릅니다.
+    ///
+    /// 종류마다 페이지를 따로 세므로, 앞 종류를 소진하고 넘어간 다음 종류의 첫 페이지는 보내지 않습니다.
+    /// 요청은 한 번에 하나만 나가고 지난 검색의 응답은 여기 오기 전에 버리므로, 같은 페이지를 두 번 보내지 않습니다.
+    func logLoadMore(_ state: State, page: PhotoBoothSearchCandidatePage) -> Effect<Action> {
+        let requestedPage = state.pagination(for: page.type).nextPage
+        guard requestedPage > PhotoBoothSearchPaging.firstPage, let query = state.query else { return .none }
+        let event = MapAnalyticsEvent.mapSearchLoadMore(
+            query: query.rawValue,
+            candidateType: page.type.analyticsCandidateType,
+            // 요청 페이지는 0부터 세므로, 이벤트에는 1을 더해 두 번째 페이지를 2로 남깁니다.
+            page: requestedPage + 1,
+            pageResultCount: page.candidates.count,
+            hasNextPage: page.hasNext
+        )
+        return .run { _ in await analytics.logEvent(event) }
+    }
+}
+
+
+// MARK: - PhotoBoothSearchCandidateType + Analytics
+
+private extension PhotoBoothSearchCandidateType {
+    /// 분석 이벤트에 남기는 후보 유형입니다.
+    var analyticsCandidateType: MapSearchCandidateType {
+        switch self {
+        case .region: .district
+        case .subwayStation: .subwayStation
+        case .photoBooth: .booth
+        }
     }
 }
 

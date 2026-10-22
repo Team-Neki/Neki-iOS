@@ -38,6 +38,12 @@ fileprivate enum Constants {
     static let captionColorHex: UInt = 0x202227
     static let brandClusteringThreshold: Double = 14.0
     static let favoriteMarkerViewportUpdateInterval: TimeInterval = 0.15
+    
+    // Search Field
+    /// 지도 상단 검색 필드를 상단 안전 영역에서 띄우는 높이
+    static let searchFieldTopPadding: CGFloat = 8
+    /// 시트를 가장 높이 올렸을 때 검색 필드 아래에 둘 간격
+    static let sheetSpacingBelowSearchField: CGFloat = 8
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
@@ -705,6 +711,8 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewTouchDelegate {
 
 public struct NaverMapView: View {
     @Bindable var store: StoreOf<MapFeature>
+    /// 지도 상단 검색 필드의 높이입니다. 시트를 가장 높이 올려도 검색 필드를 가리지 않도록 잽니다.
+    @State private var searchFieldHeight: CGFloat = .zero
     
     @Dependency(\.distanceFormatterClient) var formatterClient
     
@@ -728,12 +736,13 @@ public struct NaverMapView: View {
             VStack(spacing: 12) {
                 MapSearchField(store: store)
                     .padding(.horizontal, 20)
+                    .measureHeight { searchFieldHeight = $0 }
 
                 if store.isExploreHereButtonVisible {
                     exploreHereControl
                 }
             }
-            .safeAreaPadding(.top, 8)
+            .safeAreaPadding(.top, Constants.searchFieldTopPadding)
         }
         .nekiSheet(selection: $store.detent) {
             NearPhotoBoothListSheet(store: store.scope(state: \.photoBoothListState, action: \.photoBoothListAction))
@@ -741,6 +750,8 @@ public struct NaverMapView: View {
         } controllers: {
             mapControllers()
         }
+        // 시트를 가장 높이 올려도 검색 필드는 가리지 않고 그 아래에서 멈춥니다.
+        .nekiSheetTopInset(Constants.searchFieldTopPadding + searchFieldHeight + Constants.sheetSpacingBelowSearchField)
         .nekiSheetBottomInset()
         .nekiSheetDetents(store.sheetDetents)
         .overlay(alignment: .bottom) {
@@ -878,11 +889,18 @@ private extension NaverMapView {
                     Button {
                         store.send(.didTapCurrentLocationButton)
                     } label: {
+                        // 비활성 아이콘은 28pt 아이콘 영역 가운데에 놓이는 그림만 담고 있어, 활성 아이콘과 같은 영역에 맞춥니다.
                         Image(store.isUserTrackingMode ? .iconCurrentLocationActive : .iconCurrentLocationInactive)
-                            .padding(8)
+                            .frame(width: 28, height: 28)
+                            .padding(6)
                             .background(.white)
                             .clipShape(.circle)
+                            // 버튼은 자기 프레임 안의 터치만 받으므로, 누르는 영역을 44pt로 맞추려고 프레임을 키웁니다.
+                            .frame(width: 44, height: 44)
+                            .contentShape(.rect)
                     }
+                    // 키운 만큼 바깥 여백을 2pt씩 빼서, 버튼 묶음에서는 보이는 원(40pt) 크기만 차지하게 합니다.
+                    .padding(-2)
                 }
             }
             
@@ -900,16 +918,21 @@ private extension NaverMapView {
             }
         }
         .padding(.horizontal, 20)
-        .shadow(color: .gray400, radius: 8, y: 4)
+        .nekiShadow(.button)
     }
     
     func favoriteControlButton(isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(isSelected ? .iconHeart28Fill : .iconHeart28Gray)
-                .padding(8)
+            Image(isSelected ? .iconHeart28Fill : .iconMapButtonHeart)
+                .padding(6)
                 .background(.white)
                 .clipShape(.circle)
+                // 버튼은 자기 프레임 안의 터치만 받으므로, 누르는 영역을 44pt로 맞추려고 프레임을 키웁니다.
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
         }
+        // 키운 만큼 바깥 여백을 2pt씩 빼서, 버튼 묶음에서는 보이는 원(40pt) 크기만 차지하게 합니다.
+        .padding(-2)
     }
     
     var exploreHereControl: some View {
@@ -928,7 +951,7 @@ private extension NaverMapView {
             .background(
                 Capsule()
                     .fill(.white)
-                    .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
+                    .nekiShadow(.button)
             )
             .overlay {
                 Capsule()

@@ -441,7 +441,7 @@ private extension NearPhotoBoothListSheet {
             Button {
                 handleFavoriteButtonTap(photoBooth)
             } label: {
-                Image(isFavoritePresented(for: photoBooth) ? .iconHeart28Fill : .iconHeart28Gray)
+                Image(isFavoritePresented(for: photoBooth) ? .iconHeart24Fill : .iconHeart24Gray)
             }
             .buttonStyle(.plain)
             .disabled(pendingFavoriteRemovalIDs.contains(photoBooth.id))

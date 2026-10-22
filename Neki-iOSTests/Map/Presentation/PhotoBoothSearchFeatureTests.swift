@@ -363,8 +363,8 @@ struct PhotoBoothSearchFeatureTests {
         #expect(store.state.isAwaitingFirstCandidates == false)
     }
 
-    @Test("후보를 고르면 직접 조회하지 않고 고른 후보와 검색어를 지도로 넘긴다")
-    func didSelectCandidate_delegatesCandidateWithQuery() async {
+    @Test("후보를 고르면 직접 조회하지 않고 고른 후보를 지도로 넘긴다")
+    func didSelectCandidate_delegatesCandidate() async {
         let delegates = LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]>([])
         let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], delegates: delegates)
 
@@ -377,10 +377,9 @@ struct PhotoBoothSearchFeatureTests {
         await store.send(.didSelectCandidate(candidate))
         await settle(store)
 
-        // 부스 목록은 지도가 조회하므로, 검색 화면을 닫으면 비워질 검색어와 기준 좌표, 거리 표기 여부를 함께 넘깁니다.
+        // 부스 목록은 지도가 조회하므로, 검색 화면을 닫으면 비워질 기준 좌표와 거리 표기 여부를 함께 넘깁니다.
         #expect(delegates.value == [.didSelectCandidate(
             candidate: candidate,
-            query: PhotoBoothSearchQuery(rawValue: "강남"),
             distanceOrigin: PhotoBoothSearchFeature.Constants.defaultDistanceOrigin,
             isDistanceVisible: false
         )])
@@ -407,7 +406,7 @@ struct PhotoBoothSearchFeatureTests {
 
         // 후보 목록과 결과 목록의 거리가 어긋나지 않도록 지도도 같은 기준으로 조회하게 합니다.
         // 검색할 때 위치를 알았으므로 결과에도 거리를 표기합니다.
-        guard case let .didSelectCandidate(_, _, distanceOrigin, isDistanceVisible) = delegates.value.first else {
+        guard case let .didSelectCandidate(_, distanceOrigin, isDistanceVisible) = delegates.value.first else {
             Issue.record("후보 선택을 지도로 넘기지 않았습니다")
             return
         }
@@ -468,7 +467,7 @@ struct PhotoBoothSearchFeatureTests {
         await settle(store)
 
         // 위치를 몰라도 서버에는 기본 좌표를 기준으로 넘기되, 그 좌표로 잰 거리는 결과에도 표기하지 않습니다.
-        guard case let .didSelectCandidate(_, _, distanceOrigin, isDistanceVisible) = delegates.value.first else {
+        guard case let .didSelectCandidate(_, distanceOrigin, isDistanceVisible) = delegates.value.first else {
             Issue.record("후보 선택을 지도로 넘기지 않았습니다")
             return
         }
@@ -521,6 +520,302 @@ struct PhotoBoothSearchFeatureTests {
         #expect(store.state.contentState.isResults)
         #expect(store.state.rows.count == 2)
     }
+
+    @Test("후보를 고르면 목록을 불러온 검색어와 고른 후보의 유형·이름으로 후보 선택 이벤트를 보낸다")
+    func didSelectCandidate_logsCandidateSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [makeRegionPage(count: 1, hasNext: false)],
+                .subwayStation: [makeStationPage(count: 1, hasNext: false)],
+                .photoBooth: [makePhotoBoothPage(count: 1, hasNext: false)]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+        await exhaustAllTypes(on: store)
+        events.setValue([])
+
+        for candidate in store.state.rows {
+            await store.send(.didSelectCandidate(candidate))
+            await settle(store)
+        }
+
+        #expect(events.value == [
+            .mapSearchCandidateSelect(query: "강남", candidateType: .district, candidateName: "서울특별시 강남구 역삼1동"),
+            .mapSearchCandidateSelect(query: "강남", candidateType: .subwayStation, candidateName: "강남역 2호선"),
+            .mapSearchCandidateSelect(query: "강남", candidateType: .booth, candidateName: "포토이즘 강남1호점")
+        ])
+    }
+
+    @Test("입력창의 검색어를 고치고 제출하지 않은 채 후보를 고르면 목록을 불러온 검색어로 후보 선택 이벤트를 보낸다")
+    func didSelectCandidate_afterEditingSearchText_logsQueryOfList() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], events: events)
+        await submitSearch(on: store)
+        guard let candidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+        await store.send(.binding(.set(\.searchText, "홍대")))
+        events.setValue([])
+
+        await store.send(.didSelectCandidate(candidate))
+        await settle(store)
+
+        #expect(events.value == [
+            .mapSearchCandidateSelect(query: "강남", candidateType: .district, candidateName: candidate.keyword)
+        ])
+    }
+
+    @Test("첫 후보를 기다리는 동안 노출 중인 직전 목록의 후보를 골라도 후보 선택 이벤트를 보내지 않는다")
+    func didSelectCandidate_whileAwaitingNewSearch_doesNotLogCandidateSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 2, hasNext: false)]], events: events)
+        await submitSearch(on: store)
+        guard let previousCandidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+        await submitPendingSearch(on: store, keyword: "홍대")
+        events.setValue([])
+
+        await store.send(.didSelectCandidate(previousCandidate))
+        // 붙잡아 둔 요청을 취소하고, 남은 효과가 모두 끝난 뒤에 확인합니다.
+        await store.send(.dismissSearch)
+        await store.finish()
+
+        #expect(events.value.isEmpty)
+    }
+
+    @Test("지도에 반영 중인 검색어로 다시 연 검색 화면에서 후보를 골라도 그 검색어로 후보 선택 이벤트를 보낸다")
+    func didSelectCandidate_afterBeginSearch_logsCandidateSelect() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.region: [makeRegionPage(count: 1, hasNext: false)]], events: events)
+        await store.send(.beginSearch(PhotoBoothSearchQuery(rawValue: "서울특별시 강남구")))
+        await settle(store)
+        guard let candidate = store.state.rows.first else {
+            Issue.record("후보가 없어 선택 동작을 확인할 수 없습니다")
+            return
+        }
+        events.setValue([])
+
+        await store.send(.didSelectCandidate(candidate))
+        await settle(store)
+
+        #expect(events.value == [
+            .mapSearchCandidateSelect(query: "서울특별시 강남구", candidateType: .district, candidateName: candidate.keyword)
+        ])
+    }
+
+    @Test("검색어를 제출해 첫 후보가 오면 입력한 검색어 그대로 matched 검색 결과 이벤트를 보내고, 다음 페이지를 불러도 다시 보내지 않는다")
+    func candidatePageResponse_afterSubmit_logsMatchedSearchResultOnce() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 1, firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+
+        await submitSearch(on: store)
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isSearchResult) == [.mapSearchResult(query: "강남", resultStatus: .matched)])
+    }
+
+    @Test("앞 종류가 비어 다음 종류를 이어 부르는 동안에는 보내지 않고, 후보가 오면 matched 검색 결과 이벤트를 한 번 보낸다")
+    func candidatePageResponse_afterEmptyLeadingTypes_logsMatchedSearchResultOnce() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(pages: [.photoBooth: [makePhotoBoothPage(count: 1, hasNext: false)]], events: events)
+
+        await submitSearch(on: store)
+
+        #expect(events.value.filter(\.isSearchResult) == [.mapSearchResult(query: "강남", resultStatus: .matched)])
+    }
+
+    @Test("세 종류 모두 후보가 없으면 unmatched 검색 결과 이벤트를 한 번 보낸다")
+    func candidatePageResponse_whenEveryTypeIsEmpty_logsUnmatchedSearchResult() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+
+        await submitSearch(on: store)
+
+        #expect(store.state.contentState == .noResult)
+        #expect(events.value.filter(\.isSearchResult) == [.mapSearchResult(query: "강남", resultStatus: .unmatched)])
+    }
+
+    @Test("후보 요청이 실패하면 검색 결과 이벤트를 보내지 않고, 다시 제출해 응답이 오면 보낸다")
+    func candidatePageResponse_afterFailure_logsSearchResultOnlyAfterSuccess() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(candidateError: NetworkError.responseDecodingError, events: events)
+
+        await submitSearch(on: store)
+        #expect(store.state.contentState == .failure(.unknown))
+        #expect(events.value.filter(\.isSearchResult).isEmpty)
+
+        let page = makeRegionPage(count: 1, hasNext: false)
+        store.dependencies.photoBoothClient.searchCandidates = { _, type, _, _ in
+            type == .region ? page : PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
+        }
+        await store.send(.submitSearch)
+        await settle(store)
+
+        #expect(events.value.filter(\.isSearchResult) == [.mapSearchResult(query: "강남", resultStatus: .matched)])
+    }
+
+    @Test("지도에 반영 중인 검색어로 검색 화면을 다시 열어 검색하면 검색 결과 이벤트를 보내지 않는다", arguments: [false, true])
+    func beginSearch_doesNotLogSearchResult(hasCandidates: Bool) async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let pages: [PhotoBoothSearchCandidateType: [PhotoBoothSearchCandidatePage]] = hasCandidates
+            ? [.region: [makeRegionPage(count: 1, hasNext: false)]]
+            : [:]
+        let store = makeStore(pages: pages, events: events)
+
+        await store.send(.beginSearch(PhotoBoothSearchQuery(rawValue: "서울특별시 강남구")))
+        await settle(store)
+
+        #expect(store.state.contentState.isResults == hasCandidates)
+        #expect(events.value.filter(\.isSearchResult).isEmpty)
+    }
+
+    @Test("새 검색을 제출하면 지난 검색의 응답이 늦게 와도 검색 결과 이벤트를 보내지 않는다")
+    func candidatePageResponse_fromPreviousSearch_doesNotLogSearchResult() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+        await submitPendingSearch(on: store, keyword: "강남")
+        let previousGeneration = store.state.requestGeneration
+        await submitPendingSearch(on: store, keyword: "홍대")
+
+        await store.send(.candidatePageResponse(
+            .success(makeRegionPage(count: 1, hasNext: false)),
+            generation: previousGeneration
+        ))
+        // 붙잡아 둔 요청을 취소하고, 남은 효과가 모두 끝난 뒤에 확인합니다.
+        await store.send(.dismissSearch)
+        await store.finish()
+
+        #expect(events.value.filter(\.isSearchResult).isEmpty)
+    }
+
+    @Test("같은 종류의 다음 페이지를 불러오면 두 번째 페이지부터 추가 조회 이벤트를 보낸다")
+    func candidatePageResponse_forFollowingPages_logsLoadMore() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 20, firstIndex: 20, hasNext: true),
+                    makeRegionPage(count: 5, firstIndex: 40, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+        #expect(events.value.filter(\.isLoadMore).isEmpty)
+
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(query: "강남", candidateType: .district, page: 2, pageResultCount: 20, hasNextPage: true),
+            .mapSearchLoadMore(query: "강남", candidateType: .district, page: 3, pageResultCount: 5, hasNextPage: false)
+        ])
+    }
+
+    @Test("다음 종류로 넘어가 받은 첫 페이지는 추가 조회로 세지 않고, 그 종류의 두 번째 페이지부터 보낸다")
+    func candidatePageResponse_forFirstPageOfNextType_doesNotLogLoadMore() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [makeRegionPage(count: 1, hasNext: false)],
+                .photoBooth: [
+                    makePhotoBoothPage(distances: Array(repeating: 100, count: 20), hasNext: true),
+                    makePhotoBoothPage(distances: [100, 200], firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+
+        // 지하철역 첫 페이지가 비어 포토부스 첫 페이지까지 이어 부릅니다.
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+        #expect(events.value.filter(\.isLoadMore).isEmpty)
+
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(query: "강남", candidateType: .booth, page: 2, pageResultCount: 2, hasNextPage: false)
+        ])
+    }
+
+    @Test("다음 페이지 요청이 실패하면 추가 조회 이벤트를 보내지 않고, 다시 불러와 응답이 오면 한 번 보낸다")
+    func candidatePageResponse_afterLoadMoreFailure_logsLoadMoreOnce() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 3, firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+        let searchCandidates = store.dependencies.photoBoothClient.searchCandidates
+
+        store.dependencies.photoBoothClient.searchCandidates = { _, _, _, _ in
+            throw NetworkError.responseDecodingError
+        }
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+        #expect(events.value.filter(\.isLoadMore).isEmpty)
+
+        store.dependencies.photoBoothClient.searchCandidates = searchCandidates
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(query: "강남", candidateType: .district, page: 2, pageResultCount: 3, hasNextPage: false)
+        ])
+    }
+
+    @Test("지도에 반영 중인 검색어로 다시 연 검색 화면에서 다음 페이지를 불러와도 그 검색어로 추가 조회 이벤트를 보낸다")
+    func candidatePageResponse_afterBeginSearch_logsLoadMore() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 1, firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await store.send(.beginSearch(PhotoBoothSearchQuery(rawValue: "서울특별시 강남구")))
+        await settle(store)
+
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(
+                query: "서울특별시 강남구",
+                candidateType: .district,
+                page: 2,
+                pageResultCount: 1,
+                hasNextPage: false
+            )
+        ])
+    }
 }
 
 
@@ -537,6 +832,20 @@ private extension PhotoBoothSearchFeature.State.ContentState {
     var isDistanceVisible: Bool? {
         guard case let .results(_, _, _, isDistanceVisible) = self else { return nil }
         return isDistanceVisible
+    }
+}
+
+private extension MapAnalyticsEvent {
+    /// 검색 결과 이벤트인지 여부입니다.
+    var isSearchResult: Bool {
+        guard case .mapSearchResult = self else { return false }
+        return true
+    }
+
+    /// 추가 조회 이벤트인지 여부입니다.
+    var isLoadMore: Bool {
+        guard case .mapSearchLoadMore = self else { return false }
+        return true
     }
 }
 
@@ -565,7 +874,9 @@ private extension PhotoBoothSearchFeatureTests {
         /// 응답을 붙잡아 후보 페이지 요청이 진행 중인 상태를 만들 때 씁니다.
         candidateResponseDelay: Duration? = nil,
         /// 검색 화면이 상위 화면(지도)으로 넘긴 알림을 받은 순서대로 담습니다.
-        delegates: LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]> = .init([])
+        delegates: LockIsolated<[PhotoBoothSearchFeature.Action.Delegate]> = .init([]),
+        /// 검색 화면이 보낸 분석 이벤트를 보낸 순서대로 담습니다.
+        events: LockIsolated<[MapAnalyticsEvent]> = .init([])
     ) -> TestStoreOf<PhotoBoothSearchFeature> {
         let store = TestStore(initialState: PhotoBoothSearchFeature.State()) {
             CombineReducers {
@@ -586,6 +897,10 @@ private extension PhotoBoothSearchFeatureTests {
                     return PhotoBoothSearchCandidatePage(type: type, candidates: [], hasNext: false)
                 }
                 return typePages[page]
+            }
+            $0.analyticsClient.logEvent = { event in
+                guard let event = event as? MapAnalyticsEvent else { return }
+                events.withValue { $0.append(event) }
             }
         }
         store.exhaustivity = .off

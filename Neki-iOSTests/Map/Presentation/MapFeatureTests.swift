@@ -861,6 +861,42 @@ struct MapFeatureTests {
         #expect(store.selectedBooth == searchedPhotoBooth)
         #expect(events.value.isEmpty)
     }
+
+    @Test("검색창을 눌러 닫혀 있던 검색 화면을 열면 검색 진입 이벤트를 보내고, 검색 화면이 열린 채로 다시 눌러도 더 보내지 않는다")
+    func didTapSearchField_logsSearchViewOnlyWhenEnteringSearch() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+
+        await store.send(.didTapSearchField).finish()
+        await store.send(.didTapSearchField).finish()
+
+        #expect(store.isSearchPresented)
+        #expect(events.value == [.mapSearchView])
+    }
+
+    @Test("검색 결과를 보다가 검색어를 눌러 검색 화면에 다시 들어가도 검색 진입 이벤트를 보낸다", arguments: [false, true])
+    func didTapSearchField_afterSearchResult_logsSearchView(isPhotoBoothCandidate: Bool) async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+        selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
+
+        await store.send(.didTapSearchField).finish()
+
+        #expect(store.isSearchPresented)
+        #expect(events.value == [.mapSearchView])
+    }
+
+    @Test("부스 하나를 바로 고른 검색에서 상세를 닫아 검색 화면으로 돌아가면 검색 진입 이벤트를 보내지 않는다")
+    func didTapCloseDetail_afterSinglePhotoBoothSearch_doesNotLogSearchView() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+        selectSearchResult(photoBoothCandidate, result: photoBoothResult, in: store)
+
+        await store.send(.didTapCloseDetail).finish()
+
+        #expect(store.isSearchPresented)
+        #expect(events.value.isEmpty)
+    }
 }
 
 

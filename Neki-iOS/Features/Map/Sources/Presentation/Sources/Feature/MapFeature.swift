@@ -496,7 +496,11 @@ public struct MapFeature {
                 return .none
                 
             case .didTapSearchField:
-                return presentSearch(&state)
+                // 닫혀 있던 검색 화면을 열 때만 검색 진입으로 셉니다.
+                let isEnteringSearch = state.isSearchPresented == false
+                let effect = presentSearch(&state)
+                guard isEnteringSearch else { return effect }
+                return .merge(effect, .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapSearchView) })
 
             case .didTapClearSearchButton:
                 return endSearch(&state)
@@ -845,6 +849,7 @@ public struct MapFeature {
                 // 빈 지도를 눌러도 이 액션이 오므로, 닫을 상세가 있을 때만 검색 화면으로 돌아갑니다.
                 if state.isSinglePhotoBoothSearchApplied, state.selectedBooth != nil {
                     resetToMapMode(&state, for: .first)
+                    // 검색창을 누른 것이 아니므로 검색 진입 이벤트는 보내지 않습니다.
                     return presentSearch(&state)
                 }
                 // 결과가 0곳이거나 조회에 실패한 검색에서 빈 지도를 눌렀다면 결과 없음 높이를 그대로 둡니다.

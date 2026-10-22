@@ -226,8 +226,10 @@ public struct PhotoBoothSearchFeature {
             case let .candidatePageResponse(.success(page), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
                 state.isFetching = false
+                // 이어붙이면 이 종류의 다음 페이지 번호가 넘어가므로, 추가 조회 이벤트는 이어붙이기 전에 만듭니다.
+                let loadMoreEffect = logLoadMore(state, page: page)
                 let hasNewCandidates = appendCandidatePage(&state, page: page)
-                let logEffect = logSearchResultIfDetermined(&state)
+                let logEffect = Effect<Action>.merge(loadMoreEffect, logSearchResultIfDetermined(&state))
                 // 새 셀이 생기지 않은 페이지(빈 페이지, 이미 담은 후보만 온 페이지)는
                 // 스크롤 트리거가 발생하지 않으므로 다음 종류로 이어 부릅니다.
                 guard hasNewCandidates == false, state.pendingType != nil else { return logEffect }
@@ -395,6 +397,24 @@ private extension PhotoBoothSearchFeature {
         let event = MapAnalyticsEvent.mapSearchResult(
             query: query.rawValue,
             resultStatus: state.rows.isEmpty ? .unmatched : .matched
+        )
+        return .run { _ in await analytics.logEvent(event) }
+    }
+
+    /// 받은 페이지가 그 종류의 두 번째 페이지부터면 추가 조회 이벤트를 보냅니다. 받은 페이지를 이어붙이기 전에 부릅니다.
+    ///
+    /// 종류마다 페이지를 따로 세므로, 앞 종류를 소진하고 넘어간 다음 종류의 첫 페이지는 보내지 않습니다.
+    /// 요청은 한 번에 하나만 나가고 지난 검색의 응답은 여기 오기 전에 버리므로, 같은 페이지를 두 번 보내지 않습니다.
+    func logLoadMore(_ state: State, page: PhotoBoothSearchCandidatePage) -> Effect<Action> {
+        let requestedPage = state.pagination(for: page.type).nextPage
+        guard requestedPage > PhotoBoothSearchPaging.firstPage, let query = state.query else { return .none }
+        let event = MapAnalyticsEvent.mapSearchLoadMore(
+            query: query.rawValue,
+            candidateType: page.type.analyticsCandidateType,
+            // 요청 페이지는 0부터 세므로, 이벤트에는 1을 더해 두 번째 페이지를 2로 남깁니다.
+            page: requestedPage + 1,
+            pageResultCount: page.candidates.count,
+            hasNextPage: page.hasNext
         )
         return .run { _ in await analytics.logEvent(event) }
     }

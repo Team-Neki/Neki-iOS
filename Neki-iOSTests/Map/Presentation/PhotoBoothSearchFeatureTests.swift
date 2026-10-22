@@ -701,6 +701,121 @@ struct PhotoBoothSearchFeatureTests {
 
         #expect(events.value.filter(\.isSearchResult).isEmpty)
     }
+
+    @Test("같은 종류의 다음 페이지를 불러오면 두 번째 페이지부터 추가 조회 이벤트를 보낸다")
+    func candidatePageResponse_forFollowingPages_logsLoadMore() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 20, firstIndex: 20, hasNext: true),
+                    makeRegionPage(count: 5, firstIndex: 40, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+        #expect(events.value.filter(\.isLoadMore).isEmpty)
+
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(query: "강남", candidateType: .district, page: 2, pageResultCount: 20, hasNextPage: true),
+            .mapSearchLoadMore(query: "강남", candidateType: .district, page: 3, pageResultCount: 5, hasNextPage: false)
+        ])
+    }
+
+    @Test("다음 종류로 넘어가 받은 첫 페이지는 추가 조회로 세지 않고, 그 종류의 두 번째 페이지부터 보낸다")
+    func candidatePageResponse_forFirstPageOfNextType_doesNotLogLoadMore() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [makeRegionPage(count: 1, hasNext: false)],
+                .photoBooth: [
+                    makePhotoBoothPage(distances: Array(repeating: 100, count: 20), hasNext: true),
+                    makePhotoBoothPage(distances: [100, 200], firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+
+        // 지하철역 첫 페이지가 비어 포토부스 첫 페이지까지 이어 부릅니다.
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+        #expect(events.value.filter(\.isLoadMore).isEmpty)
+
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(query: "강남", candidateType: .booth, page: 2, pageResultCount: 2, hasNextPage: false)
+        ])
+    }
+
+    @Test("다음 페이지 요청이 실패하면 추가 조회 이벤트를 보내지 않고, 다시 불러와 응답이 오면 한 번 보낸다")
+    func candidatePageResponse_afterLoadMoreFailure_logsLoadMoreOnce() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 3, firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await submitSearch(on: store)
+        let searchCandidates = store.dependencies.photoBoothClient.searchCandidates
+
+        store.dependencies.photoBoothClient.searchCandidates = { _, _, _, _ in
+            throw NetworkError.responseDecodingError
+        }
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+        #expect(events.value.filter(\.isLoadMore).isEmpty)
+
+        store.dependencies.photoBoothClient.searchCandidates = searchCandidates
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(query: "강남", candidateType: .district, page: 2, pageResultCount: 3, hasNextPage: false)
+        ])
+    }
+
+    @Test("지도에 반영 중인 검색어로 다시 연 검색 화면에서 다음 페이지를 불러와도 그 검색어로 추가 조회 이벤트를 보낸다")
+    func candidatePageResponse_afterBeginSearch_logsLoadMore() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(
+            pages: [
+                .region: [
+                    makeRegionPage(count: 20, hasNext: true),
+                    makeRegionPage(count: 1, firstIndex: 20, hasNext: false)
+                ]
+            ],
+            events: events
+        )
+        await store.send(.beginSearch(PhotoBoothSearchQuery(rawValue: "서울특별시 강남구")))
+        await settle(store)
+
+        await store.send(.fetchNextCandidatePage)
+        await settle(store)
+
+        #expect(events.value.filter(\.isLoadMore) == [
+            .mapSearchLoadMore(
+                query: "서울특별시 강남구",
+                candidateType: .district,
+                page: 2,
+                pageResultCount: 1,
+                hasNextPage: false
+            )
+        ])
+    }
 }
 
 
@@ -724,6 +839,12 @@ private extension MapAnalyticsEvent {
     /// 검색 결과 이벤트인지 여부입니다.
     var isSearchResult: Bool {
         guard case .mapSearchResult = self else { return false }
+        return true
+    }
+
+    /// 추가 조회 이벤트인지 여부입니다.
+    var isLoadMore: Bool {
+        guard case .mapSearchLoadMore = self else { return false }
         return true
     }
 }

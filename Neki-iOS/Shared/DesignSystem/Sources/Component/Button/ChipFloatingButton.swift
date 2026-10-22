@@ -9,18 +9,16 @@ import SwiftUI
 
 public struct ChipFloatingButton: View {
     public enum Style {
-        case map, randomPose
+        case randomPose
         
         var icon: ImageResource {
             switch self {
-            case .map: return .iconPin
             case .randomPose: return .iconRepeat
             }
         }
         
         var title: String {
             switch self {
-            case .map: return "지도로"
             case .randomPose: return "랜덤 포즈 추천"
             }
         }

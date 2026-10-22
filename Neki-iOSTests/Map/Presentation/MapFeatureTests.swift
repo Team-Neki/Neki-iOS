@@ -208,8 +208,8 @@ struct MapFeatureTests {
     func didTapCloseDetail_withoutDetailAfterSinglePhotoBoothSearch_keepsMap() {
         let store = makeStore()
         selectSearchResult(photoBoothCandidate, result: photoBoothResult, in: store)
-        // 검색 화면을 거치지 않고 상세만 닫힌 상태를 만듭니다.
-        store.send(.didTapGoBackToMapButton)
+        // 검색 화면을 거치지 않고 상세만 닫힌 상태를 직접 만듭니다.
+        store.send(.binding(.set(\.selectedBooth, nil)))
 
         store.send(.didTapCloseDetail)
 

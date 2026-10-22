@@ -223,7 +223,6 @@ public struct MapFeature {
         case didEnterTab
         case requestPermission
         case openAppSettings
-        case didTapGoBackToMapButton
         case didTapBooth(PhotoBooth)
         case didTapBoothCard
         case didTapCloseDetail
@@ -825,10 +824,6 @@ public struct MapFeature {
                     .send(.photoBoothListAction(.setVisibleBooths(list))),
                     .send(.photoBoothListAction(.setVisibleFavoriteBooths(favoriteList)))
                 )
-                
-            case .didTapGoBackToMapButton:
-                resetToMapMode(&state, for: .first)
-                return .none
                 
             case .didTapBooth(let photoBooth):
                 state.isUserTrackingMode = false

@@ -754,13 +754,6 @@ public struct NaverMapView: View {
         .nekiSheetTopInset(Constants.searchFieldTopPadding + searchFieldHeight + Constants.sheetSpacingBelowSearchField)
         .nekiSheetBottomInset()
         .nekiSheetDetents(store.sheetDetents)
-        .overlay(alignment: .bottom) {
-            if case .large = store.detent {
-                ChipFloatingButton(.map) { store.send(.didTapGoBackToMapButton, animation: .default) }
-                    .padding(.bottom, 52)
-                    .safeAreaPadding()
-            }
-        }
         .animation(.easeInOut, value: store.detent)
         .animation(.easeInOut, value: store.selectedBooth?.id)
         // 검색 화면은 지도 화면의 검색 모드라 새 화면으로 띄우지 않고 지도 위에 겹쳐 그립니다.

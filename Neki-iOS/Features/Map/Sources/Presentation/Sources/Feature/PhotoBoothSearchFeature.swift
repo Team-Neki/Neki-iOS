@@ -113,6 +113,11 @@ public struct PhotoBoothSearchFeature {
         /// 새 검색은 후보를 새로 쌓기 위해 목록을 비우지만, 본문은 첫 후보가 올 때까지 이 내용을 이어서 노출해 비지 않게 합니다.
         /// 첫 후보가 온 뒤에는 읽지 않고, 다음 검색을 요청할 때 다시 채웁니다.
         var contentBeforeSearch: ContentState = .guide
+        /// 이번 검색의 결과 이벤트를 아직 보내지 않았는지 여부입니다.
+        ///
+        /// 사용자가 제출한 검색만 세므로, 지도에 반영 중인 검색어로 검색 화면을 다시 열 때는 켜지 않습니다.
+        /// 첫 화면이 정해지면 한 번 보내고 끕니다. 요청이 실패하면 켜 둔 채로 두어, 다시 시도해 응답이 오면 그때 보냅니다.
+        var shouldLogSearchResult: Bool = false
 
         public init() {}
 
@@ -210,10 +215,10 @@ public struct PhotoBoothSearchFeature {
             case .submitSearch:
                 let keyword = state.searchText
                 guard keyword.isEmpty == false else { return .none }
-                return beginSearch(&state, query: PhotoBoothSearchQuery(rawValue: keyword))
+                return beginSearch(&state, query: PhotoBoothSearchQuery(rawValue: keyword), isUserSubmitted: true)
 
             case let .beginSearch(query):
-                return beginSearch(&state, query: query)
+                return beginSearch(&state, query: query, isUserSubmitted: false)
 
             case .fetchNextCandidatePage:
                 return fetchNextCandidatePage(&state)
@@ -222,10 +227,11 @@ public struct PhotoBoothSearchFeature {
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
                 state.isFetching = false
                 let hasNewCandidates = appendCandidatePage(&state, page: page)
+                let logEffect = logSearchResultIfDetermined(&state)
                 // 새 셀이 생기지 않은 페이지(빈 페이지, 이미 담은 후보만 온 페이지)는
                 // 스크롤 트리거가 발생하지 않으므로 다음 종류로 이어 부릅니다.
-                guard hasNewCandidates == false, state.pendingType != nil else { return .none }
-                return fetchNextCandidatePage(&state)
+                guard hasNewCandidates == false, state.pendingType != nil else { return logEffect }
+                return .merge(logEffect, fetchNextCandidatePage(&state))
 
             case let .candidatePageResponse(.failure(failure), generation):
                 guard state.mode == .searching, state.requestGeneration == generation else { return .none }
@@ -283,7 +289,9 @@ public struct PhotoBoothSearchFeature {
 
 private extension PhotoBoothSearchFeature {
     /// 새 검색을 시작합니다. 진행 중이던 요청을 취소하고 첫 후보 페이지를 요청합니다.
-    func beginSearch(_ state: inout State, query: PhotoBoothSearchQuery) -> Effect<Action> {
+    ///
+    /// - Parameter isUserSubmitted: 사용자가 검색어를 제출한 검색인지 여부. 이 검색만 검색 결과 이벤트로 셉니다.
+    func beginSearch(_ state: inout State, query: PhotoBoothSearchQuery, isUserSubmitted: Bool) -> Effect<Action> {
         // 목록을 비우기 전에 지금 본문을 남겨, 첫 후보가 올 때까지 이어서 노출합니다.
         state.contentBeforeSearch = state.contentState
         state.requestGeneration &+= 1
@@ -300,6 +308,7 @@ private extension PhotoBoothSearchFeature {
         state.rows = []
         state.isFetching = false
         state.failure = nil
+        state.shouldLogSearchResult = isUserSubmitted
         return .concatenate(
             .cancel(id: CancelID.candidatePage),
             fetchNextCandidatePage(&state)
@@ -365,6 +374,29 @@ private extension PhotoBoothSearchFeature {
         state.rows = []
         state.isFetching = false
         state.failure = nil
+        state.shouldLogSearchResult = false
+    }
+}
+
+
+// MARK: - PhotoBoothSearchFeature + Analytics
+
+private extension PhotoBoothSearchFeature {
+    /// 사용자가 제출한 검색의 첫 화면이 정해졌으면 검색 결과 이벤트를 한 번 보냅니다. 후보 페이지를 받은 뒤에 부릅니다.
+    ///
+    /// 후보가 하나라도 오면 `matched`, 세 종류를 모두 불러와도 후보가 없으면 `unmatched`입니다.
+    /// 앞 종류가 비어 다음 종류를 잇는 동안에는 첫 화면이 정해지지 않았으므로 보내지 않습니다.
+    func logSearchResultIfDetermined(_ state: inout State) -> Effect<Action> {
+        guard state.shouldLogSearchResult,
+              state.isAwaitingFirstCandidates == false,
+              let query = state.query
+        else { return .none }
+        state.shouldLogSearchResult = false
+        let event = MapAnalyticsEvent.mapSearchResult(
+            query: query.rawValue,
+            resultStatus: state.rows.isEmpty ? .unmatched : .matched
+        )
+        return .run { _ in await analytics.logEvent(event) }
     }
 }
 

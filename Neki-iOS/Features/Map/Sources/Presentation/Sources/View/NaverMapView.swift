@@ -263,13 +263,6 @@ extension NaverMapRepresentable {
             return NMFOverlayImage(image: image)
         }()
 
-        func hasPendingCameraMove(_ request: MapFeature.CameraMoveRequest) -> Bool {
-            request.coordinate != nil && request.generation != appliedCameraMoveGeneration
-        }
-
-        func hasPendingCameraFit(_ request: MapFeature.CameraFitRequest) -> Bool {
-            request.bounds != nil && request.generation != appliedCameraFitGeneration
-        }
         private var currentKeyByID: [BoothID: BoothClusteringKey] = [:]
         private var clusteredMarkerStateByID: [BoothID: PhotoBoothMarkerPresentationState] = [:]
         private var visibleBoothIDs: Set<BoothID> = []
@@ -309,6 +302,14 @@ extension NaverMapRepresentable {
         init(parent: NaverMapRepresentable, displayScale: CGFloat) {
             self.parent = parent
             self.displayScale = displayScale
+        }
+
+        func hasPendingCameraMove(_ request: MapFeature.CameraMoveRequest) -> Bool {
+            request.coordinate != nil && request.generation != appliedCameraMoveGeneration
+        }
+
+        func hasPendingCameraFit(_ request: MapFeature.CameraFitRequest) -> Bool {
+            request.bounds != nil && request.generation != appliedCameraFitGeneration
         }
         
         private func setupClusterer(mapView: NMFMapView) {

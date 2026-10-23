@@ -46,16 +46,6 @@ fileprivate enum Constants {
     static let sheetSpacingBelowSearchField: CGFloat = 8
 }
 
-enum MapCameraTransitionPolicy {
-    static func animatesContentInset(hasPendingCameraMove: Bool, hasPendingCameraFit: Bool) -> Bool {
-        hasPendingCameraMove == false && hasPendingCameraFit == false
-    }
-
-    static func publishesUserInteractionUpdates(for cameraChangeReason: Int) -> Bool {
-        cameraChangeReason == NMFMapChangedByGesture
-    }
-}
-
 struct NaverMapRepresentable: UIViewRepresentable {
     @Environment(\.displayScale) private var displayScale
 
@@ -86,17 +76,14 @@ struct NaverMapRepresentable: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
-        let hasPendingCameraMove = context.coordinator.hasPendingCameraMove(store.cameraMoveRequest)
-        let hasPendingCameraFit = context.coordinator.hasPendingCameraFit(store.cameraFitRequest)
+        let hasPendingCameraUpdate = context.coordinator.hasPendingCameraMove(store.cameraMoveRequest)
+            || context.coordinator.hasPendingCameraFit(store.cameraFitRequest)
 
         // 시트가 사라지는 동시에 카메라를 옮기면, 기존 inset을 기준으로 이동을 시작한 뒤
         // inset 애니메이션이 지도의 유효 중심을 다시 바꾸게 된다. 새 카메라 요청은 목표 inset을 먼저 확정한다.
         updateContentInset(
             uiView.mapView,
-            animated: MapCameraTransitionPolicy.animatesContentInset(
-                hasPendingCameraMove: hasPendingCameraMove,
-                hasPendingCameraFit: hasPendingCameraFit
-            )
+            animated: hasPendingCameraUpdate == false
         )
 
         // State 변경 시 카메라 이동
@@ -712,7 +699,7 @@ extension NaverMapRepresentable {
 
 extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     func mapView(_ mapView: NMFMapView, cameraWillChangeByReason reason: Int, animated: Bool) {
-        guard MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: reason) else { return }
+        guard reason == NMFMapChangedByGesture else { return }
         parent.store.send(.didDetectMapInteraction)
         parent.store.send(.cameraMotionStarted)
     }
@@ -720,7 +707,7 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     func mapView(_ mapView: NMFMapView, cameraIsChangingByReason reason: Int) {
         updateOverlappingMarkerModeIfNeeded(mapView: mapView)
         updateOverlappingMarkerPositionsIfNeeded(mapView: mapView)
-        guard MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: reason) else { return }
+        guard reason == NMFMapChangedByGesture else { return }
 
         let currentTime = CACurrentMediaTime()
         if currentTime - lastFavoriteMarkerViewportUpdateTime >= Constants.favoriteMarkerViewportUpdateInterval {

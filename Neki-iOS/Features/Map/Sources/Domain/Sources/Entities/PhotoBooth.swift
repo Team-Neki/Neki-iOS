@@ -9,22 +9,22 @@ import Foundation
 
 /// 포토부스 지점 정보
 public struct PhotoBooth: Identifiable, Sendable, Equatable, Hashable {
-    public let id: Int
+    public let id: String
     public let brand: PhotoBoothBrand
     public let name: String
     public let coordinate: GeographicCoordinate
     public let address: String
-    public let nearbyDistance: Int?
+    public let nearbyDistance: GeographicDistance?
     public let detailInformationURL: URL?
     public var isFavorite: Bool
     
     public init(
-        id: Int,
+        id: String,
         brand: PhotoBoothBrand,
         name: String,
         coordinate: GeographicCoordinate,
         address: String,
-        nearbyDistance: Int? = nil,
+        nearbyDistance: GeographicDistance? = nil,
         detailInformationURL: URL? = nil,
         isFavorite: Bool = false
     ) {

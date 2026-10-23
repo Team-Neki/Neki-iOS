@@ -7,12 +7,13 @@
 
 import Foundation
 
-/// 통합 검색과 검색 결과 부스 조회가 공통으로 사용하는 포토부스 지점입니다.
+/// 검색 결과 부스 조회가 내려주는 포토부스 지점입니다.
 ///
-/// 기존 지도 조회(`/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
+/// 기존 지도 조회(`/v2/photo-booths/polygon`, `/point`) 응답과 달리 브랜드 코드가 함께 내려오므로,
 /// 브랜드 이름 대신 코드로 브랜드를 매칭하기 위해 ``PhotoBoothDTO``와 분리했습니다.
 struct SearchPhotoBoothDTO: Decodable {
-    let id: Int
+    /// 지도 V2 조회·즐겨찾기와 같은 부스 ID입니다. 즐겨찾기 상태를 맞추는 기준으로 사용합니다.
+    let id: String
     let brandName: String
     /// 브랜드 전체 조회의 `code`와 같은 값입니다. 브랜드를 매칭하는 기준으로 사용합니다.
     let brandCode: String
@@ -22,7 +23,7 @@ struct SearchPhotoBoothDTO: Decodable {
     let longitude: Double
     /// 사용자 현재 위치에서 부스까지의 거리(m).
     ///
-    /// 부스 목록 요청에 `userLocation`을 담았을 때만 내려오고, 검색 응답에는 없습니다.
+    /// 부스 목록 요청에 `userLocation`을 담았을 때만 내려옵니다.
     let distance: Int?
     let favorite: Bool?
 
@@ -33,24 +34,9 @@ struct SearchPhotoBoothDTO: Decodable {
             name: branchName,
             coordinate: .init(latitude: latitude, longitude: longitude),
             address: address,
-            nearbyDistance: distance,
+            nearbyDistance: distance.map(GeographicDistance.init),
             isFavorite: favorite ?? false
         )
-    }
-}
-
-/// 부스 조회 API가 공통으로 받는 브랜드 필터입니다.
-///
-/// 비어 있으면 모든 브랜드를 조회합니다.
-struct PhotoBoothBrandFilterDTO: Encodable {
-    let brandIDs: [Int]
-
-    enum CodingKeys: String, CodingKey {
-        case brandIDs = "brandIds"
-    }
-
-    init(brandIDs: [Int] = []) {
-        self.brandIDs = brandIDs
     }
 }
 

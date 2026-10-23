@@ -10,6 +10,21 @@ import ComposableArchitecture
 
 @Reducer
 public struct PhotoBoothListFeature {
+    public enum FavoriteSortOrder: Equatable {
+        case saved
+        case distance
+    }
+
+    /// 검색 결과 시트가 보여 줄 조회 단계입니다.
+    public enum SearchResultPhase: Equatable {
+        /// 고른 후보의 부스 목록을 조회하는 중입니다.
+        case loading
+        /// 조회가 실패했습니다.
+        case failure(PhotoBoothSearchFailure)
+        /// 조회한 결과를 보여 주는 중입니다.
+        case loaded
+    }
+
     public enum ListTab: CaseIterable, Identifiable {
         case nearby
         case favorite
@@ -61,6 +76,14 @@ public struct PhotoBoothListFeature {
             guard remainingCount > .zero else { return firstBrand.name }
             return "\(firstBrand.name) 외 \(remainingCount)개"
         }
+
+        /// 검색 결과의 `브랜드` 칩에서 강조색으로 적을 브랜드 이름입니다. 고른 브랜드가 없으면 `nil`입니다.
+        ///
+        /// ``searchResultBrandFilterChipTitle`` 맨 앞의 첫 브랜드 이름이며, 뒤에 붙는 나머지 개수는 강조하지 않습니다.
+        var searchResultBrandFilterChipBrandName: String? {
+            guard filteredBrands.isEmpty == false else { return nil }
+            return selectableBrands.first { filteredBrands.contains($0) }?.name
+        }
         
         /// 검색 결과를 보여 주는 중인지 여부입니다.
         ///
@@ -68,10 +91,26 @@ public struct PhotoBoothListFeature {
         /// 지도 영역 조회로 돌아가면 `false`가 되어 다시 탭과 원형 브랜드 칩이 있는 목록으로 돌아갑니다.
         var isSearchResultPresented: Bool = false
 
+        /// 검색 결과를 보여 주는 동안 시트가 보여 줄 조회 단계입니다.
+        ///
+        /// 후보를 고르면 지도로 먼저 돌아와 부스 목록을 조회하므로, 결과가 오기 전에는 로딩을, 조회가 실패하면 실패 문구를 보여 줍니다.
+        var searchResultPhase: SearchResultPhase = .loaded
+
+        /// 검색 결과에 거리를 표기할지 여부입니다.
+        ///
+        /// 검색 결과의 거리는 서버가 검색 화면이 고정한 기준 좌표로 잰 값입니다.
+        /// 위치를 모른 채 검색해 기본 좌표로 쟀으면 사용자 위치에서 잰 거리가 아니므로 표기하지 않습니다.
+        var isSearchResultDistanceVisible: Bool = false
+
         /// 검색 결과의 `브랜드` 칩으로 여는 브랜드 필터 바텀시트가 떠 있는지 여부입니다.
         var isSearchResultBrandFilterSheetPresented: Bool = false
 
         var selectedTab: ListTab = .nearby
+        var favoriteSortOrder: FavoriteSortOrder = .saved
+        /// 위치 변화마다 목록이 재정렬되지 않도록 조회·정렬 시점의 좌표를 유지합니다.
+        var favoriteSortCoordinate: GeographicCoordinate?
+        /// 동일 기준 좌표에서 필터 변경 시 거리를 재계산하지 않습니다.
+        var favoriteDistances: [GeographicCoordinate: GeographicDistance] = [:]
         var visibleBooths: IdentifiedArrayOf<PhotoBooth> = []
         var favoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
         var visibleFavoriteBooths: IdentifiedArrayOf<PhotoBooth> = []
@@ -89,6 +128,7 @@ public struct PhotoBoothListFeature {
         // View Actions
         case selectFilterOption(PhotoBoothBrand)
         case selectTab(ListTab)
+        case selectFavoriteSortOrder(FavoriteSortOrder)
         case toggleTooltip
         case didTapFavorite(PhotoBooth)
         case didTapBrandReorderButton

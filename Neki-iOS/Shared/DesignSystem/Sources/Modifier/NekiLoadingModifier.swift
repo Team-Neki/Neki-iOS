@@ -90,11 +90,12 @@ private struct NekiLoadingModifier: ViewModifier {
         // 결과가 인디케이터 뒤로 비치지 않도록 본문을 감춰 두었다가 인디케이터가 내려갈 때 함께 드러냅니다.
         // 표시를 미루는 동안 보이는 본문은 터치만 막습니다. `disabled`는 버튼을 흐리게 그려,
         // 로딩이 빨리 끝나도 본문이 흐려졌다 돌아오는 깜빡임이 생깁니다.
+        // 인디케이터는 본문보다 클 수 있어, 본문 바깥의 입력을 가로채지 않도록 터치를 받지 않습니다.
         content
             .opacity(isIndicatorVisible ? 0 : 1)
             .allowsHitTesting(isPresented == false && isIndicatorVisible == false)
             .overlay {
-                if isIndicatorVisible { NekiLoadingIndicator() }
+                if isIndicatorVisible { NekiLoadingIndicator().allowsHitTesting(false) }
             }
     }
 

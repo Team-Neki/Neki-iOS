@@ -1,8 +1,11 @@
-<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M14.0127 6.11816C18.3639 6.11816 21.8916 9.64684 21.8916 14C21.8915 18.3531 18.3638 21.8818 14.0127 21.8818C9.66164 21.8818 6.13392 18.353 6.13379 14C6.13379 9.64687 9.66156 6.11822 14.0127 6.11816Z" stroke="#3C3E48" stroke-width="2" stroke-linecap="round"/>
-<circle cx="14" cy="14" r="3.5" fill="#3C3E48"/>
-<line x1="13.8335" y1="3.33301" x2="13.8335" y2="5.99967" stroke="#3C3E48" stroke-width="2" stroke-linecap="round"/>
-<line x1="13.8335" y1="22" x2="13.8335" y2="24.6667" stroke="#3C3E48" stroke-width="2" stroke-linecap="round"/>
-<line x1="24.6665" y1="13.833" x2="21.9998" y2="13.833" stroke="#3C3E48" stroke-width="2" stroke-linecap="round"/>
-<line x1="6" y1="13.833" x2="3.33333" y2="13.833" stroke="#3C3E48" stroke-width="2" stroke-linecap="round"/>
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="23.3327" height="23.3327" viewBox="0 0 23.3327 23.3327" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 427322448">
+<clipPath id="stroke0_0_33"><path d="M20.5575 11.6668C20.5575 16.5719 16.5822 20.5484 11.6785 20.5484C6.77474 20.5484 2.79948 16.5719 2.79948 11.6668C2.79948 6.76158 6.77474 2.78516 11.6785 2.78516C16.5822 2.78516 20.5575 6.76158 20.5575 11.6668Z"/></clipPath>
+<path id="Ellipse 24" d="M20.5575 11.6668C20.5575 16.5719 16.5822 20.5484 11.6785 20.5484C6.77474 20.5484 2.79948 16.5719 2.79948 11.6668C2.79948 6.76158 6.77474 2.78516 11.6785 2.78516C16.5822 2.78516 20.5575 6.76158 20.5575 11.6668Z" stroke-width="4" stroke-linecap="round" stroke="#616575" clip-path="url(#stroke0_0_33)"/>
+<circle id="Ellipse 25" cx="11.6667" cy="11.666" r="3.5" fill="#616575"/>
+<path id="Line 10" d="M11.4987 1L11.4987 3.66667" stroke-width="2" stroke-linecap="round" stroke="#616575"/>
+<path id="Line 11" d="M11.4987 19.666L11.4987 22.3327" stroke-width="2" stroke-linecap="round" stroke="#616575"/>
+<path id="Line 12" d="M22.3327 11.5L19.666 11.5" stroke-width="2" stroke-linecap="round" stroke="#616575"/>
+<path id="Line 13" d="M3.66667 11.5L1 11.5" stroke-width="2" stroke-linecap="round" stroke="#616575"/>
+</g>
 </svg>

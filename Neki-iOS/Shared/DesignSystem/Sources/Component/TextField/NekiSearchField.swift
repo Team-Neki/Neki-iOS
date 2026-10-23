@@ -47,6 +47,8 @@ public struct NekiSearchField: View {
 
     /// 검색어를 입력받는 검색 필드를 생성합니다.
     ///
+    /// 버튼 밖의 여백을 눌러도 텍스트 필드에 포커스를 줍니다.
+    ///
     /// - Parameters:
     ///   - text: 사용자가 입력 중인 검색어
     ///   - phase: 검색 필드의 단계. 입력 중에는 `.editing`, 제출한 검색어로 결과를 보는 동안에는 `.submitted`를 전달합니다.
@@ -98,7 +100,7 @@ public struct NekiSearchField: View {
     ///
     /// 입력은 검색 화면에서 하고 결과 화면에서는 검색어만 보여 주는 자리에 사용합니다.
     /// 검색어를 여기서 고치지 않으므로 검색어를 바인딩이 아닌 값으로 받고 포커스를 받지 않습니다.
-    /// 뒤로가기·검색어·검색 버튼은 모두 검색어를 다시 입력하러 가는 하나의 동작으로 이어집니다.
+    /// 뒤로가기·검색어·검색 버튼과 버튼 밖의 여백은 모두 검색어를 다시 입력하러 가는 하나의 동작으로 이어집니다.
     ///
     /// - Parameters:
     ///   - keyword: 검색을 완료한 검색어
@@ -185,7 +187,16 @@ private extension NekiSearchField {
             }
         }
 
-        /// 진입점은 필드 전체가 하나의 버튼입니다. 그 외에는 필드 안의 버튼과 텍스트 필드가 각자 입력을 받습니다.
+        /// 제출하거나 완료한 검색어 옆의 검색 아이콘은 입력 중보다 연하게 표시합니다.
+        var searchIcon: ImageResource {
+            switch self {
+            case .entry, .input(.editing): .iconSearch
+            case .input(.submitted), .completed: .iconSearchGray
+            }
+        }
+
+        /// 진입점은 필드 전체가 하나의 버튼입니다.
+        /// 그 외에는 필드 안의 버튼과 텍스트 필드가 각자 입력을 받고, 그 밖을 누른 탭은 필드가 받습니다.
         var isTappableAsWhole: Bool {
             switch self {
             case .entry: true
@@ -207,8 +218,6 @@ private extension NekiSearchField {
         static let iconSize: CGFloat = 24
         static let horizontalPadding: CGFloat = 16
         static let verticalPadding: CGFloat = 12
-        static let shadowRadius: CGFloat = 4
-        static let shadowOffsetY: CGFloat = 2
         static let pressedOpacity: Double = 0.75
     }
 }
@@ -217,6 +226,10 @@ private extension NekiSearchField {
 // MARK: - NekiSearchField + Subviews
 
 private extension NekiSearchField {
+    /// 안쪽 버튼과 텍스트 필드가 받지 않은 탭은 필드가 받아, 여백을 눌러도 반응합니다.
+    ///
+    /// 필드의 탭은 안쪽 버튼의 탭보다 우선순위가 낮아서, 버튼을 누르면 버튼의 동작만 실행됩니다.
+    /// 진입점은 필드 전체를 덮은 버튼이 탭을 받으므로 필드의 탭을 끕니다.
     var field: some View {
         HStack(spacing: Metrics.spacing) {
             leading
@@ -226,6 +239,11 @@ private extension NekiSearchField {
             trailing
         }
         .searchFieldContainer(variant.decoration)
+        .contentShape(.capsule)
+        .gesture(
+            TapGesture().onEnded { tapField() },
+            including: variant.isTappableAsWhole ? .subviews : .all
+        )
     }
 
     /// 진입점에서 필드 전체를 덮는 버튼입니다.
@@ -245,6 +263,18 @@ private extension NekiSearchField {
         }
     }
 
+    /// 안쪽 버튼과 텍스트 필드가 받지 않은 탭을 받았을 때 실행합니다.
+    ///
+    /// 검색 완료 형태는 검색어를 다시 입력하러 가고, 입력 형태는 텍스트 필드에 포커스를 줘 입력을 시작합니다.
+    func tapField() {
+        switch variant {
+        case .entry, .completed:
+            onTap?()
+        case .input:
+            isFocused?.wrappedValue = true
+        }
+    }
+
     /// 진입점에서는 서비스 심볼을, 그 외에는 뒤로가기 버튼을 노출합니다.
     @ViewBuilder
     var leading: some View {
@@ -252,7 +282,7 @@ private extension NekiSearchField {
         case .entry:
             iconImage(.iconNeki)
         case .input, .completed:
-            icon(.iconChevronLeft) { onBack?() }
+            icon(.iconChevronLeft24) { onBack?() }
         }
     }
 
@@ -287,13 +317,13 @@ private extension NekiSearchField {
     var trailing: some View {
         switch variant {
         case .entry:
-            iconImage(.iconSearch)
+            iconImage(variant.searchIcon)
         case .input:
-            icon(.iconSearch) { onSubmit?() }
+            icon(variant.searchIcon) { onSubmit?() }
         case .completed:
-            icon(.iconSearch) { onSubmit?() }
+            icon(variant.searchIcon) { onSubmit?() }
 
-            icon(.iconXmarkBlack) { onClear?() }
+            icon(.iconXmark24Black) { onClear?() }
         }
     }
 
@@ -325,9 +355,12 @@ private extension NekiSearchField {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// 아이콘을 원래 크기로 아이콘 영역(24pt) 가운데에 그립니다.
+    ///
+    /// 검색 필드의 아이콘은 이 크기로 그린 에셋이라 늘리거나 줄이지 않습니다.
+    /// 그림 부분만 담은 에셋(`icon_search_gray`)도 디자인처럼 영역 가운데에 놓입니다.
     func iconImage(_ icon: ImageResource) -> some View {
         Image(icon)
-            .resizable()
             .frame(width: Metrics.iconSize, height: Metrics.iconSize)
     }
 
@@ -356,11 +389,7 @@ private struct SearchFieldContainer: ViewModifier {
                     Capsule().strokeBorder(.gray100)
                 }
             }
-            .shadow(
-                color: decoration == .shadow ? .black.opacity(0.25) : .clear,
-                radius: NekiSearchField.Metrics.shadowRadius,
-                y: NekiSearchField.Metrics.shadowOffsetY
-            )
+            .nekiShadow(.button, isVisible: decoration == .shadow)
     }
 }
 

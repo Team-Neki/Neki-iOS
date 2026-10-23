@@ -19,8 +19,14 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
     let content: () -> Content
     
     private let controllerSpacing: CGFloat = 12
+    private let indicatorAreaHeight: CGFloat = 24
     
-    var isControllersVisible: Bool { selection == MapFeature.SheetStage.first.detent || selection == MapFeature.SheetStage.second.detent }
+    /// 시트 위에 지도 버튼을 띄우는 높이인지 여부입니다. 결과 없음 높이에서도 띄워 현위치로 옮길 수 있게 합니다.
+    var isControllersVisible: Bool {
+        selection == MapFeature.SheetStage.first.detent
+            || selection == MapFeature.SheetStage.second.detent
+            || selection == MapFeature.SheetStage.emptySearchResult.detent
+    }
     
     public var body: some View {
         GeometryReader { proxy in
@@ -39,6 +45,7 @@ public struct NekiSheet<Content: View, Controllers: View>: View {
                             guard isContentScrollAtTop != isAtTop else { return }
                             isContentScrollAtTop = isAtTop
                         })
+                        .environment(\.nekiSheetVisibleContentHeight, visibleContentHeight(of: layout))
                 }
                 .background(configuration.backgroundColor)
                 .clipShape(PresentationCornerShape(radius: configuration.cornerRadius, corners: [.topLeft, .topRight]))
@@ -77,7 +84,7 @@ private extension NekiSheet {
                 .frame(width: configuration.indicatorSize.width, height: configuration.indicatorSize.height)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 24)
+        .frame(height: indicatorAreaHeight)
         .contentShape(.rect)
         .onTapGesture { withAnimation(configuration.animation) { selection = .large } }
     }
@@ -111,8 +118,9 @@ private extension NekiSheet {
 private extension NekiSheet {
     func layout(in totalHeight: CGFloat) -> SheetLayout {
         let inset = configuration.bottomInset
-        let sortedHeights = configuration.detents.map { $0.resolve(in: totalHeight, inset: inset) }.sorted()
-        let targetHeight = selection.resolve(in: totalHeight, inset: inset)
+        let topInset = configuration.topInset
+        let sortedHeights = configuration.detents.map { $0.resolve(in: totalHeight, inset: inset, topInset: topInset) }.sorted()
+        let targetHeight = selection.resolve(in: totalHeight, inset: inset, topInset: topInset)
         let currentHeight = sortedHeights.min(by: { abs($0 - targetHeight) < abs($1 - targetHeight) }) ?? targetHeight
         let maxHeight = sortedHeights.last ?? totalHeight
         let baseOffset = maxHeight - currentHeight
@@ -124,6 +132,14 @@ private extension NekiSheet {
             currentHeight: currentHeight,
             dragOffset: dragOffset
         )
+    }
+
+    /// 시트 내용 중 화면에 드러난 높이입니다.
+    ///
+    /// 끌고 있는 만큼 더하거나 빼고, 손잡이 영역은 뺍니다.
+    func visibleContentHeight(of layout: SheetLayout) -> CGFloat {
+        let visibleSheetHeight = min(max(layout.currentHeight - translation, .zero), layout.maxHeight)
+        return max(visibleSheetHeight - indicatorAreaHeight, .zero)
     }
 
     func shouldHandleSheetDrag(_ value: DragGesture.Value) -> Bool {
@@ -156,12 +172,15 @@ private extension NekiSheet {
         }
 
         let inset = configuration.bottomInset
+        let topInset = configuration.topInset
         let predictedHeight = layout.currentHeight - value.translation.height
         let interactiveDetents = configuration.detents.filter { $0 != .hidden }
-        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxyHeight, inset: inset) }
+        let interactiveHeights = interactiveDetents.map { $0.resolve(in: proxyHeight, inset: inset, topInset: topInset) }
         let closestHeight = interactiveHeights.min(by: { abs($0 - predictedHeight) < abs($1 - predictedHeight) }) ?? layout.currentHeight
 
-        guard let newDetent = interactiveDetents.first(where: { abs($0.resolve(in: proxyHeight, inset: inset) - closestHeight) < 1.0 }) else {
+        guard let newDetent = interactiveDetents.first(where: {
+            abs($0.resolve(in: proxyHeight, inset: inset, topInset: topInset) - closestHeight) < 1.0
+        }) else {
             return resetDragState()
         }
 
@@ -206,6 +225,20 @@ public extension View {
     func nekiSheetBottomInset(_ height: CGFloat = .screenTabBarHeight) -> some View {
         transformEnvironment(\.sheetConfiguration) { $0.bottomInset = height }
     }
+
+    /// 시트를 가장 높이 올렸을 때(`large`) 위에 여백을 남깁니다.
+    ///
+    /// - Parameter height: 남길 높이. 시트를 그리는 영역(상단 안전 영역 아래)의 위쪽부터 잽니다.
+    func nekiSheetTopInset(_ height: CGFloat) -> some View {
+        transformEnvironment(\.sheetConfiguration) { $0.topInset = height }
+    }
+
+    /// 시트를 끌어 맞출 수 있는 높이를 정합니다.
+    ///
+    /// - Parameter detents: 끌어 맞출 높이. 지금 높이(`selection`)를 포함해야 그 높이로 그립니다.
+    func nekiSheetDetents(_ detents: Set<NekiSheetDetent>) -> some View {
+        transformEnvironment(\.sheetConfiguration) { $0.detents = detents }
+    }
     
     /// 뷰 영역의 높이를 확인합니다.
     func measureHeight(perform action: @escaping (CGFloat) -> Void) -> some View {
@@ -240,6 +273,24 @@ extension EnvironmentValues {
     var nekiSheetScrollStateHandler: NekiSheetScrollStateHandler {
         get { self[NekiSheetScrollStateHandlerKey.self] }
         set { self[NekiSheetScrollStateHandlerKey.self] = newValue }
+    }
+}
+
+
+// MARK: - NekiSheetVisibleContentHeight
+
+private struct NekiSheetVisibleContentHeightKey: EnvironmentKey {
+    static let defaultValue: CGFloat? = nil
+}
+
+extension EnvironmentValues {
+    /// 시트 내용 중 화면에 드러난 높이입니다. 손잡이 영역은 빼고, 시트를 끄는 동안에도 따라 바뀝니다.
+    ///
+    /// 시트는 가장 높은 높이로 내용을 그린 뒤 아래로 밀어 두므로, 내용 영역의 가운데는 화면 밖에 놓일 수 있습니다.
+    /// 시트 높이와 상관없이 드러난 부분의 가운데에 무언가를 두어야 할 때 씁니다. 시트 밖에서는 `nil`입니다.
+    var nekiSheetVisibleContentHeight: CGFloat? {
+        get { self[NekiSheetVisibleContentHeightKey.self] }
+        set { self[NekiSheetVisibleContentHeightKey.self] = newValue }
     }
 }
 

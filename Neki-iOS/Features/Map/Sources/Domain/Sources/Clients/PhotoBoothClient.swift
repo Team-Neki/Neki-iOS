@@ -13,7 +13,7 @@ public struct PhotoBoothClient {
     /// 지도 영역(bounds) 내의 포토부스 데이터를 가져옵니다.
     public var fetchPhotoBooths: @Sendable (_ bounds: GeographicBoundingBox) async throws -> AsyncThrowingStream<[PhotoBooth], Error>
     /// 특정 포토부스의 즐겨찾기 상태를 변경합니다.
-    public var updatePhotoBoothFavorite: @Sendable (_ id: Int, _ isFavorite: Bool) async throws -> Void
+    public var updatePhotoBoothFavorite: @Sendable (_ id: PhotoBooth.ID, _ isFavorite: Bool) async throws -> Void
     /// 즐겨찾기 포토부스 목록 조회
     public var fetchFavoritePhotoBooths: @Sendable () async throws -> [PhotoBooth]
     /// 지원 브랜드 정보 조회
@@ -21,10 +21,13 @@ public struct PhotoBoothClient {
     /// 브랜드 필터칩 노출 순서 변경
     public var updateBrandOrder: @Sendable (_ brands: [PhotoBoothBrand]) async throws -> [PhotoBoothBrand]
     /// 검색어에 대응하는 특정 종류의 검색 후보 페이지 조회
-    public var searchCandidates: @Sendable (_ query: PhotoBoothSearchQuery, _ type: PhotoBoothSearchCandidateType, _ page: Int) async throws -> PhotoBoothSearchCandidatePage
+    ///
+    /// `origin`은 지하철역·포토부스 후보에 담길 거리의 기준이며, 지역은 거리를 내려주지 않아 쓰지 않습니다.
+    public var searchCandidates: @Sendable (_ query: PhotoBoothSearchQuery, _ type: PhotoBoothSearchCandidateType, _ page: Int, _ origin: GeographicCoordinate?) async throws -> PhotoBoothSearchCandidatePage
     /// 사용자가 선택한 검색 후보에 대응하는 포토부스 조회
     ///
-    /// 포토부스 후보는 검색 응답에 지도에 필요한 값이 모두 들어 있어 네트워크 호출 없이 자기 자신을 반환합니다.
+    /// 세 종류 모두 후보의 `keyword`와 `filterGroup`으로 부스 목록을 조회합니다.
+    /// 포토부스 후보는 그 지점 하나가 오지만, 지도에서 숨긴 지점이면 빈 배열입니다.
     /// `userCoordinate`는 응답에 담길 거리의 기준이며, 위치를 알 수 없으면 `nil`을 전달해 거리를 받지 않습니다.
     public var fetchSearchPhotoBooths: @Sendable (_ candidate: PhotoBoothSearchCandidate, _ userCoordinate: GeographicCoordinate?) async throws -> [PhotoBooth]
     /// 사용자가 선택한 검색 후보의 부스 목록에서 쓸 수 있는 브랜드 필터 조회
@@ -57,42 +60,28 @@ extension PhotoBoothClient: DependencyKey {
         client.updateBrandOrder = { brands in
             try await photoBoothRepository.updateBrandOrder(brands)
         }
-        client.searchCandidates = { query, type, page in
+        client.searchCandidates = { query, type, page, origin in
             try await photoBoothRepository.searchCandidates(
                 keyword: query.rawValue,
                 type: type,
                 page: page,
-                size: PhotoBoothSearchPaging.size
+                size: PhotoBoothSearchPaging.size,
+                origin: origin
             )
         }
         client.fetchSearchPhotoBooths = { candidate, userCoordinate in
-            switch candidate {
-            case let .region(region):
-                return try await photoBoothRepository.readSearchResultPhotoBooths(
-                    target: .region(code: region.code),
-                    userCoordinate: userCoordinate
-                )
-
-            case let .subwayStation(station):
-                return try await photoBoothRepository.readSearchResultPhotoBooths(
-                    target: .subwayStation(name: station.name, lineName: station.lineName),
-                    userCoordinate: userCoordinate
-                )
-
-            case let .photoBooth(photoBooth):
-                return [photoBooth]
-            }
+            try await photoBoothRepository.readSearchResultPhotoBooths(
+                keyword: candidate.keyword,
+                filterGroup: candidate.filterGroup,
+                userCoordinate: userCoordinate
+            )
         }
         client.fetchSearchBrandFilters = { candidate in
-            switch candidate {
-            case let .region(region):
+            switch candidate.type {
+            case .region, .subwayStation:
                 return try await photoBoothRepository.readSearchResultBrandFilters(
-                    target: .region(code: region.code)
-                )
-
-            case let .subwayStation(station):
-                return try await photoBoothRepository.readSearchResultBrandFilters(
-                    target: .subwayStation(name: station.name, lineName: station.lineName)
+                    keyword: candidate.keyword,
+                    filterGroup: candidate.filterGroup
                 )
 
             case .photoBooth:

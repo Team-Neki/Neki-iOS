@@ -46,6 +46,12 @@ fileprivate enum Constants {
     static let sheetSpacingBelowSearchField: CGFloat = 8
 }
 
+enum MapCameraTransitionPolicy {
+    static func animatesContentInset(hasPendingCameraMove: Bool, hasPendingCameraFit: Bool) -> Bool {
+        hasPendingCameraMove == false && hasPendingCameraFit == false
+    }
+}
+
 struct NaverMapRepresentable: UIViewRepresentable {
     @Environment(\.displayScale) private var displayScale
 
@@ -76,6 +82,19 @@ struct NaverMapRepresentable: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: NMFNaverMapView, context: Context) {
+        let hasPendingCameraMove = context.coordinator.hasPendingCameraMove(store.cameraMoveRequest)
+        let hasPendingCameraFit = context.coordinator.hasPendingCameraFit(store.cameraFitRequest)
+
+        // 시트가 사라지는 동시에 카메라를 옮기면, 기존 inset을 기준으로 이동을 시작한 뒤
+        // inset 애니메이션이 지도의 유효 중심을 다시 바꾸게 된다. 새 카메라 요청은 목표 inset을 먼저 확정한다.
+        updateContentInset(
+            uiView.mapView,
+            animated: MapCameraTransitionPolicy.animatesContentInset(
+                hasPendingCameraMove: hasPendingCameraMove,
+                hasPendingCameraFit: hasPendingCameraFit
+            )
+        )
+
         // State 변경 시 카메라 이동
         if context.coordinator.isMapLoaded {
             updateCameraPosition(uiView.mapView, context: context)
@@ -89,7 +108,6 @@ struct NaverMapRepresentable: UIViewRepresentable {
             selectedBoothID: store.selectedBooth?.id
         )
         
-        updateContentInset(uiView.mapView)
         // 현위치 모드는 인셋을 반영한 뒤에 맞춥니다. 인셋을 바꾸면 SDK가 위치 추적 모드를 풀어 버리기 때문입니다.
         updateLocationOverlay(uiView.mapView, isAuthorized: isLocationAuthorized)
     }
@@ -136,7 +154,7 @@ private extension NaverMapRepresentable {
         context.coordinator.appliedCameraMoveGeneration = request.generation
 
         let cameraUpdate = NMFCameraUpdate(scrollTo: NMGLatLng(lat: coordinate.latitude, lng: coordinate.longitude))
-        cameraUpdate.animation = .linear
+        cameraUpdate.animation = .easeOut
         cameraUpdate.animationDuration = Constants.animationDuration
         mapView.moveCamera(cameraUpdate)
     }
@@ -164,16 +182,27 @@ private extension NaverMapRepresentable {
             northEastLng: bounds.maxLongitude + longitudePadding
         )
         let cameraUpdate = NMFCameraUpdate(fit: latLngBounds, padding: Constants.fitBoundsPadding)
-        cameraUpdate.animation = .linear
+        cameraUpdate.animation = .easeOut
         cameraUpdate.animationDuration = Constants.animationDuration
         mapView.moveCamera(cameraUpdate)
     }
 
-    func updateContentInset(_ mapView: NMFMapView) {
+    func updateContentInset(_ mapView: NMFMapView, animated: Bool) {
         let sheetHeight = store.detent.resolve(in: UIScreen.main.bounds.height, inset: .screenTabBarHeight)
         let targetInset = store.detent == .large ? .zero : UIEdgeInsets(top: .zero, left: .zero, bottom: sheetHeight, right: .zero)
-        if mapView.contentInset != targetInset {
-            UIView.animate(withDuration: Constants.animationDuration, delay: .zero) {
+        guard mapView.contentInset != targetInset else { return }
+
+        if animated {
+            UIView.animate(
+                withDuration: Constants.animationDuration,
+                delay: .zero,
+                options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction]
+            ) {
+                mapView.contentInset = targetInset
+                mapView.layoutIfNeeded()
+            }
+        } else {
+            UIView.performWithoutAnimation {
                 mapView.contentInset = targetInset
                 mapView.layoutIfNeeded()
             }
@@ -242,6 +271,14 @@ extension NaverMapRepresentable {
             )
             return NMFOverlayImage(image: image)
         }()
+
+        func hasPendingCameraMove(_ request: MapFeature.CameraMoveRequest) -> Bool {
+            request.coordinate != nil && request.generation != appliedCameraMoveGeneration
+        }
+
+        func hasPendingCameraFit(_ request: MapFeature.CameraFitRequest) -> Bool {
+            request.bounds != nil && request.generation != appliedCameraFitGeneration
+        }
         private var currentKeyByID: [BoothID: BoothClusteringKey] = [:]
         private var clusteredMarkerStateByID: [BoothID: PhotoBoothMarkerPresentationState] = [:]
         private var visibleBoothIDs: Set<BoothID> = []
@@ -754,8 +791,8 @@ public struct NaverMapView: View {
         .nekiSheetTopInset(Constants.searchFieldTopPadding + searchFieldHeight + Constants.sheetSpacingBelowSearchField)
         .nekiSheetBottomInset()
         .nekiSheetDetents(store.sheetDetents)
-        .animation(.easeInOut, value: store.detent)
-        .animation(.easeInOut, value: store.selectedBooth?.id)
+        .animation(.easeOut(duration: Constants.animationDuration), value: store.detent)
+        .animation(.easeOut(duration: Constants.animationDuration), value: store.selectedBooth?.id)
         // 검색 화면은 지도 화면의 검색 모드라 새 화면으로 띄우지 않고 지도 위에 겹쳐 그립니다.
         // 시트·버튼보다 위, 알림보다 아래에 그려지도록 이 자리에 둡니다.
         // 검색 중 키보드가 올라와도 지도 크기가 바뀌지 않도록 지도 쪽은 키보드 영역을 무시하고,

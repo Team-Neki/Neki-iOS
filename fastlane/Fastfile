@@ -1,4 +1,5 @@
 require "base64"
+require "shellwords"
 require File.expand_path(
   "deployment_configuration",
   FastlaneCore::FastlaneFolder.path
@@ -24,6 +25,24 @@ def require_semantic_version!(version)
   return if version.match?(/\A(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\z/)
 
   UI.user_error!("MARKETING_VERSION must follow MAJOR.MINOR.PATCH: #{version}")
+end
+
+def require_signing_identity!(team_id)
+  keychain_path = Actions.lane_context[Actions::SharedValues::KEYCHAIN_PATH].to_s
+  keychain_reference = if keychain_path.empty?
+                         ENV["MATCH_KEYCHAIN_NAME"].to_s
+                       else
+                         File.expand_path(Shellwords.split(keychain_path).fetch(0))
+                       end
+  keychain_reference = "login.keychain" if keychain_reference.empty?
+  command = "security find-identity -v -p codesigning #{Shellwords.escape(keychain_reference)}"
+
+  identity_output = sh(command, log: false)
+  return if identity_output.include?("(#{team_id})")
+
+  UI.user_error!(
+    "No valid code signing identity with a private key was installed for team #{team_id}"
+  )
 end
 
 platform :ios do
@@ -55,6 +74,10 @@ platform :ios do
         configuration.fetch(:share_extension_app_identifier)
       ]
     )
+
+    # Match can continue after `security import` rejects a PKCS#12 file. Fail here
+    # so connection validation cannot report success without a usable private key.
+    require_signing_identity!(DeploymentConfiguration::TEAM_ID)
 
     api_key
   end

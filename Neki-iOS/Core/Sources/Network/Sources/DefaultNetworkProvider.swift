@@ -109,7 +109,9 @@ private extension DefaultNetworkProvider {
         try Task.checkCancellation()
         try await verifyAuthorizationGeneration(generation, for: endpoint)
         let request = try endpoint.asURLRequest()
-        guard endpoint.authorizationType == .bearer else { return try await executeValidatedRequest(request) }
+        guard endpoint.authorizationType == .bearer else {
+            return try await executeValidatedRequest(request, authorizationType: endpoint.authorizationType)
+        }
 
         do {
             return try await credentialBroker.performAuthenticatedRequest(using: self, generation: generation) { tokens, revision in
@@ -132,10 +134,10 @@ private extension DefaultNetworkProvider {
         }
     }
 
-    func executeValidatedRequest(_ request: URLRequest) async throws -> Data {
+    func executeValidatedRequest(_ request: URLRequest, authorizationType: AuthorizationType = .none) async throws -> Data {
         let (data, response) = try await executeSession(with: request)
         try Task.checkCancellation()
-        switch validateResponse(response) {
+        switch validateResponse(response, authorizationType: authorizationType) {
         case .success: return data
         case .unauthorized: throw NetworkError.unauthorizedError
         case .failure(let error): throw error
@@ -179,13 +181,15 @@ private extension DefaultNetworkProvider {
         case failure(NetworkError)
     }
     
-    func validateResponse(_ response: URLResponse) -> ResponseStatus {
+    func validateResponse(_ response: URLResponse, authorizationType: AuthorizationType) -> ResponseStatus {
         guard let httpResponse = response as? HTTPURLResponse else { return .failure(.responseError) }
         
         switch httpResponse.statusCode {
         case 200..<300: return .success
         case 400: return .failure(.badRequestError)
         case 401: return .unauthorized
+        // 재발급 API는 Refresh Token 만료를 403으로 반환합니다. 일반 API의 403과 구분합니다.
+        case 403 where authorizationType == .reissue: return .unauthorized
         case 404: return .failure(.notFound)
         case 500..<600: return .failure(.internalServerError)
         default: return .failure(.networkFail)

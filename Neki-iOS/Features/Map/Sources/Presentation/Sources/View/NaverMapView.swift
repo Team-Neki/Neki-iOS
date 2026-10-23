@@ -700,8 +700,9 @@ extension NaverMapRepresentable {
 
 extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     func mapView(_ mapView: NMFMapView, cameraWillChangeByReason reason: Int, animated: Bool) {
-        guard reason == NMFMapChangedByGesture else { return }
-        parent.store.send(.didDetectMapInteraction)
+        if reason == NMFMapChangedByGesture {
+            parent.store.send(.didDetectMapInteraction)
+        }
         parent.store.send(.cameraMotionStarted)
     }
 

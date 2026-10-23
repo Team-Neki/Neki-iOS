@@ -6,6 +6,7 @@
 //
 
 import Testing
+import NMapsMap
 @testable import Neki_iOS
 
 struct MapCameraTransitionPolicyTests {
@@ -30,5 +31,12 @@ struct MapCameraTransitionPolicyTests {
             hasPendingCameraMove: false,
             hasPendingCameraFit: false
         ))
+    }
+
+    @Test("사용자 제스처 카메라 이동만 중간 viewport 상태를 발행한다")
+    func cameraChangeReason_publishesOnlyGestureUpdates() {
+        #expect(MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: NMFMapChangedByGesture))
+        #expect(MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: NMFMapChangedByDeveloper) == false)
+        #expect(MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: NMFMapChangedByControl) == false)
     }
 }

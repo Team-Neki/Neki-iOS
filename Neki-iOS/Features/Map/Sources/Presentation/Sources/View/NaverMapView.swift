@@ -50,6 +50,10 @@ enum MapCameraTransitionPolicy {
     static func animatesContentInset(hasPendingCameraMove: Bool, hasPendingCameraFit: Bool) -> Bool {
         hasPendingCameraMove == false && hasPendingCameraFit == false
     }
+
+    static func publishesUserInteractionUpdates(for cameraChangeReason: Int) -> Bool {
+        cameraChangeReason == NMFMapChangedByGesture
+    }
 }
 
 struct NaverMapRepresentable: UIViewRepresentable {
@@ -708,16 +712,17 @@ extension NaverMapRepresentable {
 
 extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
     func mapView(_ mapView: NMFMapView, cameraWillChangeByReason reason: Int, animated: Bool) {
-        if reason == NMFMapChangedByGesture {
-            parent.store.send(.didDetectMapInteraction)
-        }
+        guard MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: reason) else { return }
+        parent.store.send(.didDetectMapInteraction)
         parent.store.send(.cameraMotionStarted)
     }
 
     func mapView(_ mapView: NMFMapView, cameraIsChangingByReason reason: Int) {
-        let currentTime = CACurrentMediaTime()
         updateOverlappingMarkerModeIfNeeded(mapView: mapView)
         updateOverlappingMarkerPositionsIfNeeded(mapView: mapView)
+        guard MapCameraTransitionPolicy.publishesUserInteractionUpdates(for: reason) else { return }
+
+        let currentTime = CACurrentMediaTime()
         if currentTime - lastFavoriteMarkerViewportUpdateTime >= Constants.favoriteMarkerViewportUpdateInterval {
             lastFavoriteMarkerViewportUpdateTime = currentTime
             parent.store.send(.cameraMotionChanged(mapView.contentBounds.toDomain()))

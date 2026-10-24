@@ -7,6 +7,7 @@
 
 import CoreGraphics
 import Foundation
+import NMapsMap
 import Testing
 @testable import Neki_iOS
 
@@ -18,7 +19,7 @@ struct OverlappingMarkerLayoutTests {
 
     private let markerSize = CGSize(width: 52, height: 52)
     private let minimumGap: CGFloat = .zero
-    private let coordinateDecimalPlaces = 5
+    private let maximumDistanceMeters: Double = 1
 
     @Test("단독 마커는 원본 화면 좌표를 유지한다")
     func singleMarker_staysAtOrigin() {
@@ -78,6 +79,11 @@ struct OverlappingMarkerLayoutTests {
         #expect(first == second)
         #expect(Set(first).count == 2)
         #expect(first.allSatisfy { coordinateDistance(from: origin, to: $0) < 20 })
+
+        let metersPerPoint = 2 * .pi * 6_378_137.0 * cos(origin.latitude * .pi / 180)
+            / (256 * pow(2, 19.0))
+        let minimumDistance = Double(markerSize.height) * metersPerPoint
+        #expect(coordinateDistance(from: first[0], to: first[1]) >= minimumDistance * 0.99)
     }
 
     @Test("응답 순서가 달라도 같은 좌표 그룹의 ID 배치 순서는 유지된다")
@@ -97,7 +103,7 @@ struct OverlappingMarkerLayoutTests {
         #expect(firstGroups[coordinate] == ["source:A:1", "source:B:2", "source:C:3"])
     }
 
-    @Test("소수점 전체 값이 달라도 정규화 좌표가 같으면 같은 그룹으로 묶는다")
+    @Test("원본 좌표가 달라도 실제 거리가 가까우면 같은 그룹으로 묶는다")
     func nearbyCoordinates_joinSameGroup() {
         let markers = [
             Marker(id: "A", coordinate: GeographicCoordinate(latitude: 37.4979000, longitude: 127.0276000)),
@@ -107,7 +113,17 @@ struct OverlappingMarkerLayoutTests {
         #expect(groups(markers).values.first == ["A", "B"])
     }
 
-    @Test("정규화 좌표가 다른 지점은 별도 그룹으로 유지한다")
+    @Test("반올림 경계 양쪽의 가까운 좌표도 같은 그룹으로 묶는다")
+    func nearbyCoordinatesAcrossRoundingBoundary_joinSameGroup() {
+        let markers = [
+            Marker(id: "A", coordinate: GeographicCoordinate(latitude: 37.497904, longitude: 127.0276)),
+            Marker(id: "B", coordinate: GeographicCoordinate(latitude: 37.497906, longitude: 127.0276))
+        ]
+
+        #expect(groups(markers).values.first == ["A", "B"])
+    }
+
+    @Test("기준 거리보다 먼 지점은 별도 그룹으로 유지한다")
     func separatedCoordinates_stayInDifferentGroups() {
         let markers = [
             Marker(id: "A", coordinate: GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)),
@@ -115,6 +131,79 @@ struct OverlappingMarkerLayoutTests {
         ]
 
         #expect(groups(markers).isEmpty)
+    }
+
+    @Test("그룹 구성이 바뀌면 기존 마커의 클러스터 등록 정보도 교체한다")
+    func changedGroup_replacesExistingMarkerRegistration() {
+        let origin = GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)
+        let previousCoordinates = OverlappingMarkerLayout.coordinates(
+            origin: origin,
+            count: 2,
+            markerSize: markerSize,
+            minimumGap: minimumGap,
+            zoomLevel: 19
+        )
+        let updatedCoordinates = OverlappingMarkerLayout.coordinates(
+            origin: origin,
+            count: 3,
+            markerSize: markerSize,
+            minimumGap: minimumGap,
+            zoomLevel: 19
+        )
+        let previousTag = NaverMapRepresentable.BoothClusterTag(
+            brandID: 1,
+            overlappingGroupID: ["B", "C"]
+        )
+        let updatedTag = NaverMapRepresentable.BoothClusterTag(
+            brandID: 1,
+            overlappingGroupID: ["A", "B", "C"]
+        )
+        let previousPosition = NMGLatLng(
+            lat: previousCoordinates[0].latitude,
+            lng: previousCoordinates[0].longitude
+        )
+        let updatedPosition = NMGLatLng(
+            lat: updatedCoordinates[1].latitude,
+            lng: updatedCoordinates[1].longitude
+        )
+        let key = NaverMapRepresentable.BoothClusteringKey(
+            identifier: "B",
+            position: previousPosition,
+            tag: previousTag
+        )
+
+        #expect(key.matches(position: previousPosition, tag: previousTag))
+        #expect(key.matches(position: updatedPosition, tag: updatedTag) == false)
+    }
+
+    @Test("근접 그룹은 브랜드가 달라도 분리 줌 전까지 거리 기반 클러스터링을 유지한다")
+    func nearbyGroupWithDifferentBrands_usesDistanceClustering() {
+        let firstBrand = NaverMapRepresentable.BoothClusterTag(brandID: 1)
+        let secondBrand = NaverMapRepresentable.BoothClusterTag(brandID: 2)
+        let firstGroupTag = NaverMapRepresentable.BoothClusterTag(
+            brandID: 1,
+            overlappingGroupID: ["A", "B"]
+        )
+        let secondGroupTag = NaverMapRepresentable.BoothClusterTag(
+            brandID: 2,
+            overlappingGroupID: ["A", "B"]
+        )
+
+        #expect(NaverMapRepresentable.ClusterStrategy.shouldUseDefaultDistance(
+            zoom: 18,
+            firstTag: firstGroupTag,
+            secondTag: secondGroupTag
+        ))
+        #expect(NaverMapRepresentable.ClusterStrategy.shouldUseDefaultDistance(
+            zoom: 18,
+            firstTag: firstGroupTag,
+            secondTag: firstBrand
+        ))
+        #expect(NaverMapRepresentable.ClusterStrategy.shouldUseDefaultDistance(
+            zoom: 18,
+            firstTag: firstBrand,
+            secondTag: secondBrand
+        ) == false)
     }
 
     @Test("마커와 무관한 상세 정보 변경은 표현 상태를 갱신하지 않는다")
@@ -138,7 +227,7 @@ struct OverlappingMarkerLayoutTests {
             elements: markers,
             id: \.id,
             coordinate: \.coordinate,
-            coordinateDecimalPlaces: coordinateDecimalPlaces
+            maximumDistanceMeters: maximumDistanceMeters
         )
     }
 

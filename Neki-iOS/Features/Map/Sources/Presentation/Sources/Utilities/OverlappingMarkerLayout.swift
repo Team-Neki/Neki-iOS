@@ -9,32 +9,71 @@ import CoreGraphics
 
 /// 가까운 원본 좌표를 같은 위치로 묶고, 식별자 순서로 안정화합니다.
 enum OverlappingMarkerGroupResolver {
-    private struct CoordinateBucket: Hashable {
-        let latitude: Int64
-        let longitude: Int64
-    }
+    private static let earthRadius: Double = 6_378_137
 
     static func groups<Element, ID: Hashable & Comparable>(
         elements: some Sequence<Element>,
         id: (Element) -> ID,
         coordinate: (Element) -> GeographicCoordinate,
-        coordinateDecimalPlaces: Int
+        maximumDistanceMeters: Double
     ) -> [GeographicCoordinate: [ID]] {
-        let scale = pow(10, Double(coordinateDecimalPlaces))
-        let grouped = Dictionary(grouping: elements) { element in
-            let coordinate = coordinate(element)
-            return CoordinateBucket(
-                latitude: Int64((coordinate.latitude * scale).rounded()),
-                longitude: Int64((coordinate.longitude * scale).rounded())
-            )
+        guard maximumDistanceMeters.isFinite, maximumDistanceMeters >= .zero else { return [:] }
+
+        let candidates = elements.map { (id: id($0), coordinate: coordinate($0)) }
+        guard candidates.count > 1 else { return [:] }
+
+        let latitudeThreshold = maximumDistanceMeters / earthRadius * 180 / .pi
+        let indicesByLatitude = candidates.indices.sorted {
+            candidates[$0].coordinate.latitude < candidates[$1].coordinate.latitude
+        }
+        var parents = Array(candidates.indices)
+
+        func root(of index: Int) -> Int {
+            var current = index
+            while parents[current] != current { current = parents[current] }
+            return current
         }
 
-        return grouped.reduce(into: [:]) { result, entry in
-            guard entry.value.count > 1 else { return }
-            let sortedElements = entry.value.sorted { id($0) < id($1) }
-            guard let origin = sortedElements.first.map(coordinate) else { return }
-            result[origin] = sortedElements.map(id)
+        func join(_ firstIndex: Int, _ secondIndex: Int) {
+            let firstRoot = root(of: firstIndex)
+            let secondRoot = root(of: secondIndex)
+            guard firstRoot != secondRoot else { return }
+            parents[secondRoot] = firstRoot
         }
+
+        for (offset, firstIndex) in indicesByLatitude.enumerated() {
+            for secondIndex in indicesByLatitude.dropFirst(offset + 1) {
+                let latitudeDelta = candidates[secondIndex].coordinate.latitude
+                    - candidates[firstIndex].coordinate.latitude
+                if latitudeDelta > latitudeThreshold { break }
+                if distance(
+                    from: candidates[firstIndex].coordinate,
+                    to: candidates[secondIndex].coordinate
+                ) <= maximumDistanceMeters {
+                    join(firstIndex, secondIndex)
+                }
+            }
+        }
+
+        let groupedIndices = Dictionary(grouping: candidates.indices, by: { root(of: $0) })
+        return groupedIndices.values.reduce(into: [:]) { result, indices in
+            guard indices.count > 1 else { return }
+            let sortedIndices = indices.sorted { candidates[$0].id < candidates[$1].id }
+            guard let originIndex = sortedIndices.first else { return }
+            result[candidates[originIndex].coordinate] = sortedIndices.map { candidates[$0].id }
+        }
+    }
+
+    private static func distance(
+        from start: GeographicCoordinate,
+        to end: GeographicCoordinate
+    ) -> Double {
+        let latitudeDelta = (end.latitude - start.latitude) * .pi / 180
+        let longitudeDelta = (end.longitude - start.longitude) * .pi / 180
+        let meanLatitude = (start.latitude + end.latitude) / 2 * .pi / 180
+        let northMeters = latitudeDelta * earthRadius
+        let eastMeters = longitudeDelta * earthRadius * cos(meanLatitude)
+        return hypot(northMeters, eastMeters)
     }
 }
 

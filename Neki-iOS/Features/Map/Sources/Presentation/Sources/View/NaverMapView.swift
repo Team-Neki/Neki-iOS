@@ -43,8 +43,8 @@ fileprivate enum Constants {
     static let overlappingMarkerLayoutZoom = Double(overlappingMarkerExpansionZoom + 1)
     /// 최소 터치 영역(44pt)과 SDK의 클러스터 임계 거리(48pt)를 모두 확보하는 크기입니다.
     static let overlappingMarkerInteractionSize = CGSize(width: 52, height: 52)
-    /// 약 1m 이내의 가까운 좌표를 같은 위치로 취급합니다.
-    static let overlappingCoordinateDecimalPlaces = 5
+    /// 이 거리 이내의 가까운 좌표를 같은 위치로 취급합니다.
+    static let overlappingMarkerMaximumDistanceMeters: Double = 1
     static let favoriteMarkerViewportUpdateInterval: TimeInterval = 0.15
     
     // Search Field
@@ -404,9 +404,13 @@ extension NaverMapRepresentable {
                 elements: photoBooths,
                 id: \.id,
                 coordinate: \.coordinate,
-                coordinateDecimalPlaces: Constants.overlappingCoordinateDecimalPlaces
+                maximumDistanceMeters: Constants.overlappingMarkerMaximumDistanceMeters
             )
             let markerPositions = makeMarkerPositions(
+                photoBooths: photoBooths,
+                overlappingGroups: newOverlappingGroups
+            )
+            let markerTags = makeMarkerTags(
                 photoBooths: photoBooths,
                 overlappingGroups: newOverlappingGroups
             )
@@ -415,6 +419,7 @@ extension NaverMapRepresentable {
             updateClusteredMarkers(
                 photoBooths: photoBooths,
                 markerPositions: markerPositions,
+                markerTags: markerTags,
                 selectedBoothID: selectedBoothID
             )
 
@@ -429,6 +434,7 @@ extension NaverMapRepresentable {
         private func updateClusteredMarkers(
             photoBooths: IdentifiedArrayOf<PhotoBooth>,
             markerPositions: [BoothID: NMGLatLng],
+            markerTags: [BoothID: BoothClusterTag],
             selectedBoothID: BoothID?
         ) {
             let photoBoothIDs = Set(photoBooths.ids)
@@ -438,19 +444,21 @@ extension NaverMapRepresentable {
             let selectionChanged = lastSelectedBoothID != selectedBoothID
 
             for booth in photoBooths {
+                let position = markerPositions[booth.id]
+                    ?? NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
+                let tag = markerTags[booth.id] ?? BoothClusterTag(brandID: booth.brand.id)
                 let state = PhotoBoothMarkerPresentationState(booth: booth)
                 let markerChanged = clusteredMarkerStateByID[booth.id] != state
                 let selectionAffectsMarker = selectionChanged
                     && (booth.id == selectedBoothID || booth.id == lastSelectedBoothID)
-                guard currentKeyByID[booth.id] == nil || markerChanged || selectionAffectsMarker else { continue }
+                let registrationChanged = currentKeyByID[booth.id]?.matches(position: position, tag: tag) != true
+                guard registrationChanged || markerChanged || selectionAffectsMarker else { continue }
 
                 if let oldKey = currentKeyByID[booth.id] {
                     keysToRemove.append(oldKey)
                 }
-                let position = markerPositions[booth.id]
-                    ?? NMGLatLng(lat: booth.coordinate.latitude, lng: booth.coordinate.longitude)
-                let key = BoothClusteringKey(identifier: booth.id, brandID: booth.brand.id, position: position)
-                keysToAdd[key] = NSNumber(value: booth.brand.id)
+                let key = BoothClusteringKey(identifier: booth.id, position: position, tag: tag)
+                keysToAdd[key] = tag
                 currentKeyByID[booth.id] = key
                 clusteredMarkerStateByID[booth.id] = state
             }
@@ -491,6 +499,26 @@ extension NaverMapRepresentable {
             }
             return positions
         }
+
+        private func makeMarkerTags(
+            photoBooths: IdentifiedArrayOf<PhotoBooth>,
+            overlappingGroups: [GeographicCoordinate: [BoothID]]
+        ) -> [BoothID: BoothClusterTag] {
+            var tags = photoBooths.reduce(into: [BoothID: BoothClusterTag]()) { result, booth in
+                result[booth.id] = BoothClusterTag(brandID: booth.brand.id)
+            }
+
+            for boothIDs in overlappingGroups.values {
+                for boothID in boothIDs {
+                    guard let tag = tags[boothID] else { continue }
+                    tags[boothID] = BoothClusterTag(
+                        brandID: tag.brandID,
+                        overlappingGroupID: boothIDs
+                    )
+                }
+            }
+            return tags
+        }
         
         func applyOverlay(to marker: NMFMarker, overlay: NMFOverlayImage, expectedID: BoothID) {
             guard let currentID = marker.userInfo["identifier"] as? BoothID, currentID == expectedID else { return }
@@ -521,30 +549,72 @@ extension NaverMapRepresentable {
             guard Double(zoom) < Constants.brandClusteringThreshold else { return Constants.clusterThresholdZoomIn }
             return Constants.clusterThresholdZoomOut
         }
+
+        static func shouldUseDefaultDistance(
+            zoom: Int,
+            firstTag: NSObject?,
+            secondTag: NSObject?
+        ) -> Bool {
+            if Double(zoom) < Constants.brandClusteringThreshold { return true }
+            guard let firstTag = firstTag as? BoothClusterTag,
+                  let secondTag = secondTag as? BoothClusterTag
+            else { return false }
+            let sharesOverlappingGroup = firstTag.overlappingGroupID != nil
+                && firstTag.overlappingGroupID == secondTag.overlappingGroupID
+            let sharesBrand = firstTag.brandID != nil && firstTag.brandID == secondTag.brandID
+            return sharesOverlappingGroup || sharesBrand
+        }
         
         override func getDistance(_ zoom: Int, node1: NMCNode, node2: NMCNode) -> Double {
             let defaultDistance = super.getDistance(zoom, node1: node1, node2: node2)
-            
-            if Double(zoom) < Constants.brandClusteringThreshold { return defaultDistance }
-            
-            guard let tag1 = node1.tag as? NSNumber,
-                  let tag2 = node2.tag as? NSNumber,
-                  tag1 == tag2
-            else { return Double.infinity }
-            
-            return defaultDistance
+            return Self.shouldUseDefaultDistance(
+                zoom: zoom,
+                firstTag: node1.tag,
+                secondTag: node2.tag
+            ) ? defaultDistance : .infinity
         }
     }
-    
+
+    final class BoothClusterTag: NSObject {
+        let brandID: PhotoBoothBrand.ID?
+        let overlappingGroupID: [PhotoBooth.ID]?
+
+        init(
+            brandID: PhotoBoothBrand.ID?,
+            overlappingGroupID: [PhotoBooth.ID]? = nil
+        ) {
+            self.brandID = brandID
+            self.overlappingGroupID = overlappingGroupID
+        }
+
+        override func isEqual(_ object: Any?) -> Bool {
+            guard let other = object as? BoothClusterTag else { return false }
+            return brandID == other.brandID && overlappingGroupID == other.overlappingGroupID
+        }
+
+        override var hash: Int {
+            var hasher = Hasher()
+            hasher.combine(brandID)
+            hasher.combine(overlappingGroupID)
+            return hasher.finalize()
+        }
+    }
+
     final class BoothClusteringKey: NSObject, NMCClusteringKey {
         let identifier: PhotoBooth.ID
-        let brandID: Int
         let position: NMGLatLng
-        
-        init(identifier: PhotoBooth.ID, brandID: Int, position: NMGLatLng) {
+        let tag: BoothClusterTag
+
+        init(identifier: PhotoBooth.ID, position: NMGLatLng, tag: BoothClusterTag) {
             self.identifier = identifier
-            self.brandID = brandID
             self.position = position
+            self.tag = tag
+        }
+
+        func matches(position: NMGLatLng, tag: BoothClusterTag) -> Bool {
+            self.position.lat == position.lat
+                && self.position.lng == position.lng
+                && self.tag == tag
         }
         
         override func isEqual(_ object: Any?) -> Bool {
@@ -555,7 +625,7 @@ extension NaverMapRepresentable {
         override var hash: Int { identifier.hashValue }
         
         func copy(with zone: NSZone? = nil) -> Any {
-            BoothClusteringKey(identifier: identifier, brandID: brandID, position: position)
+            BoothClusteringKey(identifier: identifier, position: position, tag: tag)
         }
     }
     
@@ -586,8 +656,7 @@ extension NaverMapRepresentable {
                     captionTextSize: Constants.leafCaptionTextSize,
                     normalZIndex: Constants.zIndexNormal,
                     selectedZIndex: Constants.zIndexSelected
-                ),
-                collisionPolicy: .clusteredLeaf
+                )
             )
             marker.touchHandler = { [weak self] _ in
                 self?.onLeafTapped?(booth.id)
@@ -666,20 +735,31 @@ extension NaverMapRepresentable {
     
     final class BoothTagMergeStrategy: NSObject, NMCTagMergeStrategy {
         func mergeTag(_ cluster: NMCCluster) -> NSObject? {
-            var mergedBrandID: Int?
-            
+            var mergedBrandID: PhotoBoothBrand.ID?
+            var mergedOverlappingGroupID: [PhotoBooth.ID]?
+            var hasMergedTag = false
+
             for node in cluster.children {
-                guard let tag = node.tag as? NSNumber else { return nil }
-                let currentBrandID = tag.intValue
-                
-                if mergedBrandID == nil {
-                    mergedBrandID = currentBrandID
-                } else if mergedBrandID != currentBrandID {
-                    return nil
+                guard let tag = node.tag as? BoothClusterTag else { return nil }
+                if hasMergedTag {
+                    if mergedBrandID != tag.brandID { mergedBrandID = nil }
+                    if mergedOverlappingGroupID != tag.overlappingGroupID {
+                        mergedOverlappingGroupID = nil
+                    }
+                } else {
+                    mergedBrandID = tag.brandID
+                    mergedOverlappingGroupID = tag.overlappingGroupID
+                    hasMergedTag = true
                 }
             }
-            
-            return mergedBrandID.map { NSNumber(value: $0) }
+
+            guard hasMergedTag,
+                  mergedBrandID != nil || mergedOverlappingGroupID != nil
+            else { return nil }
+            return BoothClusterTag(
+                brandID: mergedBrandID,
+                overlappingGroupID: mergedOverlappingGroupID
+            )
         }
     }
 }

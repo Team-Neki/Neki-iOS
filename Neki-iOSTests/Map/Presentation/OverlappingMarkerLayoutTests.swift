@@ -17,7 +17,7 @@ struct OverlappingMarkerLayoutTests {
         let coordinate: GeographicCoordinate
     }
 
-    private let markerSize = CGSize(width: 52, height: 52)
+    private let markerSize = CGSize(width: 44, height: 44)
     private let minimumGap: CGFloat = .zero
     private let maximumDistanceMeters: Double = 1
 
@@ -66,14 +66,14 @@ struct OverlappingMarkerLayoutTests {
             count: 2,
             markerSize: markerSize,
             minimumGap: minimumGap,
-            zoomLevel: 19
+            zoomLevel: 20
         )
         let second = OverlappingMarkerLayout.coordinates(
             origin: origin,
             count: 2,
             markerSize: markerSize,
             minimumGap: minimumGap,
-            zoomLevel: 19
+            zoomLevel: 20
         )
 
         #expect(first == second)
@@ -81,7 +81,7 @@ struct OverlappingMarkerLayoutTests {
         #expect(first.allSatisfy { coordinateDistance(from: origin, to: $0) < 20 })
 
         let metersPerPoint = 2 * .pi * 6_378_137.0 * cos(origin.latitude * .pi / 180)
-            / (256 * pow(2, 19.0))
+            / (256 * pow(2, 20.0))
         let minimumDistance = Double(markerSize.height) * metersPerPoint
         #expect(coordinateDistance(from: first[0], to: first[1]) >= minimumDistance * 0.99)
     }
@@ -141,14 +141,14 @@ struct OverlappingMarkerLayoutTests {
             count: 2,
             markerSize: markerSize,
             minimumGap: minimumGap,
-            zoomLevel: 19
+            zoomLevel: 20
         )
         let updatedCoordinates = OverlappingMarkerLayout.coordinates(
             origin: origin,
             count: 3,
             markerSize: markerSize,
             minimumGap: minimumGap,
-            zoomLevel: 19
+            zoomLevel: 20
         )
         let previousTag = NaverMapRepresentable.BoothClusterTag(
             brandID: 1,
@@ -195,6 +195,19 @@ struct OverlappingMarkerLayoutTests {
             secondTag: secondGroupTag
         ))
         #expect(NaverMapRepresentable.ClusterStrategy.shouldUseDefaultDistance(
+            zoom: 19,
+            firstTag: firstGroupTag,
+            secondTag: secondGroupTag
+        ) == false)
+        #expect(NaverMapRepresentable.ClusterStrategy.shouldUseDefaultDistance(
+            zoom: 19,
+            firstTag: firstGroupTag,
+            secondTag: NaverMapRepresentable.BoothClusterTag(
+                brandID: 1,
+                overlappingGroupID: ["A", "B"]
+            )
+        ) == false)
+        #expect(NaverMapRepresentable.ClusterStrategy.shouldUseDefaultDistance(
             zoom: 18,
             firstTag: firstGroupTag,
             secondTag: firstBrand
@@ -204,6 +217,16 @@ struct OverlappingMarkerLayoutTests {
             firstTag: firstBrand,
             secondTag: secondBrand
         ) == false)
+        #expect(firstBrand == firstGroupTag)
+        #expect(
+            NaverMapRepresentable.BoothClusterTag(
+                brandID: nil,
+                overlappingGroupID: ["A", "B"]
+            ) != NaverMapRepresentable.BoothClusterTag(
+                brandID: nil,
+                overlappingGroupID: ["C", "D"]
+            )
+        )
     }
 
     @Test("마커와 무관한 상세 정보 변경은 표현 상태를 갱신하지 않는다")

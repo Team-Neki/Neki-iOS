@@ -37,12 +37,12 @@ fileprivate enum Constants {
     static let clusterCaptionTextSize: CGFloat = 14.0
     static let captionColorHex: UInt = 0x202227
     static let brandClusteringThreshold: Double = 14.0
-    /// 이 줌부터 가까운 POI가 SDK 클러스터에서 자연스럽게 분리되도록 좌표 간격을 계산합니다.
+    /// 이 줌까지 가까운 POI의 SDK 클러스터링을 유지합니다.
     static let overlappingMarkerExpansionZoom: Int = 18
-    /// 다음 줌에서 마커 상호작용 영역이 완전히 분리되도록 고정 지리 좌표를 계산합니다.
-    static let overlappingMarkerLayoutZoom = Double(overlappingMarkerExpansionZoom + 1)
-    /// 최소 터치 영역(44pt)과 SDK의 클러스터 임계 거리(48pt)를 모두 확보하는 크기입니다.
-    static let overlappingMarkerInteractionSize = CGSize(width: 52, height: 52)
+    /// 최대 줌에서 마커 간격이 과도하게 확대되지 않도록 고정 지리 좌표를 계산합니다.
+    static let overlappingMarkerLayoutZoom = maxZoomLevel
+    /// 최대 줌에서 서로 다른 마커를 터치할 수 있도록 확보할 최소 중심 간격입니다.
+    static let overlappingMarkerSeparationSize = CGSize(width: 44, height: 44)
     /// 이 거리 이내의 가까운 좌표를 같은 위치로 취급합니다.
     static let overlappingMarkerMaximumDistanceMeters: Double = 1
     static let favoriteMarkerViewportUpdateInterval: TimeInterval = 0.15
@@ -486,7 +486,7 @@ extension NaverMapRepresentable {
                 let coordinates = OverlappingMarkerLayout.coordinates(
                     origin: origin,
                     count: boothIDs.count,
-                    markerSize: Constants.overlappingMarkerInteractionSize,
+                    markerSize: Constants.overlappingMarkerSeparationSize,
                     minimumGap: .zero,
                     zoomLevel: Constants.overlappingMarkerLayoutZoom
                 )
@@ -562,7 +562,10 @@ extension NaverMapRepresentable {
             let sharesOverlappingGroup = firstTag.overlappingGroupID != nil
                 && firstTag.overlappingGroupID == secondTag.overlappingGroupID
             let sharesBrand = firstTag.brandID != nil && firstTag.brandID == secondTag.brandID
-            return sharesOverlappingGroup || sharesBrand
+            if sharesOverlappingGroup {
+                return zoom <= Constants.overlappingMarkerExpansionZoom
+            }
+            return sharesBrand
         }
         
         override func getDistance(_ zoom: Int, node1: NMCNode, node2: NMCNode) -> Double {
@@ -589,13 +592,19 @@ extension NaverMapRepresentable {
 
         override func isEqual(_ object: Any?) -> Bool {
             guard let other = object as? BoothClusterTag else { return false }
-            return brandID == other.brandID && overlappingGroupID == other.overlappingGroupID
+            if let brandID, let otherBrandID = other.brandID {
+                return brandID == otherBrandID
+            }
+            return overlappingGroupID != nil && overlappingGroupID == other.overlappingGroupID
         }
 
         override var hash: Int {
             var hasher = Hasher()
-            hasher.combine(brandID)
-            hasher.combine(overlappingGroupID)
+            if let brandID {
+                hasher.combine(brandID)
+            } else {
+                hasher.combine(overlappingGroupID)
+            }
             return hasher.finalize()
         }
     }
@@ -614,7 +623,8 @@ extension NaverMapRepresentable {
         func matches(position: NMGLatLng, tag: BoothClusterTag) -> Bool {
             self.position.lat == position.lat
                 && self.position.lng == position.lng
-                && self.tag == tag
+                && self.tag.brandID == tag.brandID
+                && self.tag.overlappingGroupID == tag.overlappingGroupID
         }
         
         override func isEqual(_ object: Any?) -> Bool {

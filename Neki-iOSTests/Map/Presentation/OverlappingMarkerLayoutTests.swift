@@ -11,26 +11,22 @@ import Testing
 @testable import Neki_iOS
 
 struct OverlappingMarkerLayoutTests {
-    private struct Coordinate: Hashable {
-        let longitude: Double
-        let latitude: Double
-    }
-
     private struct Marker {
         let id: String
-        let coordinate: Coordinate
+        let coordinate: GeographicCoordinate
     }
 
-    private let markerSize = MarkerImageRenderer.maximumRenderedSize
+    private let markerSize = CGSize(width: 52, height: 52)
     private let minimumGap: CGFloat = .zero
+    private let coordinateDecimalPlaces = 5
 
     @Test("단독 마커는 원본 화면 좌표를 유지한다")
     func singleMarker_staysAtOrigin() {
         #expect(OverlappingMarkerLayout.offsets(count: 1, markerSize: markerSize, minimumGap: minimumGap) == [.zero])
     }
 
-    @Test("동일 좌표 2·3·7·8개와 과밀 그룹의 실제 아이콘 영역이 겹치지 않는다", arguments: [2, 3, 7, 8, 9, 24])
-    func overlappingMarkers_keepIconFramesSeparated(count: Int) {
+    @Test("동일 좌표 2·3·7·8개와 과밀 그룹의 상호작용 영역이 겹치지 않는다", arguments: [2, 3, 7, 8, 9, 24])
+    func overlappingMarkers_keepInteractionFramesSeparated(count: Int) {
         let offsets = makeOffsets(count: count)
         let frames = offsets.map(markerFrame(at:))
 
@@ -60,9 +56,33 @@ struct OverlappingMarkerLayoutTests {
         #expect(outerRadius > innerRadius)
     }
 
+    @Test("분산 화면 오프셋은 고정된 지리 좌표로 변환한다")
+    func markerOffsets_convertToStableCoordinates() {
+        let origin = GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)
+
+        let first = OverlappingMarkerLayout.coordinates(
+            origin: origin,
+            count: 2,
+            markerSize: markerSize,
+            minimumGap: minimumGap,
+            zoomLevel: 19
+        )
+        let second = OverlappingMarkerLayout.coordinates(
+            origin: origin,
+            count: 2,
+            markerSize: markerSize,
+            minimumGap: minimumGap,
+            zoomLevel: 19
+        )
+
+        #expect(first == second)
+        #expect(Set(first).count == 2)
+        #expect(first.allSatisfy { coordinateDistance(from: origin, to: $0) < 20 })
+    }
+
     @Test("응답 순서가 달라도 같은 좌표 그룹의 ID 배치 순서는 유지된다")
     func reorderedInput_keepsIDBasedOrder() {
-        let coordinate = Coordinate(longitude: 127.0276, latitude: 37.4979)
+        let coordinate = GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)
         let first = [
             Marker(id: "source:C:3", coordinate: coordinate),
             Marker(id: "source:A:1", coordinate: coordinate),
@@ -77,11 +97,21 @@ struct OverlappingMarkerLayoutTests {
         #expect(firstGroups[coordinate] == ["source:A:1", "source:B:2", "source:C:3"])
     }
 
-    @Test("근접하지만 다른 원본 좌표는 같은 그룹으로 합치지 않는다")
-    func nearbyCoordinates_stayInDifferentGroups() {
+    @Test("소수점 전체 값이 달라도 정규화 좌표가 같으면 같은 그룹으로 묶는다")
+    func nearbyCoordinates_joinSameGroup() {
         let markers = [
-            Marker(id: "A", coordinate: Coordinate(longitude: 127.0276000, latitude: 37.4979000)),
-            Marker(id: "B", coordinate: Coordinate(longitude: 127.0276001, latitude: 37.4979000))
+            Marker(id: "A", coordinate: GeographicCoordinate(latitude: 37.4979000, longitude: 127.0276000)),
+            Marker(id: "B", coordinate: GeographicCoordinate(latitude: 37.4979001, longitude: 127.0276001))
+        ]
+
+        #expect(groups(markers).values.first == ["A", "B"])
+    }
+
+    @Test("정규화 좌표가 다른 지점은 별도 그룹으로 유지한다")
+    func separatedCoordinates_stayInDifferentGroups() {
+        let markers = [
+            Marker(id: "A", coordinate: GeographicCoordinate(latitude: 37.4979, longitude: 127.0276)),
+            Marker(id: "B", coordinate: GeographicCoordinate(latitude: 37.49792, longitude: 127.02762))
         ]
 
         #expect(groups(markers).isEmpty)
@@ -103,8 +133,13 @@ struct OverlappingMarkerLayoutTests {
         #expect(PhotoBoothMarkerPresentationState(booth: normal) != PhotoBoothMarkerPresentationState(booth: favorite))
     }
 
-    private func groups(_ markers: [Marker]) -> [Coordinate: [String]] {
-        OverlappingMarkerGroupResolver.groups(elements: markers, id: \.id, coordinate: \.coordinate)
+    private func groups(_ markers: [Marker]) -> [GeographicCoordinate: [String]] {
+        OverlappingMarkerGroupResolver.groups(
+            elements: markers,
+            id: \.id,
+            coordinate: \.coordinate,
+            coordinateDecimalPlaces: coordinateDecimalPlaces
+        )
     }
 
     private func makeOffsets(count: Int) -> [CGPoint] {
@@ -119,6 +154,19 @@ struct OverlappingMarkerLayoutTests {
             height: markerSize.height
         )
         .insetBy(dx: -minimumGap / 2, dy: -minimumGap / 2)
+    }
+
+    private func coordinateDistance(
+        from start: GeographicCoordinate,
+        to end: GeographicCoordinate
+    ) -> Double {
+        let earthRadius = 6_378_137.0
+        let latitudeDelta = (end.latitude - start.latitude) * .pi / 180
+        let longitudeDelta = (end.longitude - start.longitude) * .pi / 180
+        let meanLatitude = (start.latitude + end.latitude) / 2 * .pi / 180
+        let northMeters = latitudeDelta * earthRadius
+        let eastMeters = longitudeDelta * earthRadius * cos(meanLatitude)
+        return hypot(northMeters, eastMeters)
     }
 
     private func makePhotoBooth(

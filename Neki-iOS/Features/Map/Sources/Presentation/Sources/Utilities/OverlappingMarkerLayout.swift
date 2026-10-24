@@ -7,25 +7,81 @@
 
 import CoreGraphics
 
-/// 원본 좌표가 정확히 같은 항목만 묶고, 식별자 순서로 안정화합니다.
+/// 가까운 원본 좌표를 같은 위치로 묶고, 식별자 순서로 안정화합니다.
 enum OverlappingMarkerGroupResolver {
-    static func groups<Element, ID: Hashable & Comparable, Coordinate: Hashable>(
+    private static let earthRadius: Double = 6_378_137
+
+    static func groups<Element, ID: Hashable & Comparable>(
         elements: some Sequence<Element>,
         id: (Element) -> ID,
-        coordinate: (Element) -> Coordinate
-    ) -> [Coordinate: [ID]] {
-        let grouped = Dictionary(grouping: elements, by: coordinate)
-        return grouped.reduce(into: [:]) { result, entry in
-            guard entry.value.count > 1 else { return }
-            result[entry.key] = entry.value.map(id).sorted()
+        coordinate: (Element) -> GeographicCoordinate,
+        maximumDistanceMeters: Double
+    ) -> [GeographicCoordinate: [ID]] {
+        guard maximumDistanceMeters.isFinite, maximumDistanceMeters >= .zero else { return [:] }
+
+        let candidates = elements.map { (id: id($0), coordinate: coordinate($0)) }
+        guard candidates.count > 1 else { return [:] }
+
+        let latitudeThreshold = maximumDistanceMeters / earthRadius * 180 / .pi
+        let indicesByLatitude = candidates.indices.sorted {
+            candidates[$0].coordinate.latitude < candidates[$1].coordinate.latitude
         }
+        var parents = Array(candidates.indices)
+
+        func root(of index: Int) -> Int {
+            var current = index
+            while parents[current] != current { current = parents[current] }
+            return current
+        }
+
+        func join(_ firstIndex: Int, _ secondIndex: Int) {
+            let firstRoot = root(of: firstIndex)
+            let secondRoot = root(of: secondIndex)
+            guard firstRoot != secondRoot else { return }
+            parents[secondRoot] = firstRoot
+        }
+
+        for (offset, firstIndex) in indicesByLatitude.enumerated() {
+            for secondIndex in indicesByLatitude.dropFirst(offset + 1) {
+                let latitudeDelta = candidates[secondIndex].coordinate.latitude
+                    - candidates[firstIndex].coordinate.latitude
+                if latitudeDelta > latitudeThreshold { break }
+                if distance(
+                    from: candidates[firstIndex].coordinate,
+                    to: candidates[secondIndex].coordinate
+                ) <= maximumDistanceMeters {
+                    join(firstIndex, secondIndex)
+                }
+            }
+        }
+
+        let groupedIndices = Dictionary(grouping: candidates.indices, by: { root(of: $0) })
+        return groupedIndices.values.reduce(into: [:]) { result, indices in
+            guard indices.count > 1 else { return }
+            let sortedIndices = indices.sorted { candidates[$0].id < candidates[$1].id }
+            guard let originIndex = sortedIndices.first else { return }
+            result[candidates[originIndex].coordinate] = sortedIndices.map { candidates[$0].id }
+        }
+    }
+
+    private static func distance(
+        from start: GeographicCoordinate,
+        to end: GeographicCoordinate
+    ) -> Double {
+        let latitudeDelta = (end.latitude - start.latitude) * .pi / 180
+        let longitudeDelta = (end.longitude - start.longitude) * .pi / 180
+        let meanLatitude = (start.latitude + end.latitude) / 2 * .pi / 180
+        let northMeters = latitudeDelta * earthRadius
+        let eastMeters = longitudeDelta * earthRadius * cos(meanLatitude)
+        return hypot(northMeters, eastMeters)
     }
 }
 
-/// 같은 화면 좌표에서 시작하는 마커의 아이콘 영역을 서로 떨어뜨리는 순수 배치 로직입니다.
-///
-/// 지도 SDK의 투영과 역투영은 호출부가 담당하고, 이 타입은 화면 좌표 오프셋만 계산합니다.
+/// 가까운 위치에서 시작하는 마커의 상호작용 영역을 서로 떨어뜨리고 고정 지리 좌표로 변환합니다.
 enum OverlappingMarkerLayout {
+    private static let earthRadius: Double = 6_378_137
+    private static let tileSize: Double = 256
+
     /// 첫 번째 원에 배치할 최대 마커 수입니다.
     /// 2~3개의 일반적인 중첩은 작은 원 하나로 처리하고, 과밀 그룹은 여러 원으로 확장합니다.
     private static let firstRingCapacity = 8
@@ -66,6 +122,31 @@ enum OverlappingMarkerLayout {
         }
 
         return result
+    }
+
+    /// 지정한 줌에서 화면 오프셋과 일치하는 고정 지리 좌표를 계산합니다.
+    static func coordinates(
+        origin: GeographicCoordinate,
+        count: Int,
+        markerSize: CGSize,
+        minimumGap: CGFloat,
+        zoomLevel: Double
+    ) -> [GeographicCoordinate] {
+        guard zoomLevel.isFinite else { return [] }
+
+        let offsets = offsets(count: count, markerSize: markerSize, minimumGap: minimumGap)
+        let latitudeRadians = origin.latitude * .pi / 180
+        let metersPerPoint = 2 * .pi * earthRadius * cos(latitudeRadians)
+            / (tileSize * pow(2, zoomLevel))
+
+        return offsets.map { offset in
+            let northMeters = -Double(offset.y) * metersPerPoint
+            let eastMeters = Double(offset.x) * metersPerPoint
+            let latitude = origin.latitude + northMeters / earthRadius * 180 / .pi
+            let longitude = origin.longitude
+                + eastMeters / (earthRadius * cos(latitudeRadians)) * 180 / .pi
+            return GeographicCoordinate(latitude: latitude, longitude: longitude)
+        }
     }
 
     private static func minimumRadius(
@@ -116,7 +197,7 @@ enum OverlappingMarkerLayout {
         minimumGap: CGFloat
     ) -> Bool {
         let frames = offsets.map {
-            // NMFMarker의 기본 앵커 (0.5, 1.0)를 기준으로 실제 아이콘 영역을 계산합니다.
+            // NMFMarker의 기본 앵커 (0.5, 1.0)를 기준으로 상호작용 영역을 계산합니다.
             CGRect(
                 x: $0.x - markerSize.width / 2,
                 y: $0.y - markerSize.height,

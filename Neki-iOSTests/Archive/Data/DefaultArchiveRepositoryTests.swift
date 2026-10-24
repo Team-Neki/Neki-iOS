@@ -107,7 +107,7 @@ struct DefaultArchiveRepositoryTests {
         let requestCount = await networkProvider.requestCount
 
         #expect(favoriteSnapshot.photos.map(\.id) == [1])
-        #expect(favoriteSnapshot.photos.allSatisfy(\.isFavorite))
+        #expect(favoriteSnapshot.photos.allSatisfy { $0.isFavorite })
         #expect(requestCount == 3)
     }
 }

@@ -34,6 +34,7 @@ public struct AuthClient {
     public var updateMarketingConsent: @Sendable (_ isAgreed: Bool) async throws -> Void
     public var signOut: @Sendable () async throws -> Void
     public var withdraw: @Sendable () async throws -> Void
+    public var fetchRecentLoginProvider: @Sendable () async -> ProviderType?
     public var updateProfile: @Sendable (_ nickname: String?, _ updateAction: ProfileImageUpdateAction) async throws -> User
     public var handleKakaoOpenURL: @Sendable (_ url: URL) -> Void
 }
@@ -75,6 +76,7 @@ extension AuthClient: DependencyKey {
             do {
                 let loginResult = try await authRepository.login(idToken: idTokenString, provider: .apple)
                 let user = try await authRepository.fetchUser()
+                await authRepository.saveRecentLoginProvider(.apple)
                 return AuthLoginResult(user: user, registrationStatus: loginResult.registrationStatus)
             } catch {
                 throw AuthClient.mapError(error)
@@ -87,6 +89,7 @@ extension AuthClient: DependencyKey {
                 let idToken = try await kakaoSDKHelper.login()
                 let loginResult = try await authRepository.login(idToken: idToken, provider: .kakao)
                 let user = try await authRepository.fetchUser()
+                await authRepository.saveRecentLoginProvider(.kakao)
                 return AuthLoginResult(user: user, registrationStatus: loginResult.registrationStatus)
             } catch let error as AuthRepositoryError {
                 throw AuthClient.mapError(error)
@@ -151,6 +154,7 @@ extension AuthClient: DependencyKey {
         @Sendable func withdraw() async throws -> Void {
             do {
                 try await authRepository.withdraw()
+                await authRepository.deleteRecentLoginProvider()
                 kakaoSDKHelper.logout()
             } catch {
                 throw AuthClient.mapError(error)
@@ -200,6 +204,10 @@ extension AuthClient: DependencyKey {
                 throw AuthClient.mapError(error)
             }
         }
+
+        @Sendable func fetchRecentLoginProvider() async -> ProviderType? {
+            await authRepository.fetchRecentLoginProvider()
+        }
         
         @Sendable func handleKakaoOpenURL(_ url: URL) -> Void {
             Task { @MainActor in kakaoSDKHelper.handleOpenURL(url) }
@@ -216,6 +224,7 @@ extension AuthClient: DependencyKey {
             updateMarketingConsent: updateMarketingConsent,
             signOut: signOut,
             withdraw: withdraw,
+            fetchRecentLoginProvider: fetchRecentLoginProvider,
             updateProfile: updateProfile,
             handleKakaoOpenURL: handleKakaoOpenURL
         )

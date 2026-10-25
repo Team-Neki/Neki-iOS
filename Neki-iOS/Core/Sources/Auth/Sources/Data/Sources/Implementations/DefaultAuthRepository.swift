@@ -87,6 +87,24 @@ public final actor DefaultAuthRepository: AuthRepository {
             throw .userNotFound
         } catch { throw mapError(error) }
     }
+
+    public func fetchRecentLoginProvider() -> ProviderType? {
+        guard let rawValue = UserDefaults.standard.string(forKey: AppStorageKey.recentLoginProvider),
+              let provider = ProviderType(rawValue: rawValue),
+              provider == .apple || provider == .kakao
+        else { return nil }
+
+        return provider
+    }
+
+    public func saveRecentLoginProvider(_ provider: ProviderType) {
+        guard provider == .apple || provider == .kakao else { return }
+        UserDefaults.standard.set(provider.rawValue, forKey: AppStorageKey.recentLoginProvider)
+    }
+
+    public func deleteRecentLoginProvider() {
+        UserDefaults.standard.removeObject(forKey: AppStorageKey.recentLoginProvider)
+    }
     
     public func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void {
         if let nickname {

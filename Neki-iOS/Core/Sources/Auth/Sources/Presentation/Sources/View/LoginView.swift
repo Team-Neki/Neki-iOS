@@ -45,32 +45,84 @@ public struct LoginView: View {
     
     private var authenticationProviders: some View {
         VStack(spacing: 10) {
-            Image(.imgAppleLogin)
-                .resizable()
-                .scaledToFit()
-                .overlay {
-                    SignInWithAppleButton(.continue) { _ in
-                        
-                    } onCompletion: { result in
-                        store.send(.appleLogin(result))
-                    }
-                    .blendMode(.destinationOver)
-                }
+            appleLoginButton
             
-            Button {
-                store.send(.kakaoLogin)
-            } label: {
-                Image(.imgKakaoLogin)
-                    .resizable()
-                    .scaledToFit()
-            }
-            .onOpenURL { store.send(.handleKakaoOpenURL($0)) }
+            kakaoLoginButton
         }
         .allowsHitTesting(store.advertisingTrackingAuthorizationPhase == .resolved)
         .padding(.horizontal, 20)
         .padding(.vertical, 32)
         .background(.white)
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 20))
+    }
+
+    private var appleLoginButton: some View {
+        Image(.imgAppleLogin)
+            .resizable()
+            .scaledToFit()
+            .overlay {
+                SignInWithAppleButton(.continue) { _ in
+
+                } onCompletion: { result in
+                    store.send(.appleLogin(result))
+                }
+                .blendMode(.destinationOver)
+            }
+            .recentLoginBadge(provider: .apple, isPresented: store.recentLoginProvider == .apple)
+    }
+
+    private var kakaoLoginButton: some View {
+        Button {
+            store.send(.kakaoLogin)
+        } label: {
+            Image(.imgKakaoLogin)
+                .resizable()
+                .scaledToFit()
+        }
+        .recentLoginBadge(provider: .kakao, isPresented: store.recentLoginProvider == .kakao)
+        .onOpenURL { store.send(.handleKakaoOpenURL($0)) }
+    }
+}
+
+
+// MARK: - RecentLoginBadge
+
+private struct RecentLoginBadgeModifier: ViewModifier {
+    let provider: ProviderType
+    let isPresented: Bool
+
+    private var foregroundColor: Color {
+        provider == .apple ? .gray900 : .white
+    }
+
+    private var backgroundColor: Color {
+        provider == .apple ? .white : .gray900
+    }
+
+    func body(content: Content) -> some View {
+        content.overlay(alignment: .topTrailing) {
+            if isPresented {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock.fill")
+                        .font(.system(size: 11, weight: .semibold))
+
+                    Text("최근 로그인")
+                        .nekiFont(.caption12Medium)
+                }
+                .foregroundStyle(foregroundColor)
+                .padding(.horizontal, 8)
+                .frame(height: 24)
+                .background(backgroundColor, in: RoundedRectangle(cornerRadius: 6))
+                .padding(8)
+                .allowsHitTesting(false)
+            }
+        }
+    }
+}
+
+private extension View {
+    func recentLoginBadge(provider: ProviderType, isPresented: Bool) -> some View {
+        modifier(RecentLoginBadgeModifier(provider: provider, isPresented: isPresented))
     }
 }
 

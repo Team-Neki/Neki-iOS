@@ -29,7 +29,7 @@ fileprivate enum Constants {
     static let zIndexSelected: Int = 100
     
     // Clustering Settings
-    static let clusterMaxZoom: Int = 20
+    static let clusterMaxZoom: Int = 19
     static let clusterMinZoom: Int = 12
     static let clusterThresholdZoomIn: Double = 48.0
     static let clusterThresholdZoomOut: Double = 60.0

@@ -29,6 +29,11 @@ public enum HTTPContentType {
     case custom(String)
 }
 
+public enum NetworkLogPolicy {
+    case standard
+    case metadataOnly
+}
+
 public protocol Endpoint {
     var credentialOperation: CredentialOperation { get }
     var authorizationType: AuthorizationType { get }
@@ -39,6 +44,7 @@ public protocol Endpoint {
     var queryParameters: [String: String]? { get }
     var body: Encodable? { get }
     var multipartItems: [MultipartItem]? { get }
+    var networkLogPolicy: NetworkLogPolicy { get }
     
     func asURLRequest() throws -> URLRequest
 }
@@ -57,6 +63,8 @@ extension Endpoint {
     public var queryParameters: [String: String]? { nil }
     
     public var multipartItems: [MultipartItem]? { nil }
+
+    public var networkLogPolicy: NetworkLogPolicy { .standard }
     
     static var defaultEncoder: JSONEncoder { JSONEncoder() }
     

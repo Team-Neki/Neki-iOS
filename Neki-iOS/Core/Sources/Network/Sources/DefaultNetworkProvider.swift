@@ -28,6 +28,18 @@ public final actor DefaultNetworkProvider: NetworkProvider {
         decoder.dateDecodingStrategy = .formatted(formatter)
         self.decoder = decoder
     }
+
+    /// 디코딩이나 상태 코드 검증 없이 원문 응답을 반환합니다.
+    public func request(endpoint: Endpoint) async throws -> (data: Data, response: HTTPURLResponse) {
+        guard endpoint.credentialOperation == .none,
+              endpoint.authorizationType == .none
+        else { throw NetworkError.responseError }
+
+        let request = try endpoint.asURLRequest()
+        let (data, response) = try await executeSession(with: request, networkLogPolicy: endpoint.networkLogPolicy)
+        guard let httpResponse = response as? HTTPURLResponse else { throw NetworkError.responseError }
+        return (data, httpResponse)
+    }
     
     /// 네트워크 요청을 수행하고 별도의 응답 데이터 없이 성공 여부만 판단합니다.
     /// 임시 구현 - Presigned URL 요청 시에만 사용합니다
@@ -47,10 +59,10 @@ public final actor DefaultNetworkProvider: NetworkProvider {
         }
         // Presigned URL 업로드의 기존 응답/오류 계약은 변경하지 않습니다.
         let request = try endpoint.asURLRequest()
-        requestLog(request)
+        requestLog(request, policy: endpoint.networkLogPolicy)
         do {
             let (_, response) = try await session.data(for: request, delegate: nil)
-            responseLog(data: Data(), response: response)
+            responseLog(data: Data(), response: response, policy: endpoint.networkLogPolicy)
             guard let httpResponse = response as? HTTPURLResponse else { throw NetworkError.responseError }
             guard (200..<300).contains(httpResponse.statusCode) else { throw NetworkError.networkFail }
         } catch is CancellationError {
@@ -110,7 +122,11 @@ private extension DefaultNetworkProvider {
         try await verifyAuthorizationGeneration(generation, for: endpoint)
         let request = try endpoint.asURLRequest()
         guard endpoint.authorizationType == .bearer else {
-            return try await executeValidatedRequest(request, authorizationType: endpoint.authorizationType)
+            return try await executeValidatedRequest(
+                request,
+                authorizationType: endpoint.authorizationType,
+                networkLogPolicy: endpoint.networkLogPolicy
+            )
         }
 
         do {
@@ -119,7 +135,7 @@ private extension DefaultNetworkProvider {
                 guard await self.credentialBroker.isUsable(generation: generation, revision: revision) else { throw CancellationError() }
                 var authorizedRequest = request
                 authorizedRequest.setValue("Bearer \(tokens.accessToken)", forHTTPHeaderField: "Authorization")
-                let data = try await self.executeValidatedRequest(authorizedRequest)
+                let data = try await self.executeValidatedRequest(authorizedRequest, networkLogPolicy: endpoint.networkLogPolicy)
                 try Task.checkCancellation()
                 guard await self.credentialBroker.isUsable(generation: generation, revision: revision) else { throw CancellationError() }
                 return data
@@ -134,8 +150,12 @@ private extension DefaultNetworkProvider {
         }
     }
 
-    func executeValidatedRequest(_ request: URLRequest, authorizationType: AuthorizationType = .none) async throws -> Data {
-        let (data, response) = try await executeSession(with: request)
+    func executeValidatedRequest(
+        _ request: URLRequest,
+        authorizationType: AuthorizationType = .none,
+        networkLogPolicy: NetworkLogPolicy = .standard
+    ) async throws -> Data {
+        let (data, response) = try await executeSession(with: request, networkLogPolicy: networkLogPolicy)
         try Task.checkCancellation()
         switch validateResponse(response, authorizationType: authorizationType) {
         case .success: return data
@@ -144,12 +164,12 @@ private extension DefaultNetworkProvider {
         }
     }
     
-    func executeSession(with request: URLRequest) async throws -> (Data, URLResponse) {
-        requestLog(request)
+    func executeSession(with request: URLRequest, networkLogPolicy: NetworkLogPolicy) async throws -> (Data, URLResponse) {
+        requestLog(request, policy: networkLogPolicy)
         
         do {
             let (data, response) = try await session.data(for: request, delegate: nil)
-            responseLog(data: data, response: response)
+            responseLog(data: data, response: response, policy: networkLogPolicy)
             return (data, response)
         } catch is CancellationError {
             throw CancellationError()
@@ -210,24 +230,57 @@ private extension DefaultNetworkProvider {
 // MARK: - Request & Response Log
 
 private extension DefaultNetworkProvider {
-    func requestLog(_ request: URLRequest) {
-        Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(request.url?.absoluteString ?? "")")
+    func requestLog(_ request: URLRequest, policy: NetworkLogPolicy) {
+        let urlDescription: String
+        switch policy {
+        case .standard:
+            urlDescription = request.url?.absoluteString ?? ""
+        case .metadataOnly:
+            guard let url = request.url,
+                  var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            else {
+                urlDescription = ""
+                break
+            }
+            components.query = nil
+            components.fragment = nil
+            urlDescription = components.url?.absoluteString ?? ""
+        }
+
+        Logger.network.debug("➡️ [REQUEST] \(request.httpMethod ?? "") \(urlDescription)")
         if let headers = request.allHTTPHeaderFields {
             Logger.network.debug("🧾 Request Headers: \(headers.description)")
         }
-        if let body = request.httpBody,
-           let bodyString = String(data: body, encoding: .utf8) {
-            Logger.network.debug("📦 Request Body: \(bodyString)")
+        guard let body = request.httpBody else { return }
+
+        switch policy {
+        case .standard:
+            if let bodyString = String(data: body, encoding: .utf8) {
+                Logger.network.debug("📦 Request Body: \(bodyString)")
+            }
+        case .metadataOnly:
+            Logger.network.debug("📦 Request Body: <redacted, \(body.count) bytes>")
         }
     }
     
-    func responseLog(data: Data, response: URLResponse) {
+    func responseLog(
+        data: Data,
+        response: URLResponse,
+        policy: NetworkLogPolicy
+    ) {
         guard let httpResponse = response as? HTTPURLResponse else { return }
         
         Logger.network.debug("⬅️ [RESPONSE] Status Code: \(httpResponse.statusCode)")
-        
-        if let responseBody = String(data: data, encoding: .utf8) {
-            Logger.network.debug("📨 Response Body: \(responseBody)")
+
+        switch policy {
+        case .standard:
+            if let responseBody = String(data: data, encoding: .utf8) {
+                Logger.network.debug("📨 Response Body: \(responseBody)")
+            }
+        case .metadataOnly where data.isEmpty == false:
+            Logger.network.debug("📨 Response Body: <redacted, \(data.count) bytes>")
+        case .metadataOnly:
+            break
         }
     }
 }

@@ -820,8 +820,8 @@ struct MapFeatureTests {
         await store.send(.photoBoothListAction(.didTapBooth(searchedPhotoBooth))).finish()
 
         #expect(events.value == [
-            .boothSelect(brandName: life4cut.name, entryPoint: .map, source: .map),
-            .boothSelect(brandName: life4cut.name, entryPoint: .bottomSheet, source: .map)
+            .boothSelect(brandName: life4cut.name, brandID: life4cut.id, entryPoint: .map, source: .map),
+            .boothSelect(brandName: life4cut.name, brandID: life4cut.id, entryPoint: .bottomSheet, source: .map)
         ])
     }
 
@@ -840,9 +840,9 @@ struct MapFeatureTests {
         await store.send(.didTapBooth(searchedPhotoBooth)).finish()
 
         #expect(events.value == [
-            .boothSelect(brandName: life4cut.name, entryPoint: .map, source: .search),
-            .boothSelect(brandName: life4cut.name, entryPoint: .bottomSheet, source: .search),
-            .boothSelect(brandName: life4cut.name, entryPoint: .map, source: .map)
+            .boothSelect(brandName: life4cut.name, brandID: life4cut.id, entryPoint: .map, source: .search),
+            .boothSelect(brandName: life4cut.name, brandID: life4cut.id, entryPoint: .bottomSheet, source: .search),
+            .boothSelect(brandName: life4cut.name, brandID: life4cut.id, entryPoint: .map, source: .map)
         ])
     }
 
@@ -862,7 +862,21 @@ struct MapFeatureTests {
 
         await store.send(.didTapBooth(favoritePhotoBooth)).finish()
 
-        #expect(events.value == [.boothSelect(brandName: photoism.name, entryPoint: .map, source: .map)])
+        #expect(events.value == [.boothSelect(brandName: photoism.name, brandID: photoism.id, entryPoint: .map, source: .map)])
+    }
+
+    @Test("즐겨찾기 추가·해제 요청이 성공하면 부스 이름과 브랜드 이름에 브랜드 ID를 더해 남긴다")
+    func updatePhotoBoothFavoriteResponse_success_logsFavoriteEventWithBrandID() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+
+        await store.send(.updatePhotoBoothFavoriteResponse(photoBooth: searchedPhotoBooth, requestedValue: true, .success(()))).finish()
+        await store.send(.updatePhotoBoothFavoriteResponse(photoBooth: searchedPhotoBooth, requestedValue: false, .success(()))).finish()
+
+        #expect(events.value == [
+            .boothFavoriteAdd(boothName: searchedPhotoBooth.name, brandName: life4cut.name, brandID: life4cut.id),
+            .boothFavoriteRemove(boothName: searchedPhotoBooth.name, brandName: life4cut.name, brandID: life4cut.id)
+        ])
     }
 
     @Test("부스 하나로 좁혀진 검색 결과는 상세를 바로 띄워도 부스 선택 이벤트를 보내지 않는다")

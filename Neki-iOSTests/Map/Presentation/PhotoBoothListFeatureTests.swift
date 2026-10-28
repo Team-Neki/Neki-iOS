@@ -65,6 +65,26 @@ struct PhotoBoothListFeatureTests {
         }
     }
 
+    @Test("브랜드 필터 칩을 누르면 선택·해제, 선택한 수, 브랜드 이름과 함께 브랜드 ID를 남긴다")
+    func selectFilterOption_logsBrandFilterToggleWithBrandID() async {
+        let brand = makeBrand(id: 1, name: "포토이즘")
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(events: events)
+
+        await store.send(.selectFilterOption(brand)) {
+            $0.filteredBrands = [brand]
+        }
+        await store.send(.selectFilterOption(brand)) {
+            $0.filteredBrands = []
+        }
+        await store.finish()
+
+        #expect(events.value == [
+            .mapBrandFilterToggle(action: .select, selectedCount: 1, brandName: "포토이즘", brandID: 1),
+            .mapBrandFilterToggle(action: .deselect, selectedCount: 0, brandName: "포토이즘", brandID: 1)
+        ])
+    }
+
     @Test("고른 브랜드가 없으면 브랜드 칩에 `브랜드`를 적는다")
     func searchResultBrandFilterChipTitle_withoutSelection_showsDefaultTitle() {
         let state = makeSearchResultState()
@@ -100,11 +120,18 @@ struct PhotoBoothListFeatureTests {
 // MARK: - Helpers
 
 private extension PhotoBoothListFeatureTests {
-    func makeStore(initialState: PhotoBoothListFeature.State = .init()) -> TestStoreOf<PhotoBoothListFeature> {
+    /// 보낸 분석 이벤트는 `events`에 차례로 모읍니다.
+    func makeStore(
+        initialState: PhotoBoothListFeature.State = .init(),
+        events: LockIsolated<[MapAnalyticsEvent]> = .init([])
+    ) -> TestStoreOf<PhotoBoothListFeature> {
         TestStore(initialState: initialState) {
             PhotoBoothListFeature()
         } withDependencies: {
-            $0.analyticsClient.logEvent = { _ in }
+            $0.analyticsClient.logEvent = { event in
+                guard let event = event as? MapAnalyticsEvent else { return }
+                events.withValue { $0.append(event) }
+            }
         }
     }
 

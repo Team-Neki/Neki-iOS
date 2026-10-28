@@ -91,14 +91,14 @@ public final actor DefaultAuthRepository: AuthRepository {
     public func fetchRecentLoginProvider() -> ProviderType? {
         guard let rawValue = UserDefaults.standard.string(forKey: AppStorageKey.recentLoginProvider),
               let provider = ProviderType(rawValue: rawValue),
-              provider == .apple || provider == .kakao
+              provider.isSocialLogin
         else { return nil }
 
         return provider
     }
 
     public func saveRecentLoginProvider(_ provider: ProviderType) {
-        guard provider == .apple || provider == .kakao else { return }
+        guard provider.isSocialLogin else { return }
         UserDefaults.standard.set(provider.rawValue, forKey: AppStorageKey.recentLoginProvider)
     }
 

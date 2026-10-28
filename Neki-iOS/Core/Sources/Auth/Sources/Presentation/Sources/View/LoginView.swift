@@ -87,20 +87,9 @@ public struct LoginView: View {
 
 // MARK: - RecentLoginBadge
 
-private struct RecentLoginBadgeModifier: ViewModifier {
-    let provider: ProviderType
-    let isPresented: Bool
-
-    private var foregroundColor: Color {
-        provider == .apple ? .gray900 : .white
-    }
-
-    private var backgroundColor: Color {
-        provider == .apple ? .white : .gray900
-    }
-
-    func body(content: Content) -> some View {
-        content.overlay(alignment: .topTrailing) {
+private extension View {
+    func recentLoginBadge(provider: ProviderType, isPresented: Bool) -> some View {
+        overlay(alignment: .topTrailing) {
             if isPresented {
                 HStack(spacing: 4) {
                     Image(systemName: "clock.fill")
@@ -109,20 +98,17 @@ private struct RecentLoginBadgeModifier: ViewModifier {
                     Text("최근 로그인")
                         .nekiFont(.caption12Medium)
                 }
-                .foregroundStyle(foregroundColor)
+                .foregroundStyle(provider == .apple ? Color.gray900 : Color.white)
                 .padding(.horizontal, 8)
                 .frame(height: 24)
-                .background(backgroundColor, in: RoundedRectangle(cornerRadius: 6))
+                .background(
+                    provider == .apple ? Color.white : Color.gray900,
+                    in: RoundedRectangle(cornerRadius: 6)
+                )
                 .padding(8)
                 .allowsHitTesting(false)
             }
         }
-    }
-}
-
-private extension View {
-    func recentLoginBadge(provider: ProviderType, isPresented: Bool) -> some View {
-        modifier(RecentLoginBadgeModifier(provider: provider, isPresented: isPresented))
     }
 }
 

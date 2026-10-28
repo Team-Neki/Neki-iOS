@@ -104,6 +104,7 @@ extension AuthClient: DependencyKey {
         @Sendable func autoLogin() async throws -> User {
             do {
                 let user = try await authRepository.restoreSession()
+                await authRepository.saveRecentLoginProvider(user.providerType)
                 return user
             } catch {
                 throw AuthClient.mapError(error)

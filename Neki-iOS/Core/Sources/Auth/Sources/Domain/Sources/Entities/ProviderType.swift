@@ -15,4 +15,11 @@ public enum ProviderType: String, Sendable, Codable {
     case test = "test"
     
     var name: String { self.rawValue }
+
+    var isSocialLogin: Bool {
+        switch self {
+        case .apple, .kakao: true
+        case .local, .test: false
+        }
+    }
 }

@@ -172,8 +172,13 @@ public struct PhotoBoothListFeature {
                 return .run { _ in await analytics.logEvent(event) }
                 
             case let .selectTab(tab):
+                // 다른 탭에서 즐겨찾기 탭으로 바꿀 때만 즐겨찾기 탭 진입으로 셉니다.
+                // 목록을 다시 불러오기를 기다리지 않고 지금 가진 즐겨찾기 수로 바로 보냅니다.
+                let isEnteringFavoriteTab = tab == .favorite && state.selectedTab != .favorite
                 state.selectedTab = tab
-                return .none
+                guard isEnteringFavoriteTab else { return .none }
+                let event = MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: state.favoriteBoothCount)
+                return .run { _ in await analytics.logEvent(event) }
 
             case .toggleTooltip:
                 state.$isTooltipPresented.withLock { $0.toggle() }

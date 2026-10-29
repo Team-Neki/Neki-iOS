@@ -218,13 +218,14 @@ struct ArchiveAlbumDetailFeature {
                 return .none
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message, albumCount):
+                case let .didCompleteTask(message, albumCount, purpose):
                     let photoCount = state.selectedIDs.count
                     state.albumSelection = nil
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
+                    let events = ArchiveAnalyticsEvent.multiPhotoSelectionEvents(for: purpose, photoCount: photoCount, albumCount: albumCount)
                     return .merge(
-                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in for event in events { await analyticsClient.logEvent(event) } },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )
@@ -299,8 +300,12 @@ struct ArchiveAlbumDetailFeature {
                     state.photoImport = nil
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
+                    // 사진 가져오기는 다른 앨범의 사진을 이 앨범에 복사하는 것이라 `photo_copy`도 함께 보냅니다.
                     return .merge(
-                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoAddToAlbum(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in
+                            await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoAddToAlbum(photoCount: photoCount, albumCount: albumCount))
+                            await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoCopy)
+                        },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchPhotos)
                     )

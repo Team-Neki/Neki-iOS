@@ -192,14 +192,15 @@ struct ArchiveFavoriteAlbumFeature {
                 
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message, albumCount):
+                case let .didCompleteTask(message, albumCount, purpose):
                     let photoCount = state.selectedIDs.count
                     state.albumSelection = nil
                     state.isSelectionMode = false
                     state.selectedIDs.removeAll()
+                    let events = ArchiveAnalyticsEvent.multiPhotoSelectionEvents(for: purpose, photoCount: photoCount, albumCount: albumCount)
                     
                     return .merge(
-                        .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumAddFromMulti(photoCount: photoCount, albumCount: albumCount)) },
+                        .run { _ in for event in events { await analyticsClient.logEvent(event) } },
                         .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
                         .send(.fetchFavoritePhotos)
                     )

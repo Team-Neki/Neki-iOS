@@ -48,6 +48,8 @@ struct PoseFeature {
     enum Action: BindableAction {
         // User Actions
         case onAppear
+        /// QR·알림 목록처럼 이 화면을 덮은 전체 화면이 닫혀 다시 보일 때 받습니다. 이때는 onAppear가 다시 불리지 않아 메인 탭이 알립니다.
+        case fullScreenCoverDismissed
         case loadMoreItems
         case onTapFilter
         case onTapScrapMode
@@ -89,15 +91,20 @@ struct PoseFeature {
             switch action {
                 // MARK: - View Actions
             case .onAppear:
+                // 화면 진입은 목록을 이미 불러왔어도 화면이 보일 때마다 기록합니다.
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseView) }
                 let fetchEffect: Effect<Action>
                 if state.isSelectedScrap {
-                    guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return .none }
+                    guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return trackingEffect }
                     fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 } else {
-                    guard state.isGeneralLoading == false, state.generalPoses.isEmpty else { return .none }
+                    guard state.isGeneralLoading == false, state.generalPoses.isEmpty else { return trackingEffect }
                     fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 }
-                return fetchEffect
+                return .merge(trackingEffect, fetchEffect)
+                
+            case .fullScreenCoverDismissed:
+                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseView) }
                 
             case .loadMoreItems:
                 if state.isSelectedScrap {
@@ -150,10 +157,8 @@ struct PoseFeature {
                 
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
-                return .merge(
-                    .run { _ in await analytics.logEvent(PoseAnalyticsEvent.randomPoseSuggestionStart) },
-                    .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
-                )
+                // 랜덤 포즈 시작은 랜덤 포즈 화면을 띄우는 포즈 코디네이터가 기록합니다.
+                return .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
                 
             case let .imageTapped(pose):
                 let event = PoseAnalyticsEvent.poseDetailClick(
@@ -179,8 +184,9 @@ struct PoseFeature {
                     await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
-                return .merge(scrapEffect, .send(.updatePoseInList(updatedPose)))
+                return .merge(scrapEffect, trackingEffect, .send(.updatePoseInList(updatedPose)))
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
@@ -222,7 +228,7 @@ struct PoseFeature {
                 return .none
                 
             case .bookmarkResponse(_, .success):
-                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .none
                 
             case let .bookmarkResponse(pose, .failure(error)):
                 if error is CancellationError { return .none }

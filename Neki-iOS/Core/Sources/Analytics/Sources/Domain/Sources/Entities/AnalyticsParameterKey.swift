@@ -8,15 +8,6 @@
 import Foundation
 
 public enum AnalyticsParameterKey: String {
-    // 공통
-    case userId = "user_id"
-    case platform = "platform"
-    case appVersion = "app_version"
-    case notificationType = "notification_type"
-    case targetType = "target_type"
-    case messageTone = "message_tone"
-    case hasVariable = "has_variable"
-    
     // 아카이빙
     case method = "method"
     case count = "count"

@@ -335,7 +335,7 @@ struct MapFeatureTests {
         let store = makeAppearableStore()
         store.send(.updateLocationAuthorization(.authorizedWhenInUse))
         store.send(.updateUserLocation(.success(userLocation)))
-        store.send(.mapLoaded(bounds(centeredAt: userCoordinate)))
+        store.send(.mapLoaded(bounds(centeredAt: userCoordinate), zoomLevel: 14))
         #expect(store.initialExplorationState == .completed)
 
         // 지도가 보이는 동안 같은 권한을 다시 받아도 보고 있던 상세를 닫거나 첫 지도 화면을 다시 탐색하지 않습니다.
@@ -361,7 +361,7 @@ struct MapFeatureTests {
         let store = makeAppearableStore()
         let defaultCoordinate = PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
         store.send(.updateLocationAuthorization(.denied))
-        store.send(.mapLoaded(bounds(centeredAt: defaultCoordinate)))
+        store.send(.mapLoaded(bounds(centeredAt: defaultCoordinate), zoomLevel: 14))
         #expect(store.initialExplorationState == .completed)
         let fetchGeneration = store.photoBoothFetchContext.generation
 
@@ -489,8 +489,8 @@ struct MapFeatureTests {
         let request = store.cameraMoveRequest
         let stoppedBounds = GeographicBoundingBox(minLatitude: 37.49, minLongitude: 127.02, maxLatitude: 37.50, maxLongitude: 127.03)
 
-        store.send(.mapLoaded(stoppedBounds))
-        store.send(.cameraMotionEnded(stoppedBounds))
+        store.send(.mapLoaded(stoppedBounds, zoomLevel: 14))
+        store.send(.cameraMotionEnded(stoppedBounds, zoomLevel: 14))
 
         #expect(store.cameraMoveRequest == request)
         #expect(store.currentBounds == stoppedBounds)
@@ -672,8 +672,8 @@ struct MapFeatureTests {
 
         // 후보를 고르며 바뀐 시트 높이로 인셋이 바뀌거나 지도를 옮기면 카메라 이벤트가 옵니다.
         let viewportBounds = bounds(centeredAt: favoritePhotoBooth.coordinate)
-        await store.send(.cameraMotionChanged(viewportBounds)).finish()
-        await store.send(.cameraMotionEnded(viewportBounds)).finish()
+        await store.send(.cameraMotionChanged(viewportBounds, zoomLevel: 14)).finish()
+        await store.send(.cameraMotionEnded(viewportBounds, zoomLevel: 14)).finish()
         #expect(store.visiblePhotoBooths.isEmpty)
 
         await store.send(.searchResultResponse(
@@ -907,8 +907,8 @@ struct MapFeatureTests {
         #expect(events.value == [.mapSearchView])
     }
 
-    @Test("검색 결과를 보다가 검색어를 눌러 검색 화면에 다시 들어가도 검색 진입 이벤트를 보낸다", arguments: [false, true])
-    func didTapSearchField_afterSearchResult_logsSearchView(isPhotoBoothCandidate: Bool) async {
+    @Test("검색 결과를 보다가 검색어를 눌러 검색 화면으로 돌아가면 검색 중이므로 검색 진입 이벤트를 보내지 않는다", arguments: [false, true])
+    func didTapSearchField_afterSearchResult_doesNotLogSearchView(isPhotoBoothCandidate: Bool) async {
         let events = LockIsolated<[MapAnalyticsEvent]>([])
         let store = makeStore(events: events)
         selectSearchResultSheet(in: store, isPhotoBoothCandidate: isPhotoBoothCandidate)
@@ -916,7 +916,7 @@ struct MapFeatureTests {
         await store.send(.didTapSearchField).finish()
 
         #expect(store.isSearchPresented)
-        #expect(events.value == [.mapSearchView])
+        #expect(events.value.isEmpty)
     }
 
     @Test("부스 하나를 바로 고른 검색에서 상세를 닫아 검색 화면으로 돌아가면 검색 진입 이벤트를 보내지 않는다")
@@ -929,6 +929,101 @@ struct MapFeatureTests {
 
         #expect(store.isSearchPresented)
         #expect(events.value.isEmpty)
+    }
+
+    @Test("지도 화면이 보일 때마다 화면 진입 이벤트를 보낸다")
+    func onAppear_logsMapViewEveryTime() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeAppearableStore(events: events)
+
+        await store.send(.onAppear).finish()
+        await store.send(.onAppear).finish()
+
+        #expect(events.value == [.mapView, .mapView])
+    }
+
+    @Test("앱을 실행한 뒤 처음 재탐색하면 첫 지도 화면에서 얼마나 옮겼든 비교할 직전 재탐색이 없어 지역 변경이 아니다")
+    func didTapExploreHereButton_withoutPreviousReExplore_logsRegionUnchanged() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeExplorableStore(events: events)
+        let defaultCoordinate = PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
+        store.send(.updateLocationAuthorization(.denied))
+        store.send(.mapLoaded(bounds(centeredAt: defaultCoordinate), zoomLevel: 14))
+        #expect(store.initialExplorationState == .completed)
+        #expect(store.lastReExploredLocation == nil)
+
+        store.send(.cameraMotionEnded(bounds(centeredAt: coordinate(movedNorthFrom: defaultCoordinate, by: 2_000)), zoomLevel: 14))
+        await store.send(.didTapExploreHereButton).finish()
+
+        #expect(regionChangedValues(in: events) == [false])
+    }
+
+    @Test(
+        "직전 재탐색 위치에서 누른 순간의 줌에 맞는 기준 거리 이상 옮겨 재탐색하면 지역 변경으로 보낸다",
+        arguments: [
+            (zoomLevel: 18.0, distance: 350.0, isRegionChanged: true),
+            (zoomLevel: 17.9, distance: 450.0, isRegionChanged: false),
+            (zoomLevel: 16.0, distance: 550.0, isRegionChanged: true),
+            (zoomLevel: 15.9, distance: 650.0, isRegionChanged: false),
+            (zoomLevel: 14.0, distance: 750.0, isRegionChanged: true),
+            (zoomLevel: 13.9, distance: 950.0, isRegionChanged: false),
+            (zoomLevel: 12.0, distance: 1_050.0, isRegionChanged: true)
+        ]
+    )
+    func didTapExploreHereButton_comparesWithPreviousReExploreByZoomLevel(
+        zoomLevel: Double,
+        distance: CLLocationDistance,
+        isRegionChanged: Bool
+    ) async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeExplorableStore(events: events)
+        store.send(.cameraMotionEnded(bounds(centeredAt: userCoordinate), zoomLevel: zoomLevel))
+        await store.send(.didTapExploreHereButton).finish()
+
+        store.send(.cameraMotionEnded(bounds(centeredAt: coordinate(movedNorthFrom: userCoordinate, by: distance)), zoomLevel: zoomLevel))
+        await store.send(.didTapExploreHereButton).finish()
+
+        #expect(regionChangedValues(in: events) == [false, isRegionChanged])
+    }
+
+    @Test("다른 탭에 다녀와 첫 지도 화면을 다시 탐색해도 재탐색 기준점은 직전 재탐색 위치로 남는다")
+    func didEnterTab_thenInitialExploration_keepsPreviousReExploreLocation() async {
+        let store = makeExplorableStore()
+        let defaultCoordinate = PhotoBoothSearchFeature.Constants.defaultDistanceOrigin
+        let reExploredBounds = bounds(centeredAt: coordinate(movedNorthFrom: defaultCoordinate, by: 2_000))
+        store.send(.updateLocationAuthorization(.denied))
+        store.send(.cameraMotionEnded(reExploredBounds, zoomLevel: 14))
+        await store.send(.didTapExploreHereButton).finish()
+
+        store.send(.didEnterTab)
+        store.send(.onAppear)
+        store.send(.updateLocationAuthorization(.denied))
+        store.send(.cameraMotionEnded(bounds(centeredAt: defaultCoordinate), zoomLevel: 14))
+
+        #expect(store.initialExplorationState == .completed)
+        #expect(store.lastReExploredLocation?.coordinate.latitude == reExploredBounds.center.latitude)
+        #expect(store.lastReExploredLocation?.coordinate.longitude == reExploredBounds.center.longitude)
+    }
+
+    @Test("길찾기 시트에서 지도 앱을 고르면 바로 길찾기 클릭을 보내고 그 앱의 길찾기 링크를 연다")
+    func didSelectDirectionApp_logsRouteClickAndOpensLink() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let openedURLs = LockIsolated<[URL]>([])
+        let store = makeStore(events: events) {
+            $0.openURL = OpenURLEffect { url in
+                openedURLs.withValue { $0.append(url) }
+                return true
+            }
+        }
+        await store.send(.didTapBooth(searchedPhotoBooth)).finish()
+        store.send(.didTapDirectionAppsButton)
+        events.setValue([])
+
+        await store.send(.didSelectDirectionApp(.naverMap)).finish()
+
+        #expect(events.value == [.mapRouteClick(mapType: .naverMap)])
+        #expect(openedURLs.value.count == 1)
+        #expect(store.directionSheetPhotoBooth == nil)
     }
 }
 
@@ -978,12 +1073,38 @@ private extension MapFeatureTests {
     }
 
     /// 지도가 보일 때 하는 브랜드·즐겨찾기 조회와 권한 구독을 바로 끝내는 지도 스토어입니다.
-    func makeAppearableStore() -> StoreOf<MapFeature> {
-        makeStore {
+    func makeAppearableStore(
+        events: LockIsolated<[MapAnalyticsEvent]> = .init([]),
+        dependencies updateDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
+    ) -> StoreOf<MapFeature> {
+        makeStore(events: events) {
             $0.photoBoothClient.loadBrands = { [] }
             $0.photoBoothClient.fetchFavoritePhotoBooths = { [] }
             $0.mapClient.locationAuthorizationStatus = { .finished }
             $0.mapClient.checkSDKAuthorizationStatus = { .finished }
+            updateDependencies(&$0)
+        }
+    }
+
+    /// 지도가 보일 때의 조회에 더해 영역 조회도 바로 끝내는 지도 스토어입니다. 재탐색한 뒤 이펙트가 끝나기를 기다릴 수 있습니다.
+    func makeExplorableStore(events: LockIsolated<[MapAnalyticsEvent]> = .init([])) -> StoreOf<MapFeature> {
+        makeAppearableStore(events: events) {
+            $0.photoBoothClient.fetchPhotoBooths = { _ in AsyncThrowingStream { $0.finish() } }
+        }
+    }
+
+    /// 주어진 좌표에서 북쪽으로 `distance`m쯤 옮긴 좌표입니다.
+    ///
+    /// 위도 1도를 111km로 어림하므로, 기준 거리와 견줄 때는 기준 거리에서 50m 넘게 떨어진 값을 씁니다.
+    func coordinate(movedNorthFrom coordinate: GeographicCoordinate, by distance: CLLocationDistance) -> GeographicCoordinate {
+        GeographicCoordinate(latitude: coordinate.latitude + distance / 111_000, longitude: coordinate.longitude)
+    }
+
+    /// 보낸 재탐색 이벤트의 지역 변경 여부를 차례로 모읍니다.
+    func regionChangedValues(in events: LockIsolated<[MapAnalyticsEvent]>) -> [Bool] {
+        events.value.compactMap { event in
+            guard case let .mapReExplore(_, regionChanged) = event else { return nil }
+            return regionChanged
         }
     }
 
@@ -1064,10 +1185,9 @@ private extension MapFeatureTests {
     ///
     /// 위치 권한을 받기 전이라 카메라가 멈춰도 첫 지도 화면을 조회하지 않으므로, 즐겨찾기 응답과 마커 계산만 기다립니다.
     func showFavoritePhotoBooth(in store: StoreOf<MapFeature>) async {
-        await store.send(.cameraMotionEnded(bounds(centeredAt: favoritePhotoBooth.coordinate))).finish()
+        await store.send(.cameraMotionEnded(bounds(centeredAt: favoritePhotoBooth.coordinate), zoomLevel: 14)).finish()
         await store.send(.favoritePhotoBoothsResponse(
             .success([favoritePhotoBooth]),
-            shouldLogViewEvent: false,
             generation: store.favoriteFetchGeneration
         )).finish()
     }

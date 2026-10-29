@@ -85,6 +85,25 @@ struct PhotoBoothListFeatureTests {
         ])
     }
 
+    @Test("이 지역 탭에서 즐겨찾기 탭으로 바꾸면 그때 가진 즐겨찾기 수로 즐겨찾기 탭 진입을 남기고, 이미 고른 즐겨찾기 탭을 다시 눌러도 더 남기지 않는다")
+    func selectTab_fromNearbyToFavorite_logsFavoriteBoothViewOnce() async {
+        var state = PhotoBoothListFeature.State()
+        state.favoriteBoothCount = 3
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeStore(initialState: state, events: events)
+
+        await store.send(.selectTab(.favorite)) {
+            $0.selectedTab = .favorite
+        }
+        await store.send(.selectTab(.favorite))
+        await store.send(.selectTab(.nearby)) {
+            $0.selectedTab = .nearby
+        }
+        await store.finish()
+
+        #expect(events.value == [.favoriteBoothView(favoriteBoothCount: 3)])
+    }
+
     @Test("고른 브랜드가 없으면 브랜드 칩에 `브랜드`를 적는다")
     func searchResultBrandFilterChipTitle_withoutSelection_showsDefaultTitle() {
         let state = makeSearchResultState()

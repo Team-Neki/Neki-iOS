@@ -62,7 +62,8 @@ struct AlbumSelectionFeature {
         
         case delegate(DelegateAction)
         enum DelegateAction {
-            case didCompleteTask(message: String, albumCount: Int)
+            /// 복사나 이동을 마쳤음을 알립니다. 받는 화면이 목적에 맞는 이벤트를 보내도록 목적을 함께 넘깁니다.
+            case didCompleteTask(message: String, albumCount: Int, purpose: PhotoSelectionPurpose)
             case didTapCancel
             case showToast(NekiToastItem)
             case didSelectForUpload(albumId: Int)
@@ -182,7 +183,7 @@ struct AlbumSelectionFeature {
                 
             case let .taskCompleted(message, albumCount):
                 state.isLoading = false
-                return .send(.delegate(.didCompleteTask(message: message, albumCount: albumCount)))
+                return .send(.delegate(.didCompleteTask(message: message, albumCount: albumCount, purpose: state.selectionPurpose)))
                 
             case let .taskFailed(message, error):
                 state.isLoading = false
@@ -208,6 +209,7 @@ struct AlbumSelectionFeature {
                 
             case .addFolderResponse(.success):
                 return .merge(
+                    .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.albumCreate) },
                     .send(.delegate(.showToast(NekiToastItem("새로운 앨범을 추가했어요", style: .success)))),
                     .send(.onAppear)
                 )

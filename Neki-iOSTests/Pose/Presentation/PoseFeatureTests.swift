@@ -47,6 +47,19 @@ struct PoseFeatureTests {
         #expect(events.value == [.poseBookmark])
     }
 
+    @Test("북마크 아이콘을 누르면 요청에 실패해도 북마크를 남긴다")
+    func onTapBookmark_whenRequestFails_logsBookmark() async {
+        let events = LockIsolated<[PoseAnalyticsEvent]>([])
+        let store = makeStore(events: events) {
+            $0.poseClient.scrapPose = { _ in throw BookmarkFailure() }
+        }
+
+        await store.send(.onTapBookmark(makePose(id: 128, peopleCount: .duo)))
+        await store.finish()
+
+        #expect(events.value == [.poseBookmark])
+    }
+
     @Test("포즈 첫 화면이 보일 때마다 목록을 이미 불러왔어도 화면 진입을 남긴다")
     func onAppear_whenPosesLoaded_logsPoseViewEveryTime() async {
         var state = PoseFeature.State()
@@ -86,7 +99,8 @@ private extension PoseFeatureTests {
     /// 보낸 분석 이벤트는 `events`에 차례로 모읍니다. 이펙트가 보내는 액션은 확인하지 않습니다.
     func makeStore(
         initialState: PoseFeature.State = .init(),
-        events: LockIsolated<[PoseAnalyticsEvent]> = .init([])
+        events: LockIsolated<[PoseAnalyticsEvent]> = .init([]),
+        dependencies updateDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> TestStoreOf<PoseFeature> {
         let store = TestStore(initialState: initialState) {
             PoseFeature()
@@ -96,6 +110,7 @@ private extension PoseFeatureTests {
                 events.withValue { $0.append(event) }
             }
             $0.poseClient.scrapPose = { _ in }
+            updateDependencies(&$0)
         }
         store.exhaustivity = .off
         return store
@@ -114,3 +129,5 @@ private extension PoseFeatureTests {
         )
     }
 }
+
+private struct BookmarkFailure: Error {}

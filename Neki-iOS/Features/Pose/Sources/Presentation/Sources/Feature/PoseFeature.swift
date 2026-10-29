@@ -157,10 +157,8 @@ struct PoseFeature {
                 
             case .onTapStartRandomPoseCarousel:
                 state.sheetItem = nil
-                return .merge(
-                    .run { _ in await analytics.logEvent(PoseAnalyticsEvent.randomPoseSuggestionStart) },
-                    .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
-                )
+                // 랜덤 포즈 시작은 랜덤 포즈 화면을 띄우는 포즈 코디네이터가 기록합니다.
+                return .send(.delegate(.didTapStartRandomPose(state.selectedRandomPoseCountSelectionOption)))
                 
             case let .imageTapped(pose):
                 let event = PoseAnalyticsEvent.poseDetailClick(
@@ -186,8 +184,9 @@ struct PoseFeature {
                     await send(.bookmarkResponse(updatedPose, Result { try await poseClient.scrapPose(pose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
-                return .merge(scrapEffect, .send(.updatePoseInList(updatedPose)))
+                return .merge(scrapEffect, trackingEffect, .send(.updatePoseInList(updatedPose)))
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
@@ -229,7 +228,7 @@ struct PoseFeature {
                 return .none
                 
             case .bookmarkResponse(_, .success):
-                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .none
                 
             case let .bookmarkResponse(pose, .failure(error)):
                 if error is CancellationError { return .none }

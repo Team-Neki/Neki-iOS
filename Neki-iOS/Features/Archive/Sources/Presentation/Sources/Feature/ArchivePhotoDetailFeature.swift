@@ -123,9 +123,11 @@ struct ArchivePhotoDetailFeature {
             case .doneMemoEditing:
                 let limitedText = String(state.editingMemoText.prefix(100))
                 let photoID = state.currentItemID
-                state.photos[id: photoID]?.memo = limitedText
                 state.isMemoEditing = false
                 state.isMemoExpanded = false
+                // 메모가 바뀌지 않았으면 저장을 요청하지 않아, 메모 작성 이벤트도 남지 않습니다.
+                guard limitedText != (state.currentItem?.memo ?? "") else { return .none }
+                state.photos[id: photoID]?.memo = limitedText
                 
                 return .run { send in
                     await send(.memoUpdateResponse(Result {
@@ -171,7 +173,7 @@ struct ArchivePhotoDetailFeature {
             // 🌟 에러 수정 및 단일 상세 앨범 추가 GA4 로깅 적용 부분
             case let .albumSelection(.presented(.delegate(delegateAction))):
                 switch delegateAction {
-                case let .didCompleteTask(message, albumCount): // 💡 누락되었던 albumCount 파라미터 추가!
+                case let .didCompleteTask(message, albumCount, _): // 💡 누락되었던 albumCount 파라미터 추가!
                     state.albumSelection = nil
                     
                     return .merge(

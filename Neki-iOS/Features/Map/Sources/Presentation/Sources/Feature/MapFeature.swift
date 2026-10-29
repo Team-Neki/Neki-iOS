@@ -15,7 +15,6 @@ public struct MapFeature {
     enum Constants {
         static let defaultInitialPosition: CLLocation = .init(latitude: 37.498095, longitude: 127.027610)
         static let cameraTargetDistanceThreshold: CLLocationDistance = 200
-        static let regionChangeDistanceThreshold: CLLocationDistance = 500
     }
     
     enum SheetStage {
@@ -176,7 +175,12 @@ public struct MapFeature {
         var cameraMoveRequest = CameraMoveRequest()
         var cameraFitRequest = CameraFitRequest()
         var currentBounds: GeographicBoundingBox?
-        var lastExploredLocation: CLLocation?
+        /// 카메라가 마지막으로 알려 준 줌입니다. ``currentBounds``와 함께 갱신합니다.
+        var currentZoomLevel: Double?
+        /// 직전에 `이 지역 재탐색`을 눌렀을 때의 지도 중심으로, 재탐색 이벤트의 `region_changed` 기준점입니다.
+        ///
+        /// 재탐색할 때만 바꿉니다. 첫 지도 화면 탐색이나 탭 이동으로는 바뀌지 않아, 앱을 실행한 뒤 첫 재탐색은 비교할 기준점이 없습니다.
+        var lastReExploredLocation: CLLocation?
         
         // User Location
         var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -247,10 +251,10 @@ public struct MapFeature {
         case attemptInitialExploration
         
         // Map Logic Actions
-        case mapLoaded(GeographicBoundingBox)
+        case mapLoaded(GeographicBoundingBox, zoomLevel: Double)
         case cameraMotionStarted
-        case cameraMotionChanged(GeographicBoundingBox)
-        case cameraMotionEnded(GeographicBoundingBox)
+        case cameraMotionChanged(GeographicBoundingBox, zoomLevel: Double)
+        case cameraMotionEnded(GeographicBoundingBox, zoomLevel: Double)
         case updateExploreButtonVisibility(isVisible: Bool)
         
         // Data Handling Actions
@@ -267,8 +271,8 @@ public struct MapFeature {
         case searchResultResponse(Result<PhotoBoothSearchResult, PhotoBoothSearchFailure>, candidate: PhotoBoothSearchCandidate, generation: UInt)
         
         // Sheet
-        case fetchFavoritePhotoBooths(shouldLogViewEvent: Bool)
-        case favoritePhotoBoothsResponse(Result<[PhotoBooth], Error>, shouldLogViewEvent: Bool, generation: Int)
+        case fetchFavoritePhotoBooths
+        case favoritePhotoBoothsResponse(Result<[PhotoBooth], Error>, generation: Int)
         case refreshVisibleMapPhotoBooths
         case didUpdateVisibleMapPhotoBooths(IdentifiedArrayOf<PhotoBooth>)
         case startBackgroundCalculation
@@ -334,7 +338,7 @@ public struct MapFeature {
                 return .merge(
                     .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapView) },
                     .send(.loadBrands),
-                    .send(.fetchFavoritePhotoBooths(shouldLogViewEvent: false)),
+                    .send(.fetchFavoritePhotoBooths),
                     .run { send in
                         for await status in await mapClient.locationAuthorizationStatus() {
                             await send(.updateLocationAuthorization(status))
@@ -429,8 +433,9 @@ public struct MapFeature {
                 }
                 
                 // MARK: - User Location Interaction
-            case let .mapLoaded(bounds):
+            case let .mapLoaded(bounds, zoomLevel):
                 state.currentBounds = bounds
+                state.currentZoomLevel = zoomLevel
                 return .merge(
                     .send(.attemptInitialExploration),
                     .send(.startBackgroundCalculation)
@@ -488,12 +493,14 @@ public struct MapFeature {
             case .cameraMotionStarted:
                 return .send(.updateExploreButtonVisibility(isVisible: true))
 
-            case let .cameraMotionChanged(bounds):
+            case let .cameraMotionChanged(bounds, zoomLevel):
                 state.currentBounds = bounds
+                state.currentZoomLevel = zoomLevel
                 return .send(.refreshVisibleMapPhotoBooths)
                 
-            case let .cameraMotionEnded(bounds):
+            case let .cameraMotionEnded(bounds, zoomLevel):
                 state.currentBounds = bounds
+                state.currentZoomLevel = zoomLevel
                 return .merge(
                     .send(.attemptInitialExploration),
                     .send(.startBackgroundCalculation)
@@ -506,7 +513,8 @@ public struct MapFeature {
                 
             case .didTapSearchField:
                 // 닫혀 있던 검색 화면을 열 때만 검색 진입으로 셉니다.
-                let isEnteringSearch = state.isSearchPresented == false
+                // 검색 결과를 지도에 띄운 동안도 검색 중이므로, 이때 검색어를 눌러 검색 화면으로 돌아가는 것은 세지 않습니다.
+                let isEnteringSearch = state.isSearchPresented == false && state.appliedSearchQuery == nil
                 let effect = presentSearch(&state)
                 guard isEnteringSearch else { return effect }
                 return .merge(effect, .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapSearchView) })
@@ -515,13 +523,17 @@ public struct MapFeature {
                 return endSearch(&state)
 
             case .didTapExploreHereButton:
-                guard let bounds = state.currentBounds else { return .none }
+                guard let bounds = state.currentBounds, let zoomLevel = state.currentZoomLevel else { return .none }
                 let centerCoordinate = bounds.center
                 let currentCenterLocation = CLLocation(latitude: centerCoordinate.latitude, longitude: centerCoordinate.longitude)
-                let isRegionChanged = checkIfRegionChanged(from: state.lastExploredLocation, to: currentCenterLocation)
+                let isRegionChanged = checkIfRegionChanged(
+                    from: state.lastReExploredLocation,
+                    to: currentCenterLocation,
+                    zoomLevel: zoomLevel
+                )
                 let hasFilter = state.photoBoothListState.filteredBrands.isEmpty == false
                 let event = MapAnalyticsEvent.mapReExplore(hasFilter: hasFilter, regionChanged: isRegionChanged)
-                state.lastExploredLocation = currentCenterLocation
+                state.lastReExploredLocation = currentCenterLocation
                 return .merge(
                     .run { _ in await analytics.logEvent(event) },
                     .send(.fetchPhotoBooths(bounds: bounds))
@@ -541,7 +553,6 @@ public struct MapFeature {
                 
                 guard currentCameraLocation.distance(from: targetLocation) <= Constants.cameraTargetDistanceThreshold else { return .none }
                 state.initialExplorationState = .completed
-                state.lastExploredLocation = currentCameraLocation
                 return .send(.fetchPhotoBooths(bounds: bounds))
                 
                 // MARK: - Data Fetching
@@ -700,34 +711,29 @@ public struct MapFeature {
                 updatePhotoBoothFavoriteState(&state, photoBooth: photoBooth, isFavorite: requestedValue == false)
                 return .send(.startBackgroundCalculation)
 
-            case let .fetchFavoritePhotoBooths(shouldLogViewEvent):
+            case .fetchFavoritePhotoBooths:
                 state.favoriteFetchGeneration += 1
                 let generation = state.favoriteFetchGeneration
                 return .run { send in
                     await send(.favoritePhotoBoothsResponse(
                         Result { try await photoBoothClient.fetchFavoritePhotoBooths() },
-                        shouldLogViewEvent: shouldLogViewEvent,
                         generation: generation
                     ))
                 }
                 .cancellable(id: CancelID.favoriteFetch, cancelInFlight: true)
 
-            case let .favoritePhotoBoothsResponse(.success(photoBooths), shouldLogViewEvent, generation):
+            case let .favoritePhotoBoothsResponse(.success(photoBooths), generation):
                 guard generation == state.favoriteFetchGeneration else { return .none }
                 updateFavoriteSortCoordinate(&state.photoBoothListState, coordinate: state.isLocationAuthorized ? state.userGeographicCoordinate : nil)
                 let favoriteBooths = mergedFavoriteBooths(from: photoBooths, state: state)
                 let favoriteBoothCount = favoriteBooths.count
-                let viewEventEffect: Effect<Action> = shouldLogViewEvent
-                    ? .run { _ in await analytics.logEvent(MapAnalyticsEvent.favoriteBoothView(favoriteBoothCount: favoriteBoothCount)) }
-                    : .none
                 return .concatenate(
                     .send(.photoBoothListAction(.setFavoriteBooths(favoriteBooths))),
                     .send(.photoBoothListAction(.setFavoriteBoothCount(favoriteBoothCount))),
-                    .send(.startBackgroundCalculation),
-                    viewEventEffect
+                    .send(.startBackgroundCalculation)
                 )
                 
-            case let .favoritePhotoBoothsResponse(.failure(error), _, generation):
+            case let .favoritePhotoBoothsResponse(.failure(error), generation):
                 guard generation == state.favoriteFetchGeneration else { return .none }
                 Logger.presentation.error("Favorite PhotoBooths fetch error: \(error)")
                 return .none
@@ -879,10 +885,12 @@ public struct MapFeature {
                 
             case let .didSelectDirectionApp(appType):
                 guard let photoBooth = state.directionSheetPhotoBooth else { return .none }
-                guard let url = appType.connectLink(coordinate: photoBooth.coordinate, name: photoBooth.name) else { return .none }
+                // 지도 앱을 고른 순간 기록합니다. 길찾기 링크를 만들지 못해 앱을 열지 못해도 남깁니다.
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapRouteClick(mapType: appType)) }
+                guard let url = appType.connectLink(coordinate: photoBooth.coordinate, name: photoBooth.name) else { return trackingEffect }
                 state.directionSheetPhotoBooth = nil
                 return .merge(
-                    .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapRouteClick(mapType: appType)) },
+                    trackingEffect,
                     .run { _ in await openURL(url) }
                 )
                 
@@ -904,7 +912,7 @@ public struct MapFeature {
                     return .concatenate(
                         .send(.photoBoothListAction(.clearFilterOptions)),
                         .merge(
-                            .send(.fetchFavoritePhotoBooths(shouldLogViewEvent: true)),
+                            .send(.fetchFavoritePhotoBooths),
                             .send(.startBackgroundCalculation)
                         )
                     )
@@ -1396,9 +1404,24 @@ private extension MapFeature {
         state.cameraMoveRequest.move(to: .init(latitude: coordinate.latitude, longitude: coordinate.longitude))
     }
     
-    func checkIfRegionChanged(from lastLocation: CLLocation?, to currentLocation: CLLocation) -> Bool {
+    /// 재탐색하는 지도 중심이 직전 재탐색 위치에서 다른 지역으로 옮겨졌는지 판정합니다.
+    ///
+    /// 직전 재탐색이 없으면 비교할 기준점이 없어 `false`입니다.
+    func checkIfRegionChanged(from lastLocation: CLLocation?, to currentLocation: CLLocation, zoomLevel: Double) -> Bool {
         guard let lastLocation else { return false }
-        return currentLocation.distance(from: lastLocation) >= Constants.regionChangeDistanceThreshold
+        return currentLocation.distance(from: lastLocation) >= Self.regionChangeDistanceThreshold(zoomLevel: zoomLevel)
+    }
+    
+    /// 재탐색할 때 다른 지역으로 옮겼다고 볼 거리입니다. 누른 순간의 줌이 클수록(가까이 볼수록) 짧습니다.
+    ///
+    /// 명세의 줌 구간(12~13 1000m, 14~15 700m, 16~17 500m, 18~20 300m)을 Android와 같이 각 구간이 시작하는 줌으로 나눕니다.
+    static func regionChangeDistanceThreshold(zoomLevel: Double) -> CLLocationDistance {
+        switch zoomLevel {
+        case 18...: return 300
+        case 16..<18: return 500
+        case 14..<16: return 700
+        default: return 1000
+        }
     }
     
     func initialExplorationTargetCoordinate(for state: State) -> GeographicCoordinate? {

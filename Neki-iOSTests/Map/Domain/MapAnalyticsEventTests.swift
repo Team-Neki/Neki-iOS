@@ -40,6 +40,7 @@ struct MapAnalyticsEventTests {
         #expect(stringValue(parameters?[.priorityBrandId2]) == "1")
         #expect(stringValue(parameters?[.priorityBrandId3]) == "")
         #expect(stringValue(parameters?[.priorityBrand1]) == "하루필름")
+        #expect(stringValue(parameters?[.priorityBrand2]) == "포토이즘")
         #expect(stringValue(parameters?[.priorityBrand3]) == "")
     }
 }

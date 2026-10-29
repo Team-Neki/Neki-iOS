@@ -126,12 +126,12 @@ extension MapAnalyticsEvent: AnalyticsEvent {
             let priorityBrandNames = orderedBrands.map(\.name)
             let priorityBrandIDs = orderedBrands.map { String($0.id) }
             return [
-                .priorityBrand1: .string(priorityBrandNames.indices.contains(0) ? priorityBrandNames[0] : ""),
-                .priorityBrand2: .string(priorityBrandNames.indices.contains(1) ? priorityBrandNames[1] : ""),
-                .priorityBrand3: .string(priorityBrandNames.indices.contains(2) ? priorityBrandNames[2] : ""),
-                .priorityBrandId1: .string(priorityBrandIDs.indices.contains(0) ? priorityBrandIDs[0] : ""),
-                .priorityBrandId2: .string(priorityBrandIDs.indices.contains(1) ? priorityBrandIDs[1] : ""),
-                .priorityBrandId3: .string(priorityBrandIDs.indices.contains(2) ? priorityBrandIDs[2] : "")
+                .priorityBrand1: .string(priorityBrandNames[safe: 0] ?? ""),
+                .priorityBrand2: .string(priorityBrandNames[safe: 1] ?? ""),
+                .priorityBrand3: .string(priorityBrandNames[safe: 2] ?? ""),
+                .priorityBrandId1: .string(priorityBrandIDs[safe: 0] ?? ""),
+                .priorityBrandId2: .string(priorityBrandIDs[safe: 1] ?? ""),
+                .priorityBrandId3: .string(priorityBrandIDs[safe: 2] ?? "")
             ]
         case let .mapRouteClick(mapType):
             return [.mapType: .string(mapType.rawValue)]

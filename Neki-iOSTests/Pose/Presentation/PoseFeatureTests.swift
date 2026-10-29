@@ -47,6 +47,20 @@ struct PoseFeatureTests {
         #expect(events.value == [.poseBookmark])
     }
 
+    @Test("포즈 첫 화면이 보일 때마다 목록을 이미 불러왔어도 화면 진입을 남긴다")
+    func onAppear_whenPosesLoaded_logsPoseViewEveryTime() async {
+        var state = PoseFeature.State()
+        state.generalPoses = [makePose(id: 1, peopleCount: .solo)]
+        let events = LockIsolated<[PoseAnalyticsEvent]>([])
+        let store = makeStore(initialState: state, events: events)
+
+        await store.send(.onAppear)
+        await store.send(.onAppear)
+        await store.finish()
+
+        #expect(events.value == [.poseView, .poseView])
+    }
+
     @Test("상세 클릭은 포즈 ID를 문자열로 `pose_id`에 담는다")
     func poseDetailClick_sendsPoseIDAsString() {
         let parameters = PoseAnalyticsEvent.poseDetailClick(poseID: 128, peopleCount: 2, entryPoint: .list).parameters

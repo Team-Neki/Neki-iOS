@@ -221,6 +221,8 @@ public struct MapFeature {
         case onDisappear
         /// 다른 탭에서 지도 탭으로 돌아왔음을 알립니다. 탭 전환을 아는 상위 화면(메인 탭)이 보냅니다.
         case didEnterTab
+        /// QR·알림 목록처럼 지도를 덮은 전체 화면이 닫혀 다시 보일 때 받습니다. 이때는 onAppear가 다시 불리지 않아 메인 탭이 알립니다.
+        case fullScreenCoverDismissed
         case requestPermission
         case openAppSettings
         case didTapBooth(PhotoBooth)
@@ -330,6 +332,7 @@ public struct MapFeature {
                 // - 위치 권한 확인: 그 뒤로는 권한이 바뀌었을 때만 첫 지도 화면을 다시 탐색합니다.
                 state.shouldExploreOnNextAuthorization = true
                 return .merge(
+                    .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapView) },
                     .send(.loadBrands),
                     .send(.fetchFavoritePhotoBooths(shouldLogViewEvent: false)),
                     .run { send in
@@ -365,6 +368,9 @@ public struct MapFeature {
                     .cancel(id: CancelID.searchResult),
                     state.isSearchPresented ? .send(.photoBoothSearchAction(.dismissSearch)) : .none
                 )
+                
+            case .fullScreenCoverDismissed:
+                return .run { _ in await analytics.logEvent(MapAnalyticsEvent.mapView) }
                 
                 // MARK: - Permission Flow
             case .requestPermission:

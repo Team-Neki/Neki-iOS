@@ -930,6 +930,17 @@ struct MapFeatureTests {
         #expect(store.isSearchPresented)
         #expect(events.value.isEmpty)
     }
+
+    @Test("지도 화면이 보일 때마다 화면 진입 이벤트를 보낸다")
+    func onAppear_logsMapViewEveryTime() async {
+        let events = LockIsolated<[MapAnalyticsEvent]>([])
+        let store = makeAppearableStore(events: events)
+
+        await store.send(.onAppear).finish()
+        await store.send(.onAppear).finish()
+
+        #expect(events.value == [.mapView, .mapView])
+    }
 }
 
 
@@ -978,8 +989,8 @@ private extension MapFeatureTests {
     }
 
     /// 지도가 보일 때 하는 브랜드·즐겨찾기 조회와 권한 구독을 바로 끝내는 지도 스토어입니다.
-    func makeAppearableStore() -> StoreOf<MapFeature> {
-        makeStore {
+    func makeAppearableStore(events: LockIsolated<[MapAnalyticsEvent]> = .init([])) -> StoreOf<MapFeature> {
+        makeStore(events: events) {
             $0.photoBoothClient.loadBrands = { [] }
             $0.photoBoothClient.fetchFavoritePhotoBooths = { [] }
             $0.mapClient.locationAuthorizationStatus = { .finished }

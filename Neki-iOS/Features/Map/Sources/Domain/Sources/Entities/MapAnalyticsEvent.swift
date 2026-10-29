@@ -8,6 +8,8 @@
 import Foundation
 
 enum MapAnalyticsEvent {
+    /// 지도 첫 화면이 보일 때마다 기록합니다. 탭을 옮겨 오거나 브랜드 순서 화면, QR·알림 목록에서 돌아올 때도 포함합니다.
+    case mapView
     /// 검색창을 통해 검색 모드에 정상 진입했을 때 기록합니다. 모드 내 재포커스는 제외합니다.
     case mapSearchView
     /// 검색 후보 첫 페이지의 정상 응답만 기록합니다. query는 입력 원문이며 기술적 실패와 POI 조회는 제외합니다.
@@ -59,6 +61,7 @@ enum MapAnalyticsEvent {
 extension MapAnalyticsEvent: AnalyticsEvent {
     var name: AnalyticsEventName {
         switch self {
+        case .mapView: return .mapView
         case .mapSearchView: return .mapSearchView
         case .mapSearchResult: return .mapSearchResult
         case .mapSearchCandidateSelect: return .mapSearchCandidateSelect
@@ -78,7 +81,7 @@ extension MapAnalyticsEvent: AnalyticsEvent {
     
     var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
-        case .mapSearchView:
+        case .mapView, .mapSearchView:
             return nil
         case let .mapSearchResult(query, resultStatus):
             return [.query: .string(query), .resultStatus: .string(resultStatus.rawValue)]

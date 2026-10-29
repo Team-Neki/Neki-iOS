@@ -1,6 +1,7 @@
 import Foundation
 
 public enum ArchiveAnalyticsEvent: AnalyticsEvent {
+    /// 아카이브 첫 화면이 보일 때마다 기록합니다. 탭을 옮겨 오거나 앨범·사진 화면, QR·알림 목록에서 돌아올 때도 포함합니다.
     case archivingView
     case photoUpload(method: PhotoUploadMethod, count: Int)
     case albumCreate
@@ -47,3 +48,8 @@ public enum ArchiveAnalyticsEvent: AnalyticsEvent {
         }
     }
 }
+
+
+// MARK: - ArchiveAnalyticsEvent + Equatable
+
+extension ArchiveAnalyticsEvent: Equatable {}

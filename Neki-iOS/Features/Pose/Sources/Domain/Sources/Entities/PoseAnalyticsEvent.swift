@@ -8,6 +8,8 @@
 import Foundation
 
 enum PoseAnalyticsEvent {
+    /// 포즈 첫 화면이 보일 때마다 기록합니다. 탭을 옮겨 오거나 포즈 상세·랜덤 포즈, QR·알림 목록에서 돌아올 때도 포함합니다.
+    case poseView
     case randomPoseSuggestionStart
     case randomPoseSuggestionEnd(totalSwipeCount: Int)
     case poseFilterToggle(peopleCount: Int)
@@ -23,6 +25,7 @@ enum PoseAnalyticsEvent {
 extension PoseAnalyticsEvent: AnalyticsEvent {
     var name: AnalyticsEventName {
         switch self {
+        case .poseView: return .poseView
         case .randomPoseSuggestionStart: return .poseRandomStart
         case .randomPoseSuggestionEnd: return .poseRandomSessionEnd
         case .poseFilterToggle: return .poseFilterToggle
@@ -34,7 +37,7 @@ extension PoseAnalyticsEvent: AnalyticsEvent {
     
     var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
-        case .randomPoseSuggestionStart, .poseBookmarkFilter, .poseBookmark: return nil
+        case .poseView, .randomPoseSuggestionStart, .poseBookmarkFilter, .poseBookmark: return nil
         case let .randomPoseSuggestionEnd(totalSwipeCount):
             return [.totalSwipeCount: .integer(totalSwipeCount)]
         case let .poseFilterToggle(peopleCount):

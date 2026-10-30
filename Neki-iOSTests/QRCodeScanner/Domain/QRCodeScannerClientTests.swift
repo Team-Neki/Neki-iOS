@@ -101,65 +101,17 @@ struct QRCodeScannerClientTests {
         #expect(await dumpRepository.uploadCount == 1)
     }
 
-    @Test("메모리 경고는 실행·대기 dump를 취소하고 URL 예약을 해제한다")
-    func memoryWarning_cancelsDumpAndReleasesReservations() async {
-        let (memoryWarnings, memoryWarningContinuation) = AsyncStream<Void>.makeStream()
-        let dumpRepository = RecordingDumpRepository(operationDelay: .seconds(10))
-        let client = makeClient(
-            scanRepository: UnsupportedScanRepository(),
-            dumpRepository: dumpRepository,
-            memoryWarnings: memoryWarnings
-        )
-        let firstURL = "https://unsupported.example.com/first"
-        let secondURL = "https://unsupported.example.com/second"
-
-        await ignoreError { _ = try await client.parse(firstURL, .dummy) }
-        await ignoreError { _ = try await client.parse(secondURL, .dummy) }
-        await dumpRepository.waitForFetchCount(1)
-        memoryWarningContinuation.yield(())
-        await dumpRepository.waitForCancellationCount(1)
-
-        await ignoreError { _ = try await client.parse(firstURL, .dummy) }
-        await dumpRepository.waitForFetchCount(2)
-
-        #expect(await dumpRepository.fetchCount == 2)
-        #expect(await dumpRepository.uploadCount == 0)
-        memoryWarningContinuation.yield(())
-        await dumpRepository.waitForCancellationCount(2)
-        memoryWarningContinuation.finish()
-    }
-
-    @Test("종료된 작업의 늦은 완료는 같은 URL의 새 예약을 해제하지 않는다")
-    func staleFinish_doesNotReleaseNewReservation() async throws {
-        let session = QRCodeDumpSession()
-        let url = try #require(URL(string: "https://unsupported.example.com/qr"))
-
-        #expect(await session.reserve(url))
-        await session.finish(id: UUID(), url: url, succeeded: false)
-
-        #expect(await session.reserve(url) == false)
-    }
 }
 
 private extension QRCodeScannerClientTests {
     func makeClient(
         scanRepository: any QRCodeScanRepository,
-        dumpRepository: any QRCodeDumpRepository,
-        memoryWarnings: AsyncStream<Void>? = nil
+        dumpRepository: any QRCodeDumpRepository
     ) -> QRScannerClient {
-        let makeMemoryWarnings: (@Sendable () -> AsyncStream<Void>)?
-        if let memoryWarnings {
-            makeMemoryWarnings = { memoryWarnings }
-        } else {
-            makeMemoryWarnings = nil
-        }
         return withDependencies {
             $0.qrCodeScanRepository = scanRepository
             $0.qrCodeDumpRepository = dumpRepository
             $0.imageUploadRepository = ImageUploadRepositoryStub()
-            if let makeMemoryWarnings {
-                $0.qrCodeDumpMemoryWarningClient.events = makeMemoryWarnings
-            }
         } operation: {
             QRScannerClient.makeLiveValue()
         }
@@ -206,12 +158,10 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
     private(set) var fetchCount = 0
     private(set) var ticketCount = 0
     private(set) var uploadCount = 0
-    private(set) var cancellationCount = 0
     private(set) var maximumConcurrentOperationCount = 0
     private var concurrentOperationCount = 0
     private var fetchWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
     private var uploadWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
-    private var cancellationWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     init(operationDelay: Duration? = nil, preparationFailureCount: Int = 0) {
         self.operationDelay = operationDelay
@@ -231,30 +181,14 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
         concurrentOperationCount += 1
         maximumConcurrentOperationCount = max(maximumConcurrentOperationCount, concurrentOperationCount)
         defer { concurrentOperationCount -= 1 }
-        do {
-            if let operationDelay { try await Task.sleep(for: operationDelay) }
-        } catch {
-            cancellationCount += 1
-            let satisfiedCancellationWaiters = cancellationWaiters.filter {
-                $0.expectedCount <= cancellationCount
-            }
-            cancellationWaiters.removeAll { $0.expectedCount <= cancellationCount }
-            satisfiedCancellationWaiters.forEach { $0.continuation.resume() }
-            throw error
-        }
-        return QRCodeDumpDocument(
-            id: UUID(),
-            sourceURL: sourceURL,
-            finalURL: sourceURL,
-            byteCount: 13
-        )
+        if let operationDelay { try await Task.sleep(for: operationDelay) }
+        return QRCodeDumpDocument(data: Data("<html></html>".utf8))
     }
 
     func issueUploadTicket() async throws -> QRCodeDumpUploadTicket {
         ticketCount += 1
         return QRCodeDumpUploadTicket(
             method: "PUT",
-            expiresIn: "2026-10-28T15:00:00Z",
             uploadTicket: "https://example.com/upload",
             contentType: "text/html; charset=utf-8"
         )
@@ -266,8 +200,6 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
         uploadWaiters.removeAll { $0.expectedCount <= uploadCount }
         satisfiedWaiters.forEach { $0.continuation.resume() }
     }
-
-    func discard(_ document: QRCodeDumpDocument) {}
 
     func waitForUploadCount(_ expectedCount: Int) async {
         guard uploadCount < expectedCount else { return }
@@ -283,12 +215,6 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
         }
     }
 
-    func waitForCancellationCount(_ expectedCount: Int) async {
-        guard cancellationCount < expectedCount else { return }
-        await withCheckedContinuation { continuation in
-            cancellationWaiters.append((expectedCount, continuation))
-        }
-    }
 }
 
 private struct ImageUploadRepositoryStub: ImageUploadRepository {

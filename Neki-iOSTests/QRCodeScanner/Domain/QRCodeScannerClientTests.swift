@@ -5,6 +5,7 @@
 //  Created by SwainYun on 10/28/26.
 //
 
+import Dependencies
 import Foundation
 import Testing
 @testable import Neki_iOS
@@ -79,15 +80,78 @@ struct QRCodeScannerClientTests {
         #expect(await dumpRepository.ticketCount == 0)
         #expect(await dumpRepository.uploadCount == 0)
     }
+
+    @Test("실패한 dump URL은 예약을 해제해 재스캔할 수 있다")
+    func parseUnsupportedBrand_releasesFailedDumpReservation() async {
+        let dumpRepository = RecordingDumpRepository(preparationFailureCount: 1)
+        let client = makeClient(scanRepository: UnsupportedScanRepository(), dumpRepository: dumpRepository)
+        let url = "https://unsupported.example.com/retry"
+
+        await ignoreError { _ = try await client.parse(url, .dummy) }
+        await dumpRepository.waitForFetchCount(1)
+
+        for _ in 0..<100 {
+            guard await dumpRepository.fetchCount < 2 else { break }
+            await ignoreError { _ = try await client.parse(url, .dummy) }
+            await Task.yield()
+        }
+
+        await dumpRepository.waitForUploadCount(1)
+        #expect(await dumpRepository.fetchCount == 2)
+        #expect(await dumpRepository.uploadCount == 1)
+    }
+
+    @Test("메모리 경고는 실행·대기 dump를 취소하고 URL 예약을 해제한다")
+    func memoryWarning_cancelsDumpAndReleasesReservations() async {
+        let (memoryWarnings, memoryWarningContinuation) = AsyncStream<Void>.makeStream()
+        let dumpRepository = RecordingDumpRepository(operationDelay: .seconds(10))
+        let client = makeClient(
+            scanRepository: UnsupportedScanRepository(),
+            dumpRepository: dumpRepository,
+            memoryWarnings: memoryWarnings
+        )
+        let firstURL = "https://unsupported.example.com/first"
+        let secondURL = "https://unsupported.example.com/second"
+
+        await ignoreError { _ = try await client.parse(firstURL, .dummy) }
+        await ignoreError { _ = try await client.parse(secondURL, .dummy) }
+        await dumpRepository.waitForFetchCount(1)
+        memoryWarningContinuation.yield(())
+        await dumpRepository.waitForCancellationCount(1)
+
+        await ignoreError { _ = try await client.parse(firstURL, .dummy) }
+        await dumpRepository.waitForFetchCount(2)
+
+        #expect(await dumpRepository.fetchCount == 2)
+        #expect(await dumpRepository.uploadCount == 0)
+        memoryWarningContinuation.yield(())
+        await dumpRepository.waitForCancellationCount(2)
+        memoryWarningContinuation.finish()
+    }
 }
 
 private extension QRCodeScannerClientTests {
-    func makeClient(scanRepository: any QRCodeScanRepository, dumpRepository: any QRCodeDumpRepository) -> QRScannerClient {
-        .live(
-            qrCodeScanRepository: scanRepository,
-            qrCodeDumpRepository: dumpRepository,
-            imageUploadRepository: ImageUploadRepositoryStub()
-        )
+    func makeClient(
+        scanRepository: any QRCodeScanRepository,
+        dumpRepository: any QRCodeDumpRepository,
+        memoryWarnings: AsyncStream<Void>? = nil
+    ) -> QRScannerClient {
+        let makeMemoryWarnings: (@Sendable () -> AsyncStream<Void>)?
+        if let memoryWarnings {
+            makeMemoryWarnings = { memoryWarnings }
+        } else {
+            makeMemoryWarnings = nil
+        }
+        return withDependencies {
+            $0.qrCodeScanRepository = scanRepository
+            $0.qrCodeDumpRepository = dumpRepository
+            $0.imageUploadRepository = ImageUploadRepositoryStub()
+            if let makeMemoryWarnings {
+                $0.qrCodeDumpMemoryWarningClient.events = makeMemoryWarnings
+            }
+        } operation: {
+            QRScannerClient.makeLiveValue()
+        }
     }
 
     func ignoreError(_ operation: () async throws -> Void) async {
@@ -127,29 +191,51 @@ private struct SupportedScanRepository: QRCodeScanRepository {
 
 private actor RecordingDumpRepository: QRCodeDumpRepository {
     private let operationDelay: Duration?
+    private var preparationFailureCount: Int
     private(set) var fetchCount = 0
     private(set) var ticketCount = 0
     private(set) var uploadCount = 0
+    private(set) var cancellationCount = 0
     private(set) var maximumConcurrentOperationCount = 0
     private var concurrentOperationCount = 0
+    private var fetchWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
     private var uploadWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var cancellationWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
-    init(operationDelay: Duration? = nil) {
+    init(operationDelay: Duration? = nil, preparationFailureCount: Int = 0) {
         self.operationDelay = operationDelay
+        self.preparationFailureCount = preparationFailureCount
     }
 
-    func fetchHTMLDocument(from sourceURL: URL) async throws -> QRCodeDumpDocument {
+    func prepareHTMLDocument(from sourceURL: URL) async throws -> QRCodeDumpDocument {
+        fetchCount += 1
+        let satisfiedFetchWaiters = fetchWaiters.filter { $0.expectedCount <= fetchCount }
+        fetchWaiters.removeAll { $0.expectedCount <= fetchCount }
+        satisfiedFetchWaiters.forEach { $0.continuation.resume() }
+        guard preparationFailureCount == 0 else {
+            preparationFailureCount -= 1
+            throw TestError.preparationFailed
+        }
+
         concurrentOperationCount += 1
         maximumConcurrentOperationCount = max(maximumConcurrentOperationCount, concurrentOperationCount)
-        if let operationDelay {
-            try await Task.sleep(for: operationDelay)
+        defer { concurrentOperationCount -= 1 }
+        do {
+            if let operationDelay { try await Task.sleep(for: operationDelay) }
+        } catch {
+            cancellationCount += 1
+            let satisfiedCancellationWaiters = cancellationWaiters.filter {
+                $0.expectedCount <= cancellationCount
+            }
+            cancellationWaiters.removeAll { $0.expectedCount <= cancellationCount }
+            satisfiedCancellationWaiters.forEach { $0.continuation.resume() }
+            throw error
         }
-        concurrentOperationCount -= 1
-        fetchCount += 1
         return QRCodeDumpDocument(
+            id: UUID(),
             sourceURL: sourceURL,
             finalURL: sourceURL,
-            htmlData: Data("<html></html>".utf8)
+            byteCount: 13
         )
     }
 
@@ -163,12 +249,14 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
         )
     }
 
-    func upload(_ data: Data, with ticket: QRCodeDumpUploadTicket) async throws {
+    func upload(_ document: QRCodeDumpDocument, with ticket: QRCodeDumpUploadTicket) async throws {
         uploadCount += 1
         let satisfiedWaiters = uploadWaiters.filter { $0.expectedCount <= uploadCount }
         uploadWaiters.removeAll { $0.expectedCount <= uploadCount }
         satisfiedWaiters.forEach { $0.continuation.resume() }
     }
+
+    func discard(_ document: QRCodeDumpDocument) {}
 
     func waitForUploadCount(_ expectedCount: Int) async {
         guard uploadCount < expectedCount else { return }
@@ -176,8 +264,26 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
             uploadWaiters.append((expectedCount, continuation))
         }
     }
+
+    func waitForFetchCount(_ expectedCount: Int) async {
+        guard fetchCount < expectedCount else { return }
+        await withCheckedContinuation { continuation in
+            fetchWaiters.append((expectedCount, continuation))
+        }
+    }
+
+    func waitForCancellationCount(_ expectedCount: Int) async {
+        guard cancellationCount < expectedCount else { return }
+        await withCheckedContinuation { continuation in
+            cancellationWaiters.append((expectedCount, continuation))
+        }
+    }
 }
 
 private struct ImageUploadRepositoryStub: ImageUploadRepository {
     func upload(items: [ImageUploadEntity], mediaType: ImageMediaType) async throws -> [Int] { [] }
+}
+
+private enum TestError: Error {
+    case preparationFailed
 }

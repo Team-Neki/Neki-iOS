@@ -27,8 +27,8 @@ struct QRCodeScannerClientTests {
             }
         }
 
-        await dumpRepository.waitForUploadCount(1)
-        await scanRepository.waitForNotification()
+        #expect(await dumpRepository.waitForUploadCount(1))
+        #expect(await scanRepository.waitForNotification())
         #expect(await dumpRepository.uploadCount == 1)
         #expect(await scanRepository.notificationCount == 1)
     }
@@ -39,15 +39,16 @@ struct QRCodeScannerClientTests {
         let dumpRepository = RecordingDumpRepository()
         let client = makeClient(scanRepository: scanRepository, dumpRepository: dumpRepository)
         let url = "https://unsupported.example.com/qr"
+        let sentinelURL = "https://unsupported.example.com/sentinel"
 
         async let first: Void = ignoreError { _ = try await client.parse(url, .dummy) }
         async let second: Void = ignoreError { _ = try await client.parse(url, .dummy) }
         _ = await (first, second)
         await ignoreError { _ = try await client.parse(url, .dummy) }
+        await ignoreError { _ = try await client.parse(sentinelURL, .dummy) }
 
-        await dumpRepository.waitForUploadCount(1)
-        #expect(await dumpRepository.uploadCount == 1)
-        #expect(await dumpRepository.fetchCount == 1)
+        #expect(await dumpRepository.waitForUploadCount(2))
+        #expect(await dumpRepository.fetchedURLs.map(\.absoluteString) == [url, sentinelURL])
     }
 
     @Test("서로 다른 URL의 dump도 한 번에 하나만 실행한다")
@@ -63,7 +64,7 @@ struct QRCodeScannerClientTests {
         }
         _ = await (first, second)
 
-        await dumpRepository.waitForUploadCount(2)
+        #expect(await dumpRepository.waitForUploadCount(2))
         #expect(await dumpRepository.uploadCount == 2)
         #expect(await dumpRepository.maximumConcurrentOperationCount == 1)
     }
@@ -88,7 +89,7 @@ struct QRCodeScannerClientTests {
         let url = "https://unsupported.example.com/retry"
 
         await ignoreError { _ = try await client.parse(url, .dummy) }
-        await dumpRepository.waitForFetchCount(1)
+        #expect(await dumpRepository.waitForFetchCount(1))
 
         for _ in 0..<100 {
             guard await dumpRepository.fetchCount < 2 else { break }
@@ -96,7 +97,7 @@ struct QRCodeScannerClientTests {
             await Task.yield()
         }
 
-        await dumpRepository.waitForUploadCount(1)
+        #expect(await dumpRepository.waitForUploadCount(1))
         #expect(await dumpRepository.fetchCount == 2)
         #expect(await dumpRepository.uploadCount == 1)
     }
@@ -124,7 +125,6 @@ private extension QRCodeScannerClientTests {
 
 private actor UnsupportedScanRepository: QRCodeScanRepository {
     private(set) var notificationCount = 0
-    private var notificationWaiters: [CheckedContinuation<Void, Never>] = []
 
     func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
         throw .unsupportedBrand
@@ -132,15 +132,14 @@ private actor UnsupportedScanRepository: QRCodeScanRepository {
 
     func notifyUnsupportedBrand(url: URL, user: User) async throws {
         notificationCount += 1
-        notificationWaiters.forEach { $0.resume() }
-        notificationWaiters.removeAll()
     }
 
-    func waitForNotification() async {
-        guard notificationCount == 0 else { return }
-        await withCheckedContinuation { continuation in
-            notificationWaiters.append(continuation)
+    func waitForNotification() async -> Bool {
+        for _ in 0..<1_000 {
+            guard notificationCount == 0 else { return true }
+            try? await Task.sleep(for: .milliseconds(1))
         }
+        return notificationCount > 0
     }
 }
 
@@ -159,9 +158,8 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
     private(set) var ticketCount = 0
     private(set) var uploadCount = 0
     private(set) var maximumConcurrentOperationCount = 0
+    private(set) var fetchedURLs: [URL] = []
     private var concurrentOperationCount = 0
-    private var fetchWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
-    private var uploadWaiters: [(expectedCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     init(operationDelay: Duration? = nil, preparationFailureCount: Int = 0) {
         self.operationDelay = operationDelay
@@ -170,9 +168,7 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
 
     func prepareHTMLDocument(from sourceURL: URL) async throws -> QRCodeDumpDocument {
         fetchCount += 1
-        let satisfiedFetchWaiters = fetchWaiters.filter { $0.expectedCount <= fetchCount }
-        fetchWaiters.removeAll { $0.expectedCount <= fetchCount }
-        satisfiedFetchWaiters.forEach { $0.continuation.resume() }
+        fetchedURLs.append(sourceURL)
         guard preparationFailureCount == 0 else {
             preparationFailureCount -= 1
             throw TestError.preparationFailed
@@ -196,23 +192,22 @@ private actor RecordingDumpRepository: QRCodeDumpRepository {
 
     func upload(_ document: QRCodeDumpDocument, with ticket: QRCodeDumpUploadTicket) async throws {
         uploadCount += 1
-        let satisfiedWaiters = uploadWaiters.filter { $0.expectedCount <= uploadCount }
-        uploadWaiters.removeAll { $0.expectedCount <= uploadCount }
-        satisfiedWaiters.forEach { $0.continuation.resume() }
     }
 
-    func waitForUploadCount(_ expectedCount: Int) async {
-        guard uploadCount < expectedCount else { return }
-        await withCheckedContinuation { continuation in
-            uploadWaiters.append((expectedCount, continuation))
+    func waitForUploadCount(_ expectedCount: Int) async -> Bool {
+        for _ in 0..<1_000 {
+            guard uploadCount < expectedCount else { return true }
+            try? await Task.sleep(for: .milliseconds(1))
         }
+        return uploadCount >= expectedCount
     }
 
-    func waitForFetchCount(_ expectedCount: Int) async {
-        guard fetchCount < expectedCount else { return }
-        await withCheckedContinuation { continuation in
-            fetchWaiters.append((expectedCount, continuation))
+    func waitForFetchCount(_ expectedCount: Int) async -> Bool {
+        for _ in 0..<1_000 {
+            guard fetchCount < expectedCount else { return true }
+            try? await Task.sleep(for: .milliseconds(1))
         }
+        return fetchCount >= expectedCount
     }
 
 }

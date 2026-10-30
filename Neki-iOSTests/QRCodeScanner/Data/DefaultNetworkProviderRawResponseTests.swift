@@ -15,7 +15,11 @@ struct DefaultNetworkProviderRawResponseTests {
     @Test("허용하지 않은 MIME 응답은 수신하지 않는다")
     func request_rejectsUnsupportedMIMEType() async throws {
         let response = try makeResponse(contentType: "video/mp4")
-        URLProtocolStub.prepare(response: response, data: Data(repeating: 0x01, count: 16))
+        URLProtocolStub.prepare(
+            response: response,
+            data: Data(repeating: 0x01, count: 16),
+            waitsForCancellationBeforeDelivery: true
+        )
         let provider = makeProvider()
 
         await #expect(throws: NetworkError.self) {
@@ -24,6 +28,7 @@ struct DefaultNetworkProviderRawResponseTests {
             )
         }
 
+        #expect(await URLProtocolStub.waitForStopLoading())
         #expect(URLProtocolStub.deliveredByteCount == 0)
     }
 
@@ -34,7 +39,7 @@ struct DefaultNetworkProviderRawResponseTests {
             response: response,
             data: Data(repeating: 0x61, count: 16),
             chunkSize: 4,
-            chunkDelay: 0.01
+            waitsForCancellationBeforeDelivery: true
         )
         let provider = makeProvider()
 
@@ -44,7 +49,7 @@ struct DefaultNetworkProviderRawResponseTests {
             )
         }
 
-        await URLProtocolStub.waitForStopLoading()
+        #expect(await URLProtocolStub.waitForStopLoading())
         #expect(URLProtocolStub.deliveredByteCount == 0)
         #expect(URLProtocolStub.didStopLoading)
     }
@@ -67,7 +72,7 @@ struct DefaultNetworkProviderRawResponseTests {
             )
         }
 
-        await URLProtocolStub.waitForStopLoading()
+        #expect(await URLProtocolStub.waitForStopLoading())
         #expect(URLProtocolStub.deliveredByteCount < payload.count)
         #expect(URLProtocolStub.didStopLoading)
     }
@@ -141,12 +146,14 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     private static var data = Data()
     private static var chunkSize = 0
     private static var chunkDelay: TimeInterval = 0
+    private static var waitsForCancellationBeforeDelivery = false
     private static var isStopped = false
     private static var _deliveredByteCount = 0
     private static var _didStopLoading = false
     private static var generation = 0
     private var deliveryTask: Task<Void, Never>?
     private var requestGeneration: Int?
+    private let deliveryGate = DeliveryGate()
 
     static var deliveredByteCount: Int {
         lock.withLock { _deliveredByteCount }
@@ -160,13 +167,15 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
         response: HTTPURLResponse,
         data: Data,
         chunkSize: Int? = nil,
-        chunkDelay: TimeInterval = 0
+        chunkDelay: TimeInterval = 0,
+        waitsForCancellationBeforeDelivery: Bool = false
     ) {
         lock.withLock {
             self.response = response
             self.data = data
             self.chunkSize = chunkSize ?? data.count
             self.chunkDelay = chunkDelay
+            self.waitsForCancellationBeforeDelivery = waitsForCancellationBeforeDelivery
             isStopped = false
             _deliveredByteCount = 0
             _didStopLoading = false
@@ -174,11 +183,12 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
         }
     }
 
-    static func waitForStopLoading() async {
-        for _ in 0..<100 {
-            guard didStopLoading == false else { return }
+    static func waitForStopLoading() async -> Bool {
+        for _ in 0..<1_000 {
+            guard didStopLoading == false else { return true }
             try? await Task.sleep(for: .milliseconds(1))
         }
+        return didStopLoading
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -187,17 +197,34 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         let configuration = Self.lock.withLock {
-            Self.response.map { ($0, Self.data, Self.chunkSize, Self.chunkDelay, Self.generation) }
+            Self.response.map {
+                (
+                    $0,
+                    Self.data,
+                    Self.chunkSize,
+                    Self.chunkDelay,
+                    Self.waitsForCancellationBeforeDelivery,
+                    Self.generation
+                )
+            }
         }
         guard let configuration else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
-        let (response, data, chunkSize, chunkDelay, generation) = configuration
+        let (
+            response,
+            data,
+            chunkSize,
+            chunkDelay,
+            waitsForCancellationBeforeDelivery,
+            generation
+        ) = configuration
         requestGeneration = generation
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
 
         deliveryTask = Task.detached(priority: .utility) { [self] in
+            if waitsForCancellationBeforeDelivery { await deliveryGate.wait() }
             var offset = 0
             while offset < data.count {
                 guard Self.shouldContinue(generation: generation) else { return }
@@ -225,9 +252,36 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
             Self.isStopped = true
             Self._didStopLoading = true
         }
+        deliveryGate.open()
     }
 
     private static func shouldContinue(generation: Int) -> Bool {
         lock.withLock { self.generation == generation && isStopped == false }
+    }
+}
+
+private final class DeliveryGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            let resumesImmediately = lock.withLock {
+                guard isOpen == false else { return true }
+                waiters.append(continuation)
+                return false
+            }
+            if resumesImmediately { continuation.resume() }
+        }
+    }
+
+    func open() {
+        let suspendedWaiters = lock.withLock {
+            isOpen = true
+            defer { waiters.removeAll() }
+            return waiters
+        }
+        suspendedWaiters.forEach { $0.resume() }
     }
 }

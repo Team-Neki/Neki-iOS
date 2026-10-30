@@ -181,6 +181,46 @@ struct DefaultQRCodeDumpRepositoryTests {
         await repository.discard(document)
     }
 
+    @Test("다운로드 상한에 단일 PUT과 UTF-8 최대 확장률을 반영한다")
+    func prepareHTMLDocument_appliesSinglePutLimitBeforeDownload() async throws {
+        let url = try #require(URL(string: "https://example.com/qr"))
+        let response = try makeResponse(url: url, contentType: "text/html; charset=utf-8")
+        let provider = RecordingNetworkProvider(data: Data("<html></html>".utf8), response: response)
+        let directoryURL = temporaryDirectoryURL()
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let repository = makeRepository(provider: provider, temporaryDirectoryURL: directoryURL)
+
+        let document = try await repository.prepareHTMLDocument(from: url)
+
+        let maximumSourceBodySize = QRCodeDumpUploadEndpoint.maximumBodySize / 3
+        #expect(await provider.requestedMaximumBodySizes == [maximumSourceBodySize])
+        await repository.discard(document)
+    }
+
+    @Test("UTF-8 문서가 단일 PUT 한도를 넘기 전에 변환을 중단한다")
+    func documentWriter_rejectsOversizedOutput() throws {
+        let sourceURL = try #require(URL(string: "https://example.com/qr"))
+        let directoryURL = temporaryDirectoryURL()
+        let sourceFileURL = directoryURL.appendingPathComponent("source.html")
+        let outputFileURL = directoryURL.appendingPathComponent("output.html")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try Data("body".utf8).write(to: sourceFileURL)
+        #expect(FileManager.default.createFile(atPath: outputFileURL.path, contents: nil))
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+        let commentByteCount = Data("<!-- source: \(sourceURL.absoluteString) -->\n".utf8).count
+
+        #expect(throws: QRCodeDumpError.self) {
+            try QRCodeDumpDocumentWriter.write(
+                sourceFileURL: sourceFileURL,
+                uploadFileURL: outputFileURL,
+                sourceURL: sourceURL,
+                finalURL: sourceURL,
+                encodingName: "utf-8",
+                maximumOutputSize: Int64(commentByteCount + 3)
+            )
+        }
+    }
+
     @Test("가용 용량을 확인할 수 없으면 다운로드를 시작하지 않는다")
     func prepareHTMLDocument_rejectsUnavailableStorageCapacity() async throws {
         let url = try #require(URL(string: "https://example.com/qr"))

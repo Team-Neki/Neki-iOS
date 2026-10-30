@@ -128,6 +128,17 @@ struct QRCodeScannerClientTests {
         await dumpRepository.waitForCancellationCount(2)
         memoryWarningContinuation.finish()
     }
+
+    @Test("종료된 작업의 늦은 완료는 같은 URL의 새 예약을 해제하지 않는다")
+    func staleFinish_doesNotReleaseNewReservation() async throws {
+        let session = QRCodeDumpSession()
+        let url = try #require(URL(string: "https://unsupported.example.com/qr"))
+
+        #expect(await session.reserve(url))
+        await session.finish(id: UUID(), url: url, succeeded: false)
+
+        #expect(await session.reserve(url) == false)
+    }
 }
 
 private extension QRCodeScannerClientTests {

@@ -178,6 +178,9 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
     private static var isStopped = false
     private static var _deliveredByteCount = 0
     private static var _didStopLoading = false
+    private static var generation = 0
+    private var deliveryTask: Task<Void, Never>?
+    private var requestGeneration: Int?
 
     static var deliveredByteCount: Int {
         lock.withLock { _deliveredByteCount }
@@ -201,6 +204,7 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
             isStopped = false
             _deliveredByteCount = 0
             _didStopLoading = false
+            generation += 1
         }
     }
 
@@ -217,36 +221,47 @@ private final class URLProtocolStub: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         let configuration = Self.lock.withLock {
-            Self.response.map { ($0, Self.data, Self.chunkSize, Self.chunkDelay) }
+            Self.response.map { ($0, Self.data, Self.chunkSize, Self.chunkDelay, Self.generation) }
         }
         guard let configuration else {
             client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
-        let (response, data, chunkSize, chunkDelay) = configuration
+        let (response, data, chunkSize, chunkDelay, generation) = configuration
+        requestGeneration = generation
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
 
-        DispatchQueue.global(qos: .utility).async { [self] in
+        deliveryTask = Task.detached(priority: .utility) { [self] in
             var offset = 0
             while offset < data.count {
-                guard Self.lock.withLock({ Self.isStopped == false }) else { return }
-                if chunkDelay > 0 { Thread.sleep(forTimeInterval: chunkDelay) }
-                guard Self.lock.withLock({ Self.isStopped == false }) else { return }
+                guard Self.shouldContinue(generation: generation) else { return }
+                if chunkDelay > 0 { try? await Task.sleep(for: .seconds(chunkDelay)) }
+                guard Self.shouldContinue(generation: generation) else { return }
 
                 let endOffset = min(offset + chunkSize, data.count)
                 let chunk = data[offset..<endOffset]
                 client?.urlProtocol(self, didLoad: Data(chunk))
-                Self.lock.withLock { Self._deliveredByteCount += chunk.count }
+                Self.lock.withLock {
+                    guard Self.generation == generation else { return }
+                    Self._deliveredByteCount += chunk.count
+                }
                 offset = endOffset
             }
+            guard Self.shouldContinue(generation: generation) else { return }
             client?.urlProtocolDidFinishLoading(self)
         }
     }
 
     override func stopLoading() {
+        deliveryTask?.cancel()
         Self.lock.withLock {
+            guard requestGeneration == Self.generation else { return }
             Self.isStopped = true
             Self._didStopLoading = true
         }
+    }
+
+    private static func shouldContinue(generation: Int) -> Bool {
+        lock.withLock { self.generation == generation && isStopped == false }
     }
 }

@@ -41,7 +41,7 @@ actor QRCodeDumpSession {
     }
 
     func finish(id: UUID, url: URL, succeeded: Bool) {
-        tasks[id] = nil
+        guard tasks.removeValue(forKey: id) != nil else { return }
         taskURLs[id] = nil
         if succeeded == false { reservedURLs.remove(url) }
         if tasks.isEmpty { stopMemoryWarningObservation() }

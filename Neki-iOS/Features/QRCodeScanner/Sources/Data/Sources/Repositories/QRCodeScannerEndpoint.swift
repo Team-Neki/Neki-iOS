@@ -76,8 +76,6 @@ extension QRCodeScannerEndpoint: Endpoint {
 }
 
 struct QRCodeDumpDownloadEndpoint: FileDownloadEndpoint {
-    static let maximumObjectSize: Int64 = 5 * 1_024 * 1_024 * 1_024 * 1_024
-
     let sourceURL: URL
     let maximumBodySize: Int64
 
@@ -90,9 +88,19 @@ struct QRCodeDumpDownloadEndpoint: FileDownloadEndpoint {
     var responseConstraint: HTTPResponseConstraint {
         HTTPResponseConstraint(allowedContentTypes: [.html], maximumBodySize: maximumBodySize)
     }
+
+    func asURLRequest() throws -> URLRequest {
+        var request = URLRequest(url: sourceURL)
+        request.httpMethod = method.rawValue
+        request.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        return request
+    }
 }
 
 struct QRCodeDumpUploadEndpoint: FileUploadEndpoint {
+    static let maximumBodySize: Int64 = 5 * 1_024 * 1_024 * 1_024
+
     let presignedURL: String
     let uploadMethod: HTTPMethodType
     let uploadContentType: String
@@ -103,4 +111,13 @@ struct QRCodeDumpUploadEndpoint: FileUploadEndpoint {
     var contentType: HTTPContentType { .custom(uploadContentType) }
     var body: (any Encodable)? { nil }
     var networkLogPolicy: NetworkLogPolicy { .metadataOnly }
+
+    func asURLRequest() throws -> URLRequest {
+        guard let url = URL(string: presignedURL) else { throw NetworkError.invalidURLError }
+        var request = URLRequest(url: url)
+        request.httpMethod = method.rawValue
+        request.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
+        request.setValue(uploadContentType, forHTTPHeaderField: "Content-Type")
+        return request
+    }
 }

@@ -16,7 +16,8 @@ enum QRCodeDumpDocumentWriter {
         uploadFileURL: URL,
         sourceURL: URL,
         finalURL: URL,
-        encodingName: String?
+        encodingName: String?,
+        maximumOutputSize: Int64
     ) throws {
         let input = try FileHandle(forReadingFrom: sourceFileURL)
         let output = try FileHandle(forWritingTo: uploadFileURL)
@@ -29,32 +30,39 @@ enum QRCodeDumpDocumentWriter {
         if finalURL != sourceURL {
             comments += "<!-- final: \(finalURL.absoluteString) -->\n"
         }
-        try output.write(contentsOf: Data(comments.utf8))
+        var writtenByteCount: Int64 = 0
+        try write(
+            Data(comments.utf8),
+            to: output,
+            writtenByteCount: &writtenByteCount,
+            maximumOutputSize: maximumOutputSize
+        )
 
-        guard let encodingName else {
-            try transcodeToUTF8(input: input, output: output, sourceEncoding: .utf8)
-            try output.synchronize()
-            return
-        }
-        guard let encoding = stringEncoding(forIANAName: encodingName) else {
-            throw QRCodeDumpError.unsupportedStringEncoding
-        }
-        guard encoding != .utf8 else {
-            try transcodeToUTF8(input: input, output: output, sourceEncoding: .utf8)
-            try output.synchronize()
-            return
-        }
-        guard isStatelessEncodingName(encodingName) else {
-            throw QRCodeDumpError.unsupportedStringEncoding
-        }
-
-        let resolvedEncoding = try resolveByteOrder(for: encoding, input: input)
-        try transcodeToUTF8(input: input, output: output, sourceEncoding: resolvedEncoding)
+        let resolvedEncoding = try resolveEncoding(named: encodingName, input: input)
+        try transcodeToUTF8(
+            input: input,
+            output: output,
+            sourceEncoding: resolvedEncoding,
+            writtenByteCount: &writtenByteCount,
+            maximumOutputSize: maximumOutputSize
+        )
         try output.synchronize()
     }
 }
 
 private extension QRCodeDumpDocumentWriter {
+    static func resolveEncoding(named encodingName: String?, input: FileHandle) throws -> String.Encoding {
+        guard let encodingName else { return .utf8 }
+        guard let encoding = stringEncoding(forIANAName: encodingName) else {
+            throw QRCodeDumpError.unsupportedStringEncoding
+        }
+        guard encoding != .utf8 else { return .utf8 }
+        guard isStatelessEncodingName(encodingName) else {
+            throw QRCodeDumpError.unsupportedStringEncoding
+        }
+        return try resolveByteOrder(for: encoding, input: input)
+    }
+
     static func resolveByteOrder(for encoding: String.Encoding, input: FileHandle) throws -> String.Encoding {
         guard encoding == .utf16 || encoding == .utf32 else { return encoding }
         let byteOrderMark = try input.read(upToCount: 4) ?? Data()
@@ -86,7 +94,9 @@ private extension QRCodeDumpDocumentWriter {
     static func transcodeToUTF8(
         input: FileHandle,
         output: FileHandle,
-        sourceEncoding: String.Encoding
+        sourceEncoding: String.Encoding,
+        writtenByteCount: inout Int64,
+        maximumOutputSize: Int64
     ) throws {
         var pending = Data()
 
@@ -94,7 +104,12 @@ private extension QRCodeDumpDocumentWriter {
             try Task.checkCancellation()
             pending.append(chunk)
             let conversion = try decodeLargestPrefix(from: pending, encoding: sourceEncoding)
-            try output.write(contentsOf: Data(conversion.string.utf8))
+            try write(
+                Data(conversion.string.utf8),
+                to: output,
+                writtenByteCount: &writtenByteCount,
+                maximumOutputSize: maximumOutputSize
+            )
             pending = conversion.remainder
         }
 
@@ -103,9 +118,28 @@ private extension QRCodeDumpDocumentWriter {
             guard let string = String(data: pending, encoding: sourceEncoding) else {
                 throw QRCodeDumpError.stringDecodingFailed
             }
-            try output.write(contentsOf: Data(string.utf8))
+            try write(
+                Data(string.utf8),
+                to: output,
+                writtenByteCount: &writtenByteCount,
+                maximumOutputSize: maximumOutputSize
+            )
             return
         }
+    }
+
+    static func write(
+        _ data: Data,
+        to output: FileHandle,
+        writtenByteCount: inout Int64,
+        maximumOutputSize: Int64
+    ) throws {
+        let byteCount = Int64(data.count)
+        guard byteCount <= maximumOutputSize - writtenByteCount else {
+            throw QRCodeDumpError.responseTooLarge
+        }
+        try output.write(contentsOf: data)
+        writtenByteCount += byteCount
     }
 
     static func decodeLargestPrefix(from data: Data, encoding: String.Encoding) throws -> (string: String, remainder: Data) {

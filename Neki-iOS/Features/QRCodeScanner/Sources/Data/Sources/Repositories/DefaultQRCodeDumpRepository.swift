@@ -50,7 +50,8 @@ actor DefaultQRCodeDumpRepository: QRCodeDumpRepository {
                 uploadFileURL: partialUploadFileURL,
                 sourceURL: sourceURL,
                 finalURL: finalURL,
-                encodingName: response.textEncodingName
+                encodingName: response.textEncodingName,
+                maximumOutputSize: QRCodeDumpUploadEndpoint.maximumBodySize
             )
             try Task.checkCancellation()
             try fileManager.removeItem(at: sourceFileURL)
@@ -59,7 +60,7 @@ actor DefaultQRCodeDumpRepository: QRCodeDumpRepository {
             guard let byteCount = attributes[.size] as? NSNumber else {
                 throw QRCodeDumpError.missingFileSize
             }
-            guard byteCount.int64Value <= QRCodeDumpDownloadEndpoint.maximumObjectSize else {
+            guard byteCount.int64Value <= QRCodeDumpUploadEndpoint.maximumBodySize else {
                 throw QRCodeDumpError.responseTooLarge
             }
             try fileManager.moveItem(at: partialUploadFileURL, to: uploadFileURL)
@@ -153,7 +154,8 @@ private extension DefaultQRCodeDumpRepository {
         }
         let deviceLimit = capacity / Self.storageSafetyFactor
         guard deviceLimit > 0 else { throw QRCodeDumpError.insufficientStorageCapacity }
-        return min(deviceLimit, QRCodeDumpDownloadEndpoint.maximumObjectSize)
+        let uploadLimit = QRCodeDumpUploadEndpoint.maximumBodySize / Self.maximumUTF8ExpansionFactor
+        return min(deviceLimit, uploadLimit)
     }
 
     func removeDocument(id: UUID, fileURL: URL) {

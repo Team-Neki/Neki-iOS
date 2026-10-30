@@ -13,7 +13,7 @@ import UniformTypeIdentifiers
 struct QRCodeScannerEndpointTests {
     @Test("dump 다운로드는 QR URL을 변경 없이 GET 요청한다")
     func fetchDump_preservesSourceURL() throws {
-        let sourceURL = try #require(URL(string: "http://example.com/qr?token=value#fragment"))
+        let sourceURL = try #require(URL(string: "http://example.com/a%2Fb?token=value#fragment"))
         let endpoint = QRCodeDumpDownloadEndpoint(sourceURL: sourceURL, maximumBodySize: 1_024)
 
         let request = try endpoint.asURLRequest()
@@ -38,7 +38,7 @@ struct QRCodeScannerEndpointTests {
 
     @Test("S3 PUT은 ticket의 URL과 Content-Type을 그대로 사용한다")
     func uploadDump_preservesTicketURLAndContentType() throws {
-        let ticketURL = "https://example.com/qr-dump.html?X-Amz-Credential=a%2Fb&X-Amz-Signature=signature"
+        let ticketURL = "https://example.com/a%2Fb/qr-dump.html?X-Amz-Credential=a%2Fb&X-Amz-Signature=signature"
         let endpoint = QRCodeDumpUploadEndpoint(
             presignedURL: ticketURL,
             uploadMethod: .put,
@@ -54,5 +54,10 @@ struct QRCodeScannerEndpointTests {
         #expect(request.httpBody == nil)
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(endpoint.networkLogPolicy == .metadataOnly)
+    }
+
+    @Test("S3 단일 PUT 한도를 업로드 파일 상한으로 사용한다")
+    func uploadDump_appliesSinglePutLimit() {
+        #expect(QRCodeDumpUploadEndpoint.maximumBodySize == 5 * 1_024 * 1_024 * 1_024)
     }
 }

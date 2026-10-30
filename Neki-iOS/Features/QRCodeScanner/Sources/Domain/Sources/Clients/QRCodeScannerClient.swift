@@ -18,27 +18,25 @@ struct QRScannerClient {
 }
 
 extension QRScannerClient: DependencyKey {
-    static let liveValue: Self = {
-        @Dependency(\.qrCodeScanRepository) var qrCodeScanRepository
-        @Dependency(\.qrCodeDumpRepository) var qrCodeDumpRepository
-        @Dependency(\.imageUploadRepository) var imageUploadRepository
-        return .live(
-            qrCodeScanRepository: qrCodeScanRepository,
-            qrCodeDumpRepository: qrCodeDumpRepository,
-            imageUploadRepository: imageUploadRepository
-        )
-    }()
+    static let liveValue = makeLiveValue()
+
+    static func makeLiveValue() -> Self {
+        QRScannerClientFactory().makeClient()
+    }
 }
 
-extension QRScannerClient {
-    static func live(
-        qrCodeScanRepository: any QRCodeScanRepository,
-        qrCodeDumpRepository: any QRCodeDumpRepository,
-        imageUploadRepository: any ImageUploadRepository
-    ) -> Self {
+private struct QRScannerClientFactory {
+    @Dependency(\.qrCodeScanRepository) private var qrCodeScanRepository
+    @Dependency(\.qrCodeDumpRepository) private var qrCodeDumpRepository
+    @Dependency(\.imageUploadRepository) private var imageUploadRepository
+
+    func makeClient() -> QRScannerClient {
+        let qrCodeScanRepository = qrCodeScanRepository
+        let qrCodeDumpRepository = qrCodeDumpRepository
+        let imageUploadRepository = imageUploadRepository
         let dumpSession = QRCodeDumpSession()
 
-        return Self {
+        return QRScannerClient {
             AVCaptureDevice.authorizationStatus(for: .video)
         } requestAccess: {
             await AVCaptureDevice.requestAccess(for: .video)
@@ -47,25 +45,18 @@ extension QRScannerClient {
             do {
                 return try await qrCodeScanRepository.parse(qrCodeURL)
             } catch let error as QRParseError {
-                guard case .unsupportedBrand = error,
-                      await dumpSession.reserve(qrCodeURL)
-                else { throw error }
+                guard case .unsupportedBrand = error else { throw error }
 
                 Task(priority: .utility) {
-                    await withTaskGroup(of: Void.self) { group in
-                        group.addTask {
-                            await Self.notifyUnsupportedBrand(
-                                url: qrCodeURL,
-                                user: user,
-                                repository: qrCodeScanRepository
-                            )
-                        }
-                        group.addTask {
-                            await dumpSession.acquireUploadSlot()
-                            await Self.uploadDump(sourceURL: qrCodeURL, repository: qrCodeDumpRepository)
-                            await dumpSession.releaseUploadSlot()
-                        }
-                    }
+                    await QRScannerClient.notifyUnsupportedBrand(
+                        url: qrCodeURL,
+                        user: user,
+                        repository: qrCodeScanRepository
+                    )
+                }
+                guard await dumpSession.reserve(qrCodeURL) else { throw error }
+                await dumpSession.enqueue(url: qrCodeURL) {
+                    await QRScannerClient.uploadDump(sourceURL: qrCodeURL, repository: qrCodeDumpRepository)
                 }
                 throw error
             }
@@ -91,67 +82,64 @@ private extension QRScannerClient {
         }
     }
 
-    static func uploadDump(sourceURL: URL, repository: any QRCodeDumpRepository) async {
+    static func uploadDump(sourceURL: URL, repository: any QRCodeDumpRepository) async -> Bool {
         let document: QRCodeDumpDocument
         do {
-            document = try await repository.fetchHTMLDocument(from: sourceURL)
+            document = try await repository.prepareHTMLDocument(from: sourceURL)
         } catch {
-            Self.logDumpFailure(error, stage: "download", sourceURL: sourceURL)
-            return
+            logDumpFailure(error, stage: "download", sourceURL: sourceURL)
+            return false
         }
 
-        let uploadData = document.uploadData
         let ticket: QRCodeDumpUploadTicket
         do {
             ticket = try await repository.issueUploadTicket()
         } catch {
-            Self.logDumpFailure(error, stage: "ticket", sourceURL: sourceURL)
-            return
+            await repository.discard(document)
+            logDumpFailure(error, stage: "ticket", sourceURL: sourceURL)
+            return false
         }
 
         do {
-            try await repository.upload(uploadData, with: ticket)
-            Logger.network.info("QR HTML dump 업로드 성공: host=\(sourceURL.host() ?? "unknown"), bytes=\(uploadData.count)")
+            try await repository.upload(document, with: ticket)
+            Logger.network.info("QR HTML dump 업로드 성공: host=\(sourceURL.host() ?? "unknown"), bytes=\(document.byteCount)")
+            return true
         } catch {
-            Self.logDumpFailure(error, stage: "upload", sourceURL: sourceURL)
+            logDumpFailure(error, stage: "upload", sourceURL: sourceURL)
+            return false
         }
     }
 
     static func logDumpFailure(_ error: Error, stage: String, sourceURL: URL) {
-        if error is CancellationError {
-            Logger.network.notice("QR HTML dump 작업 취소: stage=\(stage)")
-        } else {
-            Logger.network.error("QR HTML dump 실패: stage=\(stage), host=\(sourceURL.host() ?? "unknown"), errorType=\(String(reflecting: type(of: error)))")
-        }
-    }
-}
-
-private actor QRCodeDumpSession {
-    private var reservedURLs: Set<URL> = []
-    private var isUploadSlotOccupied = false
-    private var uploadSlotWaiters: [CheckedContinuation<Void, Never>] = []
-
-    func reserve(_ url: URL) -> Bool {
-        reservedURLs.insert(url).inserted
+        let reason = dumpFailureReason(error)
+        let host = sourceURL.host() ?? "unknown"
+        Logger.network.error("QR HTML dump 종료: stage=\(stage), host=\(host), reason=\(reason), errorType=\(String(reflecting: type(of: error)))")
     }
 
-    func acquireUploadSlot() async {
-        guard isUploadSlotOccupied else {
-            isUploadSlotOccupied = true
-            return
+    static func dumpFailureReason(_ error: Error) -> String {
+        guard (error is CancellationError) == false else { return "cancelled" }
+        if let urlError = error as? URLError {
+            guard urlError.networkUnavailableReason != .constrained else { return "constrained" }
+            switch urlError.code {
+            case .dataNotAllowed: return "constrained"
+            case .notConnectedToInternet: return "offline"
+            case .networkConnectionLost: return "connectionLost"
+            case .timedOut: return "timedOut"
+            case .cancelled: return "cancelled"
+            default: return "urlError_\(urlError.code.rawValue)"
+            }
         }
-
-        await withCheckedContinuation { continuation in
-            uploadSlotWaiters.append(continuation)
+        if case let NetworkError.unknownError(underlyingError) = error {
+            return dumpFailureReason(underlyingError)
         }
-    }
-
-    func releaseUploadSlot() {
-        guard uploadSlotWaiters.isEmpty else {
-            uploadSlotWaiters.removeFirst().resume()
-            return
+        if let networkError = error as? NetworkError {
+            switch networkError {
+            case .responseTooLarge: return "responseTooLarge"
+            case .unsupportedResponseContentType: return "unsupportedContentType"
+            default: return "networkError"
+            }
         }
-        isUploadSlotOccupied = false
+        return "unexpected"
     }
 }
 

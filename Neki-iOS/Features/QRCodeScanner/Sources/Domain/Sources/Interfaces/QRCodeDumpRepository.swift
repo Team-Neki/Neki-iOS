@@ -9,9 +9,10 @@ import Foundation
 import Dependencies
 
 protocol QRCodeDumpRepository {
-    func fetchHTMLDocument(from sourceURL: URL) async throws -> QRCodeDumpDocument
+    func prepareHTMLDocument(from sourceURL: URL) async throws -> QRCodeDumpDocument
     func issueUploadTicket() async throws -> QRCodeDumpUploadTicket
-    func upload(_ data: Data, with ticket: QRCodeDumpUploadTicket) async throws
+    func upload(_ document: QRCodeDumpDocument, with ticket: QRCodeDumpUploadTicket) async throws
+    func discard(_ document: QRCodeDumpDocument) async
 }
 
 private enum QRCodeDumpRepositoryKey: DependencyKey {

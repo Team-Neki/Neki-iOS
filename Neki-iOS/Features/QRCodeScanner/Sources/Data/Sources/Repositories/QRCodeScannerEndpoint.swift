@@ -75,49 +75,52 @@ extension QRCodeScannerEndpoint: Endpoint {
     }
 }
 
-struct QRCodeDumpDownloadEndpoint: FileDownloadEndpoint {
+struct QRCodeDumpDownloadEndpoint: Endpoint {
+    static let maximumBodySize: Int64 = 5 * 1_024 * 1_024
+
     let sourceURL: URL
-    let maximumBodySize: Int64
 
     var baseURL: String { sourceURL.absoluteString }
     var path: String { "" }
     var method: HTTPMethodType { .get }
     var contentType: HTTPContentType { .json }
     var body: (any Encodable)? { nil }
+    var authorizationType: AuthorizationType { .none }
     var networkLogPolicy: NetworkLogPolicy { .metadataOnly }
-    var responseConstraint: HTTPResponseConstraint {
-        HTTPResponseConstraint(allowedContentTypes: [.html], maximumBodySize: maximumBodySize)
+    var responseConstraint: HTTPResponseConstraint? {
+        HTTPResponseConstraint(allowedContentTypes: [.html], maximumBodySize: Self.maximumBodySize)
     }
 
     func asURLRequest() throws -> URLRequest {
         var request = URLRequest(url: sourceURL)
         request.httpMethod = method.rawValue
-        request.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
+        request.allowsConstrainedNetworkAccess = false
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         return request
     }
 }
 
-struct QRCodeDumpUploadEndpoint: FileUploadEndpoint {
-    static let maximumBodySize: Int64 = 5 * 1_024 * 1_024 * 1_024
-
+struct QRCodeDumpUploadEndpoint: Endpoint {
     let presignedURL: String
     let uploadMethod: HTTPMethodType
     let uploadContentType: String
+    let uploadData: Data
 
     var baseURL: String { presignedURL }
     var path: String { "" }
     var method: HTTPMethodType { uploadMethod }
     var contentType: HTTPContentType { .custom(uploadContentType) }
-    var body: (any Encodable)? { nil }
+    var body: (any Encodable)? { uploadData }
+    var authorizationType: AuthorizationType { .none }
     var networkLogPolicy: NetworkLogPolicy { .metadataOnly }
 
     func asURLRequest() throws -> URLRequest {
         guard let url = URL(string: presignedURL) else { throw NetworkError.invalidURLError }
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-        request.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
+        request.allowsConstrainedNetworkAccess = false
         request.setValue(uploadContentType, forHTTPHeaderField: "Content-Type")
+        request.httpBody = uploadData
         return request
     }
 }

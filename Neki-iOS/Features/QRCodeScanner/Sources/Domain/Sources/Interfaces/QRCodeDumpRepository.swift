@@ -12,7 +12,6 @@ protocol QRCodeDumpRepository {
     func prepareHTMLDocument(from sourceURL: URL) async throws -> QRCodeDumpDocument
     func issueUploadTicket() async throws -> QRCodeDumpUploadTicket
     func upload(_ document: QRCodeDumpDocument, with ticket: QRCodeDumpUploadTicket) async throws
-    func discard(_ document: QRCodeDumpDocument) async
 }
 
 private enum QRCodeDumpRepositoryKey: DependencyKey {

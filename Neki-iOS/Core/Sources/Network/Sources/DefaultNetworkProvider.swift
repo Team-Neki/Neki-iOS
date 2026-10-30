@@ -9,7 +9,7 @@ import Foundation
 import os
 import UniformTypeIdentifiers
 
-public final actor DefaultNetworkProvider: NetworkProvider, FileTransferProvider {
+public final actor DefaultNetworkProvider: NetworkProvider {
     private let session: URLSessionProtocol
     private let credentialBroker: any NetworkCredentialBroker
     private let decoder: JSONDecoder
@@ -30,13 +30,17 @@ public final actor DefaultNetworkProvider: NetworkProvider, FileTransferProvider
         self.decoder = decoder
     }
 
-    /// 디코딩이나 상태 코드 검증 없이 원문 응답을 파일에 기록합니다.
-    public func request(endpoint: any FileDownloadEndpoint, writingTo fileURL: URL) async throws -> HTTPURLResponse {
+    /// 디코딩이나 상태 코드 검증 없이 제한된 크기의 원문 응답을 반환합니다.
+    public func request(endpoint: Endpoint) async throws -> (data: Data, response: HTTPURLResponse) {
+        guard endpoint.credentialOperation == .none,
+              endpoint.authorizationType == .none,
+              let constraint = endpoint.responseConstraint
+        else { throw NetworkError.responseError }
+
         let request = try endpoint.asURLRequest()
-        return try await executeFileDownload(
+        return try await executeRawResponseRequest(
             with: request,
-            writingTo: fileURL,
-            constraint: endpoint.responseConstraint,
+            constraint: constraint,
             networkLogPolicy: endpoint.networkLogPolicy
         )
     }
@@ -74,26 +78,6 @@ public final actor DefaultNetworkProvider: NetworkProvider, FileTransferProvider
         }
     }
 
-    /// 파일을 요청 body로 사용해 업로드하고 성공 여부만 판단합니다.
-    public func requestVoid(endpoint: any FileUploadEndpoint, uploading fileURL: URL) async throws {
-        let request = try endpoint.asURLRequest()
-        requestLog(request, policy: endpoint.networkLogPolicy)
-        do {
-            let (data, response) = try await session.upload(for: request, fromFile: fileURL, delegate: nil)
-            responseLog(data: data, response: response, policy: endpoint.networkLogPolicy)
-            guard let httpResponse = response as? HTTPURLResponse else { throw NetworkError.responseError }
-            guard (200..<300).contains(httpResponse.statusCode) else { throw NetworkError.networkFail }
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch let error as URLError where error.code == .cancelled {
-            throw CancellationError()
-        } catch let error as NetworkError {
-            throw error
-        } catch {
-            throw NetworkError.unknownError(error)
-        }
-    }
-    
     /// 네트워크 요청을 수행하고 성공 여부만 판단하며 BaseResponseDTO<EmptyData>를 반환합니다
     @discardableResult
     public func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData> {
@@ -200,12 +184,11 @@ private extension DefaultNetworkProvider {
         }
     }
 
-    func executeFileDownload(
+    func executeRawResponseRequest(
         with request: URLRequest,
-        writingTo fileURL: URL,
         constraint: HTTPResponseConstraint,
         networkLogPolicy: NetworkLogPolicy
-    ) async throws -> HTTPURLResponse {
+    ) async throws -> (Data, HTTPURLResponse) {
         requestLog(request, policy: networkLogPolicy)
 
         let bytes: URLSession.AsyncBytes
@@ -231,67 +214,42 @@ private extension DefaultNetworkProvider {
                 bytes.task.cancel()
                 let expectedByteCount = response.expectedContentLength
                 let maximumByteCount = constraint.maximumBodySize ?? -1
-                Logger.network.notice("파일 응답 사전 검증 실패: mimeType=\(response.mimeType ?? "unknown"), expectedBytes=\(expectedByteCount), limit=\(maximumByteCount)")
+                Logger.network.notice("원문 응답 사전 검증 실패: mimeType=\(response.mimeType ?? "unknown"), expectedBytes=\(expectedByteCount), limit=\(maximumByteCount)")
                 throw error
             }
 
-            let fileHandle = try FileHandle(forWritingTo: fileURL)
-            defer { try? fileHandle.close() }
-            try fileHandle.truncate(atOffset: 0)
-
-            var buffer = Data()
-            buffer.reserveCapacity(Self.fileTransferBufferCapacity)
-            var receivedByteCount: Int64 = 0
+            var data = Data()
+            if response.expectedContentLength > 0 {
+                data.reserveCapacity(Int(response.expectedContentLength))
+            }
 
             for try await byte in bytes {
-                receivedByteCount += 1
                 let isWithinLimit = constraint.maximumBodySize.map {
-                    receivedByteCount <= $0
+                    Int64(data.count) < $0
                 } ?? true
                 guard isWithinLimit else {
                     bytes.task.cancel()
-                    Logger.network.notice("파일 응답 수신 중단: reason=responseTooLarge, receivedBytes=\(receivedByteCount), limit=\(constraint.maximumBodySize ?? -1)")
+                    Logger.network.notice("원문 응답 수신 중단: reason=responseTooLarge, receivedBytes=\(data.count + 1), limit=\(constraint.maximumBodySize ?? -1)")
                     throw NetworkError.responseTooLarge
                 }
-
-                buffer.append(byte)
-                guard buffer.count == Self.fileTransferBufferCapacity else { continue }
-                try Task.checkCancellation()
-                try fileHandle.write(contentsOf: buffer)
-                buffer.removeAll(keepingCapacity: true)
+                data.append(byte)
             }
 
             try Task.checkCancellation()
-            if buffer.isEmpty == false {
-                try fileHandle.write(contentsOf: buffer)
-            }
-            try fileHandle.synchronize()
-            responseLog(data: Data(), response: response, policy: networkLogPolicy)
-            return httpResponse
+            responseLog(data: data, response: response, policy: networkLogPolicy)
+            return (data, httpResponse)
         } catch is CancellationError {
             bytes.task.cancel()
-            try? Self.truncateFile(at: fileURL)
             throw CancellationError()
         } catch let error as URLError where error.code == .cancelled {
             bytes.task.cancel()
-            try? Self.truncateFile(at: fileURL)
             throw CancellationError()
         } catch let error as NetworkError {
-            try? Self.truncateFile(at: fileURL)
             throw error
         } catch {
             bytes.task.cancel()
-            try? Self.truncateFile(at: fileURL)
             throw NetworkError.unknownError(error)
         }
-    }
-
-    static var fileTransferBufferCapacity: Int { 64 * 1_024 }
-
-    static func truncateFile(at fileURL: URL) throws {
-        let fileHandle = try FileHandle(forWritingTo: fileURL)
-        defer { try? fileHandle.close() }
-        try fileHandle.truncate(atOffset: 0)
     }
 
     static func validate(response: URLResponse, constraint: HTTPResponseConstraint) throws {

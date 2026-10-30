@@ -7,16 +7,11 @@
 
 enum QRCodeDumpError: Error {
     case invalidURL
+    case invalidResponse
     case invalidRedirectURL
-    case fileCreationFailed
-    case unavailableStorageCapacity
-    case insufficientStorageCapacity
-    case missingFileSize
     case responseTooLarge
     case stringDecodingFailed
-    case unsupportedStringEncoding
     case missingUploadTicket
-    case missingDocument
     case unsupportedUploadMethod
     case invalidUploadTicket
 }

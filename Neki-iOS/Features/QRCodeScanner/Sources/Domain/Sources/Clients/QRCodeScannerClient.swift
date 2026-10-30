@@ -95,7 +95,6 @@ private extension QRScannerClient {
         do {
             ticket = try await repository.issueUploadTicket()
         } catch {
-            await repository.discard(document)
             logDumpFailure(error, stage: "ticket", sourceURL: sourceURL)
             return false
         }

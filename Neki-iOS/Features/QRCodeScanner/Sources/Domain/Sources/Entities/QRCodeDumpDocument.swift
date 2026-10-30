@@ -8,15 +8,13 @@
 import Foundation
 
 struct QRCodeDumpDocument: Sendable, Equatable {
-    let id: UUID
-    let sourceURL: URL
-    let finalURL: URL?
-    let byteCount: Int64
+    let data: Data
+
+    var byteCount: Int { data.count }
 }
 
 struct QRCodeDumpUploadTicket: Sendable, Equatable {
     let method: String
-    let expiresIn: String
     let uploadTicket: String
     let contentType: String
 }

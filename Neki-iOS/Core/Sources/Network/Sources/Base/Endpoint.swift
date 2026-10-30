@@ -45,7 +45,9 @@ public struct HTTPResponseConstraint: Sendable, Equatable {
     }
 }
 
-public protocol RequestEndpoint {
+public protocol Endpoint {
+    var credentialOperation: CredentialOperation { get }
+    var authorizationType: AuthorizationType { get }
     var contentType: HTTPContentType { get }
     var baseURL: String { get }
     var path: String { get }
@@ -54,25 +56,14 @@ public protocol RequestEndpoint {
     var body: Encodable? { get }
     var multipartItems: [MultipartItem]? { get }
     var networkLogPolicy: NetworkLogPolicy { get }
-    var allowsConstrainedNetworkAccess: Bool { get }
+    var responseConstraint: HTTPResponseConstraint? { get }
     
     func asURLRequest() throws -> URLRequest
 }
 
-public protocol Endpoint: RequestEndpoint {
-    var credentialOperation: CredentialOperation { get }
-    var authorizationType: AuthorizationType { get }
-}
+extension Endpoint {
+    public var credentialOperation: CredentialOperation { .none }
 
-public protocol FileTransferEndpoint: RequestEndpoint {}
-
-public protocol FileDownloadEndpoint: FileTransferEndpoint {
-    var responseConstraint: HTTPResponseConstraint { get }
-}
-
-public protocol FileUploadEndpoint: FileTransferEndpoint {}
-
-extension RequestEndpoint {
     public var baseURL: String {
         guard let baseURLString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
             Logger.data.fault("Base URL not found in Bundle")
@@ -87,7 +78,7 @@ extension RequestEndpoint {
 
     public var networkLogPolicy: NetworkLogPolicy { .standard }
 
-    public var allowsConstrainedNetworkAccess: Bool { true }
+    public var responseConstraint: HTTPResponseConstraint? { nil }
 
     static var defaultEncoder: JSONEncoder { JSONEncoder() }
     
@@ -111,7 +102,6 @@ extension RequestEndpoint {
         
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
-        request.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
         
         switch contentType {
         case .json:
@@ -157,12 +147,4 @@ extension RequestEndpoint {
         
         return request
     }
-}
-
-extension FileTransferEndpoint {
-    public var allowsConstrainedNetworkAccess: Bool { false }
-}
-
-extension Endpoint {
-    public var credentialOperation: CredentialOperation { .none }
 }

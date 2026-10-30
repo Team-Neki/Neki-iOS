@@ -7,6 +7,7 @@
 
 import Foundation
 import os
+import UniformTypeIdentifiers
 
 /// 인증 타입
 public enum AuthorizationType {
@@ -34,9 +35,17 @@ public enum NetworkLogPolicy {
     case metadataOnly
 }
 
-public protocol Endpoint {
-    var credentialOperation: CredentialOperation { get }
-    var authorizationType: AuthorizationType { get }
+public struct HTTPResponseConstraint: Sendable, Equatable {
+    public let allowedContentTypes: Set<UTType>
+    public let maximumBodySize: Int64?
+
+    public init(allowedContentTypes: Set<UTType>, maximumBodySize: Int64? = nil) {
+        self.allowedContentTypes = allowedContentTypes
+        self.maximumBodySize = maximumBodySize
+    }
+}
+
+public protocol RequestEndpoint {
     var contentType: HTTPContentType { get }
     var baseURL: String { get }
     var path: String { get }
@@ -45,13 +54,25 @@ public protocol Endpoint {
     var body: Encodable? { get }
     var multipartItems: [MultipartItem]? { get }
     var networkLogPolicy: NetworkLogPolicy { get }
+    var allowsConstrainedNetworkAccess: Bool { get }
     
     func asURLRequest() throws -> URLRequest
 }
 
-extension Endpoint {
-    public var credentialOperation: CredentialOperation { .none }
+public protocol Endpoint: RequestEndpoint {
+    var credentialOperation: CredentialOperation { get }
+    var authorizationType: AuthorizationType { get }
+}
 
+public protocol FileTransferEndpoint: RequestEndpoint {}
+
+public protocol FileDownloadEndpoint: FileTransferEndpoint {
+    var responseConstraint: HTTPResponseConstraint { get }
+}
+
+public protocol FileUploadEndpoint: FileTransferEndpoint {}
+
+extension RequestEndpoint {
     public var baseURL: String {
         guard let baseURLString = Bundle.main.infoDictionary?["BASE_URL"] as? String else {
             Logger.data.fault("Base URL not found in Bundle")
@@ -65,7 +86,9 @@ extension Endpoint {
     public var multipartItems: [MultipartItem]? { nil }
 
     public var networkLogPolicy: NetworkLogPolicy { .standard }
-    
+
+    public var allowsConstrainedNetworkAccess: Bool { true }
+
     static var defaultEncoder: JSONEncoder { JSONEncoder() }
     
     public func asURLRequest() throws -> URLRequest {
@@ -88,6 +111,7 @@ extension Endpoint {
         
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
+        request.allowsConstrainedNetworkAccess = allowsConstrainedNetworkAccess
         
         switch contentType {
         case .json:
@@ -133,4 +157,12 @@ extension Endpoint {
         
         return request
     }
+}
+
+extension FileTransferEndpoint {
+    public var allowsConstrainedNetworkAccess: Bool { false }
+}
+
+extension Endpoint {
+    public var credentialOperation: CredentialOperation { .none }
 }

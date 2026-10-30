@@ -9,23 +9,29 @@ import Foundation
 import Dependencies
 
 public protocol NetworkProvider: Sendable {
-    func request(endpoint: Endpoint) async throws -> (data: Data, response: HTTPURLResponse)
     func requestVoid(endpoint: Endpoint) async throws -> Void
     func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData>
     func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T>
 }
 
-public extension NetworkProvider {
-    func request(endpoint: Endpoint) async throws -> (data: Data, response: HTTPURLResponse) {
-        throw NetworkError.responseError
-    }
+public protocol FileTransferProvider: Sendable {
+    func request(endpoint: any FileDownloadEndpoint, writingTo fileURL: URL) async throws -> HTTPURLResponse
+    func requestVoid(endpoint: any FileUploadEndpoint, uploading fileURL: URL) async throws -> Void
 }
 
 
 // MARK: - NetworkProvider + DependencyKey
 
 private enum NetworkProviderKey: DependencyKey {
-    static let liveValue: any NetworkProvider = {
+    static let liveValue: any NetworkProvider = LiveNetworkProvider.shared
+}
+
+private enum FileTransferProviderKey: DependencyKey {
+    static let liveValue: any FileTransferProvider = LiveNetworkProvider.shared
+}
+
+private enum LiveNetworkProvider {
+    static let shared: DefaultNetworkProvider = {
         @Dependency(\.self) var dependencies
         let broker = dependencies[NetworkCredentialBrokerKey.self]
         // 수신자는 실패 발생 시 조회합니다. Provider 생성 중 AuthRepository를 생성하지 않습니다.
@@ -61,5 +67,10 @@ extension DependencyValues {
     var networkProvider: any NetworkProvider {
         get { self[NetworkProviderKey.self] }
         set { self[NetworkProviderKey.self] = newValue }
+    }
+
+    var fileTransferProvider: any FileTransferProvider {
+        get { self[FileTransferProviderKey.self] }
+        set { self[FileTransferProviderKey.self] = newValue }
     }
 }

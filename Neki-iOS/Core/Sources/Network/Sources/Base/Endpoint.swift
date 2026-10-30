@@ -7,6 +7,7 @@
 
 import Foundation
 import os
+import UniformTypeIdentifiers
 
 /// 인증 타입
 public enum AuthorizationType {
@@ -29,6 +30,21 @@ public enum HTTPContentType {
     case custom(String)
 }
 
+public enum NetworkLogPolicy {
+    case standard
+    case metadataOnly
+}
+
+public struct HTTPResponseConstraint: Sendable, Equatable {
+    public let allowedContentTypes: Set<UTType>
+    public let maximumBodySize: Int64?
+
+    public init(allowedContentTypes: Set<UTType>, maximumBodySize: Int64? = nil) {
+        self.allowedContentTypes = allowedContentTypes
+        self.maximumBodySize = maximumBodySize
+    }
+}
+
 public protocol Endpoint {
     var credentialOperation: CredentialOperation { get }
     var authorizationType: AuthorizationType { get }
@@ -39,6 +55,8 @@ public protocol Endpoint {
     var queryParameters: [String: String]? { get }
     var body: Encodable? { get }
     var multipartItems: [MultipartItem]? { get }
+    var networkLogPolicy: NetworkLogPolicy { get }
+    var responseConstraint: HTTPResponseConstraint? { get }
     
     func asURLRequest() throws -> URLRequest
 }
@@ -57,7 +75,11 @@ extension Endpoint {
     public var queryParameters: [String: String]? { nil }
     
     public var multipartItems: [MultipartItem]? { nil }
-    
+
+    public var networkLogPolicy: NetworkLogPolicy { .standard }
+
+    public var responseConstraint: HTTPResponseConstraint? { nil }
+
     static var defaultEncoder: JSONEncoder { JSONEncoder() }
     
     public func asURLRequest() throws -> URLRequest {

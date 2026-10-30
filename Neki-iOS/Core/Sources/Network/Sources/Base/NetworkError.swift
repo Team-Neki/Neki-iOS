@@ -19,6 +19,8 @@ public enum NetworkError: LocalizedError {
     case invalidURLError
     case badRequestError
     case unauthorizedError
+    case unsupportedResponseContentType
+    case responseTooLarge
     
     public var errorDescription: String? {
         switch self {
@@ -33,6 +35,8 @@ public enum NetworkError: LocalizedError {
         case .invalidURLError: return "잘못된 URL입니다"
         case .badRequestError: return "잘못된 요청입니다"
         case .unauthorizedError: return "인증이 필요합니다"
+        case .unsupportedResponseContentType: return "지원하지 않는 응답 형식입니다"
+        case .responseTooLarge: return "응답 크기가 허용 범위를 초과했습니다"
         }
     }
 }

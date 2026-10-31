@@ -49,6 +49,7 @@ public enum AnalyticsEventName: String {
     case poseFilterToggle = "pose_filter_toggle"
     case poseBookmarkFilter = "pose_bookmark_filter"
     case poseBookmark = "pose_bookmark"
+    case poseDetailClick = "pose_detail_click"
     
     // 마이페이지
     case logout = "mypage_logout"

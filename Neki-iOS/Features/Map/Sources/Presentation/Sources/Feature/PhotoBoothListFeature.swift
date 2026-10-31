@@ -163,7 +163,12 @@ public struct PhotoBoothListFeature {
                 let filterAction: MapFilterAction = state.filteredBrands.contains(brand) ? .deselect : .select
                 toggleFilterOptionSelection(&state, brand: brand)
                 let selectedCount = state.filteredBrands.count
-                let event = MapAnalyticsEvent.mapBrandFilterToggle(action: filterAction, selectedCount: selectedCount, brandName: brand.name)
+                let event = MapAnalyticsEvent.mapBrandFilterToggle(
+                    action: filterAction,
+                    selectedCount: selectedCount,
+                    brandName: brand.name,
+                    brandID: brand.id
+                )
                 return .run { _ in await analytics.logEvent(event) }
                 
             case let .selectTab(tab):

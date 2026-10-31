@@ -156,7 +156,15 @@ struct PoseFeature {
                 )
                 
             case let .imageTapped(pose):
-                return .send(.delegate(.didTapImage(pose)))
+                let event = PoseAnalyticsEvent.poseDetailClick(
+                    poseID: pose.id,
+                    peopleCount: pose.peopleCountOption.rawValue,
+                    entryPoint: state.isSelectedScrap ? .bookmark : .list
+                )
+                return .merge(
+                    .run { _ in await analytics.logEvent(event) },
+                    .send(.delegate(.didTapImage(pose)))
+                )
                 
             case .qrScanButtonTapped:
                 return .send(.delegate(.qrScanButtonTapped))

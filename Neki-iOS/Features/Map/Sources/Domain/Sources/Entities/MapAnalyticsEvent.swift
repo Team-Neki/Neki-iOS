@@ -36,15 +36,16 @@ enum MapAnalyticsEvent {
         hasNextPage: Bool
     )
     case mapReExplore(hasFilter: Bool, regionChanged: Bool)
-    case mapBrandFilterToggle(action: MapFilterAction, selectedCount: Int, brandName: String)
+    case mapBrandFilterToggle(action: MapFilterAction, selectedCount: Int, brandName: String, brandID: PhotoBoothBrand.ID)
     /// source는 선택 당시 지도에 적용된 결과의 출처입니다.
     case boothSelect(
         brandName: String,
+        brandID: PhotoBoothBrand.ID,
         entryPoint: MapEntryPoint,
         source: MapBoothSelectionSource
     )
-    case boothFavoriteAdd(boothName: String, brandName: String)
-    case boothFavoriteRemove(boothName: String, brandName: String)
+    case boothFavoriteAdd(boothName: String, brandName: String, brandID: PhotoBoothBrand.ID)
+    case boothFavoriteRemove(boothName: String, brandName: String, brandID: PhotoBoothBrand.ID)
     case favoriteBoothFilterOn(favoriteBoothCount: Int)
     case favoriteBoothFilterOff
     case favoriteBoothView(favoriteBoothCount: Int)
@@ -97,22 +98,24 @@ extension MapAnalyticsEvent: AnalyticsEvent {
             ]
         case let .mapReExplore(hasFilter, regionChanged):
             return [.hasFilter: .boolean(hasFilter), .regionChanged: .boolean(regionChanged)]
-        case let .mapBrandFilterToggle(action, selectedCount, brandName):
+        case let .mapBrandFilterToggle(action, selectedCount, brandName, brandID):
             return [
                 .action: .string(action.rawValue),
                 .selectedCount: .integer(selectedCount),
-                .brandName: .string(brandName)
+                .brandName: .string(brandName),
+                .brandId: .string(String(brandID))
             ]
-        case let .boothSelect(brandName, entryPoint, source):
+        case let .boothSelect(brandName, brandID, entryPoint, source):
             return [
                 .brandName: .string(brandName),
+                .brandId: .string(String(brandID)),
                 .entryPoint: .string(entryPoint.rawValue),
                 .source: .string(source.rawValue)
             ]
-        case let .boothFavoriteAdd(boothName, brandName):
-            return [.boothName: .string(boothName), .brandName: .string(brandName)]
-        case let .boothFavoriteRemove(boothName, brandName):
-            return [.boothName: .string(boothName), .brandName: .string(brandName)]
+        case let .boothFavoriteAdd(boothName, brandName, brandID):
+            return [.boothName: .string(boothName), .brandName: .string(brandName), .brandId: .string(String(brandID))]
+        case let .boothFavoriteRemove(boothName, brandName, brandID):
+            return [.boothName: .string(boothName), .brandName: .string(brandName), .brandId: .string(String(brandID))]
         case let .favoriteBoothFilterOn(favoriteBoothCount):
             return [.favoriteBoothCount: .integer(favoriteBoothCount)]
         case .favoriteBoothFilterOff:
@@ -121,10 +124,14 @@ extension MapAnalyticsEvent: AnalyticsEvent {
             return [.favoriteBoothCount: .integer(favoriteBoothCount)]
         case let .brandOrderSave(orderedBrands):
             let priorityBrandNames = orderedBrands.map(\.name)
+            let priorityBrandIDs = orderedBrands.map { String($0.id) }
             return [
-                .priorityBrand1: .string(priorityBrandNames.indices.contains(0) ? priorityBrandNames[0] : ""),
-                .priorityBrand2: .string(priorityBrandNames.indices.contains(1) ? priorityBrandNames[1] : ""),
-                .priorityBrand3: .string(priorityBrandNames.indices.contains(2) ? priorityBrandNames[2] : "")
+                .priorityBrand1: .string(priorityBrandNames[safe: 0] ?? ""),
+                .priorityBrand2: .string(priorityBrandNames[safe: 1] ?? ""),
+                .priorityBrand3: .string(priorityBrandNames[safe: 2] ?? ""),
+                .priorityBrandId1: .string(priorityBrandIDs[safe: 0] ?? ""),
+                .priorityBrandId2: .string(priorityBrandIDs[safe: 1] ?? ""),
+                .priorityBrandId3: .string(priorityBrandIDs[safe: 2] ?? "")
             ]
         case let .mapRouteClick(mapType):
             return [.mapType: .string(mapType.rawValue)]

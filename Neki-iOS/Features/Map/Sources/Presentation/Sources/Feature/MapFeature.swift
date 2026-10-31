@@ -679,8 +679,8 @@ public struct MapFeature {
                     ? "저장한 포토부스에 추가했어요!"
                     : "저장한 포토부스에서 삭제했어요!"
                 let event: MapAnalyticsEvent = requestedValue
-                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name)
-                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name)
+                    ? .boothFavoriteAdd(boothName: photoBooth.name, brandName: photoBooth.brand.name, brandID: photoBooth.brand.id)
+                    : .boothFavoriteRemove(boothName: photoBooth.name, brandName: photoBooth.brand.name, brandID: photoBooth.brand.id)
                 return .merge(
                     .send(.startBackgroundCalculation),
                     .send(.delegate(.showToast(NekiToastItem(message, style: .success)))),
@@ -830,6 +830,7 @@ public struct MapFeature {
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 let event = MapAnalyticsEvent.boothSelect(
                     brandName: photoBooth.brand.name,
+                    brandID: photoBooth.brand.id,
                     entryPoint: .map,
                     source: state.boothSelectionSource
                 )
@@ -1015,6 +1016,7 @@ public struct MapFeature {
                 selectPhotoBooth(&state, photoBooth: photoBooth)
                 let event = MapAnalyticsEvent.boothSelect(
                     brandName: photoBooth.brand.name,
+                    brandID: photoBooth.brand.id,
                     entryPoint: .bottomSheet,
                     source: state.boothSelectionSource
                 )

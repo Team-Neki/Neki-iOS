@@ -32,7 +32,9 @@ struct PoseCoordinatorTests {
         await store.send(.path(.popFrom(id: randomPoseID))).finish()
 
         #expect(store.path.isEmpty)
-        #expect(events.value == [.randomPoseSuggestionStart, .randomPoseSuggestionEnd(totalSwipeCount: 2)])
+        let (startCount, otherEvents) = splitStartEvents(events.value)
+        #expect(startCount == 1)
+        #expect(otherEvents == [.randomPoseSuggestionEnd(totalSwipeCount: 2)])
     }
 
     @Test("포즈 상세만 스택에서 빠지면 랜덤 포즈 종료를 남기지 않는다")
@@ -60,7 +62,9 @@ struct PoseCoordinatorTests {
         #expect(store.path[id: randomPoseID]?.randomPose != nil)
         await store.send(.path(.popFrom(id: randomPoseID))).finish()
 
-        #expect(events.value == [.randomPoseSuggestionStart, .randomPoseSuggestionEnd(totalSwipeCount: 0)])
+        let (startCount, otherEvents) = splitStartEvents(events.value)
+        #expect(startCount == 1)
+        #expect(otherEvents == [.randomPoseSuggestionEnd(totalSwipeCount: 0)])
     }
 
     @Test(
@@ -87,7 +91,9 @@ struct PoseCoordinatorTests {
 
         #expect(store.path.isEmpty)
         #expect(flushCount.value == 1)
-        #expect(events.value == [.randomPoseSuggestionStart, .randomPoseSuggestionEnd(totalSwipeCount: 0)])
+        let (startCount, otherEvents) = splitStartEvents(events.value)
+        #expect(startCount == 1)
+        #expect(otherEvents == [.randomPoseSuggestionEnd(totalSwipeCount: 0)])
     }
 }
 
@@ -111,6 +117,14 @@ private extension PoseCoordinatorTests {
             }
             updateDependencies(&$0)
         }
+    }
+
+    /// 랜덤 포즈 시작 수와 그 밖의 이벤트로 나눕니다.
+    ///
+    /// 시작은 화면을 띄우는 액션의 효과가, 종료는 화면을 빼는 액션의 효과가 따로 남겨 둘 사이의 기록 순서는 보장되지 않습니다.
+    func splitStartEvents(_ events: [PoseAnalyticsEvent]) -> (startCount: Int, others: [PoseAnalyticsEvent]) {
+        let startCount = events.filter { $0 == .randomPoseSuggestionStart }.count
+        return (startCount, events.filter { $0 != .randomPoseSuggestionStart })
     }
 
     func makePose(id: PoseID) -> Pose {

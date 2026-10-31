@@ -44,7 +44,8 @@ struct ArchivePhotoDetailFeature {
         case cancelMemoEditing
         case doneMemoEditing
         case clearAllMemoEditing
-        case memoUpdateResponse(Result<Void, Error>)
+        /// 메모 저장 결과입니다. 저장에 실패하면 되돌릴 수 있게 저장 전 메모를 함께 받습니다.
+        case memoUpdateResponse(photoID: Int, previousMemo: String, Result<Void, Error>)
         
         case onTapTransform
         case imageFetchResponse(Result<UIImage, Error>)
@@ -126,19 +127,22 @@ struct ArchivePhotoDetailFeature {
                 state.isMemoEditing = false
                 state.isMemoExpanded = false
                 // 메모가 바뀌지 않았으면 저장을 요청하지 않아, 메모 작성 이벤트도 남지 않습니다.
-                guard limitedText != (state.currentItem?.memo ?? "") else { return .none }
+                let previousMemo = state.currentItem?.memo ?? ""
+                guard limitedText != previousMemo else { return .none }
                 state.photos[id: photoID]?.memo = limitedText
                 
                 return .run { send in
-                    await send(.memoUpdateResponse(Result {
+                    await send(.memoUpdateResponse(photoID: photoID, previousMemo: previousMemo, Result {
                         try await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
                     }))
                 }
 
-            case .memoUpdateResponse(.success):
+            case .memoUpdateResponse(_, _, .success):
                 return .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.photoMemoCreate) }
 
-            case .memoUpdateResponse(.failure):
+            case let .memoUpdateResponse(photoID, previousMemo, .failure):
+                // 저장에 실패하면 화면의 메모를 저장 전 값으로 되돌려, 같은 메모로 다시 편집을 마쳐도 바뀐 것으로 보고 다시 저장합니다.
+                state.photos[id: photoID]?.memo = previousMemo
                 return .none
                 
             case .clearAllMemoEditing:

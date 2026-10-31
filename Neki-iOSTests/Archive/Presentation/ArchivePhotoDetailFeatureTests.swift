@@ -40,6 +40,26 @@ struct ArchivePhotoDetailFeatureTests {
         #expect(events.value == [.photoMemoCreate])
         #expect(store.currentItem?.memo == "바꾼 메모")
     }
+
+    @Test("메모 저장에 실패하면 저장 전 메모로 되돌려, 같은 메모로 다시 편집을 마치면 저장을 다시 요청한다")
+    func doneMemoEditing_whenSaveFails_restoresMemoAndRetriesSameMemo() async {
+        let events = LockIsolated<[ArchiveAnalyticsEvent]>([])
+        let savedMemos = LockIsolated<[String]>([])
+        let store = makeStore(memo: "첫 메모", events: events, savedMemos: savedMemos, failingSaveCount: 1)
+        store.send(.startMemoEditing)
+        store.send(.binding(.set(\.editingMemoText, "바꾼 메모")))
+        await store.send(.doneMemoEditing).finish()
+        #expect(store.currentItem?.memo == "첫 메모")
+        #expect(events.value.isEmpty)
+
+        store.send(.startMemoEditing)
+        store.send(.binding(.set(\.editingMemoText, "바꾼 메모")))
+        await store.send(.doneMemoEditing).finish()
+
+        #expect(savedMemos.value == ["바꾼 메모", "바꾼 메모"])
+        #expect(events.value == [.photoMemoCreate])
+        #expect(store.currentItem?.memo == "바꾼 메모")
+    }
 }
 
 
@@ -50,12 +70,15 @@ private extension ArchivePhotoDetailFeatureTests {
     ///
     /// `ArchivePhotoDetailFeature.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     /// 보낸 분석 이벤트는 `events`에, 저장을 요청한 메모는 `savedMemos`에 차례로 모읍니다.
+    /// 처음 `failingSaveCount`번의 저장 요청은 실패합니다.
     func makeStore(
         memo: String,
         events: LockIsolated<[ArchiveAnalyticsEvent]>,
-        savedMemos: LockIsolated<[String]>
+        savedMemos: LockIsolated<[String]>,
+        failingSaveCount: Int = 0
     ) -> StoreOf<ArchivePhotoDetailFeature> {
-        Store(initialState: ArchivePhotoDetailFeature.State(
+        let remainingFailures = LockIsolated(failingSaveCount)
+        return Store(initialState: ArchivePhotoDetailFeature.State(
             photos: [PhotoEntity(id: 1, imageURL: nil, memo: memo)],
             currentItemID: 1,
             folderId: nil
@@ -68,7 +91,15 @@ private extension ArchivePhotoDetailFeatureTests {
             }
             $0.archiveClient.updatePhotoMemo = { _, memo in
                 savedMemos.withValue { $0.append(memo) }
+                let shouldFail = remainingFailures.withValue { count -> Bool in
+                    guard count > 0 else { return false }
+                    count -= 1
+                    return true
+                }
+                if shouldFail { throw MemoSaveFailure() }
             }
         }
     }
 }
+
+private struct MemoSaveFailure: Error {}

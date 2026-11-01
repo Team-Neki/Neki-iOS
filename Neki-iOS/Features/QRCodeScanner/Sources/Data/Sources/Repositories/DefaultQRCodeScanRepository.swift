@@ -30,7 +30,7 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
         ]
     }
     
-    func parse(_ qrCodeURL: URL, user: User) async throws(QRParseError) -> ParsedQRResult {
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult {
         guard let host = qrCodeURL.host() else { throw .invalidURL }
         
         for strategy in strategies {
@@ -40,16 +40,12 @@ struct DefaultQRCodeScanRepository: QRCodeScanRepository {
             return parsedResult
         }
         
-        Task.detached(priority: .background) {
-            do {
-                let endpoint = QRCodeScannerEndpoint.notifyUnsupportedBrand(url: qrCodeURL, user: user)
-                try await networkProvider.requestVoid(endpoint: endpoint)
-            } catch {
-                Logger.network.error("미지원 브랜드 디스코드 웹훅 발송 실패: \(error)")
-            }
-        }
-        
         throw .unsupportedBrand
+    }
+
+    func notifyUnsupportedBrand(url: URL, user: User) async throws {
+        let endpoint = QRCodeScannerEndpoint.notifyUnsupportedBrand(url: url, user: user)
+        try await networkProvider.requestVoid(endpoint: endpoint)
     }
 }
 

@@ -20,7 +20,8 @@ public enum QRParseError: Error {
 }
 
 public protocol QRCodeScanRepository {
-    func parse(_ qrCodeURL: URL, user: User) async throws(QRParseError) -> ParsedQRResult
+    func parse(_ qrCodeURL: URL) async throws(QRParseError) -> ParsedQRResult
+    func notifyUnsupportedBrand(url: URL, user: User) async throws
 }
 
 private enum QRCodeScanRepositoryKey: DependencyKey {

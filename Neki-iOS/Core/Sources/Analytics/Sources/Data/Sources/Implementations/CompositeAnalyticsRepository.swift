@@ -66,7 +66,6 @@ public final actor CompositeAnalyticsRepository: AnalyticsRepository {
 
 private enum AnalyticsRepositoryKey: DependencyKey {
     static let liveValue: any AnalyticsRepository = CompositeAnalyticsRepository(repositories: [
-        FirebaseAnalyticsRepository(),
         AmplitudeAnalyticsRepository()
     ])
 }

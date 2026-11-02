@@ -24,7 +24,7 @@ struct ServerLogEventTests {
 
         let json = String(decoding: try log.encodedLog(), as: UTF8.self)
 
-        #expect(json == #"{"appVersion":"1.2.9","context":{"device_model":"iPhone17,1","os_name":"ios"},"deviceId":"device-1","eventId":"3fa85f64-5717-4562-b3fc-2c963f66afa6","eventProperties":{"count":3,"has_filter":true,"method":"camera","ratio":0.5},"eventType":"photo_upload","occurredAt":"2026-11-01T18:48:04.997Z","sequenceNumber":2,"sessionId":1793558880000,"userIdAtOccurrence":"123"}"#)
+        #expect(json == #"{"appVersion":"1.2.9","context":{"deviceModel":"iPhone17,1","osName":"ios"},"deviceId":"device-1","eventId":"3fa85f64-5717-4562-b3fc-2c963f66afa6","eventProperties":{"count":3,"has_filter":true,"method":"camera","ratio":0.5},"eventType":"photo_upload","occurredAt":"2026-11-01T18:48:04.997Z","sequenceNumber":2,"sessionId":1793558880000,"userIdAtOccurrence":"123"}"#)
     }
 
     @Test("로그아웃 상태에서 남긴 로그는 userIdAtOccurrence를 null로 보낸다")
@@ -50,7 +50,7 @@ struct ServerLogEventTests {
             id: UUID(uuidString: "3FA85F64-5717-4562-B3FC-2C963F66AFA6")!,
             occurredAt: Date(timeIntervalSince1970: 1_793_610_697.25)
         )
-        let context = ServerLogContext(appVersion: "1.2.9", values: ["os_name": "ios"])
+        let context = ServerLogContext(appVersion: "1.2.9", values: ["osName": "ios"])
 
         let log = ServerLogEvent(
             event: ParameterEventStub(),
@@ -74,7 +74,7 @@ struct ServerLogEventTests {
         #expect(log.sessionID == 1_793_610_697_000)
         #expect(log.sequenceNumber == 4)
         #expect(log.appVersion == "1.2.9")
-        #expect(log.context == ["os_name": "ios"])
+        #expect(log.context == ["osName": "ios"])
     }
 
     @Test("속성이 없는 이벤트는 eventProperties를 빈 객체로 보낸다")
@@ -131,7 +131,7 @@ private extension ServerLogEventTests {
             deviceID: "device-1",
             userIDAtOccurrence: userID,
             appVersion: "1.2.9",
-            context: ["device_model": "iPhone17,1", "os_name": "ios"]
+            context: ["deviceModel": "iPhone17,1", "osName": "ios"]
         )
     }
 }

@@ -11,8 +11,8 @@ import UIKit
 @testable import Neki_iOS
 
 struct ServerLogContextTests {
-    @Test("Amplitude와 같은 키와 값으로 기기 정보를 담는다")
-    func init_usesAmplitudeKeysAndValues() {
+    @Test("Amplitude와 같은 기기 정보를 camelCase 키로 담는다")
+    func init_usesAmplitudeValuesWithCamelCaseKeys() {
         let context = ServerLogContext(
             appVersion: "1.2.9",
             systemName: "iOS",
@@ -25,10 +25,10 @@ struct ServerLogContextTests {
         #expect(context.appVersion == "1.2.9")
         #expect(context.values == [
             "platform": "iOS",
-            "os_name": "ios",
-            "os_version": "26.0",
-            "device_manufacturer": "Apple",
-            "device_model": "iPhone17,1",
+            "osName": "ios",
+            "osVersion": "26.0",
+            "deviceManufacturer": "Apple",
+            "deviceModel": "iPhone17,1",
             "language": "ko-KR",
             "country": "KR"
         ])
@@ -47,7 +47,7 @@ struct ServerLogContextTests {
 
         #expect(context.values["language"] == nil)
         #expect(context.values["country"] == nil)
-        #expect(context.values["device_model"] == "unknown")
+        #expect(context.values["deviceModel"] == "unknown")
     }
 
     @Test(
@@ -68,9 +68,9 @@ struct ServerLogContextTests {
 
         #expect(context.appVersion == Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
         #expect(context.values["platform"] == "iOS")
-        #expect(context.values["os_name"] == "ios")
-        #expect(context.values["os_version"] == UIDevice.current.systemVersion)
-        #expect(context.values["device_manufacturer"] == "Apple")
-        #expect(context.values["device_model"]?.isEmpty == false)
+        #expect(context.values["osName"] == "ios")
+        #expect(context.values["osVersion"] == UIDevice.current.systemVersion)
+        #expect(context.values["deviceManufacturer"] == "Apple")
+        #expect(context.values["deviceModel"]?.isEmpty == false)
     }
 }

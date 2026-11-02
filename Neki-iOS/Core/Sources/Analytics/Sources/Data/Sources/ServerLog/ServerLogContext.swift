@@ -9,7 +9,7 @@ import Foundation
 import UIKit
 
 /// 서버 로그의 `appVersion`과 `context`에 넣는 기기·앱 정보
-/// - Note: Amplitude가 이벤트마다 붙이는 값과 같은 출처, 같은 키를 씁니다(Amplitude-Swift `ContextPlugin`). Amplitude처럼 앱을 실행한 뒤 한 번만 계산합니다.
+/// - Note: Amplitude가 이벤트마다 붙이는 값과 같은 출처, 같은 값을 씁니다(Amplitude-Swift `ContextPlugin`). 키는 로그의 다른 필드처럼 camelCase로 씁니다(Amplitude `os_name` → `osName`). Amplitude처럼 앱을 실행한 뒤 한 번만 계산합니다.
 struct ServerLogContext: Equatable, Sendable {
     let appVersion: String
     let values: [String: String]
@@ -39,10 +39,10 @@ extension ServerLogContext {
     ) {
         var values = [
             "platform": "iOS",
-            "os_name": systemName.lowercased(),
-            "os_version": systemVersion,
-            "device_manufacturer": "Apple",
-            "device_model": Self.deviceModel(machine: machine ?? "unknown")
+            "osName": systemName.lowercased(),
+            "osVersion": systemVersion,
+            "deviceManufacturer": "Apple",
+            "deviceModel": Self.deviceModel(machine: machine ?? "unknown")
         ]
         values["language"] = preferredLanguage
         values["country"] = regionCode

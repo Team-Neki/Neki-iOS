@@ -27,7 +27,7 @@ struct ServerAnalyticsRepositoryTests {
             #expect(logs[0]["deviceId"] as? String == "device-1")
             #expect(logs[0]["userIdAtOccurrence"] as? String == "1")
             #expect(logs[0]["appVersion"] as? String == "1.2.9")
-            #expect(logs[0]["context"] as? [String: String] == ["os_name": "ios"])
+            #expect(logs[0]["context"] as? [String: String] == ["osName": "ios"])
             #expect(logs[1]["eventType"] as? String == "map_view")
             #expect(logs[1]["sequenceNumber"] as? Int == 2)
         }
@@ -271,7 +271,7 @@ private extension ServerAnalyticsRepositoryTests {
             observesLifecycle: false,
             now: { now.value },
             isApplicationActive: { false },
-            makeContext: { ServerLogContext(appVersion: "1.2.9", values: ["os_name": "ios"]) }
+            makeContext: { ServerLogContext(appVersion: "1.2.9", values: ["osName": "ios"]) }
         )
         let fixture = Fixture(
             repository: repository,

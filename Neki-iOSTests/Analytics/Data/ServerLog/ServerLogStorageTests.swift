@@ -52,6 +52,21 @@ struct ServerLogStorageTests {
         }
     }
 
+    @Test("보관 중인 로그 수와 가장 오래된 발생 시각, 아직 남아 있는 로그를 알려 준다")
+    func statusAndExisting_reflectStoredFiles() async throws {
+        try await withStorage { storage, _ in
+            let events = (1...3).map { makeStoredEvent(occurredAt: Int64($0) * 1_000, sequenceNumber: 1, id: "\($0)") }
+            for event in events { try await storage.write(event) }
+
+            await storage.remove([events[0]])
+            let status = await storage.status()
+
+            #expect(status.count == 2)
+            #expect(status.oldestOccurredAtMilliseconds == 2_000)
+            #expect(await storage.existing(events) == [events[1], events[2]])
+        }
+    }
+
     @Test("읽지 못한 파일과 다른 스키마 버전의 파일은 격리하고 나머지는 읽는다")
     func events_quarantineUnreadableFiles() async throws {
         try await withStorage { storage, directory in

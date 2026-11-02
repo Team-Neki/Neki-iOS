@@ -12,7 +12,7 @@ import os
 ///
 /// 네트워크 요청 중 actor가 재진입할 수 있으므로 저장 결과는 요청 시작 당시 revision과 일치할 때만
 /// 반영합니다. 저장소의 비교 및 변경은 suspension point 없이 처리합니다.
-final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDiagnosticsReading {
+final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDiagnosticsReading, StoredAuthTokenReading {
     private struct RefreshRequest {
         let id: UUID
         let revision: UUID

@@ -12,11 +12,18 @@ import Foundation
 public struct AnalyticsEventOccurrence: Sendable, Equatable {
     /// 소문자 UUID 문자열
     public let id: String
-    /// 발생 시각(epoch milliseconds). Amplitude SDK와 같이 밀리초 아래는 버립니다.
+    /// 발생 시각(epoch milliseconds)
     public let occurredAtMilliseconds: Int64
 
     public init(id: UUID, occurredAt: Date) {
         self.id = id.uuidString.lowercased()
-        self.occurredAtMilliseconds = Int64(occurredAt.timeIntervalSince1970 * 1000)
+        self.occurredAtMilliseconds = occurredAt.epochMilliseconds
+    }
+}
+
+extension Date {
+    /// epoch milliseconds. Amplitude SDK와 같이 밀리초 아래는 버립니다.
+    var epochMilliseconds: Int64 {
+        Int64(timeIntervalSince1970 * 1000)
     }
 }

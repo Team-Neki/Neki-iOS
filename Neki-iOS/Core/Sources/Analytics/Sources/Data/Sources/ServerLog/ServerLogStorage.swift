@@ -60,6 +60,17 @@ actor ServerLogStorage {
         }
     }
 
+    /// 아직 보관 중인 로그만 돌려줍니다.
+    func existing(_ events: [ServerLogStoredEvent]) -> [ServerLogStoredEvent] {
+        events.filter { FileManager.default.fileExists(atPath: directory.appendingPathComponent($0.fileName).path) }
+    }
+
+    /// 보관 중인 로그 수와 가장 오래된 로그의 발생 시각
+    func status() -> (count: Int, oldestOccurredAtMilliseconds: Int64?) {
+        let files = eventFiles()
+        return (files.count, files.first?.occurredAtMilliseconds)
+    }
+
     func remove(_ events: [ServerLogStoredEvent]) {
         for event in events {
             try? FileManager.default.removeItem(at: directory.appendingPathComponent(event.fileName))

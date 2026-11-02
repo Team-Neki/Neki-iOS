@@ -13,7 +13,7 @@ import UIKit
 /// - Note: SDK처럼 쌓인 수·타이머·백그라운드 진입에 맞춰 보내고, 업로드는 한 번에 하나만 합니다. SDK와 달리 실행·포그라운드 복귀 때도 보내고, 실패가 이어져도 멈추지 않고 보관 한도 안에서 계속 다시 보냅니다.
 actor ServerLogPipeline {
     struct Configuration: Sendable {
-        /// 이만큼 쌓이면 바로 보냅니다(#308).
+        /// 이만큼 쌓이면 바로 보냅니다.
         var flushEventCount = 100
         /// 이 간격마다 보냅니다.
         var flushInterval: Duration = .seconds(30)

@@ -11,7 +11,7 @@ import UIKit
 
 /// 행동 이벤트를 서버(`POST /api/logs`)로 보내는 저장소
 /// - Note: Amplitude-Swift의 흐름(`track` → 세션 → 문맥 → 저장 → 전송)을 옮겼습니다. 이벤트는 디스크에 쓰고 바로 반환하며, 전송 실패는 이 안에서 끝나 Amplitude 기록과 기능 결과에 영향을 주지 않습니다.
-/// - Note: SDK가 자동으로 보내는 이벤트(`session_start`·`session_end`, `[Amplitude] Application …`)는 서버로 보내지 않습니다. Amplitude SDK 제거 시 이 이벤트를 자체로 만들지 정합니다(#308 후속).
+/// - Note: SDK가 자동으로 보내는 이벤트(`session_start`·`session_end`, `[Amplitude] Application …`)는 서버로 보내지 않습니다. Amplitude SDK 제거 시 이 이벤트를 자체로 만들지 정합니다.
 final actor ServerAnalyticsRepository: AnalyticsRepository {
     private let identity: any AnalyticsIdentityProviding
     private let pipeline: ServerLogPipeline

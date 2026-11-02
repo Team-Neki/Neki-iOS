@@ -161,11 +161,21 @@ private extension ServerLogPipeline {
         await storage.prune(now: now())
         var outcome = SendOutcome.delivered
         var deliveredCount = 0
+        // 목록은 비었을 때만 다시 읽고, 보낸 배치만큼 앞에서 잘라 냅니다.
+        var pending: [ServerLogStoredEvent] = []
         while Task.isCancelled == false {
-            guard let batch = Self.nextBatch(from: await storage.events()) else { break }
+            if pending.isEmpty { pending = await storage.events() }
+            guard let candidate = Self.nextBatch(from: pending) else { break }
+            // 업로드를 기다리는 동안 탈퇴로 지운 로그는 보내지 않도록, 배치가 남아 있는지 확인하고 빠졌으면 다시 읽습니다.
+            let batch = await storage.existing(candidate)
+            guard batch.count == candidate.count else {
+                pending = []
+                continue
+            }
             outcome = await send(batch)
             guard outcome == .delivered else { break }
             deliveredCount += batch.count
+            pending.removeFirst(batch.count)
         }
         if outcome == .delivered {
             failureCount = 0

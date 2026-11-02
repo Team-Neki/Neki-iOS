@@ -122,6 +122,27 @@ struct ServerLogPipelineTests {
         }
     }
 
+    @Test("업로드를 기다리는 동안 탈퇴로 지운 로그는 이미 읽은 목록에 있어도 보내지 않는다")
+    func upload_skipsLogsRemovedWhileUploading() async throws {
+        let holder = PipelineHolder()
+        let session = ScriptedURLSession { request in
+            if request.logEventIDs == ["e0"], let pipeline = holder.pipeline {
+                await pipeline.removeEvents(userID: "2")
+            }
+            return 200
+        }
+        try await withPipeline(session: session) { pipeline, storage in
+            holder.pipeline = pipeline
+            try await pipeline.put(makeServerLogStoredEvent(id: "e0", occurredAt: 1_000, userID: "1"))
+            try await pipeline.put(makeServerLogStoredEvent(id: "e1", occurredAt: 2_000, userID: "2"))
+
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(session.requests.map(\.logEventIDs) == [["e0"]])
+            #expect(await storage.events().isEmpty)
+        }
+    }
+
     @Test("다시 보내기까지의 대기 시간은 1초부터 두 배씩 늘어 5분에서 멈춘다")
     func retryDelay_growsExponentiallyUpToFiveMinutes() {
         let delays = (1...11).map { ServerLogPipeline.retryDelay(failureCount: $0, configuration: .init()) }
@@ -177,6 +198,10 @@ struct ServerLogPipelineTests {
 
 
 // MARK: - Helpers
+
+private final class PipelineHolder: @unchecked Sendable {
+    var pipeline: ServerLogPipeline?
+}
 
 private extension ServerLogPipelineTests {
     struct StoredTokenStub: StoredAuthTokenReading {

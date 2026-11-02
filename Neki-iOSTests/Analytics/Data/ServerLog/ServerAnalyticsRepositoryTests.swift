@@ -124,6 +124,14 @@ struct ServerAnalyticsRepositoryTests {
         }
     }
 
+    @Test(
+        "포그라운드 진입을 따로 받아 생긴 1분 미만의 차이는 같은 세션으로 본다",
+        arguments: zip([Int64(0), 835, -59_999, 60_000, -300_000], [true, true, true, false, false])
+    )
+    func isSameSession_allowsSmallStartGap(difference: Int64, expected: Bool) {
+        #expect(ServerAnalyticsRepository.isSameSession(1_793_634_073_138, 1_793_634_073_138 + difference) == expected)
+    }
+
     @Test("포그라운드에 있는 동안 다시 활성화되는 것은 세션을 바꾸지 않는다")
     func lifecycle_becomingActiveInForeground_keepsSession() async throws {
         let identity = IdentityStub(deviceID: "device-1", sessionID: 1_000)

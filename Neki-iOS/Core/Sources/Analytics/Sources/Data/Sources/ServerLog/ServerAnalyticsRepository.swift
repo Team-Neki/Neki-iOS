@@ -106,6 +106,16 @@ extension ServerAnalyticsRepository {
 }
 
 
+// MARK: - Session Comparison
+
+extension ServerAnalyticsRepository {
+    /// SDK와 서버 로그는 포그라운드 진입을 따로 받아, 같은 세션도 시작 시각(세션 ID)이 조금 다를 수 있습니다. 1분 넘게 차이 날 때만 다른 세션으로 봅니다.
+    static func isSameSession(_ sdkSessionID: Int64, _ computedSessionID: Int64) -> Bool {
+        abs(sdkSessionID - computedSessionID) < 60_000
+    }
+}
+
+
 // MARK: - Recording
 
 private extension ServerAnalyticsRepository {
@@ -143,7 +153,7 @@ private extension ServerAnalyticsRepository {
             sessionID: sdkSessionID
         )
         sessionStore.save(session)
-        if numbering.computedSessionID != numbering.sessionID {
+        if Self.isSameSession(numbering.sessionID, numbering.computedSessionID) == false {
             Logger.analytics.debug("세션 ID가 SDK와 다름: SDK \(numbering.sessionID), 자체 계산 \(numbering.computedSessionID)")
         }
 

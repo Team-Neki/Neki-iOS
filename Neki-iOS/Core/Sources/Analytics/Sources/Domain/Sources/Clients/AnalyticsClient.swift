@@ -21,15 +21,19 @@ public struct AnalyticsClient {
 extension AnalyticsClient: DependencyKey {
     public static var liveValue: AnalyticsClient = {
         @Dependency(\.analyticsRepository) var repository
+        @Dependency(\.uuid) var uuid
+        @Dependency(\.date.now) var now
         
         return AnalyticsClient {
             try await repository.initialize()
         } setUserSession: { userID in
             await repository.setUserSession(with: userID)
         } endUserSession: { event in
-            await repository.endUserSession(with: event)
+            let occurrence = AnalyticsEventOccurrence(id: uuid(), occurredAt: now)
+            await repository.endUserSession(with: event, occurrence: occurrence)
         } logEvent: { event in
-            await repository.logEvent(event)
+            let occurrence = AnalyticsEventOccurrence(id: uuid(), occurredAt: now)
+            await repository.logEvent(event, occurrence: occurrence)
         }
     }()
 }

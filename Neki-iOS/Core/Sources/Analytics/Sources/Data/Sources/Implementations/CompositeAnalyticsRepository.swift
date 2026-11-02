@@ -31,18 +31,18 @@ public final actor CompositeAnalyticsRepository: AnalyticsRepository {
         }
     }
 
-    public func endUserSession(with event: any AnalyticsEvent) async {
+    public func endUserSession(with event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
         await enqueue { [repositories] in
             for repository in repositories {
-                await repository.endUserSession(with: event)
+                await repository.endUserSession(with: event, occurrence: occurrence)
             }
         }
     }
 
-    public func logEvent(_ event: any AnalyticsEvent) async {
+    public func logEvent(_ event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
         await enqueue { [repositories] in
             for repository in repositories {
-                await repository.logEvent(event)
+                await repository.logEvent(event, occurrence: occurrence)
             }
         }
     }

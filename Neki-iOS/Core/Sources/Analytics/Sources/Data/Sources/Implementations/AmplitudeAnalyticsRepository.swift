@@ -18,7 +18,7 @@ public final actor AmplitudeAnalyticsRepository: AnalyticsRepository {
             let amplitudeConfiguration = Configuration(
                 apiKey: configuration.apiKey,
                 minIdLength: configuration.minimumIdentifierLength,
-                autocapture: .appLifecycles,
+                autocapture: [.sessions, .appLifecycles],
                 enableAutoCaptureRemoteConfig: false
             )
             self.amplitude = Amplitude(configuration: amplitudeConfiguration)

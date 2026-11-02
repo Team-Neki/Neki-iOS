@@ -67,7 +67,9 @@ struct AccountPreferenceFeature {
                 state.isLogoutAlertPresented = false
                 state.isLoading = true
                 
+                // 로그아웃은 요청하기 전에 기록해, 요청이 실패해도 남깁니다. 사용자 ID는 로그아웃에 성공한 뒤 해제합니다.
                 return .run { send in
+                    await analytics.logEvent(MyPageAnalyticsEvent.logout)
                     try await authClient.signOut()
                     await send(.signOutSucceeded)
                 } catch: { error, send in
@@ -95,7 +97,7 @@ struct AccountPreferenceFeature {
                 
             case .signOutSucceeded:
                 return .run { send in
-                    await analytics.endUserSession(MyPageAnalyticsEvent.logout)
+                    await analytics.setUserSession(nil)
                     await send(.didSignOut)
                 }
                 

@@ -237,10 +237,14 @@ struct AppCoordinator {
             case let .analyticsSessionConfigured(status, shouldPresentMarketingConsentAlert):
                 guard state.pendingAnalyticsSessionStatus == status else { return .none }
                 state.pendingAnalyticsSessionStatus = nil
-                return navigateToNextScreen(
-                    state: &state,
-                    sessionStatus: status,
-                    shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                let appOpenEffect = logAppOpenIfAutoLoggedIn(route: state.route, status: status)
+                return .merge(
+                    appOpenEffect,
+                    navigateToNextScreen(
+                        state: &state,
+                        sessionStatus: status,
+                        shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                    )
                 )
                 
             case .route(.onboarding(.delegate(.didFinishOnboarding))):
@@ -452,6 +456,15 @@ private extension AppCoordinator {
             await analytics.setUserSession(userID)
         }
         .cancellable(id: CancelID.analyticsSessionConfiguration, cancelInFlight: true)
+    }
+
+    /// 자동 로그인에 성공해 스플래시를 벗어날 때 앱 실행을 기록합니다.
+    ///
+    /// 스플래시에서 로그인 상태로 넘어가는 것은 자동 로그인에 성공했을 때뿐입니다. 새로 로그인하면 로그인 화면에서 넘어오므로 기록하지 않습니다.
+    /// 사용자 ID를 지정한 뒤에 불러야 앱 실행이 그 사용자로 남습니다.
+    func logAppOpenIfAutoLoggedIn(route: Route.State, status: UserSessionStatus) -> Effect<Action> {
+        guard case .splash = route, case .signedIn = status else { return .none }
+        return .run { _ in await analytics.logEvent(AppAnalyticsEvent.appOpen) }
     }
 
     func navigateToNextScreen(

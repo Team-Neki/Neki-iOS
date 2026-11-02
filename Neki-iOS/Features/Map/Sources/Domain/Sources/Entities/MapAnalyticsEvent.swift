@@ -8,7 +8,10 @@
 import Foundation
 
 enum MapAnalyticsEvent {
-    /// 검색창을 통해 검색 모드에 정상 진입했을 때 기록합니다. 모드 내 재포커스는 제외합니다.
+    /// 지도 첫 화면이 보일 때마다 기록합니다. 탭을 옮겨 오거나 브랜드 순서 화면, QR·알림 목록에서 돌아올 때도 포함합니다.
+    case mapView
+    /// 검색창을 통해 검색 모드에 정상 진입했을 때 기록합니다.
+    /// 모드 내 재포커스와, 검색 결과를 지도에 띄운 상태에서 검색 화면으로 돌아가는 것은 제외합니다.
     case mapSearchView
     /// 검색 후보 첫 페이지의 정상 응답만 기록합니다. query는 입력 원문이며 기술적 실패와 POI 조회는 제외합니다.
     case mapSearchResult(query: String, resultStatus: MapSearchResultStatus)
@@ -35,6 +38,9 @@ enum MapAnalyticsEvent {
         pageResultCount: Int,
         hasNextPage: Bool
     )
+    /// `이 지역 재탐색`을 누를 때 기록합니다.
+    ///
+    /// regionChanged는 직전 재탐색 위치에서 누른 순간의 줌에 맞는 기준 거리 이상 옮겼는지입니다. 직전 재탐색이 없으면 `false`입니다.
     case mapReExplore(hasFilter: Bool, regionChanged: Bool)
     case mapBrandFilterToggle(action: MapFilterAction, selectedCount: Int, brandName: String, brandID: PhotoBoothBrand.ID)
     /// source는 선택 당시 지도에 적용된 결과의 출처입니다.
@@ -48,8 +54,10 @@ enum MapAnalyticsEvent {
     case boothFavoriteRemove(boothName: String, brandName: String, brandID: PhotoBoothBrand.ID)
     case favoriteBoothFilterOn(favoriteBoothCount: Int)
     case favoriteBoothFilterOff
+    /// 목록의 다른 탭에서 즐겨찾기 탭으로 바꿀 때, 그때 가진 즐겨찾기 수로 기록합니다.
     case favoriteBoothView(favoriteBoothCount: Int)
     case brandOrderSave(orderedBrands: [PhotoBoothBrand])
+    /// 길찾기 시트에서 지도 앱을 고를 때 기록합니다. 앱을 열 수 있는지는 따지지 않습니다.
     case mapRouteClick(mapType: DirectionAppType)
 }
 
@@ -59,6 +67,7 @@ enum MapAnalyticsEvent {
 extension MapAnalyticsEvent: AnalyticsEvent {
     var name: AnalyticsEventName {
         switch self {
+        case .mapView: return .mapView
         case .mapSearchView: return .mapSearchView
         case .mapSearchResult: return .mapSearchResult
         case .mapSearchCandidateSelect: return .mapSearchCandidateSelect
@@ -78,7 +87,7 @@ extension MapAnalyticsEvent: AnalyticsEvent {
     
     var parameters: [AnalyticsParameterKey: AnalyticsParameterValue]? {
         switch self {
-        case .mapSearchView:
+        case .mapView, .mapSearchView:
             return nil
         case let .mapSearchResult(query, resultStatus):
             return [.query: .string(query), .resultStatus: .string(resultStatus.rawValue)]

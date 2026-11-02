@@ -45,6 +45,8 @@ struct ArchiveFeature {
         case binding(BindingAction<State>)
         case clearData
         case onAppear
+        /// QR·알림 목록처럼 이 화면을 덮은 전체 화면이 닫혀 다시 보일 때 받습니다. 이때는 onAppear가 다시 불리지 않아 메인 탭이 알립니다.
+        case fullScreenCoverDismissed
         case onTapAllPhotos
         case onTapAllAlbums
         case openAppSettings
@@ -104,7 +106,14 @@ struct ArchiveFeature {
                 return .run { _ in try await archiveClient.clearCache() }
                 
             case .onAppear:
-                return .merge(.send(.fetchAlbums), .send(.fetchPhotos))
+                return .merge(
+                    .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.archivingView) },
+                    .send(.fetchAlbums),
+                    .send(.fetchPhotos)
+                )
+                
+            case .fullScreenCoverDismissed:
+                return .run { _ in await analyticsClient.logEvent(ArchiveAnalyticsEvent.archivingView) }
                 
             case let .onTapFavorite(item):
                 let newStatus = !item.isFavorite

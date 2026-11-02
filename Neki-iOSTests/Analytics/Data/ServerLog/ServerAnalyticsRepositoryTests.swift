@@ -33,6 +33,20 @@ struct ServerAnalyticsRepositoryTests {
         }
     }
 
+    @Test("순번은 발생 시각이 아니라 기록한 순서대로 매긴다")
+    func logEvent_numbersInRecordOrder() async throws {
+        let identity = IdentityStub(deviceID: "device-1", sessionID: 5_000)
+        try await withRepository(identity: identity) { repository, storage, _, _ in
+            await repository.logEvent(AnalyticsEventStub.appOpen, occurrence: occurrence(id: 1, at: 6_000))
+            await repository.logEvent(AnalyticsEventStub.mapView, occurrence: occurrence(id: 2, at: 5_500))
+
+            let logs = try await storedLogs(in: storage)
+
+            #expect(logs.map { $0["eventType"] as? String } == ["map_view", "app_open"])
+            #expect(logs.map { $0["sequenceNumber"] as? Int } == [2, 1])
+        }
+    }
+
     @Test("Amplitude가 꺼진 빌드처럼 기기 ID가 없으면 서버로 보낼 로그를 남기지 않는다")
     func logEvent_withoutDeviceID_storesNothing() async throws {
         let identity = IdentityStub(deviceID: nil, sessionID: 5_000)

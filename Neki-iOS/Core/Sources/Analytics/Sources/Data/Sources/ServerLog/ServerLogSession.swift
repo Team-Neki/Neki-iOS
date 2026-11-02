@@ -27,6 +27,7 @@ struct ServerLogSession: Codable, Equatable, Sendable {
 
     /// 이벤트 한 건의 세션 ID와 순번을 정하고, 같은 시각으로 자체 계산한 세션 ID를 함께 돌려줍니다.
     /// - Parameter sdkSessionID: 서버로 보낼 Amplitude SDK 세션 ID. SDK가 이벤트를 아직 처리하지 않아 세션이 없으면(-1) SDK가 열 세션과 같은 자체 계산 값을 씁니다.
+    /// - Note: 순번은 서버 저장소가 기록한 순서(Composite가 처리한 순서)로 매깁니다. 동시에 기록하면 발생 시각 순서와 어긋날 수 있지만, 그 차이는 Composite 큐에 들어가기 전의 짧은 시간뿐입니다.
     mutating func number(
         eventAt timestamp: Int64,
         inForeground: Bool,

@@ -22,6 +22,17 @@ struct ServerLogSessionTests {
         #expect(result.sequenceNumber == 1)
     }
 
+    @Test("SDK 세션이 아직 없으면 SDK가 열 세션과 같은 자체 계산 값으로 순번을 매긴다")
+    func number_withoutSDKSession_usesComputedSession() {
+        var session = ServerLogSession()
+
+        let result = session.number(eventAt: start, inForeground: false, sessionID: -1)
+
+        #expect(result.sessionID == start)
+        #expect(result.sequenceNumber == 1)
+        #expect(result.computedSessionID == start)
+    }
+
     @Test("포그라운드에서는 만료 시간이 지나도 같은 세션을 잇는다")
     func number_inForeground_keepsSessionPastTimeout() {
         var session = ServerLogSession()

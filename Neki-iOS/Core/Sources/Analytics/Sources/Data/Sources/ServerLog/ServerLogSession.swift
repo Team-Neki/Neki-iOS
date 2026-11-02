@@ -25,19 +25,21 @@ struct ServerLogSession: Codable, Equatable, Sendable {
     /// 마지막으로 알려진 회원 ID. Amplitude처럼 재실행해도 유지합니다.
     private(set) var userID: String?
 
-    /// 이벤트 한 건의 순번을 정하고, 같은 시각으로 자체 계산한 세션 ID를 돌려줍니다.
+    /// 이벤트 한 건의 세션 ID와 순번을 정하고, 같은 시각으로 자체 계산한 세션 ID를 함께 돌려줍니다.
+    /// - Parameter sdkSessionID: 서버로 보낼 Amplitude SDK 세션 ID. SDK가 이벤트를 아직 처리하지 않아 세션이 없으면(-1) SDK가 열 세션과 같은 자체 계산 값을 씁니다.
     mutating func number(
         eventAt timestamp: Int64,
         inForeground: Bool,
-        sessionID sentSessionID: Int64
-    ) -> (sequenceNumber: Int, computedSessionID: Int64) {
+        sessionID sdkSessionID: Int64
+    ) -> (sessionID: Int64, sequenceNumber: Int, computedSessionID: Int64) {
         startNewSessionIfNeeded(at: timestamp, inForeground: inForeground)
+        let sentSessionID = sdkSessionID >= 0 ? sdkSessionID : sessionID
         if numberedSessionID != sentSessionID {
             numberedSessionID = sentSessionID
             lastSequenceNumber = 0
         }
         lastSequenceNumber += 1
-        return (lastSequenceNumber, sessionID)
+        return (sentSessionID, lastSequenceNumber, sessionID)
     }
 
     /// 포그라운드로 돌아올 때(SDK `onEnterForeground`). SDK처럼 돌아오기 전 상태로 판정합니다.

@@ -38,11 +38,27 @@ struct AnalyticsRepositoryCall: Equatable {
     let occurrence: AnalyticsEventOccurrence
 }
 
+struct AnalyticsUserSessionChange: Equatable {
+    let repository: String
+    let userID: Int?
+    let changedAt: Date
+}
+
 actor AnalyticsCallLog {
     private(set) var calls: [AnalyticsRepositoryCall] = []
+    private(set) var userSessionChanges: [AnalyticsUserSessionChange] = []
+    private(set) var flushedRepositories: [String] = []
 
     func append(_ call: AnalyticsRepositoryCall) {
         calls.append(call)
+    }
+
+    func append(_ change: AnalyticsUserSessionChange) {
+        userSessionChanges.append(change)
+    }
+
+    func appendFlush(repository: String) {
+        flushedRepositories.append(repository)
     }
 }
 
@@ -57,7 +73,9 @@ actor AnalyticsRepositorySpy: AnalyticsRepository {
 
     func initialize() async throws {}
 
-    func setUserSession(with userID: Int?) async {}
+    func setUserSession(with userID: Int?, changedAt: Date) async {
+        await log.append(AnalyticsUserSessionChange(repository: name, userID: userID, changedAt: changedAt))
+    }
 
     func endUserSession(with event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
         await log.append(AnalyticsRepositoryCall(
@@ -75,5 +93,9 @@ actor AnalyticsRepositorySpy: AnalyticsRepository {
             eventName: event.name,
             occurrence: occurrence
         ))
+    }
+
+    func flush() async {
+        await log.appendFlush(repository: name)
     }
 }

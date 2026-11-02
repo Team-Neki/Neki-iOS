@@ -40,6 +40,24 @@ struct CompositeAnalyticsRepositoryTests {
         ])
     }
 
+    @Test("회원 변경과 flush도 같은 값으로 등록 순서대로 모든 저장소에 넘긴다")
+    func setUserSessionAndFlush_forwardToAllRepositories() async {
+        let log = AnalyticsCallLog()
+        let repository = makeRepository(log: log)
+        let changedAt = Date(timeIntervalSince1970: 1_793_610_697.25)
+
+        await repository.setUserSession(with: 1, changedAt: changedAt)
+        await repository.flush()
+        let userSessionChanges = await log.userSessionChanges
+        let flushedRepositories = await log.flushedRepositories
+
+        #expect(userSessionChanges == [
+            AnalyticsUserSessionChange(repository: "first", userID: 1, changedAt: changedAt),
+            AnalyticsUserSessionChange(repository: "second", userID: 1, changedAt: changedAt)
+        ])
+        #expect(flushedRepositories == ["first", "second"])
+    }
+
     @Test("동시에 기록해도 이벤트마다 자기 발생 정보를 모든 저장소에 이어서 넘긴다")
     func logEvent_whenConcurrent_keepsEachOccurrenceTogether() async {
         let log = AnalyticsCallLog()

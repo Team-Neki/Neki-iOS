@@ -42,6 +42,25 @@ struct AnalyticsClientTests {
         ])
     }
 
+    @Test("회원 변경은 그 시점의 시각과 함께 넘기고, flush는 그대로 넘긴다")
+    func liveValue_forwardsUserChangeTimeAndFlush() async {
+        let log = AnalyticsCallLog()
+        let changedAt = Date(timeIntervalSince1970: 1_793_610_697.25)
+
+        await withDependencies {
+            $0.analyticsRepository = AnalyticsRepositorySpy(name: "composite", log: log)
+            $0.date = .constant(changedAt)
+        } operation: {
+            await AnalyticsClient.liveValue.setUserSession(1)
+            await AnalyticsClient.liveValue.flush()
+        }
+        let userSessionChanges = await log.userSessionChanges
+        let flushedRepositories = await log.flushedRepositories
+
+        #expect(userSessionChanges == [AnalyticsUserSessionChange(repository: "composite", userID: 1, changedAt: changedAt)])
+        #expect(flushedRepositories == ["composite"])
+    }
+
     @Test("이벤트 ID는 소문자 UUID 문자열로 만든다")
     func occurrence_usesLowercasedUUIDString() {
         let occurrence = AnalyticsEventOccurrence(

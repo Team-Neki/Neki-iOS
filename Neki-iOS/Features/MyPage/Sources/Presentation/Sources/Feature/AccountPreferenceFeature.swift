@@ -80,6 +80,8 @@ struct AccountPreferenceFeature {
                 state.isLoading = true
                 
                 return .run { [userID = state.user.id] send in
+                    // 탈퇴에 성공하면 이 회원의 남은 서버 로그를 지우므로, 탈퇴 요청 전에 보내 둡니다.
+                    await analytics.flush()
                     try await authClient.withdraw()
                     UserDefaults.standard.removeObject(forKey: "TermsAgreed_\(userID)")
                     await send(.withdrawSucceeded)

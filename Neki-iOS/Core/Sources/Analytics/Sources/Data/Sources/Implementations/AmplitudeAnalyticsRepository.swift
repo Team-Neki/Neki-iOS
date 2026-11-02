@@ -37,8 +37,8 @@ public final actor AmplitudeAnalyticsRepository: AnalyticsRepository {
         throw initializationError
     }
 
-    public func setUserSession(with userID: Int?) async {
-        amplitude?.setUserId(userId: userID.map(String.init))
+    public func setUserSession(with userID: Int?, changedAt: Date) async {
+        updateUserID(userID.map(String.init), changedAt: changedAt.epochMilliseconds)
     }
 
     public func endUserSession(with event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
@@ -47,7 +47,7 @@ public final actor AmplitudeAnalyticsRepository: AnalyticsRepository {
             eventProperties: event.rawParameters,
             options: Self.eventOptions(for: occurrence)
         )
-        amplitude?.setUserId(userId: nil)
+        updateUserID(nil, changedAt: occurrence.occurredAtMilliseconds)
     }
 
     public func logEvent(_ event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
@@ -56,6 +56,42 @@ public final actor AmplitudeAnalyticsRepository: AnalyticsRepository {
             eventProperties: event.rawParameters,
             options: Self.eventOptions(for: occurrence)
         )
+    }
+
+    public func flush() async {
+        amplitude?.flush()
+    }
+}
+
+
+// MARK: - User Session
+
+private extension AmplitudeAnalyticsRepository {
+    /// 회원 ID를 바꿉니다. 회원 ID가 없어지거나 다른 회원으로 바뀌면 같은 시각으로 새 세션을 엽니다(#383 4.4).
+    /// - Note: 서버 로그의 `ServerLogSession`도 같은 시각으로 새 세션을 열어, 두 세션 ID가 같게 유지됩니다.
+    /// - Note: Amplitude SDK 제거 시 `setSessionId` 호출을 지우고 `ServerLogSession`만 새 세션을 엽니다.
+    func updateUserID(_ userID: String?, changedAt timestamp: Int64) {
+        guard let amplitude else { return }
+        let isLeaving = amplitude.getUserId().map { $0 != userID } ?? false
+        amplitude.setUserId(userId: userID)
+        if isLeaving { amplitude.setSessionId(timestamp: timestamp) }
+    }
+}
+
+
+// MARK: - Identity
+
+extension AmplitudeAnalyticsRepository: AnalyticsIdentityProviding {
+    /// Amplitude가 UserDefaults에 저장해 둔 `device_id`
+    /// - Note: Amplitude SDK 제거 시 같은 suite(`com.amplitude.storage.amplitude-swift-storage-<API 키>-$default_instance`)의 `device_id`를 직접 읽습니다. 값이 없으면 SDK와 같은 규칙(IDFV → UUID)으로 만들어 같은 키에 씁니다. suite 이름에 API 키가 들어가므로 키 값은 SDK를 걷어 낸 뒤에도 남겨 둡니다.
+    func deviceID() -> String? {
+        amplitude?.getDeviceId()
+    }
+
+    /// 지금 Amplitude 세션 ID. 세션이 없으면 -1
+    /// - Note: Amplitude SDK 제거 시 `ServerLogSession`이 계산한 값을 씁니다.
+    func sessionID() -> Int64 {
+        amplitude?.getSessionId() ?? -1
     }
 }
 

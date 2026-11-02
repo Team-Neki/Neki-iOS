@@ -10,7 +10,7 @@ import os
 import UIKit
 
 /// 저장한 로그를 모아 서버로 보냅니다(Amplitude-Swift `EventPipeline`).
-/// - Note: SDK처럼 쌓인 수·타이머·백그라운드 진입에 맞춰 보내고, 업로드는 한 번에 하나만 합니다. SDK와 달리 실행·포그라운드 복귀 때도 보내고, 실패가 이어져도 멈추지 않고 보관 한도 안에서 계속 다시 보냅니다.
+/// - Note: SDK처럼 쌓인 수·타이머·백그라운드 진입에 맞춰 보내고, 업로드는 한 번에 하나만 합니다. Android(`ServerAnalyticsLogger`)처럼 로그인 때도 보냅니다. SDK와 달리 실패가 이어져도 멈추지 않고 보관 한도 안에서 계속 다시 보냅니다.
 actor ServerLogPipeline {
     struct Configuration: Sendable {
         /// 이만큼 쌓이면 바로 보냅니다.
@@ -65,7 +65,7 @@ actor ServerLogPipeline {
         self.jitter = jitter
     }
 
-    /// 타이머를 켜고 남아 있는 로그를 보냅니다.
+    /// 타이머를 켭니다. SDK·Android와 같이 실행 직후에는 보내지 않고, 첫 전송은 타이머나 쌓인 수를 따릅니다.
     func start() {
         guard timerTask == nil else { return }
         timerTask = Task { [clock, flushInterval = configuration.flushInterval] in
@@ -75,7 +75,6 @@ actor ServerLogPipeline {
                 self.flush(ignoringRetryDelay: false)
             }
         }
-        flush()
     }
 
     func stop() {
@@ -102,7 +101,7 @@ actor ServerLogPipeline {
     }
 
     /// 업로드 중이 아니면 바로 보냅니다.
-    /// - Parameter ignoringRetryDelay: 실행·포그라운드 복귀·백그라운드 진입처럼 지금 보내야 할 때는 실패 뒤 대기 시간을 무시합니다.
+    /// - Parameter ignoringRetryDelay: 백그라운드 진입처럼 지금 보내야 할 때는 실패 뒤 대기 시간을 무시합니다.
     func flush(ignoringRetryDelay: Bool = true) {
         guard uploadTask == nil else { return }
         if ignoringRetryDelay == false, let retryAvailableAt, now() < retryAvailableAt { return }

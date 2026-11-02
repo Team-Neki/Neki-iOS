@@ -27,6 +27,20 @@ struct ServerLogPipelineTests {
         }
     }
 
+    @Test("실행 직후 start는 타이머만 켜고 바로 보내지 않는다")
+    func start_doesNotSendImmediately() async throws {
+        let session = ScriptedURLSession { _ in 200 }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+
+            await pipeline.start()
+            await pipeline.waitForUpload()
+
+            #expect(session.requests.isEmpty)
+            #expect(await storage.events().map(\.eventID) == ["a"])
+        }
+    }
+
     @Test("회원마다 배치를 나누고, 지금 로그인한 회원이 남긴 로그에만 토큰을 붙인다")
     func flush_splitsBatchesByUserAndAuthorizesCurrentUserOnly() async throws {
         let session = ScriptedURLSession { _ in 200 }

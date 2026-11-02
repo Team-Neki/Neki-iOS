@@ -124,6 +124,39 @@ struct ServerAnalyticsRepositoryTests {
         }
     }
 
+    @Test("로그인하면 쌓인 로그를 보낸다")
+    func setUserSession_whenSignedIn_sendsStoredLogs() async throws {
+        let identity = IdentityStub(deviceID: "device-1", sessionID: 1_000)
+        try await withFixture(identity: identity) { fixture in
+            await fixture.repository.logEvent(AnalyticsEventStub.appOpen, occurrence: occurrence(id: 1, at: 1_000))
+            await fixture.pipeline.waitForUpload()
+            let requestCountBeforeSignIn = fixture.session.requests.count
+
+            await fixture.repository.setUserSession(with: 1, changedAt: Date(timeIntervalSince1970: 2))
+            await fixture.pipeline.waitForUpload()
+
+            #expect(requestCountBeforeSignIn == 0)
+            #expect(fixture.session.requests.map(\.logEventIDs) == [[occurrence(id: 1, at: 1_000).id]])
+        }
+    }
+
+    @Test("포그라운드로 돌아올 때는 보내지 않고, 백그라운드에 들어갈 때 보낸다")
+    func lifecycle_sendsOnlyWhenEnteringBackground() async throws {
+        let identity = IdentityStub(deviceID: "device-1", sessionID: 1_000)
+        try await withFixture(identity: identity) { fixture in
+            await fixture.repository.logEvent(AnalyticsEventStub.appOpen, occurrence: occurrence(id: 1, at: 1_000))
+            await fixture.repository.applicationWillEnterForeground()
+            await fixture.pipeline.waitForUpload()
+            let requestCountAfterForeground = fixture.session.requests.count
+
+            await fixture.repository.applicationDidEnterBackground()
+            await fixture.pipeline.waitForUpload()
+
+            #expect(requestCountAfterForeground == 0)
+            #expect(fixture.session.requests.count == 1)
+        }
+    }
+
     @Test(
         "포그라운드 진입을 따로 받아 생긴 1분 미만의 차이는 같은 세션으로 본다",
         arguments: zip([Int64(0), 835, -59_999, 60_000, -300_000], [true, true, true, false, false])
@@ -178,10 +211,25 @@ private extension ServerAnalyticsRepositoryTests {
         }
     }
 
+    struct Fixture {
+        let repository: ServerAnalyticsRepository
+        let pipeline: ServerLogPipeline
+        let storage: ServerLogStorage
+        let sessionStore: ServerLogSessionStore
+        let session: ScriptedURLSession
+        let now: NowStub
+    }
+
     func withRepository(
         identity: IdentityStub,
         operation: (ServerAnalyticsRepository, ServerLogStorage, ServerLogSessionStore, NowStub) async throws -> Void
     ) async throws {
+        try await withFixture(identity: identity) { fixture in
+            try await operation(fixture.repository, fixture.storage, fixture.sessionStore, fixture.now)
+        }
+    }
+
+    func withFixture(identity: IdentityStub, operation: (Fixture) async throws -> Void) async throws {
         let directory = makeTemporaryDirectory()
         let suiteName = "ServerAnalyticsRepositoryTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -190,10 +238,11 @@ private extension ServerAnalyticsRepositoryTests {
             defaults.removePersistentDomain(forName: suiteName)
         }
         let now = NowStub(0)
+        let session = ScriptedURLSession { _ in 503 }
         let storage = ServerLogStorage(directory: directory)
         let pipeline = ServerLogPipeline(
             storage: storage,
-            client: ServerLogHttpClient(session: ScriptedURLSession { _ in 503 }),
+            client: ServerLogHttpClient(session: session),
             tokenReader: AccessTokenReaderStub(token: nil),
             backgroundTask: BackgroundTaskStub(),
             configuration: .test(),
@@ -210,8 +259,16 @@ private extension ServerAnalyticsRepositoryTests {
             isApplicationActive: { false },
             makeContext: { ServerLogContext(appVersion: "1.2.9", values: ["os_name": "ios"]) }
         )
+        let fixture = Fixture(
+            repository: repository,
+            pipeline: pipeline,
+            storage: storage,
+            sessionStore: sessionStore,
+            session: session,
+            now: now
+        )
         do {
-            try await operation(repository, storage, sessionStore, now)
+            try await operation(fixture)
         } catch {
             await pipeline.stop()
             throw error

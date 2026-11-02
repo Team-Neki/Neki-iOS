@@ -56,6 +56,10 @@ final actor ServerAnalyticsRepository: AnalyticsRepository {
 
     func setUserSession(with userID: Int?, changedAt: Date) async {
         await updateUserID(userID.map(String.init), at: changedAt.epochMilliseconds)
+        // Android와 같이 로그인(자동 로그인 포함)하면 쌓인 로그를 보냅니다.
+        if userID != nil {
+            await pipeline.flush(ignoringRetryDelay: false)
+        }
     }
 
     func endUserSession(with event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
@@ -82,12 +86,11 @@ final actor ServerAnalyticsRepository: AnalyticsRepository {
 // MARK: - Lifecycle
 
 extension ServerAnalyticsRepository {
-    /// 포그라운드로 돌아올 때(SDK `onEnterForeground`)
+    /// 포그라운드로 돌아올 때(SDK `onEnterForeground`). SDK·Android와 같이 이때는 보내지 않습니다.
     func applicationWillEnterForeground() async {
         session.enterForeground(at: now())
         sessionStore.save(session)
         isForeground = true
-        await pipeline.flush()
     }
 
     /// SDK처럼 실행 직후처럼 아직 포그라운드가 아닐 때만 받습니다. 제어 센터 등에서 돌아오는 활성화는 무시합니다.

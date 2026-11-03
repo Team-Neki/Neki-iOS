@@ -291,6 +291,7 @@ private extension ServerAnalyticsRepositoryTests {
             client: ServerLogHttpClient(session: session),
             tokenReader: AccessTokenReaderStub(token: nil),
             backgroundTask: BackgroundTaskStub(),
+            networkPath: NetworkPathStub(),
             configuration: .test(),
             now: { now.value },
             jitter: { _ in .zero }

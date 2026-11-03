@@ -8,19 +8,21 @@
 import Dependencies
 import Foundation
 
-/// 서버 로그가 쓰는 앱 생명주기, background task, 기기 정보
-/// - Note: Data 계층에는 계약만 둡니다. UIKit 구현은 APP 계층(`ServerLogPlatform+Live`)이 `liveValue`로 채웁니다.
+/// 서버 로그가 쓰는 앱 생명주기, background task, 기기 정보, 네트워크 경로
+/// - Note: Data 계층에는 계약만 둡니다. UIKit·Network 구현은 APP 계층(`ServerLogPlatform+Live`)이 `liveValue`로 채웁니다.
 struct ServerLogPlatform: Sendable {
     var lifecycle: any ApplicationLifecycleObserving
     var backgroundTask: any ServerLogBackgroundTaskStarting
     var deviceSystem: any DeviceSystemReading
+    var networkPath: any NetworkPathObserving
 }
 
 enum ServerLogPlatformKey: TestDependencyKey {
     static let testValue = ServerLogPlatform(
         lifecycle: InactiveApplicationLifecycle(),
         backgroundTask: NoBackgroundTask(),
-        deviceSystem: UnknownDeviceSystem()
+        deviceSystem: UnknownDeviceSystem(),
+        networkPath: UnchangingNetworkPath()
     )
 }
 
@@ -84,4 +86,18 @@ protocol DeviceSystemReading: Sendable {
 /// 알 수 없는 기기(테스트 기본값)
 private struct UnknownDeviceSystem: DeviceSystemReading {
     func read() async -> DeviceSystem { DeviceSystem(name: "", version: "") }
+}
+
+
+// MARK: - Network Path
+
+/// 네트워크로 나갈 수 있는지 알려 줍니다(Amplitude-Swift `NetworkConnectivityCheckerPlugin`).
+protocol NetworkPathObserving: Sendable {
+    /// 부르면 지금 경로부터, 경로가 바뀔 때마다 나갈 수 있는지(`NWPath.Status.satisfied`)를 줍니다.
+    func updates() -> AsyncStream<Bool>
+}
+
+/// 경로를 알리지 않아 계속 연결된 것으로 보는 네트워크(테스트 기본값)
+private struct UnchangingNetworkPath: NetworkPathObserving {
+    func updates() -> AsyncStream<Bool> { AsyncStream { $0.finish() } }
 }

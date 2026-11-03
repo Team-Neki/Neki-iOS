@@ -30,4 +30,15 @@ struct ServerLogPlatformLiveTests {
 
         #expect(received == [.didEnterBackground, .willEnterForeground, .didBecomeActive])
     }
+
+    @Test("네트워크 경로는 구독하면 지금 경로부터 알린다", .timeLimit(.minutes(1)))
+    func networkPath_yieldsCurrentPath() async {
+        var received: Bool?
+        for await isSatisfied in NWPathMonitorNetworkPath().updates() {
+            received = isSatisfied
+            break
+        }
+
+        #expect(received != nil)
+    }
 }

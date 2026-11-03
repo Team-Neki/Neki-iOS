@@ -7,13 +7,15 @@
 
 import Dependencies
 import Foundation
+import Network
 import UIKit
 
 extension ServerLogPlatformKey: DependencyKey {
     static let liveValue = ServerLogPlatform(
         lifecycle: UIKitApplicationLifecycle(),
         backgroundTask: UIKitBackgroundTask(),
-        deviceSystem: UIKitDeviceSystem()
+        deviceSystem: UIKitDeviceSystem(),
+        networkPath: NWPathMonitorNetworkPath()
     )
 }
 
@@ -105,6 +107,24 @@ struct UIKitDeviceSystem: DeviceSystemReading {
     func read() async -> DeviceSystem {
         await MainActor.run {
             DeviceSystem(name: UIDevice.current.systemName, version: UIDevice.current.systemVersion)
+        }
+    }
+}
+
+
+// MARK: - Network Path
+
+/// `NWPathMonitor`로 네트워크 경로를 알려 줍니다(Amplitude-Swift `PathCreation`과 같은 출처).
+struct NWPathMonitorNetworkPath: NetworkPathObserving {
+    /// 부를 때 감시를 시작하고, 스트림이 끝나면 멈춥니다. `NWPathMonitor`는 시작하자마자 지금 경로를 한 번 알립니다.
+    func updates() -> AsyncStream<Bool> {
+        AsyncStream { continuation in
+            let monitor = NWPathMonitor()
+            monitor.pathUpdateHandler = { path in
+                continuation.yield(path.status == .satisfied)
+            }
+            continuation.onTermination = { _ in monitor.cancel() }
+            monitor.start(queue: DispatchQueue(label: "com.neki.analytics.network"))
         }
     }
 }

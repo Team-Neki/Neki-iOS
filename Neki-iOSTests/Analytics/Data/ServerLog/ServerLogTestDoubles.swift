@@ -105,6 +105,26 @@ struct ApplicationLifecycleStub: ApplicationLifecycleObserving {
     }
 }
 
+/// 테스트가 보내는 네트워크 경로 변화를 그대로 넘기는 대역
+struct NetworkPathStub: NetworkPathObserving {
+    private let stream: AsyncStream<Bool>
+    private let continuation: AsyncStream<Bool>.Continuation
+
+    init() {
+        let (stream, continuation) = AsyncStream.makeStream(of: Bool.self)
+        self.stream = stream
+        self.continuation = continuation
+    }
+
+    func updates() -> AsyncStream<Bool> {
+        stream
+    }
+
+    func send(isSatisfied: Bool) {
+        continuation.yield(isSatisfied)
+    }
+}
+
 /// 다른 Task가 처리하는 일을 조건이 맞을 때까지 잠깐씩 기다립니다. 시간 안에 맞으면 `true`
 func eventually(timeout: Duration = .seconds(2), _ condition: () async -> Bool) async -> Bool {
     let deadline = ContinuousClock.now.advanced(by: timeout)

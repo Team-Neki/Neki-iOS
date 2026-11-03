@@ -9,7 +9,8 @@ import Foundation
 import os
 
 /// 저장한 로그를 모아 서버로 보냅니다(Amplitude-Swift `EventPipeline`).
-/// - Note: SDK처럼 쌓인 수·타이머·백그라운드 진입에 맞춰 보내고, 업로드는 한 번에 하나만 합니다. Android(`ServerAnalyticsLogger`)처럼 로그인 때도 보냅니다. SDK와 달리 실패가 이어져도 멈추지 않고 보관 한도 안에서 계속 다시 보냅니다.
+/// - Note: SDK처럼 쌓인 수·타이머·백그라운드 진입에 맞춰 보내고, 업로드는 한 번에 하나만 합니다. Android(`ServerAnalyticsLogger`)처럼 로그인 때도 보냅니다.
+/// - Note: SDK처럼 네트워크 경로가 끊기거나, 연결 오류가 나거나, 7번 연속 실패하면 저장만 하고, 경로 감시가 연결됨을 알리면 한 번 보냅니다. SDK와 달리 실패 횟수는 보내서 성공했을 때만 0으로 되돌립니다.
 actor ServerLogPipeline {
     struct Configuration: Sendable {
         /// 이만큼 쌓이면 바로 보냅니다.
@@ -20,17 +21,22 @@ actor ServerLogPipeline {
         var minimumRetryDelay: Duration = .seconds(1)
         /// 실패한 뒤 다시 보내기까지의 최대 대기 시간
         var maximumRetryDelay: Duration = .seconds(300)
+        /// 실패한 뒤 다시 보내는 최대 횟수. 이만큼 다시 보내도 실패하면(7번째 연속 실패) 네트워크 경로가 바뀔 때까지 멈춥니다(SDK `flushMaxRetries`).
+        var maximumRetryCount = 6
     }
 
     fileprivate enum SendOutcome {
         case delivered
         case stalled
+        /// 연결 오류로 보내지 못함
+        case disconnected
     }
 
     private let storage: ServerLogStorage
     private let client: ServerLogHttpClient
     private let tokenReader: any ServerLogAccessTokenReading
     private let backgroundTask: any ServerLogBackgroundTaskStarting
+    private let networkPath: any NetworkPathObserving
     private let configuration: Configuration
     private let clock: any Clock<Duration>
     private let now: @Sendable () -> Int64
@@ -40,15 +46,21 @@ actor ServerLogPipeline {
     private var storedCountSinceUpload = 0
     private var failureCount = 0
     private var retryAvailableAt: Int64?
+    /// 네트워크 경로로 나갈 수 있는지. 경로를 알기 전에는 나갈 수 있다고 봅니다.
+    private var isPathSatisfied = true
+    /// 연결 오류나 연속 실패로 멈췄는지. 경로 감시가 연결됨을 알리면 풉니다.
+    private var isPausedAfterFailures = false
     private var uploadTask: Task<Void, Never>?
     private var retryTask: Task<Void, Never>?
     private var timerTask: Task<Void, Never>?
+    private var networkTask: Task<Void, Never>?
 
     init(
         storage: ServerLogStorage = ServerLogStorage(),
         client: ServerLogHttpClient = ServerLogHttpClient(),
         tokenReader: any ServerLogAccessTokenReading,
         backgroundTask: any ServerLogBackgroundTaskStarting,
+        networkPath: any NetworkPathObserving,
         configuration: Configuration = Configuration(),
         clock: any Clock<Duration> = ContinuousClock(),
         now: @escaping @Sendable () -> Int64 = { Date().epochMilliseconds },
@@ -58,13 +70,14 @@ actor ServerLogPipeline {
         self.client = client
         self.tokenReader = tokenReader
         self.backgroundTask = backgroundTask
+        self.networkPath = networkPath
         self.configuration = configuration
         self.clock = clock
         self.now = now
         self.jitter = jitter
     }
 
-    /// 타이머를 켭니다. SDK·Android와 같이 실행 직후에는 보내지 않고, 첫 전송은 타이머나 쌓인 수를 따릅니다.
+    /// 타이머와 네트워크 경로 감시를 켭니다. SDK·Android와 같이 실행 직후에는 보내지 않고, 첫 전송은 타이머나 쌓인 수를 따릅니다.
     func start() {
         guard timerTask == nil else { return }
         timerTask = Task { [clock, flushInterval = configuration.flushInterval] in
@@ -74,20 +87,44 @@ actor ServerLogPipeline {
                 self.flush(ignoringRetryDelay: false)
             }
         }
+        let pathUpdates = networkPath.updates()
+        networkTask = Task {
+            for await isSatisfied in pathUpdates {
+                self.networkPathChanged(isSatisfied: isSatisfied)
+            }
+        }
     }
 
     func stop() {
         timerTask?.cancel()
         retryTask?.cancel()
         uploadTask?.cancel()
+        networkTask?.cancel()
         timerTask = nil
         retryTask = nil
         uploadTask = nil
+        networkTask = nil
     }
 
     /// 토큰을 붙일 회원. 이 회원이 남긴 로그에만 토큰을 붙입니다.
     func updateCurrentUserID(_ userID: String?) {
         currentUserID = userID
+    }
+
+    /// 네트워크 경로가 바뀔 때(SDK `NetworkConnectivityCheckerPlugin`). 끊기면 멈추고, 연결됨이면 멈춤을 모두 풀고 멈춰 있었을 때만 한 번 보냅니다. 실패 횟수는 그대로 둡니다.
+    func networkPathChanged(isSatisfied: Bool) {
+        guard isSatisfied else {
+            if isPathSatisfied { Logger.analytics.debug("네트워크 경로가 끊겨 서버 로그 전송을 멈춤") }
+            isPathSatisfied = false
+            cancelRetry()
+            return
+        }
+        let wasOffline = isOffline
+        isPathSatisfied = true
+        isPausedAfterFailures = false
+        guard wasOffline else { return }
+        Logger.analytics.debug("네트워크 경로가 이어져 서버 로그를 다시 보냄")
+        flush()
     }
 
     /// 로그를 저장하고, 쌓인 수가 기준에 닿으면 보냅니다.
@@ -99,15 +136,16 @@ actor ServerLogPipeline {
         }
     }
 
-    /// 업로드 중이 아니면 바로 보냅니다.
-    /// - Parameter ignoringRetryDelay: 백그라운드 진입처럼 지금 보내야 할 때는 실패 뒤 대기 시간을 무시합니다.
+    /// 오프라인이 아니고 업로드 중이 아니면 바로 보냅니다.
+    /// - Parameter ignoringRetryDelay: 백그라운드 진입처럼 지금 보내야 할 때는 실패 뒤 대기 시간을 무시합니다. 오프라인이면 이때도 보내지 않습니다.
     func flush(ignoringRetryDelay: Bool = true) {
-        guard uploadTask == nil else { return }
+        guard isOffline == false, uploadTask == nil else { return }
         if ignoringRetryDelay == false, let retryAvailableAt, now() < retryAvailableAt { return }
         uploadTask = Task { await self.uploadStoredEvents() }
     }
 
     /// 바로 보내고, 업로드가 끝나거나 `timeout`이 지날 때까지 기다립니다. 시간이 지나도 업로드는 이어서 합니다.
+    /// 오프라인이면 새로 보내지 않으므로, 진행 중인 업로드가 없으면 바로 돌아옵니다.
     func flushAndWait(timeout: Duration) async {
         flush()
         guard let uploadTask else { return }
@@ -181,7 +219,7 @@ private extension ServerLogPipeline {
             retryAvailableAt = nil
             storedCountSinceUpload = 0
         } else {
-            scheduleRetry()
+            handleFailure(isConnectionFailure: outcome == .disconnected)
         }
         await logStatus(deliveredCount: deliveredCount)
         uploadTask = nil
@@ -210,10 +248,13 @@ private extension ServerLogPipeline {
             return .delivered
         case .split:
             let half = batch.count / 2
-            guard await send(Array(batch[..<half])) == .delivered else { return .stalled }
+            let firstOutcome = await send(Array(batch[..<half]))
+            guard firstOutcome == .delivered else { return firstOutcome }
             return await send(Array(batch[half...]))
-        case .retryWithoutAuthorization, .retryLater, .waitForConnection:
+        case .retryWithoutAuthorization, .retryLater:
             return .stalled
+        case .waitForConnection:
+            return .disconnected
         }
     }
 
@@ -223,8 +264,28 @@ private extension ServerLogPipeline {
         return await tokenReader.usableAccessToken()
     }
 
-    func scheduleRetry() {
+    /// 오프라인이면 저장만 하고 보내지 않습니다.
+    var isOffline: Bool {
+        isPathSatisfied == false || isPausedAfterFailures
+    }
+
+    /// 보내지 못했을 때. SDK처럼 연결 오류는 첫 실패에, 그 밖은 `maximumRetryCount`번 다시 보내도 실패하면 멈춥니다. 오프라인이 아니면 대기 시간 뒤 다시 보냅니다.
+    func handleFailure(isConnectionFailure: Bool) {
+        // SDK와 달리 실패 횟수는 보내서 성공했을 때만 0으로 되돌립니다. 그래서 멈춘 뒤 다시 보낸 한 번이 실패하면 바로 다시 멈춥니다.
         failureCount += 1
+        if isConnectionFailure || failureCount > configuration.maximumRetryCount {
+            isPausedAfterFailures = true
+            let reason = isConnectionFailure ? "연결 오류" : "\(failureCount)번 연속 실패"
+            Logger.analytics.error("서버 로그 전송을 멈춤: \(reason, privacy: .public), 네트워크 경로가 바뀌면 다시 보냄")
+        }
+        if isOffline {
+            cancelRetry()
+        } else {
+            scheduleRetry()
+        }
+    }
+
+    func scheduleRetry() {
         let baseDelay = Self.retryDelay(failureCount: failureCount, configuration: configuration)
         let delay = baseDelay + jitter(baseDelay)
         retryAvailableAt = now() + delay.milliseconds
@@ -234,6 +295,13 @@ private extension ServerLogPipeline {
             guard Task.isCancelled == false else { return }
             self.flush()
         }
+    }
+
+    /// 기다리던 재시도와 대기 시각을 지웁니다.
+    func cancelRetry() {
+        retryTask?.cancel()
+        retryTask = nil
+        retryAvailableAt = nil
     }
 
     func logStatus(deliveredCount: Int) async {

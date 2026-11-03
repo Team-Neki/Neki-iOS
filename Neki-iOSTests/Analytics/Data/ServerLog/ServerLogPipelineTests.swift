@@ -210,6 +210,139 @@ struct ServerLogPipelineTests {
             #expect(backgroundTask.endedCount == 2)
         }
     }
+
+    @Test("네트워크 경로가 끊긴 동안에는 쌓인 수·탈퇴 전 전송으로도 보내지 않고 저장만 한다")
+    func flush_whilePathUnsatisfied_storesOnly() async throws {
+        let session = ScriptedURLSession { _ in 200 }
+        try await withPipeline(session: session, configuration: .test(flushEventCount: 1)) { pipeline, storage in
+            await pipeline.networkPathChanged(isSatisfied: false)
+
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            await pipeline.waitForUpload()
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(session.requests.isEmpty)
+            #expect(await storage.events().map(\.eventID) == ["a"])
+        }
+    }
+
+    @Test("경로가 이어진 채로 알림만 오면 보내지 않는다(실행 직후 첫 알림 포함)")
+    func networkPathChanged_whileOnline_doesNotSend() async throws {
+        let session = ScriptedURLSession { _ in 200 }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+
+            await pipeline.networkPathChanged(isSatisfied: true)
+            await pipeline.waitForUpload()
+
+            #expect(session.requests.isEmpty)
+            #expect(await storage.events().map(\.eventID) == ["a"])
+        }
+    }
+
+    @Test("start 뒤 경로가 끊겼다 다시 이어지면 쌓인 로그를 바로 보낸다")
+    func start_whenPathRestored_sendsStoredLogs() async throws {
+        let session = ScriptedURLSession { _ in 200 }
+        let networkPath = NetworkPathStub()
+        try await withPipeline(session: session, networkPath: networkPath) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            try await pipeline.put(makeServerLogStoredEvent(id: "b", occurredAt: 2_000))
+            await pipeline.start()
+
+            networkPath.send(isSatisfied: false)
+            networkPath.send(isSatisfied: true)
+
+            #expect(await eventually { session.requests.count == 1 })
+            await pipeline.waitForUpload()
+            #expect(session.requests.map(\.logEventIDs) == [["a", "b"]])
+            #expect(await storage.events().isEmpty)
+        }
+    }
+
+    @Test("경로가 끊기면 기다리던 재시도를 취소한다")
+    func networkPathChanged_whenUnsatisfied_cancelsPendingRetry() async throws {
+        var configuration = ServerLogPipeline.Configuration.test()
+        configuration.minimumRetryDelay = .milliseconds(100)
+        configuration.maximumRetryDelay = .milliseconds(100)
+        let counter = RequestCounter()
+        let session = ScriptedURLSession { _ in counter.next() == 1 ? 503 : 200 }
+        try await withPipeline(session: session, configuration: configuration) { pipeline, _ in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+            await pipeline.networkPathChanged(isSatisfied: false)
+            await pipeline.networkPathChanged(isSatisfied: true)
+            await pipeline.waitForUpload()
+
+            // 취소하지 않았다면 첫 실패 뒤 100ms에 걸어 둔 재시도가 이 로그를 보냅니다.
+            try await pipeline.put(makeServerLogStoredEvent(id: "b", occurredAt: 2_000))
+            try await Task.sleep(for: .milliseconds(300))
+
+            #expect(session.requests.map(\.logEventIDs) == [["a"], ["a"]])
+        }
+    }
+
+    @Test("연결 오류는 첫 실패에 멈추고, 경로가 바뀌면 한 번 보낸다")
+    func upload_whenConnectionFails_pausesUntilPathChanges() async throws {
+        let counter = RequestCounter()
+        let session = ScriptedURLSession { _ in
+            if counter.next() == 1 { throw URLError(.notConnectedToInternet) }
+            return 200
+        }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+            let requestCountWhilePaused = session.requests.count
+
+            await pipeline.networkPathChanged(isSatisfied: true)
+            await pipeline.waitForUpload()
+
+            #expect(requestCountWhilePaused == 1)
+            #expect(session.requests.count == 2)
+            #expect(await storage.events().isEmpty)
+        }
+    }
+
+    @Test("연결 오류가 아니어도 7번 연속 실패하면 멈추고, 경로가 바뀌어 다시 보낸 한 번이 실패하면 바로 다시 멈춘다")
+    func upload_afterSevenFailures_pausesUntilPathChanges() async throws {
+        let session = ScriptedURLSession { _ in 503 }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            for _ in 1...8 {
+                await pipeline.flushAndWait(timeout: .seconds(5))
+            }
+            let requestCountAfterPause = session.requests.count
+
+            await pipeline.networkPathChanged(isSatisfied: true)
+            await pipeline.waitForUpload()
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(requestCountAfterPause == 7)
+            #expect(session.requests.count == 8)
+            #expect(await storage.events().map(\.eventID) == ["a"])
+        }
+    }
+
+    @Test("멈춘 뒤 다시 보내 성공하면 실패 횟수를 0으로 되돌려, 다음 실패에는 멈추지 않는다")
+    func upload_afterPause_resetsFailureCountOnSuccess() async throws {
+        let counter = RequestCounter()
+        let session = ScriptedURLSession { _ in counter.next() == 8 ? 200 : 503 }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            for _ in 1...7 {
+                await pipeline.flushAndWait(timeout: .seconds(5))
+            }
+            await pipeline.networkPathChanged(isSatisfied: true)
+            await pipeline.waitForUpload()
+
+            try await pipeline.put(makeServerLogStoredEvent(id: "b", occurredAt: 2_000))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(session.requests.map(\.logEventIDs) == Array(repeating: ["a"], count: 8) + [["b"], ["b"]])
+            #expect(await storage.events().map(\.eventID) == ["b"])
+        }
+    }
 }
 
 
@@ -217,6 +350,19 @@ struct ServerLogPipelineTests {
 
 private final class PipelineHolder: @unchecked Sendable {
     var pipeline: ServerLogPipeline?
+}
+
+/// 받은 요청이 몇 번째인지(1부터) 셉니다.
+private final class RequestCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func next() -> Int {
+        lock.withLock {
+            count += 1
+            return count
+        }
+    }
 }
 
 private extension ServerLogPipelineTests {
@@ -232,6 +378,7 @@ private extension ServerLogPipelineTests {
         session: ScriptedURLSession,
         configuration: ServerLogPipeline.Configuration = .test(),
         backgroundTask: any ServerLogBackgroundTaskStarting = BackgroundTaskStub(),
+        networkPath: any NetworkPathObserving = NetworkPathStub(),
         operation: (ServerLogPipeline, ServerLogStorage) async throws -> Void
     ) async throws {
         let directory = makeTemporaryDirectory()
@@ -242,6 +389,7 @@ private extension ServerLogPipelineTests {
             client: ServerLogHttpClient(session: session),
             tokenReader: AccessTokenReaderStub(token: "token"),
             backgroundTask: backgroundTask,
+            networkPath: networkPath,
             configuration: configuration,
             now: { 10_000 },
             jitter: { _ in .zero }

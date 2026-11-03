@@ -17,6 +17,16 @@ struct ServerLogResponseHandlerTests {
         #expect(ServerLogResponseHandler.action(for: result, logCount: 10, sentWithAuthorization: true) == .remove)
     }
 
+    @Test("D-0을 확인하지 못한 200과 그 밖의 2xx는 지우지 않고, 진단을 남긴 뒤 다시 보낸다", arguments: [
+        ServerLogUploadResult.responded(statusCode: 200, resultCode: "D-15"),
+        .responded(statusCode: 200, resultCode: nil),
+        .responded(statusCode: 202, resultCode: "D-0"),
+        .responded(statusCode: 204, resultCode: nil)
+    ])
+    func unconfirmedSuccess_retriesWithDiagnostic(result: ServerLogUploadResult) {
+        #expect(ServerLogResponseHandler.action(for: result, logCount: 10, sentWithAuthorization: true) == .retryUnexpected)
+    }
+
     @Test("413 D-16과 400 D-01은 반으로 나누고, 한 건이면 지운다", arguments: zip([413, 400], ["D-16", "D-01"]))
     func tooLargeOrInvalid_splitsUntilSingleLog(statusCode: Int, resultCode: String) {
         let result = ServerLogUploadResult.responded(statusCode: statusCode, resultCode: resultCode)

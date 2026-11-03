@@ -8,14 +8,20 @@
 import Foundation
 @testable import Neki_iOS
 
-/// 요청을 기록하고, 요청마다 정한 상태 코드로 답하는 세션
+/// 요청을 기록하고, 요청마다 정한 상태 코드로 답하는 세션. 결과 코드를 따로 정하지 않으면 계약대로 붙입니다.
 final class ScriptedURLSession: URLSessionProtocol, @unchecked Sendable {
     private let lock = NSLock()
     private let responder: @Sendable (URLRequest) async throws -> Int
+    private let resultCode: @Sendable (Int) -> String?
     private var recordedRequests: [URLRequest] = []
 
-    init(responder: @escaping @Sendable (URLRequest) async throws -> Int) {
+    /// - Parameter resultCode: 상태 코드에 붙일 결과 코드. `nil`이면 본문에 넣지 않습니다.
+    init(
+        resultCode: @escaping @Sendable (Int) -> String? = ScriptedURLSession.contractResultCode(for:),
+        responder: @escaping @Sendable (URLRequest) async throws -> Int
+    ) {
         self.responder = responder
+        self.resultCode = resultCode
     }
 
     var requests: [URLRequest] {
@@ -26,7 +32,19 @@ final class ScriptedURLSession: URLSessionProtocol, @unchecked Sendable {
         lock.withLock { recordedRequests.append(request) }
         let statusCode = try await responder(request)
         let response = HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil)!
-        return (Data(#"{"resultCode":"D-0","message":""}"#.utf8), response)
+        let body = resultCode(statusCode).map { #"{"resultCode":"\#($0)","message":""}"# } ?? #"{"message":""}"#
+        return (Data(body.utf8), response)
+    }
+
+    /// 계약의 결과 코드: 200 D-0, 400 D-01, 413 D-16, 503 D-15
+    static func contractResultCode(for statusCode: Int) -> String? {
+        switch statusCode {
+        case 200: return "D-0"
+        case 400: return "D-01"
+        case 413: return "D-16"
+        case 503: return "D-15"
+        default: return nil
+        }
     }
 }
 

@@ -253,6 +253,9 @@ private extension ServerLogPipeline {
             return await send(Array(batch[half...]))
         case .retryWithoutAuthorization, .retryLater:
             return .stalled
+        case .retryUnexpected:
+            Logger.analytics.error("계약에 없는 응답이라 로그를 남겨 둠: \(batch.count)건 \(String(describing: result), privacy: .public)")
+            return .stalled
         case .waitForConnection:
             return .disconnected
         }

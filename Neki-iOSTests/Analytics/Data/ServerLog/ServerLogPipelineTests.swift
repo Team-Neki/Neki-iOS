@@ -87,6 +87,20 @@ struct ServerLogPipelineTests {
         }
     }
 
+    @Test("200이라도 D-0을 확인하지 못하면 지우지 않고 나중에 다시 보낸다", arguments: ["D-15", nil] as [String?])
+    func flush_whenSuccessIsUnconfirmed_keepsLogs(resultCode: String?) async throws {
+        let session = ScriptedURLSession(resultCode: { _ in resultCode }) { _ in 200 }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+
+            await pipeline.flushAndWait(timeout: .seconds(5))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(session.requests.map(\.logEventIDs) == [["a"], ["a"]])
+            #expect(await storage.events().map(\.eventID) == ["a"])
+        }
+    }
+
     @Test("401·403이면 토큰만 빼고 같은 본문을 바로 다시 보낸다", arguments: [401, 403])
     func flush_whenUnauthorized_retriesWithoutToken(statusCode: Int) async throws {
         let session = ScriptedURLSession { request in request.authorization == nil ? 200 : statusCode }

@@ -195,7 +195,7 @@ actor ServerLogPipeline {
 private extension ServerLogPipeline {
     func uploadStoredEvents() async {
         let finishBackgroundTask = await backgroundTask.begin()
-        await storage.prune(now: now())
+        logRemoval(await storage.prune(now: now()))
         var outcome = SendOutcome.delivered
         var deliveredCount = 0
         // 목록은 비었을 때만 다시 읽고, 보낸 배치만큼 앞에서 잘라 냅니다.
@@ -305,6 +305,16 @@ private extension ServerLogPipeline {
         retryTask?.cancel()
         retryTask = nil
         retryAvailableAt = nil
+    }
+
+    /// 보관 한도로 지운 로그와 읽지 못해 격리한 파일이 있으면, 정책상 삭제와 손상을 나눠 진단을 남깁니다.
+    func logRemoval(_ result: ServerLogStorage.PruneResult) {
+        if result.expired + result.overCount + result.overSize > 0 {
+            Logger.analytics.error("보관 한도로 로그를 지움: 기간 \(result.expired)건, 개수 \(result.overCount)건, 용량 \(result.overSize)건")
+        }
+        if result.quarantined > 0 {
+            Logger.analytics.error("읽지 못한 로그 파일을 격리함: \(result.quarantined)건")
+        }
     }
 
     func logStatus(deliveredCount: Int) async {

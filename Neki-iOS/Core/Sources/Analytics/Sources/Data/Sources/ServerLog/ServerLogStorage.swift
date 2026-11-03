@@ -20,10 +20,23 @@ actor ServerLogStorage {
         var maxTotalBytes = 10 * 1_024 * 1_024
     }
 
+    /// 정리하며 지운 로그 수(사유별)와 격리한 파일 수
+    struct PruneResult: Equatable, Sendable {
+        /// 보관 기간이 지나 지운 로그
+        var expired = 0
+        /// 개수 한도를 넘어 지운 로그
+        var overCount = 0
+        /// 용량 한도를 넘어 지운 로그
+        var overSize = 0
+        /// 지난 정리 뒤로 읽지 못해 격리한 파일
+        var quarantined = 0
+    }
+
     private static let quarantineDirectoryName = ".quarantine"
 
     private let directory: URL
     private let limits: Limits
+    private var quarantinedSinceLastPrune = 0
 
     init(directory: URL = ServerLogStorage.defaultDirectory, limits: Limits = Limits()) {
         self.directory = directory
@@ -78,9 +91,9 @@ actor ServerLogStorage {
     }
 
     /// 보관 기간이 지났거나 수·크기 한도를 넘은 로그를 오래된 것부터 지웁니다.
-    /// - Returns: 지운 로그 수
+    /// - Returns: 지운 로그 수(사유별)와, 지난 정리 뒤로 읽지 못해 격리한 파일 수
     @discardableResult
-    func prune(now: Int64) -> Int {
+    func prune(now: Int64) -> PruneResult {
         var files = eventFiles()
         let expiredCount = files.prefix { $0.occurredAtMilliseconds < now - limits.retention }.count
         var removing = Array(files.prefix(expiredCount))
@@ -101,7 +114,14 @@ actor ServerLogStorage {
             try? FileManager.default.removeItem(at: file.url)
         }
         pruneQuarantine(now: now)
-        return removing.count
+        let quarantined = quarantinedSinceLastPrune
+        quarantinedSinceLastPrune = 0
+        return PruneResult(
+            expired: expiredCount,
+            overCount: overflowCount,
+            overSize: removing.count - expiredCount - overflowCount,
+            quarantined: quarantined
+        )
     }
 }
 
@@ -148,7 +168,9 @@ private extension ServerLogStorage {
             }
     }
 
+    /// 읽지 못한 파일을 격리하고, 다음 정리 결과에 담도록 셉니다.
     func quarantine(_ url: URL) {
+        quarantinedSinceLastPrune += 1
         let destination = quarantineDirectory.appendingPathComponent(url.lastPathComponent)
         try? FileManager.default.createDirectory(at: quarantineDirectory, withIntermediateDirectories: true)
         try? FileManager.default.removeItem(at: destination)

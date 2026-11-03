@@ -98,9 +98,9 @@ struct ServerLogStorageTests {
                 try await storage.write(makeStoredEvent(occurredAt: occurredAt, sequenceNumber: 1, id: "\(index)"))
             }
 
-            let removedCount = await storage.prune(now: 2_500)
+            let result = await storage.prune(now: 2_500)
 
-            #expect(removedCount == 2)
+            #expect(result == ServerLogStorage.PruneResult(expired: 2))
             #expect(await storage.events().map(\.eventID) == ["2"])
         }
     }
@@ -114,9 +114,9 @@ struct ServerLogStorageTests {
                 try await storage.write(makeStoredEvent(occurredAt: Int64(index) * 1_000, sequenceNumber: 1, id: "\(index)"))
             }
 
-            let removedCount = await storage.prune(now: 3_000)
+            let result = await storage.prune(now: 3_000)
 
-            #expect(removedCount == 1)
+            #expect(result == ServerLogStorage.PruneResult(overCount: 1))
             #expect(await storage.events().map(\.eventID) == ["2", "3"])
         }
     }
@@ -133,10 +133,27 @@ struct ServerLogStorageTests {
             limits.maxTotalBytes = fileSize * 2
             let limitedStorage = ServerLogStorage(directory: directory, limits: limits)
 
-            let removedCount = await limitedStorage.prune(now: 3_000)
+            let result = await limitedStorage.prune(now: 3_000)
 
-            #expect(removedCount == 1)
+            #expect(result == ServerLogStorage.PruneResult(overSize: 1))
             #expect(await limitedStorage.events().map(\.eventID) == ["2", "3"])
+        }
+    }
+
+    @Test("읽지 못해 격리한 파일 수는 다음 정리 결과에 담고, 한 번 돌려준 뒤에는 다시 세지 않는다")
+    func prune_reportsQuarantinedFilesOnce() async throws {
+        try await withStorage { storage, directory in
+            try await storage.write(makeStoredEvent(occurredAt: 3_000, sequenceNumber: 1, id: "valid"))
+            try Data("not json".utf8).write(to: directory.appendingPathComponent("0000000001000-000000001-broken.json"))
+            try Data("not json".utf8).write(to: directory.appendingPathComponent("not-a-log-name.json"))
+
+            _ = await storage.events()
+            let first = await storage.prune(now: 3_000)
+            let second = await storage.prune(now: 3_000)
+
+            #expect(first == ServerLogStorage.PruneResult(quarantined: 2))
+            #expect(second == ServerLogStorage.PruneResult())
+            #expect(await storage.events().map(\.eventID) == ["valid"])
         }
     }
 

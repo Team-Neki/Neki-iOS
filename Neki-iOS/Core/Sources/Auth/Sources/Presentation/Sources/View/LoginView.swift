@@ -68,7 +68,7 @@ public struct LoginView: View {
                 }
                 .blendMode(.destinationOver)
             }
-            .recentLoginBadge(provider: .apple, isPresented: store.recentLoginProvider == .apple)
+            .recentLoginTooltip(isPresented: store.recentLoginProvider == .apple)
     }
 
     private var kakaoLoginButton: some View {
@@ -79,36 +79,78 @@ public struct LoginView: View {
                 .resizable()
                 .scaledToFit()
         }
-        .recentLoginBadge(provider: .kakao, isPresented: store.recentLoginProvider == .kakao)
+        .recentLoginTooltip(isPresented: store.recentLoginProvider == .kakao)
         .onOpenURL { store.send(.handleKakaoOpenURL($0)) }
     }
 }
 
 
-// MARK: - RecentLoginBadge
+// MARK: - RecentLoginTooltip
 
 private extension View {
-    func recentLoginBadge(provider: ProviderType, isPresented: Bool) -> some View {
+    func recentLoginTooltip(isPresented: Bool) -> some View {
         overlay(alignment: .topTrailing) {
             if isPresented {
-                HStack(spacing: 4) {
-                    Image(systemName: "clock.fill")
-                        .font(.system(size: 11, weight: .semibold))
-
-                    Text("최근 로그인")
-                        .nekiFont(.caption12Medium)
-                }
-                .foregroundStyle(provider == .apple ? Color.gray900 : Color.white)
-                .padding(.horizontal, 8)
-                .frame(height: 24)
-                .background(
-                    provider == .apple ? Color.white : Color.gray900,
-                    in: RoundedRectangle(cornerRadius: 6)
-                )
-                .padding(8)
-                .allowsHitTesting(false)
+                RecentLoginTooltip()
+                    .padding(.trailing, RecentLoginTooltip.Constants.buttonTrailingInset)
+                    .offset(y: RecentLoginTooltip.Constants.buttonVerticalOffset)
+                    .allowsHitTesting(false)
             }
         }
+    }
+}
+
+private struct RecentLoginTooltip: View {
+    enum Constants {
+        static let bodySize: CGSize = .init(width: 82, height: 27)
+        static let tailSize: CGSize = .init(width: 7.5, height: 6)
+        static let iconSize: CGSize = .init(width: 12, height: 12)
+        static let title: String = "최근 로그인"
+        static let contentSpacing: CGFloat = 4
+        static let contentHorizontalPadding: CGFloat = 8
+        static let contentVerticalPadding: CGFloat = 6
+        static let bodyCornerRadius: CGFloat = 6
+        static let tailTrailingInset: CGFloat = 8
+        static let tailTipRadius: CGFloat = 0.8
+        static let buttonTrailingInset: CGFloat = 8
+        static let buttonVerticalOffset: CGFloat = -(bodySize.height / 2)
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: .zero) {
+            HStack(spacing: Constants.contentSpacing) {
+                Image(.iconClock)
+                    .frame(width: Constants.iconSize.width, height: Constants.iconSize.height)
+
+                Text(Constants.title)
+                    .nekiFont(.caption12Medium)
+                    .foregroundStyle(.white)
+            }
+            .padding(.vertical, Constants.contentVerticalPadding)
+            .padding(.horizontal, Constants.contentHorizontalPadding)
+            .background(.gray800, in: RoundedRectangle(cornerRadius: Constants.bodyCornerRadius))
+
+            RecentLoginTooltipTail()
+                .fill(.gray800)
+                .frame(width: Constants.tailSize.width, height: Constants.tailSize.height)
+                .padding(.trailing, Constants.tailTrailingInset * 2)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct RecentLoginTooltipTail: Shape {
+    nonisolated func path(in rect: CGRect) -> Path {
+        let tipRadius = min(RecentLoginTooltip.Constants.tailTipRadius, rect.width / 2, rect.height)
+        let tipShoulderY = rect.maxY - tipRadius
+
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.midX + tipRadius, y: tipShoulderY))
+        path.addQuadCurve(to: CGPoint(x: rect.midX - tipRadius, y: tipShoulderY), control: CGPoint(x: rect.midX, y: rect.maxY))
+        path.closeSubpath()
+        return path
     }
 }
 

@@ -47,13 +47,29 @@ struct ServerLogHttpClientTests {
         #expect(notJSONResult == .responded(statusCode: 502, resultCode: nil))
     }
 
-    @Test("연결 오류나 타임아웃은 응답 없음으로 돌려준다")
-    func upload_whenRequestFails_returnsNoResponse() async {
+    @Test("타임아웃은 연결 실패가 아니라 응답 없음으로 돌려준다")
+    func upload_whenTimedOut_returnsNoResponse() async {
         let session = URLSessionStub(error: URLError(.timedOut))
 
         let result = await ServerLogHttpClient(session: session).upload(body: Data(), accessToken: nil)
 
         #expect(result == .noResponse)
+    }
+
+    @Test("SDK가 오프라인으로 보는 연결 오류 6종은 연결 실패로 돌려준다", arguments: [
+        URLError.Code.notConnectedToInternet,
+        .networkConnectionLost,
+        .cannotConnectToHost,
+        .cannotFindHost,
+        .appTransportSecurityRequiresSecureConnection,
+        .badURL
+    ])
+    func upload_whenConnectionFails_returnsConnectionFailed(code: URLError.Code) async {
+        let session = URLSessionStub(error: URLError(code))
+
+        let result = await ServerLogHttpClient(session: session).upload(body: Data(), accessToken: nil)
+
+        #expect(result == .connectionFailed)
     }
 }
 

@@ -10,6 +10,16 @@ import Foundation
 /// 서버 로그 요청을 보내고 상태 코드와 결과 코드를 그대로 돌려줍니다(Amplitude-Swift `HttpClient`).
 /// - Note: 공용 `NetworkProvider`는 2xx가 아니면 본문을 읽지 않고 413·403을 같은 오류로 묶습니다. 또 `.bearer`는 토큰 재발급과 전역 로그아웃으로 이어지므로, 서버 로그는 이 클라이언트로 따로 보냅니다.
 struct ServerLogHttpClient {
+    /// SDK가 첫 실패에 오프라인으로 보는 연결 오류. 타임아웃은 넣지 않습니다.
+    private static let connectionErrorCodes: [URLError.Code] = [
+        .notConnectedToInternet,
+        .networkConnectionLost,
+        .cannotConnectToHost,
+        .cannotFindHost,
+        .appTransportSecurityRequiresSecureConnection,
+        .badURL
+    ]
+
     private let session: any URLSessionProtocol
 
     init(session: any URLSessionProtocol = URLSession.shared) {
@@ -27,6 +37,8 @@ struct ServerLogHttpClient {
             guard let response = response as? HTTPURLResponse else { return .noResponse }
             let resultCode = try? JSONDecoder().decode(ResultCodeResponse.self, from: data).resultCode
             return .responded(statusCode: response.statusCode, resultCode: resultCode)
+        } catch let error as URLError where Self.connectionErrorCodes.contains(error.code) {
+            return .connectionFailed
         } catch {
             return .noResponse
         }
@@ -36,8 +48,10 @@ struct ServerLogHttpClient {
 enum ServerLogUploadResult: Equatable, Sendable {
     /// 서버가 응답함
     case responded(statusCode: Int, resultCode: String?)
-    /// 타임아웃·연결 실패처럼 응답을 받지 못함
+    /// 타임아웃처럼 응답을 받지 못함
     case noResponse
+    /// 인터넷 없음·호스트 연결 불가처럼 서버에 닿지 못함
+    case connectionFailed
 }
 
 /// 행동 로그 적재(`POST /api/logs`)

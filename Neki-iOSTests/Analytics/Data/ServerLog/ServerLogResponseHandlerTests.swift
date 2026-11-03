@@ -43,4 +43,9 @@ struct ServerLogResponseHandlerTests {
     func transientFailures_retryLater(result: ServerLogUploadResult) {
         #expect(ServerLogResponseHandler.action(for: result, logCount: 5, sentWithAuthorization: false) == .retryLater)
     }
+
+    @Test("연결 오류는 남겨 두고 네트워크 경로가 바뀔 때까지 기다린다")
+    func connectionFailed_waitsForConnection() {
+        #expect(ServerLogResponseHandler.action(for: .connectionFailed, logCount: 5, sentWithAuthorization: true) == .waitForConnection)
+    }
 }

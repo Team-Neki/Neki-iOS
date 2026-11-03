@@ -212,7 +212,7 @@ private extension ServerLogPipeline {
             let half = batch.count / 2
             guard await send(Array(batch[..<half])) == .delivered else { return .stalled }
             return await send(Array(batch[half...]))
-        case .retryWithoutAuthorization, .retryLater:
+        case .retryWithoutAuthorization, .retryLater, .waitForConnection:
             return .stalled
         }
     }

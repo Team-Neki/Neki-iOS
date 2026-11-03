@@ -12,6 +12,7 @@ import UIKit
 extension ServerLogPlatformKey: DependencyKey {
     static let liveValue = ServerLogPlatform(
         lifecycle: UIKitApplicationLifecycle(),
+        backgroundTask: UIKitBackgroundTask(),
         deviceSystem: UIKitDeviceSystem()
     )
 }
@@ -61,6 +62,38 @@ private final class NotificationObservation: @unchecked Sendable {
 
     func remove() {
         tokens.forEach { center.removeObserver($0) }
+    }
+}
+
+
+// MARK: - Background Task
+
+/// 업로드마다 `UIApplication` background task를 겁니다.
+struct UIKitBackgroundTask: ServerLogBackgroundTaskStarting {
+    func begin() async -> @Sendable () async -> Void {
+        let task = await MainActor.run {
+            let task = BackgroundTask()
+            task.begin()
+            return task
+        }
+        return { await task.end() }
+    }
+
+    @MainActor
+    private final class BackgroundTask {
+        private var identifier: UIBackgroundTaskIdentifier = .invalid
+
+        func begin() {
+            identifier = UIApplication.shared.beginBackgroundTask(withName: "ServerLogUpload") { [weak self] in
+                self?.end()
+            }
+        }
+
+        func end() {
+            guard identifier != .invalid else { return }
+            UIApplication.shared.endBackgroundTask(identifier)
+            identifier = .invalid
+        }
     }
 }
 

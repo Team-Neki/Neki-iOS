@@ -194,6 +194,22 @@ struct ServerLogPipelineTests {
         #expect(expiringToken == nil)
         #expect(missingToken == nil)
     }
+
+    @Test("업로드마다 background task를 시작하고, 보내지 못해도 끝낸다")
+    func upload_beginsAndEndsBackgroundTaskEachTime() async throws {
+        let session = ScriptedURLSession { request in request.logEventIDs.contains("fail") ? 503 : 200 }
+        let backgroundTask = BackgroundTaskRecorder()
+        try await withPipeline(session: session, backgroundTask: backgroundTask) { pipeline, _ in
+            try await pipeline.put(makeServerLogStoredEvent(id: "ok", occurredAt: 1_000))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+            try await pipeline.put(makeServerLogStoredEvent(id: "fail", occurredAt: 2_000))
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(session.requests.map(\.logEventIDs) == [["ok"], ["fail"]])
+            #expect(backgroundTask.beganCount == 2)
+            #expect(backgroundTask.endedCount == 2)
+        }
+    }
 }
 
 
@@ -215,6 +231,7 @@ private extension ServerLogPipelineTests {
     func withPipeline(
         session: ScriptedURLSession,
         configuration: ServerLogPipeline.Configuration = .test(),
+        backgroundTask: any ServerLogBackgroundTaskStarting = BackgroundTaskStub(),
         operation: (ServerLogPipeline, ServerLogStorage) async throws -> Void
     ) async throws {
         let directory = makeTemporaryDirectory()
@@ -224,7 +241,7 @@ private extension ServerLogPipelineTests {
             storage: storage,
             client: ServerLogHttpClient(session: session),
             tokenReader: AccessTokenReaderStub(token: "token"),
-            backgroundTask: BackgroundTaskStub(),
+            backgroundTask: backgroundTask,
             configuration: configuration,
             now: { 10_000 },
             jitter: { _ in .zero }

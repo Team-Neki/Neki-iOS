@@ -7,7 +7,6 @@
 
 import Foundation
 import os
-import UIKit
 
 /// 저장한 로그를 모아 서버로 보냅니다(Amplitude-Swift `EventPipeline`).
 /// - Note: SDK처럼 쌓인 수·타이머·백그라운드 진입에 맞춰 보내고, 업로드는 한 번에 하나만 합니다. Android(`ServerAnalyticsLogger`)처럼 로그인 때도 보냅니다. SDK와 달리 실패가 이어져도 멈추지 않고 보관 한도 안에서 계속 다시 보냅니다.
@@ -49,7 +48,7 @@ actor ServerLogPipeline {
         storage: ServerLogStorage = ServerLogStorage(),
         client: ServerLogHttpClient = ServerLogHttpClient(),
         tokenReader: any ServerLogAccessTokenReading,
-        backgroundTask: any ServerLogBackgroundTaskStarting = ServerLogApplicationBackgroundTask(),
+        backgroundTask: any ServerLogBackgroundTaskStarting,
         configuration: Configuration = Configuration(),
         clock: any Clock<Duration> = ContinuousClock(),
         now: @escaping @Sendable () -> Int64 = { Date().epochMilliseconds },
@@ -283,42 +282,5 @@ struct ServerLogStoredTokenReader: ServerLogAccessTokenReading {
     func usableAccessToken() async -> String? {
         guard let tokens = try? await reader.fetchStoredTokens(), tokens.refreshNeeded == false else { return nil }
         return tokens.accessToken
-    }
-}
-
-
-// MARK: - Background Task
-
-/// 업로드하는 동안 앱이 백그라운드로 가도 잠시 이어서 보낼 수 있게 합니다(SDK의 업로드별 background task).
-protocol ServerLogBackgroundTaskStarting: Sendable {
-    /// 업로드를 마치면 돌려받은 클로저를 불러 끝냅니다.
-    func begin() async -> @Sendable () async -> Void
-}
-
-struct ServerLogApplicationBackgroundTask: ServerLogBackgroundTaskStarting {
-    func begin() async -> @Sendable () async -> Void {
-        let task = await MainActor.run {
-            let task = BackgroundTask()
-            task.begin()
-            return task
-        }
-        return { await task.end() }
-    }
-
-    @MainActor
-    private final class BackgroundTask {
-        private var identifier: UIBackgroundTaskIdentifier = .invalid
-
-        func begin() {
-            identifier = UIApplication.shared.beginBackgroundTask(withName: "ServerLogUpload") { [weak self] in
-                self?.end()
-            }
-        }
-
-        func end() {
-            guard identifier != .invalid else { return }
-            UIApplication.shared.endBackgroundTask(identifier)
-            identifier = .invalid
-        }
     }
 }

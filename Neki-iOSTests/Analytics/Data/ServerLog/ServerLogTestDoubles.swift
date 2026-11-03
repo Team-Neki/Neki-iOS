@@ -59,6 +59,26 @@ struct BackgroundTaskStub: ServerLogBackgroundTaskStarting {
     }
 }
 
+/// background task를 시작하고 끝낸 횟수를 셉니다.
+final class BackgroundTaskRecorder: ServerLogBackgroundTaskStarting, @unchecked Sendable {
+    private let lock = NSLock()
+    private var began = 0
+    private var ended = 0
+
+    var beganCount: Int {
+        lock.withLock { began }
+    }
+
+    var endedCount: Int {
+        lock.withLock { ended }
+    }
+
+    func begin() async -> @Sendable () async -> Void {
+        lock.withLock { began += 1 }
+        return { self.lock.withLock { self.ended += 1 } }
+    }
+}
+
 /// 테스트가 보내는 생명주기 변화를 그대로 넘기는 대역
 struct ApplicationLifecycleStub: ApplicationLifecycleObserving {
     private let active: Bool

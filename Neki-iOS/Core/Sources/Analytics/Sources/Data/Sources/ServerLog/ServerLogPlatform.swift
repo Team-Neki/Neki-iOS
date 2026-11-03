@@ -8,16 +8,18 @@
 import Dependencies
 import Foundation
 
-/// 서버 로그가 쓰는 앱 생명주기와 기기 정보
+/// 서버 로그가 쓰는 앱 생명주기, background task, 기기 정보
 /// - Note: Data 계층에는 계약만 둡니다. UIKit 구현은 APP 계층(`ServerLogPlatform+Live`)이 `liveValue`로 채웁니다.
 struct ServerLogPlatform: Sendable {
     var lifecycle: any ApplicationLifecycleObserving
+    var backgroundTask: any ServerLogBackgroundTaskStarting
     var deviceSystem: any DeviceSystemReading
 }
 
 enum ServerLogPlatformKey: TestDependencyKey {
     static let testValue = ServerLogPlatform(
         lifecycle: InactiveApplicationLifecycle(),
+        backgroundTask: NoBackgroundTask(),
         deviceSystem: UnknownDeviceSystem()
     )
 }
@@ -50,6 +52,20 @@ protocol ApplicationLifecycleObserving: Sendable {
 private struct InactiveApplicationLifecycle: ApplicationLifecycleObserving {
     func isActive() async -> Bool { false }
     func events() -> AsyncStream<ApplicationLifecycleEvent> { AsyncStream { $0.finish() } }
+}
+
+
+// MARK: - Background Task
+
+/// 업로드하는 동안 앱이 백그라운드로 가도 잠시 이어서 보낼 수 있게 합니다(SDK의 업로드별 background task).
+protocol ServerLogBackgroundTaskStarting: Sendable {
+    /// 업로드를 마치면 돌려받은 클로저를 불러 끝냅니다.
+    func begin() async -> @Sendable () async -> Void
+}
+
+/// 아무것도 하지 않는 background task(테스트 기본값)
+private struct NoBackgroundTask: ServerLogBackgroundTaskStarting {
+    func begin() async -> @Sendable () async -> Void { {} }
 }
 
 

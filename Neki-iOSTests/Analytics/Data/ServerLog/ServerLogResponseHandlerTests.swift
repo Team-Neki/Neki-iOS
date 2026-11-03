@@ -27,12 +27,20 @@ struct ServerLogResponseHandlerTests {
         #expect(ServerLogResponseHandler.action(for: result, logCount: 10, sentWithAuthorization: true) == .retryUnexpected)
     }
 
-    @Test("413 D-16과 400 D-01은 반으로 나누고, 한 건이면 지운다", arguments: zip([413, 400], ["D-16", "D-01"]))
-    func tooLargeOrInvalid_splitsUntilSingleLog(statusCode: Int, resultCode: String) {
+    @Test("413은 결과 코드와 상관없이, 400은 D-01일 때만 반으로 나누고, 한 건이면 지운다", arguments: [(413, "D-16"), (413, nil), (400, "D-01")] as [(Int, String?)])
+    func tooLargeOrInvalid_splitsUntilSingleLog(statusCode: Int, resultCode: String?) {
         let result = ServerLogUploadResult.responded(statusCode: statusCode, resultCode: resultCode)
 
         #expect(ServerLogResponseHandler.action(for: result, logCount: 2, sentWithAuthorization: false) == .split)
         #expect(ServerLogResponseHandler.action(for: result, logCount: 1, sentWithAuthorization: false) == .drop)
+    }
+
+    @Test("D-01이 아닌 400은 나누거나 버리지 않고, 진단을 남긴 뒤 다시 보낸다", arguments: [nil, "D-15"] as [String?])
+    func unexpectedBadRequest_retriesWithDiagnostic(resultCode: String?) {
+        let result = ServerLogUploadResult.responded(statusCode: 400, resultCode: resultCode)
+
+        #expect(ServerLogResponseHandler.action(for: result, logCount: 2, sentWithAuthorization: false) == .retryUnexpected)
+        #expect(ServerLogResponseHandler.action(for: result, logCount: 1, sentWithAuthorization: false) == .retryUnexpected)
     }
 
     @Test("401·403은 토큰을 붙였을 때만 토큰을 빼고 다시 보낸다", arguments: [401, 403])

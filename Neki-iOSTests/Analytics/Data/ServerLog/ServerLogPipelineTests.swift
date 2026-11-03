@@ -101,6 +101,20 @@ struct ServerLogPipelineTests {
         }
     }
 
+    @Test("D-01이 아닌 400이면 나누거나 버리지 않고 남겨 둔다")
+    func flush_whenBadRequestIsUnexpected_keepsBatch() async throws {
+        let session = ScriptedURLSession(resultCode: { _ in nil }) { _ in 400 }
+        try await withPipeline(session: session) { pipeline, storage in
+            try await pipeline.put(makeServerLogStoredEvent(id: "a", occurredAt: 1_000))
+            try await pipeline.put(makeServerLogStoredEvent(id: "b", occurredAt: 2_000))
+
+            await pipeline.flushAndWait(timeout: .seconds(5))
+
+            #expect(session.requests.map(\.logEventIDs) == [["a", "b"]])
+            #expect(await storage.events().map(\.eventID) == ["a", "b"])
+        }
+    }
+
     @Test("401·403이면 토큰만 빼고 같은 본문을 바로 다시 보낸다", arguments: [401, 403])
     func flush_whenUnauthorized_retriesWithoutToken(statusCode: Int) async throws {
         let session = ScriptedURLSession { request in request.authorization == nil ? 200 : statusCode }

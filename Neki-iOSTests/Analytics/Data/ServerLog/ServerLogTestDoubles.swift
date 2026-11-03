@@ -59,6 +59,42 @@ struct BackgroundTaskStub: ServerLogBackgroundTaskStarting {
     }
 }
 
+/// 테스트가 보내는 생명주기 변화를 그대로 넘기는 대역
+struct ApplicationLifecycleStub: ApplicationLifecycleObserving {
+    private let active: Bool
+    private let stream: AsyncStream<ApplicationLifecycleEvent>
+    private let continuation: AsyncStream<ApplicationLifecycleEvent>.Continuation
+
+    init(isActive: Bool = false) {
+        let (stream, continuation) = AsyncStream.makeStream(of: ApplicationLifecycleEvent.self)
+        self.active = isActive
+        self.stream = stream
+        self.continuation = continuation
+    }
+
+    func isActive() async -> Bool {
+        active
+    }
+
+    func events() -> AsyncStream<ApplicationLifecycleEvent> {
+        stream
+    }
+
+    func send(_ event: ApplicationLifecycleEvent) {
+        continuation.yield(event)
+    }
+}
+
+/// 다른 Task가 처리하는 일을 조건이 맞을 때까지 잠깐씩 기다립니다. 시간 안에 맞으면 `true`
+func eventually(timeout: Duration = .seconds(2), _ condition: () async -> Bool) async -> Bool {
+    let deadline = ContinuousClock.now.advanced(by: timeout)
+    while ContinuousClock.now < deadline {
+        if await condition() { return true }
+        try? await Task.sleep(for: .milliseconds(10))
+    }
+    return await condition()
+}
+
 /// 테스트가 정하는 현재 시각(epoch ms)
 final class NowStub: @unchecked Sendable {
     private let lock = NSLock()

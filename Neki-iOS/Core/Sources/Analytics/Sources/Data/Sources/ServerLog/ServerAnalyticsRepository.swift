@@ -7,7 +7,6 @@
 
 import Foundation
 import os
-import UIKit
 
 /// 행동 이벤트를 서버(`POST /api/logs`)로 보내는 저장소
 /// - Note: Amplitude-Swift의 흐름(`track` → 세션 → 문맥 → 저장 → 전송)을 옮겼습니다. 이벤트는 디스크에 쓰고 바로 반환하며, 전송 실패는 이 안에서 끝나 Amplitude 기록과 기능 결과에 영향을 주지 않습니다.
@@ -16,38 +15,38 @@ final actor ServerAnalyticsRepository: AnalyticsRepository {
     private let identity: any AnalyticsIdentityProviding
     private let pipeline: ServerLogPipeline
     private let sessionStore: ServerLogSessionStore
-    private let observesLifecycle: Bool
+    private let lifecycle: any ApplicationLifecycleObserving
     private let now: @Sendable () -> Int64
-    private let isApplicationActive: @Sendable () async -> Bool
     private let makeContext: @Sendable () async -> ServerLogContext
 
     private var session: ServerLogSession
     private var context: ServerLogContext?
     private var isForeground = false
     private var isStarted = false
-    private var lifecycleObserver: ServerLogLifecycleObserver?
+    private var lifecycleTask: Task<Void, Never>?
 
+    /// - Parameters:
+    ///   - lifecycle: 앱 생명주기. 앱에서는 APP 계층의 UIKit 구현을 넣습니다.
+    ///   - makeContext: 처음 기록할 때 한 번 부르는 기기·앱 정보
     init(
         identity: any AnalyticsIdentityProviding,
         pipeline: ServerLogPipeline,
+        lifecycle: any ApplicationLifecycleObserving,
+        makeContext: @escaping @Sendable () async -> ServerLogContext,
         sessionStore: ServerLogSessionStore = ServerLogSessionStore(),
-        observesLifecycle: Bool = true,
-        now: @escaping @Sendable () -> Int64 = { Date().epochMilliseconds },
-        isApplicationActive: @escaping @Sendable () async -> Bool = {
-            await MainActor.run { UIApplication.shared.applicationState == .active }
-        },
-        makeContext: @escaping @Sendable () async -> ServerLogContext = {
-            await MainActor.run { ServerLogContext.current() }
-        }
+        now: @escaping @Sendable () -> Int64 = { Date().epochMilliseconds }
     ) {
         self.identity = identity
         self.pipeline = pipeline
         self.sessionStore = sessionStore
-        self.observesLifecycle = observesLifecycle
+        self.lifecycle = lifecycle
         self.now = now
-        self.isApplicationActive = isApplicationActive
         self.makeContext = makeContext
         self.session = sessionStore.load()
+    }
+
+    deinit {
+        lifecycleTask?.cancel()
     }
 
     func initialize() async throws {
@@ -106,6 +105,15 @@ extension ServerAnalyticsRepository {
         isForeground = false
         await pipeline.flush()
     }
+
+    /// 생명주기 변화를 받은 순서대로 처리합니다.
+    func handle(_ event: ApplicationLifecycleEvent) async {
+        switch event {
+        case .willEnterForeground: await applicationWillEnterForeground()
+        case .didBecomeActive: await applicationDidBecomeActive()
+        case .didEnterBackground: await applicationDidEnterBackground()
+        }
+    }
 }
 
 
@@ -131,14 +139,14 @@ private extension ServerAnalyticsRepository {
             return
         }
         await pipeline.updateCurrentUserID(session.userID)
-        if observesLifecycle {
-            lifecycleObserver = ServerLogLifecycleObserver(
-                onEnterForeground: { [weak self] in await self?.applicationWillEnterForeground() },
-                onBecomeActive: { [weak self] in await self?.applicationDidBecomeActive() },
-                onEnterBackground: { [weak self] in await self?.applicationDidEnterBackground() }
-            )
+        // 활성 상태를 묻기 전에 구독해, 그사이에 바뀐 생명주기도 받습니다.
+        let events = lifecycle.events()
+        lifecycleTask = Task { [weak self] in
+            for await event in events {
+                await self?.handle(event)
+            }
         }
-        if await isApplicationActive() {
+        if await lifecycle.isActive() {
             await applicationWillEnterForeground()
         }
         await pipeline.start()
@@ -205,39 +213,4 @@ protocol AnalyticsIdentityProviding: Sendable {
     func deviceID() async -> String?
     /// 세션이 없으면 -1
     func sessionID() async -> Int64
-}
-
-
-// MARK: - Lifecycle Observer
-
-/// 앱이 포그라운드·백그라운드로 바뀌는 것을 알려 줍니다(Amplitude-Swift `IOSLifecycleMonitor`).
-final class ServerLogLifecycleObserver: Sendable {
-    private let tasks: [Task<Void, Never>]
-
-    init(
-        onEnterForeground: @escaping @Sendable () async -> Void,
-        onBecomeActive: @escaping @Sendable () async -> Void,
-        onEnterBackground: @escaping @Sendable () async -> Void
-    ) {
-        tasks = [
-            Self.observe(UIApplication.willEnterForegroundNotification, perform: onEnterForeground),
-            Self.observe(UIApplication.didBecomeActiveNotification, perform: onBecomeActive),
-            Self.observe(UIApplication.didEnterBackgroundNotification, perform: onEnterBackground)
-        ]
-    }
-
-    deinit {
-        tasks.forEach { $0.cancel() }
-    }
-
-    private static func observe(
-        _ name: Notification.Name,
-        perform action: @escaping @Sendable () async -> Void
-    ) -> Task<Void, Never> {
-        Task {
-            for await _ in NotificationCenter.default.notifications(named: name) {
-                await action()
-            }
-        }
-    }
 }

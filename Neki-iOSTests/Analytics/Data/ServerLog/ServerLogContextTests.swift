@@ -63,8 +63,8 @@ struct ServerLogContextTests {
 
     @MainActor
     @Test("실행 중인 기기의 정보로 문맥을 만든다")
-    func current_readsRunningDevice() {
-        let context = ServerLogContext.current()
+    func current_readsRunningDevice() async {
+        let context = ServerLogContext.current(system: await UIKitDeviceSystem().read())
 
         #expect(context.appVersion == Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)
         #expect(context.values["platform"] == "iOS")

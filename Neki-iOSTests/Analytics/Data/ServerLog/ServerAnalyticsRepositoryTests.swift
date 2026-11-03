@@ -193,6 +193,33 @@ struct ServerAnalyticsRepositoryTests {
             #expect(sessionStore.load().sessionID == 1_000)
         }
     }
+
+    @Test("주입한 생명주기에서 백그라운드 진입을 받으면 쌓인 로그를 보낸다")
+    func lifecycleEvents_whenEnteringBackground_sendsStoredLogs() async throws {
+        let identity = IdentityStub(deviceID: "device-1", sessionID: 1_000)
+        try await withFixture(identity: identity) { fixture in
+            try await fixture.repository.initialize()
+            await fixture.repository.logEvent(AnalyticsEventStub.appOpen, occurrence: occurrence(id: 1, at: 1_000))
+
+            fixture.lifecycle.send(.didEnterBackground)
+
+            #expect(await eventually { fixture.session.requests.count == 1 })
+            #expect(fixture.session.requests.map(\.logEventIDs) == [[occurrence(id: 1, at: 1_000).id]])
+        }
+    }
+
+    @Test("시작할 때 앱이 활성 상태면 포그라운드로 보고, 5분이 지난 이벤트도 같은 세션으로 남긴다")
+    func initialize_whenApplicationActive_keepsForegroundSession() async throws {
+        let identity = IdentityStub(deviceID: "device-1", sessionID: 1_000)
+        try await withFixture(identity: identity, isApplicationActive: true) { fixture in
+            fixture.now.value = 1_000
+            try await fixture.repository.initialize()
+            await fixture.repository.logEvent(AnalyticsEventStub.appOpen, occurrence: occurrence(id: 1, at: 1_000))
+            await fixture.repository.logEvent(AnalyticsEventStub.mapView, occurrence: occurrence(id: 2, at: 1_000 + 600_000))
+
+            #expect(fixture.sessionStore.load().sessionID == 1_000)
+        }
+    }
 }
 
 
@@ -231,6 +258,7 @@ private extension ServerAnalyticsRepositoryTests {
         let storage: ServerLogStorage
         let sessionStore: ServerLogSessionStore
         let session: ScriptedURLSession
+        let lifecycle: ApplicationLifecycleStub
         let now: NowStub
     }
 
@@ -243,7 +271,11 @@ private extension ServerAnalyticsRepositoryTests {
         }
     }
 
-    func withFixture(identity: IdentityStub, operation: (Fixture) async throws -> Void) async throws {
+    func withFixture(
+        identity: IdentityStub,
+        isApplicationActive: Bool = false,
+        operation: (Fixture) async throws -> Void
+    ) async throws {
         let directory = makeTemporaryDirectory()
         let suiteName = "ServerAnalyticsRepositoryTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: suiteName))
@@ -264,14 +296,14 @@ private extension ServerAnalyticsRepositoryTests {
             jitter: { _ in .zero }
         )
         let sessionStore = ServerLogSessionStore(defaults: defaults)
+        let lifecycle = ApplicationLifecycleStub(isActive: isApplicationActive)
         let repository = ServerAnalyticsRepository(
             identity: identity,
             pipeline: pipeline,
+            lifecycle: lifecycle,
+            makeContext: { ServerLogContext(appVersion: "1.2.9", values: ["osName": "ios"]) },
             sessionStore: sessionStore,
-            observesLifecycle: false,
-            now: { now.value },
-            isApplicationActive: { false },
-            makeContext: { ServerLogContext(appVersion: "1.2.9", values: ["osName": "ios"]) }
+            now: { now.value }
         )
         let fixture = Fixture(
             repository: repository,
@@ -279,6 +311,7 @@ private extension ServerAnalyticsRepositoryTests {
             storage: storage,
             sessionStore: sessionStore,
             session: session,
+            lifecycle: lifecycle,
             now: now
         )
         do {

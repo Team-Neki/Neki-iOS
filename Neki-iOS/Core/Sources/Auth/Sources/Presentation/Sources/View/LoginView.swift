@@ -102,9 +102,7 @@ private extension View {
 
 private struct RecentLoginTooltip: View {
     enum Constants {
-        static let bodySize: CGSize = .init(width: 82, height: 27)
         static let tailSize: CGSize = .init(width: 7.5, height: 6)
-        static let iconSize: CGSize = .init(width: 12, height: 12)
         static let title: String = "최근 로그인"
         static let contentSpacing: CGFloat = 4
         static let contentHorizontalPadding: CGFloat = 8
@@ -112,15 +110,14 @@ private struct RecentLoginTooltip: View {
         static let bodyCornerRadius: CGFloat = 6
         static let tailTrailingInset: CGFloat = 8
         static let tailTipRadius: CGFloat = 0.8
-        static let buttonTrailingInset: CGFloat = 8
-        static let buttonVerticalOffset: CGFloat = -(bodySize.height / 2)
+        static let buttonTrailingInset: CGFloat = 16
+        static let buttonVerticalOffset: CGFloat = -(27 / 2)
     }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: .zero) {
             HStack(spacing: Constants.contentSpacing) {
                 Image(.iconClock)
-                    .frame(width: Constants.iconSize.width, height: Constants.iconSize.height)
 
                 Text(Constants.title)
                     .nekiFont(.caption12Medium)
@@ -133,9 +130,9 @@ private struct RecentLoginTooltip: View {
             RecentLoginTooltipTail()
                 .fill(.gray800)
                 .frame(width: Constants.tailSize.width, height: Constants.tailSize.height)
-                .padding(.trailing, Constants.tailTrailingInset * 2)
+                .padding(.trailing, Constants.tailTrailingInset)
         }
-        .accessibilityHidden(true)
+        .accessibilityHint(Constants.title)
     }
 }
 

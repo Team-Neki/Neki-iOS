@@ -94,4 +94,9 @@ private final class URLSessionStub: URLSessionProtocol, @unchecked Sendable {
         let response = HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil)!
         return (data, response)
     }
+
+    /// 서버 로그 전송은 `data(for:delegate:)`만 씁니다.
+    func bytes(for request: URLRequest, delegate: (any URLSessionTaskDelegate)?) async throws -> (URLSession.AsyncBytes, URLResponse) {
+        throw URLError(.unknown)
+    }
 }

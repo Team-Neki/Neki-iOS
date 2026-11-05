@@ -36,6 +36,11 @@ final class ScriptedURLSession: URLSessionProtocol, @unchecked Sendable {
         return (Data(body.utf8), response)
     }
 
+    /// 서버 로그 전송은 `data(for:delegate:)`만 씁니다.
+    func bytes(for request: URLRequest, delegate: (any URLSessionTaskDelegate)?) async throws -> (URLSession.AsyncBytes, URLResponse) {
+        throw URLError(.unknown)
+    }
+
     /// 계약의 결과 코드: 200 D-0, 400 D-01, 413 D-16, 503 D-15
     static func contractResultCode(for statusCode: Int) -> String? {
         switch statusCode {

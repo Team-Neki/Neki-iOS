@@ -9,9 +9,16 @@ import Foundation
 import Dependencies
 
 public protocol NetworkProvider: Sendable {
+    func request(endpoint: Endpoint) async throws -> (data: Data, response: HTTPURLResponse)
     func requestVoid(endpoint: Endpoint) async throws -> Void
     func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData>
     func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T>
+}
+
+public extension NetworkProvider {
+    func request(endpoint: Endpoint) async throws -> (data: Data, response: HTTPURLResponse) {
+        throw NetworkError.responseError
+    }
 }
 
 

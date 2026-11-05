@@ -2,7 +2,7 @@
 //  PhotoBoothMarkerConfigurator.swift
 //  Neki-iOS
 //
-//  Created by Codex on 10/17/26.
+//  Created by SwainYun on 10/17/26.
 //
 
 import CoreGraphics

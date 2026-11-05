@@ -93,10 +93,10 @@ private extension View {
             if isPresented {
                 RecentLoginTooltip()
                     .padding(.trailing, RecentLoginTooltip.Constants.buttonTrailingInset)
-                    .offset(y: RecentLoginTooltip.Constants.buttonVerticalOffset)
                     .allowsHitTesting(false)
             }
         }
+        .accessibilityValue(isPresented ? RecentLoginTooltip.Constants.title : "")
     }
 }
 
@@ -108,10 +108,9 @@ private struct RecentLoginTooltip: View {
         static let contentHorizontalPadding: CGFloat = 8
         static let contentVerticalPadding: CGFloat = 6
         static let bodyCornerRadius: CGFloat = 6
-        static let tailTrailingInset: CGFloat = 8
+        static let tailTrailingInset: CGFloat = 16
         static let tailTipRadius: CGFloat = 0.8
-        static let buttonTrailingInset: CGFloat = 16
-        static let buttonVerticalOffset: CGFloat = -(27 / 2)
+        static let buttonTrailingInset: CGFloat = 8
     }
 
     var body: some View {
@@ -132,13 +131,16 @@ private struct RecentLoginTooltip: View {
                 .frame(width: Constants.tailSize.width, height: Constants.tailSize.height)
                 .padding(.trailing, Constants.tailTrailingInset)
         }
-        .accessibilityHint(Constants.title)
+        .alignmentGuide(.top) { dimensions in
+            (dimensions.height - Constants.tailSize.height) / 2
+        }
+        .accessibilityHidden(true)
     }
 }
 
 private struct RecentLoginTooltipTail: Shape {
     nonisolated func path(in rect: CGRect) -> Path {
-        let tipRadius = min(RecentLoginTooltip.Constants.tailTipRadius, rect.width / 2, rect.height)
+        let tipRadius = RecentLoginTooltip.Constants.tailTipRadius
         let tipShoulderY = rect.maxY - tipRadius
 
         var path = Path()

@@ -16,6 +16,7 @@ public struct LoginFeature {
     public struct State {
         var isLoading = false
         var advertisingTrackingAuthorizationPhase: AdvertisingTrackingAuthorizationPhase = .idle
+        var recentLoginProvider: ProviderType?
     }
     
     public enum Action {
@@ -25,9 +26,12 @@ public struct LoginFeature {
         case appleLogin(Result<ASAuthorization, any Error>)
         case handleKakaoOpenURL(URL)
         
+        // Internal Actions
+        case recentLoginProviderLoaded(ProviderType?)
+        case trackingAuthorizationResolved
+
         // Delegate Actions
         case loginResponse(Result<AuthLoginResult, Error>)
-        case trackingAuthorizationResolved
     }
     
     @Dependency(\.authClient) private var authClient
@@ -37,12 +41,21 @@ public struct LoginFeature {
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .onAppear:
-                guard state.advertisingTrackingAuthorizationPhase == .idle else { return .none }
-                state.advertisingTrackingAuthorizationPhase = .resolving
-                return .run { send in
-                    _ = await attributionClient.resolveTrackingAuthorization()
-                    await send(.trackingAuthorizationResolved)
+                let loadRecentLoginProvider = Effect<Action>.run { send in
+                    await send(.recentLoginProviderLoaded(await authClient.fetchRecentLoginProvider()))
                 }
+
+                guard state.advertisingTrackingAuthorizationPhase == .idle else {
+                    return loadRecentLoginProvider
+                }
+                state.advertisingTrackingAuthorizationPhase = .resolving
+                return .merge(
+                    loadRecentLoginProvider,
+                    .run { send in
+                        _ = await attributionClient.resolveTrackingAuthorization()
+                        await send(.trackingAuthorizationResolved)
+                    }
+                )
 
             case .kakaoLogin:
                 guard state.advertisingTrackingAuthorizationPhase == .resolved else { return .none }
@@ -88,6 +101,10 @@ public struct LoginFeature {
 
             case .trackingAuthorizationResolved:
                 state.advertisingTrackingAuthorizationPhase = .resolved
+                return .none
+
+            case let .recentLoginProviderLoaded(provider):
+                state.recentLoginProvider = provider
                 return .none
                 
             case let .handleKakaoOpenURL(url):

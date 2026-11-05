@@ -791,18 +791,19 @@ extension NaverMapRepresentable.Coordinator: NMFMapViewCameraDelegate {
         let currentTime = CACurrentMediaTime()
         if currentTime - lastFavoriteMarkerViewportUpdateTime >= Constants.favoriteMarkerViewportUpdateInterval {
             lastFavoriteMarkerViewportUpdateTime = currentTime
-            parent.store.send(.cameraMotionChanged(mapView.contentBounds.toDomain()))
+            parent.store.send(.cameraMotionChanged(mapView.contentBounds.toDomain(), zoomLevel: mapView.zoomLevel))
         }
     }
     
     func mapViewCameraIdle(_ mapView: NMFMapView) {
         let nmapBounds = mapView.contentBounds
         let geographicBounds = nmapBounds.toDomain()
+        let zoomLevel = mapView.zoomLevel
         if isMapLoaded == false {
             isMapLoaded = true
-            parent.store.send(.mapLoaded(geographicBounds))
+            parent.store.send(.mapLoaded(geographicBounds, zoomLevel: zoomLevel))
         }
-        parent.store.send(.cameraMotionEnded(geographicBounds))
+        parent.store.send(.cameraMotionEnded(geographicBounds, zoomLevel: zoomLevel))
     }
 }
 

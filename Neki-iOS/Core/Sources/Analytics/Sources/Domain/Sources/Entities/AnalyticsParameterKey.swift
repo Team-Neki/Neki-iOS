@@ -8,15 +8,6 @@
 import Foundation
 
 public enum AnalyticsParameterKey: String {
-    // 공통
-    case userId = "user_id"
-    case platform = "platform"
-    case appVersion = "app_version"
-    case notificationType = "notification_type"
-    case targetType = "target_type"
-    case messageTone = "message_tone"
-    case hasVariable = "has_variable"
-    
     // 아카이빙
     case method = "method"
     case count = "count"
@@ -37,17 +28,22 @@ public enum AnalyticsParameterKey: String {
     case action = "action"
     case selectedCount = "selected_count"
     case brandName = "brand_name"
+    case brandId = "brand_id"
     case boothName = "booth_name"
     case favoriteBoothCount = "favorite_booth_count"
     case priorityBrand1 = "priority_brand_1"
     case priorityBrand2 = "priority_brand_2"
     case priorityBrand3 = "priority_brand_3"
+    case priorityBrandId1 = "priority_brand_id_1"
+    case priorityBrandId2 = "priority_brand_id_2"
+    case priorityBrandId3 = "priority_brand_id_3"
     case entryPoint = "entry_point"
     case mapType = "map_type"
     
     // 포즈
     case totalSwipeCount = "total_swipe_count"
     case peopleCount = "people_count"
+    case poseId = "pose_id"
     
     var name: String { self.rawValue }
 }

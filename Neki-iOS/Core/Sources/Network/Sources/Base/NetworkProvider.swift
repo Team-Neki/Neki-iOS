@@ -58,6 +58,11 @@ extension DependencyValues {
         self[NetworkCredentialBrokerKey.self]
     }
 
+    /// 서버 로그처럼 토큰이 있을 때만 붙이는 요청에 읽기 계약만 제공합니다.
+    var storedAuthTokenReader: any StoredAuthTokenReading {
+        self[NetworkCredentialBrokerKey.self]
+    }
+
     var networkProvider: any NetworkProvider {
         get { self[NetworkProviderKey.self] }
         set { self[NetworkProviderKey.self] = newValue }

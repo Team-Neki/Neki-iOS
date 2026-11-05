@@ -23,26 +23,34 @@ public final actor CompositeAnalyticsRepository: AnalyticsRepository {
         }
     }
 
-    public func setUserSession(with userID: Int?) async {
+    public func setUserSession(with userID: Int?, changedAt: Date) async {
         await enqueue { [repositories] in
             for repository in repositories {
-                await repository.setUserSession(with: userID)
+                await repository.setUserSession(with: userID, changedAt: changedAt)
             }
         }
     }
 
-    public func endUserSession(with event: any AnalyticsEvent) async {
+    public func endUserSession(with event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
         await enqueue { [repositories] in
             for repository in repositories {
-                await repository.endUserSession(with: event)
+                await repository.endUserSession(with: event, occurrence: occurrence)
             }
         }
     }
 
-    public func logEvent(_ event: any AnalyticsEvent) async {
+    public func logEvent(_ event: any AnalyticsEvent, occurrence: AnalyticsEventOccurrence) async {
         await enqueue { [repositories] in
             for repository in repositories {
-                await repository.logEvent(event)
+                await repository.logEvent(event, occurrence: occurrence)
+            }
+        }
+    }
+
+    public func flush() async {
+        await enqueue { [repositories] in
+            for repository in repositories {
+                await repository.flush()
             }
         }
     }
@@ -65,10 +73,27 @@ public final actor CompositeAnalyticsRepository: AnalyticsRepository {
 // MARK: - Dependency
 
 private enum AnalyticsRepositoryKey: DependencyKey {
-    static let liveValue: any AnalyticsRepository = CompositeAnalyticsRepository(repositories: [
-        FirebaseAnalyticsRepository(),
-        AmplitudeAnalyticsRepository()
-    ])
+    /// 서버 저장소는 기기 ID와 세션 ID를 Amplitude 저장소에서 읽고, 앱 생명주기·background task·기기 정보·네트워크 경로는 APP 계층이 채운 구현에서 받습니다.
+    /// - Note: Amplitude SDK 제거 시 Amplitude 저장소를 빼고, 서버 저장소의 기기 ID·세션 ID 출처를 자체 값으로 바꿉니다.
+    static let liveValue: any AnalyticsRepository = {
+        @Dependency(\.storedAuthTokenReader) var tokenReader
+        @Dependency(\.serverLogPlatform) var platform
+        let amplitude = AmplitudeAnalyticsRepository()
+        let deviceSystem = platform.deviceSystem
+        return CompositeAnalyticsRepository(repositories: [
+            amplitude,
+            ServerAnalyticsRepository(
+                identity: amplitude,
+                pipeline: ServerLogPipeline(
+                    tokenReader: ServerLogStoredTokenReader(reader: tokenReader),
+                    backgroundTask: platform.backgroundTask,
+                    networkPath: platform.networkPath
+                ),
+                lifecycle: platform.lifecycle,
+                makeContext: { ServerLogContext.current(system: await deviceSystem.read()) }
+            )
+        ])
+    }()
 }
 
 extension DependencyValues {

@@ -24,4 +24,7 @@ extension Logger {
     
     /// 도메인 관련
     public static let domain = Logger(subsystem: subsystem, category: "Domain")
+    
+    /// 분석 이벤트 전송 관련
+    public static let analytics = Logger(subsystem: subsystem, category: "Analytics")
 }

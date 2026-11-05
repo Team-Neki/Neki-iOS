@@ -9,6 +9,7 @@ import Foundation
 
 public struct AppStorageKey {
     public static let userSessionStatus: String = "UserSessionStatus"
+    public static let recentLoginProvider: String = "RecentLoginProvider"
 
     public static func marketingConsentAlertPresentationCount(userID: Int) -> String {
         "MarketingConsentAlertPresentationCount_\(userID)"

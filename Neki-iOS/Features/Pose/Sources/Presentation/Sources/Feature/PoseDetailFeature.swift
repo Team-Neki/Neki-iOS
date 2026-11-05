@@ -92,8 +92,9 @@ struct PoseDetailFeature {
                     await send(.scrapResponse(originalPose, Result { try await poseClient.scrapPose(poseID: originalPose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
-                return scrapEffect
+                return .merge(scrapEffect, trackingEffect)
                 
             case let .pageChanged(newID):
                 state.selectedID = newID
@@ -114,7 +115,7 @@ struct PoseDetailFeature {
                 return .none
 
             case .scrapResponse(_, .success):
-                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .none
                 
             case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }

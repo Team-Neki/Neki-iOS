@@ -10,7 +10,6 @@ import Foundation
 public enum AnalyticsEventName: String {
     // 공통
     case appOpen = "app_open"
-    case notificationSent = "notification_sent"
     case notificationClick = "notification_click"
     
     // 아카이빙
@@ -49,6 +48,7 @@ public enum AnalyticsEventName: String {
     case poseFilterToggle = "pose_filter_toggle"
     case poseBookmarkFilter = "pose_bookmark_filter"
     case poseBookmark = "pose_bookmark"
+    case poseDetailClick = "pose_detail_click"
     
     // 마이페이지
     case logout = "mypage_logout"

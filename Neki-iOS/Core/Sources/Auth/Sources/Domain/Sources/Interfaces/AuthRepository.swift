@@ -29,6 +29,12 @@ public protocol AuthRepository: AuthCredentialFailureHandling {
     func withdraw() async throws(AuthRepositoryError) -> Void
     /// 로그아웃
     func logout() async throws(AuthRepositoryError) -> Void
+    /// 최근 로그인한 소셜 로그인 공급자 조회
+    func fetchRecentLoginProvider() async -> ProviderType?
+    /// 최근 로그인한 소셜 로그인 공급자 저장
+    func saveRecentLoginProvider(_ provider: ProviderType) async
+    /// 최근 로그인한 소셜 로그인 공급자 삭제
+    func deleteRecentLoginProvider() async
     /// 프로필 편집
     func updateProfile(nickname: String?, editAction: ProfileImageEditAction) async throws(AuthRepositoryError) -> Void
     /// 자동 로그인 (유저 세션 복구)

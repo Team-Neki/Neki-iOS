@@ -55,6 +55,22 @@ struct MainTabCoordinator {
                 $userSessionStatus.withLock { $0 = .signedIn(newValue) }
             }
         }
+        
+        /// 지금 탭의 첫 화면이 맨 위에 있는지, QR·알림 목록처럼 탭 전체를 덮는 화면이 떠 있는지입니다.
+        var firstScreenCoverage: FirstScreenCoverage {
+            let isOnTop = switch selectedTab {
+            case .archive: archive.path.isEmpty
+            case .pose: pose.path.isEmpty
+            case .add: false
+            case .map: map.path.isEmpty
+            case .myPage: myPage.path.isEmpty
+            }
+            let isCovered = switch destination {
+            case .qrScan, .notificationList: true
+            case .uploadSelection, .none: false
+            }
+            return FirstScreenCoverage(tab: selectedTab, isOnTop: isOnTop, isCovered: isCovered)
+        }
     }
     
     enum Action: BindableAction {
@@ -101,7 +117,6 @@ struct MainTabCoordinator {
     
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.openURL) private var openURL
-    @Dependency(\.analyticsClient) private var analyticsClient
     @Dependency(\.authClient) private var authClient
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
     @Dependency(\.date.now) private var now
@@ -129,17 +144,10 @@ struct MainTabCoordinator {
                 return .send(.tabChanged(state.selectedTab))
                 
             case let .tabChanged(tab):
-                let logEffect: Effect<Action> = .run { _ in
-                    switch tab {
-                    case .archive: await analyticsClient.logEvent(MainTabAnalyticsEvent.archivingView)
-                    case .pose: await analyticsClient.logEvent(MainTabAnalyticsEvent.poseView)
-                    case .map: await analyticsClient.logEvent(MainTabAnalyticsEvent.mapView)
-                    default: break
-                    }
-                }
+                // 화면 진입 이벤트는 각 탭의 첫 화면이 보일 때 그 화면이 보내므로 여기서는 보내지 않습니다.
                 // 지도 탭으로 돌아오면 첫 지도 화면으로 되돌리도록 지도에 알립니다. 초기화는 지도가 맡습니다.
-                guard tab == .map else { return logEffect }
-                return .merge(logEffect, .send(.map(.root(.didEnterTab))))
+                guard tab == .map else { return .none }
+                return .send(.map(.root(.didEnterTab)))
                 
             case .onTapAddButton:
                 state.destination = .uploadSelection
@@ -322,6 +330,21 @@ struct MainTabCoordinator {
             }
         }
         .ifLet(\.$destination, action: \.destination)
+        .onChange(of: \.firstScreenCoverage) { oldValue, state in
+            // QR·알림 목록이 닫혀도 아래 탭 첫 화면의 onAppear는 다시 불리지 않습니다.
+            // 탭과 화면이 그대로인 채 닫혀 첫 화면이 다시 보이면, 그 화면에 알려 화면 진입을 남기게 합니다.
+            // 닫히면서 탭이 바뀌거나 첫 화면으로 돌아가면 다시 그려지는 첫 화면의 onAppear가 남기므로 알리지 않습니다.
+            let newValue = state.firstScreenCoverage
+            guard oldValue.isCovered, newValue.isCovered == false,
+                  oldValue.tab == newValue.tab, oldValue.isOnTop, newValue.isOnTop else { return .none }
+            
+            switch newValue.tab {
+            case .archive: return .send(.archive(.root(.fullScreenCoverDismissed)))
+            case .pose: return .send(.pose(.root(.fullScreenCoverDismissed)))
+            case .map: return .send(.map(.root(.fullScreenCoverDismissed)))
+            case .add, .myPage: return .none
+            }
+        }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch state.selectedTab {
@@ -413,6 +436,12 @@ extension MainTabCoordinator {
     }
     enum PendingPresentation {
         case gallery
+    }
+    /// 탭 첫 화면을 덮었던 화면이 닫혀 그 첫 화면이 다시 보이는지 판단하려고 액션 전후로 비교하는 값입니다.
+    struct FirstScreenCoverage: Equatable {
+        let tab: NekiTab
+        let isOnTop: Bool
+        let isCovered: Bool
     }
 }
 

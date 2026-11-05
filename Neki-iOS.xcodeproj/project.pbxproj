@@ -16,7 +16,6 @@
 		597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */ = {isa = PBXBuildFile; productRef = 5970335F2F2482E1000B8194 /* KakaoSDKUser */; };
 		598D191E2F72BABF002662DF /* NekiShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 59235C4F2F64245A00198051 /* NekiShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		59D1D21B2F168EE800F50EB5 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 59D1D21A2F168EE800F50EB5 /* Kingfisher */; };
-		6C0C1ACB2F6FD2E30037F650 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */; };
 		6C0C1ACD2F6FD2E30037F650 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */; };
 		6C0C1ACF2F6FD2E30037F650 /* FirebaseInstallations in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */; };
 		6C0C1AD12F6FD2E30037F650 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */; };
@@ -154,7 +153,6 @@
 				597033602F2482E1000B8194 /* KakaoSDKUser in Frameworks */,
 				592F345C2F0E1F1700802BB7 /* NMapsMap in Frameworks */,
 				597033582F2482E1000B8194 /* KakaoSDKAuth in Frameworks */,
-				6C0C1ACB2F6FD2E30037F650 /* FirebaseAnalytics in Frameworks */,
 				5970335A2F2482E1000B8194 /* KakaoSDKCert in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -268,7 +266,6 @@
 				5970335D2F2482E1000B8194 /* KakaoSDKCommon */,
 				5970335F2F2482E1000B8194 /* KakaoSDKUser */,
 				6C4D99E42F365E1700E93BF0 /* Lottie */,
-				6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */,
 				6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */,
 				6C0C1ACE2F6FD2E30037F650 /* FirebaseInstallations */,
 				6C0C1AD02F6FD2E30037F650 /* FirebaseMessaging */,
@@ -1124,11 +1121,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 59D1D2192F168EE800F50EB5 /* XCRemoteSwiftPackageReference "Kingfisher" */;
 			productName = Kingfisher;
-		};
-		6C0C1ACA2F6FD2E30037F650 /* FirebaseAnalytics */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 6C0C1AC92F6FD2E30037F650 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
-			productName = FirebaseAnalytics;
 		};
 		6C0C1ACC2F6FD2E30037F650 /* FirebaseCrashlytics */ = {
 			isa = XCSwiftPackageProductDependency;

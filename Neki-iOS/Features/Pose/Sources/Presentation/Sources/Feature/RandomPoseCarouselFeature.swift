@@ -45,9 +45,9 @@ struct RandomPoseCarouselFeature {
         case onTapDetail(Pose)
         
         // Internal Actions
-        case poseResponse(Result<Pose, Error>)
+        /// 포즈 요청 결과입니다. 좌우로 넘겨 요청한 결과인지 함께 받아, 성공한 넘김만 스와이프 수로 셉니다.
+        case poseResponse(Result<Pose, Error>, isSwipe: Bool)
         case scrapResponse(Pose, Result<Void, Error>)
-        case flushResources
         
         // Delegate Actions
         case delegate(Delegate)
@@ -69,7 +69,7 @@ struct RandomPoseCarouselFeature {
                 guard state.currentPose == nil else { return .none }
                 state.isLoading = true
                 return .run { [count = state.activePeopleCount] send in
-                    await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }))
+                    await send(.poseResponse(Result { try await poseClient.initializeRandomPose(peopleCount: count) }, isSwipe: false))
                 }
                 
             case .closeTutorialOverlay:
@@ -77,32 +77,22 @@ struct RandomPoseCarouselFeature {
                 return .none
                 
             case .onTapClose:
-                let currentSwipeCount = state.totalSwipeCount
-                return .merge(
-                    .run { _ in
-                        await analytics.logEvent(PoseAnalyticsEvent.randomPoseSuggestionEnd(totalSwipeCount: currentSwipeCount))
-                    },
-                    .run { send in
-                        await send(.flushResources)
-                        await dismiss()
-                    }
-                )
+                // 랜덤 포즈 종료 기록과 미리 불러온 랜덤 포즈 비우기는 닫기 버튼과 뒤로 스와이프 모두 이 화면이 스택에서 빠질 때 포즈 코디네이터가 맡습니다.
+                return .run { _ in await dismiss() }
                 
             case .tapLeft:
                 state.slideDirection = .previous
                 state.isLoading = true
-                state.totalSwipeCount += 1
                 return .run { send in
-                    await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }))
+                    await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .left) }, isSwipe: true))
                 }
                 .cancellable(id: CancelID.poseRequest)
                 
             case .tapRight:
                 state.slideDirection = .next
                 state.isLoading = true
-                state.totalSwipeCount += 1
                 return .run { send in
-                    await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }))
+                    await send(.poseResponse(Result { try await poseClient.startRandomPoseSuggestion(direction: .right) }, isSwipe: true))
                 }
                 .cancellable(id: CancelID.poseRequest)
                 
@@ -118,22 +108,24 @@ struct RandomPoseCarouselFeature {
                     await send(.scrapResponse(originalPose, Result { try await poseClient.scrapPose(poseID: originalPose.id) }))
                 }
                 .cancellable(id: CancelID.scrap(pose.id), cancelInFlight: true)
+                let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
                 
-                return scrapEffect
+                return .merge(scrapEffect, trackingEffect)
                 
                 // MARK: - Internal Actions
-            case let .poseResponse(.success(pose)):
+            case let .poseResponse(.success(pose), isSwipe):
                 state.isLoading = false
                 state.currentPose = pose
+                if isSwipe { state.totalSwipeCount += 1 }
                 return .none
                 
-            case let .poseResponse(.failure(error)):
+            case let .poseResponse(.failure(error), _):
                 state.isLoading = false
                 Logger.presentation.error("Random Pose Fetching Failed: \(error)")
                 return .none
                 
             case .scrapResponse(_, .success):
-                return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmark) }
+                return .none
                 
             case let .scrapResponse(originalPose, .failure(error)):
                 if error is CancellationError { return .none }
@@ -151,9 +143,6 @@ struct RandomPoseCarouselFeature {
                 return .run { send in
                     await send(.delegate(.routeToDetail(pose)))
                 }
-                
-            case .flushResources:
-                return .run { _ in await poseClient.stopRandomPoseSuggestion() }
                 
             case .delegate:
                 return .none

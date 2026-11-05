@@ -132,7 +132,7 @@ private actor RecordingNetworkProvider: NetworkProvider {
       "message": "OK",
       "data": {
         "method": "PUT",
-        "expiresIn": "2026-10-28T15:00:00Z",
+        "expiresIn": "2026-10-29T00:00:00",
         "uploadTicket": "https://example.com/qr-dump.html?X-Amz-Signature=signature",
         "contentType": "text/html; charset=utf-8"
       }

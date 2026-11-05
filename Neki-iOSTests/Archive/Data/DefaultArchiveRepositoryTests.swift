@@ -71,6 +71,23 @@ struct DefaultArchiveRepositoryTests {
         #expect(requestCount == 2)
     }
 
+    @Test("메모 수정은 사진 시각을 KST 무오프셋 capturedAt으로 보낸다")
+    func updatePhotoMemo_encodesCapturedAtAsKSTLocalSeconds() async throws {
+        let networkProvider = ArchiveNetworkProviderStub(responses: [
+            photoListResponse(ids: [1], hasNext: false, totalCount: 1),
+            emptyResponse()
+        ])
+        let repository = makeRepository(networkProvider: networkProvider)
+
+        _ = try await repository.refreshPhotos(scope: .all, size: 20, sortOrder: .descending)
+        try await repository.updatePhotoMemo(photoID: 1, memo: "새 메모")
+
+        let body = try #require(await networkProvider.requestBodies.last ?? nil)
+        let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+        #expect(json["capturedAt"] == "2026-07-03T09:00:00")
+        #expect(json["memo"] == "새 메모")
+    }
+
     @Test("정렬 조건이 바뀌면 해당 scope만 첫 페이지부터 다시 조회한다")
     func refreshPhotos_whenSortChanges_resetsScope() async throws {
         let networkProvider = ArchiveNetworkProviderStub(responses: [
@@ -174,6 +191,7 @@ private actor ArchiveNetworkProviderStub: NetworkProvider {
     private var responses: [Data]
     private let delay: Duration?
     private(set) var requestCount = 0
+    private(set) var requestBodies: [Data?] = []
 
     init(responses: [Data], delay: Duration? = nil) {
         self.responses = responses
@@ -183,17 +201,21 @@ private actor ArchiveNetworkProviderStub: NetworkProvider {
     func requestVoid(endpoint: Endpoint) async throws {}
 
     func request(endpoint: Endpoint) async throws -> BaseResponseDTO<EmptyData> {
-        try await decodeNextResponse()
+        requestBodies.append(try endpoint.asURLRequest().httpBody)
+        return try await decodeNextResponse()
     }
 
     func request<T: Decodable>(endpoint: Endpoint) async throws -> BaseResponseDTO<T> {
-        try await decodeNextResponse()
+        requestBodies.append(try endpoint.asURLRequest().httpBody)
+        return try await decodeNextResponse()
     }
 
     private func decodeNextResponse<T: Decodable>() async throws -> BaseResponseDTO<T> {
         if let delay { try await Task.sleep(for: delay) }
         guard responses.isEmpty == false else { throw NetworkError.responseError }
         requestCount += 1
-        return try JSONDecoder().decode(BaseResponseDTO<T>.self, from: responses.removeFirst())
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = ServerDateCodec.dateDecodingStrategy
+        return try decoder.decode(BaseResponseDTO<T>.self, from: responses.removeFirst())
     }
 }

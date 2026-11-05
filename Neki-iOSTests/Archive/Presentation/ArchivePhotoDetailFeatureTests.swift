@@ -79,7 +79,7 @@ private extension ArchivePhotoDetailFeatureTests {
     ) -> StoreOf<ArchivePhotoDetailFeature> {
         let remainingFailures = LockIsolated(failingSaveCount)
         return Store(initialState: ArchivePhotoDetailFeature.State(
-            photos: [PhotoEntity(id: 1, imageURL: nil, memo: memo)],
+            photos: [PhotoEntity(id: 1, imageURL: nil, createdAt: Date(timeIntervalSince1970: 0), memo: memo)],
             currentItemID: 1,
             folderId: nil
         )) {

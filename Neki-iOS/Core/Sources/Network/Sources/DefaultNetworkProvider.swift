@@ -13,20 +13,21 @@ public final actor DefaultNetworkProvider: NetworkProvider {
     private let session: URLSessionProtocol
     private let credentialBroker: any NetworkCredentialBroker
     private let decoder: JSONDecoder
+    private let now: @Sendable () -> Date
     private let reportCredentialFailure: @Sendable (NetworkCredentialFailure, @escaping @Sendable () async -> Bool) async -> Void
 
     init(
         session: URLSessionProtocol = URLSession.shared,
         credentialBroker: any NetworkCredentialBroker,
         decoder: JSONDecoder = JSONDecoder(),
+        now: @escaping @Sendable () -> Date = Date.init,
         reportCredentialFailure: @escaping @Sendable (NetworkCredentialFailure, @escaping @Sendable () async -> Bool) async -> Void
     ) {
         self.session = session
         self.credentialBroker = credentialBroker
+        self.now = now
         self.reportCredentialFailure = reportCredentialFailure
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        decoder.dateDecodingStrategy = .formatted(formatter)
+        decoder.dateDecodingStrategy = ServerDateCodec.dateDecodingStrategy
         self.decoder = decoder
     }
 
@@ -106,7 +107,7 @@ private extension DefaultNetworkProvider {
             case .none: break
             case .replaceOnSuccess:
                 guard let tokens = response.data as? any TokenContainer else { throw NetworkError.responseDecodingError }
-                try await credentialBroker.store(tokens.toEntity(), matchingGeneration: generation)
+                try await credentialBroker.store(tokens.toEntity(issuedAt: now()), matchingGeneration: generation)
             case .removeOnSuccess:
                 guard try await credentialBroker.removeCredentials(matchingGeneration: generation) else { throw CancellationError() }
             }

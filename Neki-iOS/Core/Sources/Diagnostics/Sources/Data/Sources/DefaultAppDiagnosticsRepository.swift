@@ -11,6 +11,8 @@ import Foundation
 import UserNotifications
 
 struct DefaultAppDiagnosticsRepository: AppDiagnosticsRepository {
+    @Dependency(\.date.now) private var now
+
     func fetch(
         authTokens: AuthTokens?,
         apnsTokenStatus: AppDiagnostics.TokenStatus,
@@ -27,8 +29,22 @@ struct DefaultAppDiagnosticsRepository: AppDiagnosticsRepository {
             apnsEnvironment: AppRuntimeEnvironment.apnsEnvironment,
             apnsTokenStatus: apnsTokenStatus,
             fcmTokenStatus: fcmTokenStatus,
-            notificationAuthorizationStatus: notificationSettings.authorizationStatus
+            notificationAuthorizationDescription: notificationSettings.authorizationStatus.diagnosticsDescription,
+            referenceDate: now
         )
+    }
+}
+
+private extension UNAuthorizationStatus {
+    var diagnosticsDescription: String {
+        switch self {
+        case .notDetermined: return "notDetermined"
+        case .denied: return "denied"
+        case .authorized: return "authorized"
+        case .provisional: return "provisional"
+        case .ephemeral: return "ephemeral"
+        @unknown default: return "unknown"
+        }
     }
 }
 

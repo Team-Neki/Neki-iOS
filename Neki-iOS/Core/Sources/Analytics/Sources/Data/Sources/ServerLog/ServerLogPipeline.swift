@@ -359,9 +359,12 @@ protocol ServerLogAccessTokenReading: Sendable {
 
 struct ServerLogStoredTokenReader: ServerLogAccessTokenReading {
     let reader: any StoredAuthTokenReading
+    var now: @Sendable () -> Date = Date.init
 
     func usableAccessToken() async -> String? {
-        guard let tokens = try? await reader.fetchStoredTokens(), tokens.refreshNeeded == false else { return nil }
+        guard let tokens = try? await reader.fetchStoredTokens(),
+              tokens.isRefreshNeeded(at: now()) == false
+        else { return nil }
         return tokens.accessToken
     }
 }

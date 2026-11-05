@@ -14,11 +14,14 @@ public struct AuthTokens: Codable, Sendable {
     public let accessToken: Token // 1시간
     public let refreshToken: Token // 30일
     public let expiredAt: Date
-    public var refreshNeeded: Bool { Date.now.addingTimeInterval(60 * 5) >= expiredAt } // 만료 5분 전
     
-    public init(accessToken: Token, refreshToken: Token) {
+    public init(accessToken: Token, refreshToken: Token, issuedAt: Date) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
-        expiredAt = Date(timeIntervalSinceNow: 60 * 60) // 1시간
+        expiredAt = issuedAt.addingTimeInterval(60 * 60)
+    }
+
+    public func isRefreshNeeded(at referenceDate: Date) -> Bool {
+        referenceDate.addingTimeInterval(60 * 5) >= expiredAt
     }
 }

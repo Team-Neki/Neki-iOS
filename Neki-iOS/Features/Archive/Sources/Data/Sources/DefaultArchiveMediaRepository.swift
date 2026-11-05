@@ -11,6 +11,12 @@ import Kingfisher
 import UIKit
 
 struct DefaultArchiveMediaRepository: ArchiveMediaRepository {
+    private let now: @Sendable () -> Date
+
+    init(now: @escaping @Sendable () -> Date = Date.init) {
+        self.now = now
+    }
+
     func fetchOriginalImageData(from url: URL) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             KingfisherManager.shared.retrieveImage(
@@ -42,7 +48,7 @@ struct DefaultArchiveMediaRepository: ArchiveMediaRepository {
         ]
         UIPasteboard.general.setItems(
             pasteboardItems,
-            options: [.expirationDate: Date().addingTimeInterval(60 * 5)]
+            options: [.expirationDate: now().addingTimeInterval(60 * 5)]
         )
         await UIApplication.shared.open(urlScheme)
         return true

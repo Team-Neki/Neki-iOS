@@ -28,13 +28,12 @@ public enum PhotoListDTO {
                     id: $0.photoID,
                     imageURL: URL(string: $0.imageURL),
                     isFavorite: $0.favorite,
-                    createdAt: $0.createdAt.toISO8601DateOrNil() ?? Date(),
+                    createdAt: $0.createdAt,
                     folderID: $0.folderID,
                     memo: $0.memo ?? "",
                     width: $0.width,
                     height: $0.height,
-                    contentType: $0.contentType,
-                    createdAtRawValue: $0.createdAt
+                    contentType: $0.contentType
                 )
             }
         }
@@ -45,7 +44,8 @@ public enum PhotoListDTO {
         let imageURL: String
         let folderID: Int?
         let favorite: Bool
-        let contentType, createdAt: String
+        let contentType: String
+        let createdAt: Date
         let memo: String?
         let width, height: Int?
         

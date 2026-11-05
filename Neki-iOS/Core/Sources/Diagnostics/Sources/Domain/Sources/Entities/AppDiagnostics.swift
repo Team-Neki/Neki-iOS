@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import UserNotifications
 
 public struct AppDiagnostics: Equatable, Sendable {
     public let sections: [Section]
@@ -73,10 +72,11 @@ extension AppDiagnostics {
         apnsEnvironment: String,
         apnsTokenStatus: TokenStatus,
         fcmTokenStatus: TokenStatus,
-        notificationAuthorizationStatus: UNAuthorizationStatus
+        notificationAuthorizationDescription: String,
+        referenceDate: Date
     ) {
         self.sections = [
-            Self.userSessionSection(from: userSessionStatus, authTokens: authTokens),
+            Self.userSessionSection(from: userSessionStatus, authTokens: authTokens, referenceDate: referenceDate),
             appSection,
             firebaseSection,
             .init(
@@ -85,7 +85,7 @@ extension AppDiagnostics {
                     .init(title: "APNs Environment", value: apnsEnvironment),
                     .init(title: "APNs Token", value: apnsTokenStatus.description),
                     .init(title: "FCM Token", value: fcmTokenStatus.description),
-                    .init(title: "OS Notification", value: notificationAuthorizationStatus.diagnosticsDescription)
+                    .init(title: "OS Notification", value: notificationAuthorizationDescription)
                 ]
             )
         ]
@@ -93,7 +93,8 @@ extension AppDiagnostics {
 
     static func userSessionSection(
         from status: UserSessionStatus,
-        authTokens: AuthTokens?
+        authTokens: AuthTokens?,
+        referenceDate: Date
     ) -> Section {
         switch status {
         case let .signedIn(user):
@@ -109,7 +110,7 @@ extension AppDiagnostics {
                     .init(title: "Required Terms Agreed", value: user.allRequiredTermsAgreed.diagnosticsDescription),
                     .init(title: "Marketing Term Agreed", value: user.marketingTermAgreed.diagnosticsDescription),
                     .init(title: "Push Notification Agreed", value: user.pushNotificationAgreed.diagnosticsDescription)
-                ] + authTokenRows(from: authTokens)
+                ] + authTokenRows(from: authTokens, referenceDate: referenceDate)
             )
 
         case .signedOut:
@@ -117,7 +118,7 @@ extension AppDiagnostics {
                 title: "사용자 세션",
                 rows: [
                     .init(title: "Session Status", value: "signedOut")
-                ] + authTokenRows(from: authTokens)
+                ] + authTokenRows(from: authTokens, referenceDate: referenceDate)
             )
 
         case .expired:
@@ -125,12 +126,12 @@ extension AppDiagnostics {
                 title: "사용자 세션",
                 rows: [
                     .init(title: "Session Status", value: "expired")
-                ] + authTokenRows(from: authTokens)
+                ] + authTokenRows(from: authTokens, referenceDate: referenceDate)
             )
         }
     }
 
-    static func authTokenRows(from tokens: AuthTokens?) -> [Row] {
+    static func authTokenRows(from tokens: AuthTokens?, referenceDate: Date) -> [Row] {
         guard let tokens else {
             return [
                 .init(title: "Access Token", value: "missing"),
@@ -142,7 +143,7 @@ extension AppDiagnostics {
             .init(title: "Access Token", value: tokens.accessToken),
             .init(title: "Refresh Token", value: tokens.refreshToken),
             .init(title: "Token Expired At", value: tokens.expiredAt.formatted(date: .numeric, time: .standard)),
-            .init(title: "Token Refresh Needed", value: tokens.refreshNeeded.diagnosticsDescription)
+            .init(title: "Token Refresh Needed", value: tokens.isRefreshNeeded(at: referenceDate).diagnosticsDescription)
         ]
     }
 }
@@ -150,18 +151,5 @@ extension AppDiagnostics {
 private extension Bool {
     var diagnosticsDescription: String {
         self ? "true" : "false"
-    }
-}
-
-public extension UNAuthorizationStatus {
-    var diagnosticsDescription: String {
-        switch self {
-        case .notDetermined: return "notDetermined"
-        case .denied: return "denied"
-        case .authorized: return "authorized"
-        case .provisional: return "provisional"
-        case .ephemeral: return "ephemeral"
-        @unknown default: return "unknown"
-        }
     }
 }

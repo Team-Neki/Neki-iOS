@@ -20,13 +20,18 @@ final actor DefaultNetworkCredentialBroker: NetworkCredentialBroker, AuthTokenDi
     }
 
     private let tokenStorage: any TokenStorage
+    private let now: @Sendable () -> Date
 
     private var refreshRequest: RefreshRequest?
     /// 삭제 실패 시에도 서버가 거부한 자격증명을 차단합니다. 앱 재시작 시 자동 로그인 시도는 유지합니다.
     private var rejectedCredentialRevision: UUID?
 
-    init(tokenStorage: any TokenStorage = KeychainTokenStorage(encoder: .init(), decoder: .init())) {
+    init(
+        tokenStorage: any TokenStorage = KeychainTokenStorage(encoder: .init(), decoder: .init()),
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
         self.tokenStorage = tokenStorage
+        self.now = now
     }
 
     var credentialGeneration: UUID { tokenStorage.credentialGeneration }
@@ -87,7 +92,7 @@ private extension DefaultNetworkCredentialBroker {
         guard let tokens = credentials.tokens else {
             throw NetworkCredentialFailure(credentialGeneration: credentials.generation, reason: .credentialsUnavailable)
         }
-        guard tokens.refreshNeeded else { return credentials }
+        guard tokens.isRefreshNeeded(at: now()) else { return credentials }
         return try await refresh(using: provider, credentials: credentials)
     }
 
@@ -150,7 +155,7 @@ private extension DefaultNetworkCredentialBroker {
         do {
             let dto: BaseResponseDTO<ReissueTokenDTO.Response> = try await provider.request(endpoint: destination)
             guard let data = dto.data else { throw NetworkError.networkFail }
-            return AuthTokens(accessToken: data.accessToken, refreshToken: data.refreshToken)
+            return data.toEntity(issuedAt: now())
         } catch is CancellationError {
             throw CancellationError()
         } catch {

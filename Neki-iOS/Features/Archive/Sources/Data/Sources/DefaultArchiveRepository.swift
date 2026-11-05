@@ -196,7 +196,8 @@ extension DefaultArchiveRepository {
     }
 
     func updatePhotoMemo(photoID: Int, memo: String) async throws {
-        let capturedAt = photosByID[photoID]?.createdAtRawValue ?? Date().ISO8601Format()
+        guard let createdAt = photosByID[photoID]?.createdAt else { throw ArchiveDataError.photoNotLoaded }
+        let capturedAt = ServerDateCodec().encode(createdAt, as: .kstLocalSeconds)
         let request = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
         do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.updateMemo(photoID: photoID, request: request)) }
         catch { throw mapArchiveRequestError(error) }
@@ -228,6 +229,10 @@ extension DefaultArchiveRepository {
         markPhotoScopeDirty(.album(sourceFolderId))
         targetFolderIDs.forEach { markPhotoScopeDirty(.album($0)) }
     }
+}
+
+private enum ArchiveDataError: Error {
+    case photoNotLoaded
 }
 
 // MARK: - Delete

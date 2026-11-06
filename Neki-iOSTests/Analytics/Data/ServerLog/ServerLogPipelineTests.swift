@@ -210,13 +210,14 @@ struct ServerLogPipelineTests {
 
     @Test("저장된 토큰이 없거나 만료 5분 전부터는 토큰 없이 보낸다")
     func storedTokenReader_returnsOnlyUsableToken() async throws {
-        let fresh = AuthTokens(accessToken: "fresh", refreshToken: "refresh")
-        let expiringJSON = #"{"accessToken":"expiring","refreshToken":"refresh","expiredAt":\#(Date().addingTimeInterval(60).timeIntervalSinceReferenceDate)}"#
+        let now = Date(timeIntervalSince1970: 1_000)
+        let fresh = AuthTokens(accessToken: "fresh", refreshToken: "refresh", issuedAt: now)
+        let expiringJSON = #"{"accessToken":"expiring","refreshToken":"refresh","expiredAt":\#(now.addingTimeInterval(60).timeIntervalSinceReferenceDate)}"#
         let expiring = try JSONDecoder().decode(AuthTokens.self, from: Data(expiringJSON.utf8))
 
-        let freshToken = await ServerLogStoredTokenReader(reader: StoredTokenStub(result: .success(fresh))).usableAccessToken()
-        let expiringToken = await ServerLogStoredTokenReader(reader: StoredTokenStub(result: .success(expiring))).usableAccessToken()
-        let missingToken = await ServerLogStoredTokenReader(reader: StoredTokenStub(result: .failure(TokenStorageError.notFound))).usableAccessToken()
+        let freshToken = await ServerLogStoredTokenReader(reader: StoredTokenStub(result: .success(fresh)), now: { now }).usableAccessToken()
+        let expiringToken = await ServerLogStoredTokenReader(reader: StoredTokenStub(result: .success(expiring)), now: { now }).usableAccessToken()
+        let missingToken = await ServerLogStoredTokenReader(reader: StoredTokenStub(result: .failure(TokenStorageError.notFound)), now: { now }).usableAccessToken()
 
         #expect(freshToken == "fresh")
         #expect(expiringToken == nil)

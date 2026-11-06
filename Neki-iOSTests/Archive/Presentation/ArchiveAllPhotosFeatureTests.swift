@@ -12,7 +12,7 @@ import Testing
 
 @MainActor
 struct ArchiveAllPhotosFeatureTests {
-    @Test("첫 조회 응답의 페이지 상태와 Masonry column을 반영한다")
+    @Test("첫 조회 응답의 페이지 상태와 표시할 사진을 반영한다")
     func fetchPhotos_appliesSnapshot() async {
         let photos = [makePhoto(id: 1), makePhoto(id: 2), makePhoto(id: 3)]
         let snapshot = ArchivePhotoSnapshot(photos: photos, totalCount: 3, hasNext: false)
@@ -24,7 +24,7 @@ struct ArchiveAllPhotosFeatureTests {
             $0.isFetchingPhotos = false
             $0.hasNextPhotos = false
             $0.photos = IdentifiedArray(uniqueElements: photos)
-            $0.photoColumns = ArchiveMasonryLayout.columns(for: photos)
+            $0.visiblePhotos = photos
             $0.lastVisiblePhotoID = 3
         }
     }
@@ -49,8 +49,8 @@ struct ArchiveAllPhotosFeatureTests {
         #expect(requestCount == 0)
     }
 
-    @Test("즐겨찾기 필터는 즐겨찾기 사진 ID만 column에 유지한다")
-    func favoriteFilter_updatesVisibleColumns() async {
+    @Test("즐겨찾기 필터는 즐겨찾기 사진만 표시한다")
+    func favoriteFilter_updatesVisiblePhotos() async {
         let photos = [
             makePhoto(id: 1, isFavorite: true),
             makePhoto(id: 2, isFavorite: false),
@@ -58,12 +58,12 @@ struct ArchiveAllPhotosFeatureTests {
         ]
         var state = ArchiveAllPhotosFeature.State()
         state.photos = IdentifiedArray(uniqueElements: photos)
-        state.photoColumns = ArchiveMasonryLayout.columns(for: photos)
+        state.visiblePhotos = photos
         let store = makeStore(initialState: state)
 
         await store.send(.onTapFavoriteButton) {
             $0.isSelectedFavorite = true
-            $0.photoColumns = ArchiveMasonryLayout.columns(for: [photos[0], photos[2]])
+            $0.visiblePhotos = [photos[0], photos[2]]
             $0.lastVisiblePhotoID = 3
         }
     }

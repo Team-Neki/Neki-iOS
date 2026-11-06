@@ -11,5 +11,5 @@ public protocol TokenContainer {
     var accessToken: String { get }
     var refreshToken: String { get }
     
-    func toEntity() -> AuthTokens
+    func toEntity(issuedAt: Date) -> AuthTokens
 }

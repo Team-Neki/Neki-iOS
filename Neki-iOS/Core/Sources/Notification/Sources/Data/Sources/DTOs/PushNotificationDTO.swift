@@ -13,7 +13,7 @@ struct PushNotificationDTO: Codable {
     let title: String
     let body: String
     let link: String?
-    let createdAt: String
+    let createdAt: Date
 
     func toEntity() -> PushNotificationListItem {
         PushNotificationListItem(
@@ -21,7 +21,7 @@ struct PushNotificationDTO: Codable {
             type: type,
             title: title,
             body: body,
-            sentAt: createdAt.toISO8601DateOrNil(),
+            sentAt: createdAt,
             link: link
         )
     }

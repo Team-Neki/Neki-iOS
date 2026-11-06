@@ -20,6 +20,7 @@ public final actor DefaultAuthRepository: AuthRepository {
     private var credentialFailureValidation: (@Sendable () async -> Bool)?
 
     @Dependency(\.networkProvider) private var networkProvider
+    @Dependency(\.date.now) private var now
     
     public init() {}
 
@@ -41,7 +42,7 @@ public final actor DefaultAuthRepository: AuthRepository {
         do {
             let responseDTO: BaseResponseDTO<SocialLoginDTO.Response> = try await networkProvider.request(endpoint: endpoint)
             guard let data = responseDTO.data else { throw NetworkError.responseDecodingError }
-            let tokens = data.toEntity()
+            let tokens = data.toEntity(issuedAt: now)
             let registrationStatus: RegistrationStatus = data.isNewUser ? .newlyRegistered : .existingAccount
             return (tokens, registrationStatus)
         } catch { throw mapError(error) }

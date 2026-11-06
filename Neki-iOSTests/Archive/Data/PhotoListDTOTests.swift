@@ -11,15 +11,16 @@ import Testing
 
 struct PhotoListDTOTests {
     @Test(
-        "지원하는 ISO 8601 형식을 Data 계층에서 Date로 변환한다",
+        "지원하는 서버 날짜 형식을 공용 계약으로 Date로 변환한다",
         arguments: [
-            "2026-07-03T10:20:30.123456Z",
-            "2026-07-03T10:20:30.123456",
-            "2026-07-03T10:20:30Z",
-            "2026-07-03T10:20:30"
+            ("2026-07-03T10:20:30.123456Z", "2026-07-03T10:20:30.123456Z"),
+            ("2026-07-03T10:20:30.123456", "2026-07-03T01:20:30.123456Z"),
+            ("2026-07-03T10:20:30Z", "2026-07-03T10:20:30Z"),
+            ("2026-07-03T10:20:30", "2026-07-03T01:20:30Z"),
+            ("2026-07-03T10:20:30+09:00", "2026-07-03T01:20:30Z")
         ]
     )
-    func toEntity_parsesSupportedDateFormats(dateValue: String) throws {
+    func toEntity_parsesSupportedDateFormats(dateValue: String, expectedValue: String) throws {
         let data = Data(
             """
             {
@@ -40,29 +41,18 @@ struct PhotoListDTOTests {
             """.utf8
         )
 
-        let response = try JSONDecoder().decode(PhotoListDTO.PhotoListData.self, from: data)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = ServerDateCodec.dateDecodingStrategy
+        let response = try decoder.decode(PhotoListDTO.PhotoListData.self, from: data)
         let photo = try #require(response.toEntity().first)
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
-        let nanosecond = dateValue.contains(".") ? 123_456_000 : 0
-        let expectedDate = try #require(calendar.date(from: DateComponents(
-            year: 2026,
-            month: 7,
-            day: 3,
-            hour: 10,
-            minute: 20,
-            second: 30,
-            nanosecond: nanosecond
-        )))
+        let expectedDate = try ServerDateCodec().decode(expectedValue)
 
-        #expect(photo.createdAtRawValue == dateValue)
         #expect(abs(photo.createdAt.timeIntervalSince(expectedDate)) < 0.001)
         #expect(photo.memo.isEmpty)
     }
 
-    @Test("잘못된 날짜는 기존 정책대로 현재 시각으로 대체한다")
-    func toEntity_whenDateIsInvalid_usesCurrentDate() throws {
-        let beforeParsing = Date()
+    @Test("잘못된 서버 날짜는 현재 시각으로 대체하지 않고 디코딩에 실패한다")
+    func toEntity_whenDateIsInvalid_throwsDecodingError() throws {
         let data = Data(
             """
             {
@@ -83,10 +73,10 @@ struct PhotoListDTOTests {
             """.utf8
         )
 
-        let response = try JSONDecoder().decode(PhotoListDTO.PhotoListData.self, from: data)
-        let photo = try #require(response.toEntity().first)
-
-        #expect(photo.createdAt >= beforeParsing)
-        #expect(photo.createdAt <= Date())
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = ServerDateCodec.dateDecodingStrategy
+        #expect(throws: DecodingError.self) {
+            try decoder.decode(PhotoListDTO.PhotoListData.self, from: data)
+        }
     }
 }

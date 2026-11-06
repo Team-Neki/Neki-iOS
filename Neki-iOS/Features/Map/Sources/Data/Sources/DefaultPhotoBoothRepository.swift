@@ -17,6 +17,7 @@ public final actor DefaultPhotoBoothRepository {
     
     private let regionCache: PhotoBoothRegionCache
     private let cacheFreshnessPolicy: any PhotoBoothCacheFreshnessPolicy
+    private let now: @Sendable () -> Date
     private var favoritePhotoBoothIDs: [PhotoBooth.ID] = []
     private var favoritePhotoBoothIDSet: Set<PhotoBooth.ID> = []
     private var favoritePhotoBoothsByID: [PhotoBooth.ID: PhotoBooth] = [:]
@@ -30,18 +31,22 @@ public final actor DefaultPhotoBoothRepository {
     
     public init() { self.init(configuration: .standard) }
     
-    init(configuration: PhotoBoothCacheConfiguration) {
+    init(
+        configuration: PhotoBoothCacheConfiguration,
+        now: @escaping @Sendable () -> Date = Date.init
+    ) {
         regionCache = PhotoBoothRegionCache(configuration: configuration)
         cacheFreshnessPolicy = configuration.freshnessPolicy
+        self.now = now
     }
     
     private func ensureBrandsLoaded() async throws -> [BrandID: PhotoBoothBrand] {
-        let now = Date.now
+        let referenceDate = now()
         if let existingMap = brandMap,
            let brandCachedAt,
            cacheFreshnessPolicy.isFresh(
                metadata: PhotoBoothCacheMetadata(cachedAt: brandCachedAt, validationToken: nil),
-               now: now
+               now: referenceDate
            ) {
             return existingMap
         }
@@ -64,7 +69,7 @@ public final actor DefaultPhotoBoothRepository {
             let map = Dictionary(uniqueKeysWithValues: brandEntities.map { ($0.name, $0) })
             let orderIDs = brandEntities.map(\.id)
             let latestOrderIDs = orderMutationRevision == brandOrderMutationRevision ? orderIDs : nil
-            updateCachedBrands(map, orderIDs: latestOrderIDs, cachedAt: .now)
+            updateCachedBrands(map, orderIDs: latestOrderIDs, cachedAt: self.now())
             return map
         }
         
@@ -97,9 +102,9 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                 try Task.checkCancellation()
 
                 let requestedBounds = PhotoBoothQueryBoundsExpander.expandedBounds(for: bounds)
-                let now = Date.now
+                let referenceDate = now()
                 let staleSnapshot: PhotoBoothRegionCacheSnapshot?
-                switch regionCache.lookup(bounds: requestedBounds, now: now) {
+                switch regionCache.lookup(bounds: requestedBounds, now: referenceDate) {
                 case let .fresh(snapshot):
                     continuation.yield(photoBoothsApplyingFavoriteState(snapshot.photoBooths))
                     continuation.finish()
@@ -114,7 +119,7 @@ extension DefaultPhotoBoothRepository: PhotoBoothRepository {
                     regionCache.insert(
                         photoBooths,
                         for: requestedBounds,
-                        metadata: PhotoBoothCacheMetadata(cachedAt: .now, validationToken: nil)
+                        metadata: PhotoBoothCacheMetadata(cachedAt: self.now(), validationToken: nil)
                     )
                 } catch is CancellationError {
                     throw CancellationError()

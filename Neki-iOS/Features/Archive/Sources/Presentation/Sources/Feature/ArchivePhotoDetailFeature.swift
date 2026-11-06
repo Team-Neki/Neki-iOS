@@ -123,17 +123,23 @@ struct ArchivePhotoDetailFeature {
                 
             case .doneMemoEditing:
                 let limitedText = String(state.editingMemoText.prefix(100))
-                let photoID = state.currentItemID
                 state.isMemoEditing = false
                 state.isMemoExpanded = false
+                guard let currentItem = state.currentItem else { return .none }
+                let photoID = currentItem.id
+                let createdAt = currentItem.createdAt
                 // 메모가 바뀌지 않았으면 저장을 요청하지 않아, 메모 작성 이벤트도 남지 않습니다.
-                let previousMemo = state.currentItem?.memo ?? ""
+                let previousMemo = currentItem.memo ?? ""
                 guard limitedText != previousMemo else { return .none }
                 state.photos[id: photoID]?.memo = limitedText
                 
                 return .run { send in
                     await send(.memoUpdateResponse(photoID: photoID, previousMemo: previousMemo, Result {
-                        try await archiveClient.updatePhotoMemo(photoID: photoID, memo: limitedText)
+                        try await archiveClient.updatePhotoMemo(
+                            photoID: photoID,
+                            createdAt: createdAt,
+                            memo: limitedText
+                        )
                     }))
                 }
 

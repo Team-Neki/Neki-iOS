@@ -22,7 +22,7 @@ protocol ArchiveRepository: Sendable {
     func toggleFavorite(photoID: Int, request: Bool) async throws
     func excludePhotosInAlbum(albumID: Int, photoIDs: [Int]) async throws
     func editAlbumName(albumID: Int, name: String) async throws
-    func updatePhotoMemo(photoID: Int, memo: String) async throws
+    func updatePhotoMemo(photoID: Int, createdAt: Date, memo: String) async throws
     func duplicatePhoto(photoIDs: [Int], targetFolderIDs: [Int]) async throws
     func movePhoto(sourceFolderId: Int, photoIDs: [Int], targetFolderIDs: [Int]) async throws
     

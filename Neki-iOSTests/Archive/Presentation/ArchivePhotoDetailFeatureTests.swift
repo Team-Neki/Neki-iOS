@@ -30,13 +30,20 @@ struct ArchivePhotoDetailFeatureTests {
     func doneMemoEditing_withChangedMemo_savesAndLogs() async {
         let events = LockIsolated<[ArchiveAnalyticsEvent]>([])
         let savedMemos = LockIsolated<[String]>([])
-        let store = makeStore(memo: "첫 메모", events: events, savedMemos: savedMemos)
+        let savedDates = LockIsolated<[Date]>([])
+        let store = makeStore(
+            memo: "첫 메모",
+            events: events,
+            savedMemos: savedMemos,
+            savedDates: savedDates
+        )
         store.send(.startMemoEditing)
         store.send(.binding(.set(\.editingMemoText, "바꾼 메모")))
 
         await store.send(.doneMemoEditing).finish()
 
         #expect(savedMemos.value == ["바꾼 메모"])
+        #expect(savedDates.value == [Date(timeIntervalSince1970: 0)])
         #expect(events.value == [.photoMemoCreate])
         #expect(store.currentItem?.memo == "바꾼 메모")
     }
@@ -75,6 +82,7 @@ private extension ArchivePhotoDetailFeatureTests {
         memo: String,
         events: LockIsolated<[ArchiveAnalyticsEvent]>,
         savedMemos: LockIsolated<[String]>,
+        savedDates: LockIsolated<[Date]>? = nil,
         failingSaveCount: Int = 0
     ) -> StoreOf<ArchivePhotoDetailFeature> {
         let remainingFailures = LockIsolated(failingSaveCount)
@@ -89,8 +97,9 @@ private extension ArchivePhotoDetailFeatureTests {
                 guard let event = event as? ArchiveAnalyticsEvent else { return }
                 events.withValue { $0.append(event) }
             }
-            $0.archiveClient.updatePhotoMemo = { _, memo in
+            $0.archiveClient.updatePhotoMemo = { _, createdAt, memo in
                 savedMemos.withValue { $0.append(memo) }
+                savedDates?.withValue { $0.append(createdAt) }
                 let shouldFail = remainingFailures.withValue { count -> Bool in
                     guard count > 0 else { return false }
                     count -= 1

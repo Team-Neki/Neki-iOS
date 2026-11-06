@@ -71,16 +71,13 @@ struct DefaultArchiveRepositoryTests {
         #expect(requestCount == 2)
     }
 
-    @Test("메모 수정은 사진 시각을 KST 무오프셋 capturedAt으로 보낸다")
-    func updatePhotoMemo_encodesCapturedAtAsKSTLocalSeconds() async throws {
-        let networkProvider = ArchiveNetworkProviderStub(responses: [
-            photoListResponse(ids: [1], hasNext: false, totalCount: 1),
-            emptyResponse()
-        ])
+    @Test("메모 수정은 캐시 없이 전달받은 사진 시각을 KST 무오프셋 capturedAt으로 보낸다")
+    func updatePhotoMemo_withoutCachedPhoto_encodesCapturedAtAsKSTLocalSeconds() async throws {
+        let networkProvider = ArchiveNetworkProviderStub(responses: [emptyResponse()])
         let repository = makeRepository(networkProvider: networkProvider)
+        let createdAt = try ServerDateCodec().decode("2026-07-03T00:00:00Z")
 
-        _ = try await repository.refreshPhotos(scope: .all, size: 20, sortOrder: .descending)
-        try await repository.updatePhotoMemo(photoID: 1, memo: "새 메모")
+        try await repository.updatePhotoMemo(photoID: 1, createdAt: createdAt, memo: "새 메모")
 
         let body = try #require(await networkProvider.requestBodies.last ?? nil)
         let json = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])

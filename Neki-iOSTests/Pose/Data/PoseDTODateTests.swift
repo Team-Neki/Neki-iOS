@@ -10,8 +10,8 @@ import Testing
 @testable import Neki_iOS
 
 struct PoseDTODateTests {
-    @Test("포즈 createdAt은 KST 무오프셋 서버 계약으로 디코딩한다")
-    func decode_createdAtAsKST() throws {
+    @Test("사용하지 않는 포즈 createdAt이 잘못되어도 포즈 응답을 디코딩한다")
+    func decode_ignoresUnusedCreatedAt() throws {
         let data = Data(
             """
             {
@@ -22,15 +22,15 @@ struct PoseDTODateTests {
               "contentType": "image/jpeg",
               "width": 1080,
               "height": 1440,
-              "createdAt": "2025-12-23T16:09:00"
+              "createdAt": "invalid"
             }
             """.utf8
         )
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = ServerDateCodec.dateDecodingStrategy
 
-        let pose = try decoder.decode(PoseDTO.self, from: data)
+        let pose = try decoder.decode(PoseDTO.self, from: data).toEntity()
 
-        #expect(pose.createdAt == Date(timeIntervalSince1970: 1_766_473_740))
+        #expect(pose.id == 1)
     }
 }

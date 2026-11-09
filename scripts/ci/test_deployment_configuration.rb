@@ -1,6 +1,12 @@
 # frozen_string_literal: true
 
+require "pathname"
 require_relative "../../fastlane/deployment_configuration"
+
+expected_project = File.join(DeploymentConfiguration::PROJECT_ROOT, "Neki-iOS.xcodeproj")
+abort "Project path is not absolute" unless Pathname.new(DeploymentConfiguration::PROJECT).absolute?
+abort "Project path changed: #{DeploymentConfiguration::PROJECT}" unless DeploymentConfiguration::PROJECT == expected_project
+abort "Project is missing: #{DeploymentConfiguration::PROJECT}" unless File.directory?(DeploymentConfiguration::PROJECT)
 
 relative_path = "Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
 expected_path = File.join(DeploymentConfiguration::PROJECT_ROOT, relative_path)

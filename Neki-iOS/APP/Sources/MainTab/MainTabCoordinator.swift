@@ -37,12 +37,13 @@ struct MainTabCoordinator {
         var toast: NekiToastItem? = nil
         var isPermissionAlertPresented: Bool = false
         var isPushNotificationPermissionAlertPresented: Bool = false
-        var shouldPresentMarketingConsentAlert: Bool
+        var shouldPresentMarketingConsentAlert: Bool = false
         var isMarketingConsentAlertPresented: Bool = false
         var isUpdatingMarketingConsent: Bool = false
+        var notificationGuide: NotificationGuideFeature.State
 
-        init(shouldPresentMarketingConsentAlert: Bool = false) {
-            self.shouldPresentMarketingConsentAlert = shouldPresentMarketingConsentAlert
+        init(notificationGuideEntry: NotificationGuideEntry = .regular) {
+            self.notificationGuide = NotificationGuideFeature.State(entry: notificationGuideEntry)
         }
         
         var user: User {

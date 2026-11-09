@@ -24,12 +24,7 @@ public struct LoginCoordinator {
         
         case delegate(Delegate)
         public enum Delegate {
-            case moveToMainTab(
-                User,
-                shouldPresentMarketingConsentAlert: Bool,
-                didCompleteTermsAgreement: Bool,
-                marketingConsentStatus: MarketingConsentManagementStatus?
-            )
+            case moveToMainTab(User, notificationGuideEntry: NotificationGuideEntry)
         }
     }
     
@@ -45,19 +40,14 @@ public struct LoginCoordinator {
                     state.path.append(.termsAgreement(.init()))
                     return .none
                 }
-                return .send(.delegate(.moveToMainTab(
-                    loginResult.user,
-                    shouldPresentMarketingConsentAlert: false,
-                    didCompleteTermsAgreement: false,
-                    marketingConsentStatus: nil
-                )))
+                return .send(.delegate(.moveToMainTab(loginResult.user, notificationGuideEntry: .regular)))
                 
             case let .root(.loginResponse(.failure(error))):
                 Logger.presentation.error("로그인 과정 중 에러 발생: \(error)")
                 return .none
                 
                 // MARK: - Onboarding Flow
-            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user, marketingConsentStatus)))):
+            case let .path(.element(id, action: .termsAgreement(.didFinishOnboarding(user, isMarketingTermAgreed)))):
                 guard state.pendingLoginResult != nil else {
                     Logger.presentation.error("온보딩 과정 중 중단됨.")
                     return .none
@@ -67,9 +57,7 @@ public struct LoginCoordinator {
                 state.path.pop(from: id)
                 return .send(.delegate(.moveToMainTab(
                     user,
-                    shouldPresentMarketingConsentAlert: marketingConsentStatus == nil && user.marketingTermAgreed == false,
-                    didCompleteTermsAgreement: true,
-                    marketingConsentStatus: marketingConsentStatus
+                    notificationGuideEntry: .afterTermsAgreement(isMarketingTermAgreed: isMarketingTermAgreed)
                 )))
                 
             default:

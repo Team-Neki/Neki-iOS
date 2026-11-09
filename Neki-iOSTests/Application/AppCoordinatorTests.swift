@@ -53,12 +53,7 @@ struct AppCoordinatorTests {
         let records = LockIsolated<[String]>([])
         let store = makeStore(initialState: state, records: records)
 
-        await store.send(.route(.auth(.delegate(.moveToMainTab(
-            user,
-            shouldPresentMarketingConsentAlert: false,
-            didCompleteTermsAgreement: false,
-            marketingConsentStatus: nil
-        ))))).finish()
+        await store.send(.route(.auth(.delegate(.moveToMainTab(user, notificationGuideEntry: .regular))))).finish()
 
         #expect(records.value == ["user \(user.id)"])
     }
@@ -93,7 +88,7 @@ private extension AppCoordinatorTests {
         }
     }
 
-    /// 마케팅 동의 안내 기록이 남아 있을 리 없는 사용자입니다. 필수 약관에 모두 동의해 메인으로 갑니다.
+    /// 필수 약관에 모두 동의해 메인으로 가는 테스트 사용자입니다.
     var user: User {
         User(
             id: 900_001,

@@ -195,8 +195,8 @@ extension DefaultArchiveRepository {
         isAlbumCacheDirty = true
     }
 
-    func updatePhotoMemo(photoID: Int, memo: String) async throws {
-        let capturedAt = photosByID[photoID]?.createdAtRawValue ?? Date().ISO8601Format()
+    func updatePhotoMemo(photoID: Int, createdAt: Date, memo: String) async throws {
+        let capturedAt = ServerDateCodec().encode(createdAt, as: .kstLocalSeconds)
         let request = UpdateMemoRequestDTO(memo: memo, capturedAt: capturedAt)
         do { let _: BaseResponseDTO<EmptyData> = try await networkProvider.request(endpoint: ArchiveEndpoint.updateMemo(photoID: photoID, request: request)) }
         catch { throw mapArchiveRequestError(error) }

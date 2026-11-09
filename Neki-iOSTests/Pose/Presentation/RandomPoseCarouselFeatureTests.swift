@@ -90,8 +90,7 @@ private extension RandomPoseCarouselFeatureTests {
             isScrapped: false,
             contentType: .jpeg,
             width: nil,
-            height: nil,
-            createdAt: Date(timeIntervalSince1970: 0)
+            height: nil
         )
     }
 }

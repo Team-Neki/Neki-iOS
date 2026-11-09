@@ -15,5 +15,4 @@ public struct Pose: Identifiable, Sendable, Equatable {
     public let contentType: ImageContentType
     public let width: Int?
     public let height: Int?
-    public let createdAt: Date
 }

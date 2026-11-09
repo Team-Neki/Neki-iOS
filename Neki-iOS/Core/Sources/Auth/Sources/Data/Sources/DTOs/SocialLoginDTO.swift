@@ -18,6 +18,8 @@ enum SocialLoginDTO {
         let refreshToken: String
         let isNewUser: Bool
 
-        func toEntity() -> AuthTokens { .init(accessToken: accessToken, refreshToken: refreshToken) }
+        func toEntity(issuedAt: Date) -> AuthTokens {
+            .init(accessToken: accessToken, refreshToken: refreshToken, issuedAt: issuedAt)
+        }
     }
 }

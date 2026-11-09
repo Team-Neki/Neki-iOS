@@ -120,9 +120,6 @@ enum ServerLogValue: Equatable, Sendable, Encodable {
 enum ServerLogTimestamp {
     /// epoch milliseconds를 밀리초 세 자리까지 담은 UTC ISO 8601 문자열로 바꿉니다. 예: `2026-11-01T18:48:04.997Z`
     static func string(fromMilliseconds milliseconds: Int64) -> String {
-        let (seconds, remainder) = milliseconds.quotientAndRemainder(dividingBy: 1000)
-        let date = Date(timeIntervalSince1970: TimeInterval(seconds))
-        let secondsText = date.formatted(.iso8601)
-        return String(secondsText.dropLast()) + String(format: ".%03lldZ", remainder)
+        ServerDateCodec().encodeUTC(millisecondsSince1970: milliseconds)
     }
 }

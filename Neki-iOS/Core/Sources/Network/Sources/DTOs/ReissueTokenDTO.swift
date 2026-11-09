@@ -16,6 +16,8 @@ enum ReissueTokenDTO {
         let accessToken: String
         let refreshToken: String
 
-        func toEntity() -> AuthTokens { .init(accessToken: accessToken, refreshToken: refreshToken) }
+        func toEntity(issuedAt: Date) -> AuthTokens {
+            .init(accessToken: accessToken, refreshToken: refreshToken, issuedAt: issuedAt)
+        }
     }
 }

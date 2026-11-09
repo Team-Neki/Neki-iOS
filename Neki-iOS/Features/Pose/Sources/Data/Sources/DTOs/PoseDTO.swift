@@ -15,7 +15,6 @@ struct PoseDTO: Decodable {
     let contentType: String
     let width: Int?
     let height: Int?
-    let createdAt: Date
     
     enum CodingKeys: String, CodingKey {
         case id = "poseId"
@@ -25,7 +24,6 @@ struct PoseDTO: Decodable {
         case contentType
         case width
         case height
-        case createdAt
     }
     
     func toEntity() -> Pose {
@@ -49,8 +47,7 @@ struct PoseDTO: Decodable {
             isScrapped: isScrapped ?? false,
             contentType: imageContentType,
             width: width,
-            height: height,
-            createdAt: createdAt
+            height: height
         )
     }
 }

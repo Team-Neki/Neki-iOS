@@ -31,7 +31,7 @@ public struct PushNotificationSentTime: Equatable, Sendable {
         self.value = value
     }
 
-    public func relativeValue(to referenceDate: Date = .now) -> RelativeValue {
+    public func relativeValue(to referenceDate: Date) -> RelativeValue {
         let elapsedTime = referenceDate.timeIntervalSince(value)
         guard elapsedTime >= TimeInterval.minute else { return .justNow }
         guard elapsedTime >= TimeInterval.hour else { return .minutes(Int(elapsedTime / TimeInterval.minute)) }

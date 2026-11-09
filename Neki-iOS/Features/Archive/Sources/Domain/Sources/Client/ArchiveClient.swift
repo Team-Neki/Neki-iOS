@@ -22,7 +22,7 @@ struct ArchiveClient {
     public var toggleFavorite: (_ photoID: Int, _ request: Bool) async throws -> Void
     public var excludePhotosInAlbum: (_ albumID: Int, _ photoIDs: [Int]) async throws -> Void
     public var editAlbumName: (_ albumID: Int, _ name: String) async throws -> Void
-    public var updatePhotoMemo: (_ photoID: Int, _ memo: String) async throws -> Void
+    public var updatePhotoMemo: (_ photoID: Int, _ createdAt: Date, _ memo: String) async throws -> Void
     public var clearCache: () async throws -> Void
     public var duplicatePhoto: (_ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
     public var movePhoto: (_ sourceFolderId: Int, _ photoIDs: [Int], _ targetFolderIDs: [Int]) async throws -> Void
@@ -66,8 +66,8 @@ extension ArchiveClient: DependencyKey {
             editAlbumName: { albumID, name in
                 try await archiveRepository.editAlbumName(albumID: albumID, name: name)
             },
-            updatePhotoMemo: { photoID, memo in
-                try await archiveRepository.updatePhotoMemo(photoID: photoID, memo: memo)
+            updatePhotoMemo: { photoID, createdAt, memo in
+                try await archiveRepository.updatePhotoMemo(photoID: photoID, createdAt: createdAt, memo: memo)
             },
             clearCache: {
                 try await archiveRepository.clearCache()

@@ -23,6 +23,10 @@ public struct AppStorageKey {
         "MarketingConsentManagementStatus_\(userID)"
     }
 
+    public static func notificationGuideRecord(userID: Int) -> String {
+        "NotificationGuideRecord_\(userID)"
+    }
+
 }
 
 public enum MarketingConsentManagementStatus: String {

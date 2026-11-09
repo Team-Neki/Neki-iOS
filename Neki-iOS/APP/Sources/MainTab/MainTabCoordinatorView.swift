@@ -51,8 +51,7 @@ struct MainTabCoordinatorView: View {
         .onChange(of: store.selectedTab) { _, newTab in
             store.send(.tabChanged(newTab))
         }
-        .nekiToast(item: $store.toast)
-        .modifier(MarketingConsentAlertModifier(store: store))
+        .modifier(NotificationGuideModalModifier(store: store.scope(state: \.notificationGuide, action: \.notificationGuide)))
         .nekiAlert(
             isPresented: $store.isPermissionAlertPresented,
             style: .cancelable,
@@ -73,6 +72,8 @@ struct MainTabCoordinatorView: View {
             onConfirm: { store.send(.openAppSettings) },
             onCancel: { store.send(.dismissPushNotificationPermissionAlert) }
         )
+        // 알림 모달의 어두운 배경 위에도 보이도록 모달들 뒤에 둡니다.
+        .nekiToast(item: $store.toast)
         .sheet(isPresented: Binding($store.scope(state: \.$destination, action: \.destination).uploadSelection)) {
             store.send(.uploadSelectionSheetDismissed)
         } content: {

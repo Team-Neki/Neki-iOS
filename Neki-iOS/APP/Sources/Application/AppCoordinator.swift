@@ -150,7 +150,10 @@ struct AppCoordinator {
                 
             case let .scenePhaseChanged(phase):
                 guard phase == .active else { return .none }
-                let authorizationEffect: Effect<Action> = .send(.checkPushNotificationAuthorization)
+                let authorizationEffect: Effect<Action> = .merge(
+                    .send(.checkPushNotificationAuthorization),
+                    forwardSceneActivationToMainTab(state: state)
+                )
 
                 guard state.versionAlert != .updateNeeded else { return authorizationEffect }
                 guard state.lastVersionCheckedTime.map({ now.timeIntervalSince($0) >= Constants.versionCheckInterval }) ?? true else { return authorizationEffect }
@@ -328,6 +331,9 @@ struct AppCoordinator {
                 state.shouldRetryPushNotificationSynchronization = false
                 return .send(.synchronizePushNotification)
 
+            case .route(.mainTab(.delegate(.didRequestNotificationAuthorization))):
+                return .send(.checkPushNotificationAuthorization)
+
             case .route(.mainTab(.delegate(.signedOut))), .route(.mainTab(.delegate(.withdraw))):
                 state.hasSynchronizedPushNotification = false
                 state.shouldRetryPushNotificationSynchronization = false
@@ -474,6 +480,12 @@ private extension AppCoordinator {
             return .none
         }
         return .send(.synchronizePushNotification)
+    }
+
+    /// 설정 앱에서 돌아온 것을 알림 안내가 알 수 있도록 메인 탭에 앱 활성화를 알립니다.
+    func forwardSceneActivationToMainTab(state: State) -> Effect<Action> {
+        guard case .mainTab = state.route else { return .none }
+        return .send(.route(.mainTab(.sceneDidBecomeActive)))
     }
 
     func isAPNSTokenRegistered(_ state: inout State) -> Bool {

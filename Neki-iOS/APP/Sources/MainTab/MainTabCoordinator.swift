@@ -85,6 +85,7 @@ struct MainTabCoordinator {
         case myPage(MyPageCoordinator.Action)
         case imagePicker(ImagePickerFeature.Action)
         case destination(PresentationAction<Destination.Action>)
+        case notificationGuide(NotificationGuideFeature.Action)
         
         // View Actions
         case onTapAddButton
@@ -108,11 +109,13 @@ struct MainTabCoordinator {
         
         case onAppear
         case tabChanged(NekiTab)
+        case sceneDidBecomeActive
         
         case delegate(Delegate)
         enum Delegate {
             case signedOut
             case withdraw
+            case didRequestNotificationAuthorization
         }
     }
     
@@ -130,6 +133,7 @@ struct MainTabCoordinator {
         Scope(state: \.map, action: \.map) { MapCoordinator() }
         Scope(state: \.myPage, action: \.myPage) { MyPageCoordinator() }
         Scope(state: \.imagePicker, action: \.imagePicker) { ImagePickerFeature() }
+        Scope(state: \.notificationGuide, action: \.notificationGuide) { NotificationGuideFeature() }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
@@ -142,7 +146,10 @@ struct MainTabCoordinator {
                     state.isMarketingConsentAlertPresented = true
                     recordMarketingConsentAlertPresentation(for: state.user)
                 }
-                return .send(.tabChanged(state.selectedTab))
+                return .merge(
+                    .send(.notificationGuide(.mainTabAppeared(isFirstScreenCovered: state.firstScreenCoverage.isCovered))),
+                    .send(.tabChanged(state.selectedTab))
+                )
                 
             case let .tabChanged(tab):
                 // 화면 진입 이벤트는 각 탭의 첫 화면이 보일 때 그 화면이 보내므로 여기서는 보내지 않습니다.
@@ -325,6 +332,16 @@ struct MainTabCoordinator {
                     await send(.onTapGallery)
                     await send(.setPhotosPickerPresented(true))
                 }
+                
+            case .sceneDidBecomeActive:
+                return .send(.notificationGuide(.sceneDidBecomeActive))
+                
+            case let .notificationGuide(.delegate(.showToast(item))):
+                state.toast = item
+                return .none
+                
+            case .notificationGuide(.delegate(.didRequestNotificationAuthorization)):
+                return .send(.delegate(.didRequestNotificationAuthorization))
                 
             default:
                 return .none

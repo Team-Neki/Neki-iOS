@@ -117,7 +117,12 @@ end
 
 def require_firebase_bundle_identifier!(configuration)
   # 환경별 Secret이 선택한 앱의 Firebase 설정인지 배포 설정의 단일 Bundle ID로 판정합니다.
-  plist = CFPropertyList::List.new(file: ENV.fetch("FIREBASE_PATH"))
+  firebase_path = DeploymentConfiguration.resolve_project_path(ENV.fetch("FIREBASE_PATH"))
+  unless File.file?(firebase_path) && File.readable?(firebase_path)
+    UI.user_error!("Firebase plist is not readable: #{firebase_path}")
+  end
+
+  plist = CFPropertyList::List.new(file: firebase_path)
   firebase_configuration = CFPropertyList.native_types(plist.value)
   actual_identifier = firebase_configuration.fetch("BUNDLE_ID", nil)
   expected_identifier = configuration.fetch(:app_identifier)

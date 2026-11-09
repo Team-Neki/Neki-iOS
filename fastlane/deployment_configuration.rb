@@ -3,6 +3,7 @@
 module DeploymentConfiguration
   TEAM_ID = "P85DW78LYM"
   PROJECT = "Neki-iOS.xcodeproj"
+  PROJECT_ROOT = File.expand_path("..", __dir__)
   APP_TARGET = "Neki-iOS"
   SHARE_EXTENSION_TARGET = "NekiShareExtension"
 
@@ -24,6 +25,10 @@ module DeploymentConfiguration
       build_configuration: "Release"
     }
   }.freeze
+
+  def self.resolve_project_path(path)
+    File.expand_path(path, PROJECT_ROOT)
+  end
 
   def self.fetch(target)
     CONFIGURATIONS.fetch(target) do

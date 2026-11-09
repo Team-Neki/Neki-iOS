@@ -28,6 +28,20 @@ result_line() {
   printf '%s **%s** · %s' "$(result_icon "$result")" "$label" "$(display_result "$result")"
 }
 
+append_result_line() {
+  local current="$1"
+  local label="$2"
+  local result="$3"
+  local next
+  next="$(result_line "$label" "$result")"
+
+  if [ -z "$current" ]; then
+    printf '%s' "$next"
+  else
+    printf '%s\n%s' "$current" "$next"
+  fi
+}
+
 has_delivery_success="false"
 has_delivery_failure="false"
 has_policy_failure="false"
@@ -83,21 +97,29 @@ else
   color=5763719
 fi
 
-# 실행한 단계만 남겨 동시 작업에서도 미실행 필드가 메시지를 밀어내지 않게 합니다.
-result_lines=("$(result_line "입력 검증" "$PREPARE_RESULT")")
+# 실행한 단계만 앱별로 묶어 성공·부분 성공·실패의 원인을 한눈에 구분합니다.
+prepare_summary="$(result_line "입력 검증" "$PREPARE_RESULT")"
+development_summary=""
+production_summary=""
+
+case "${DELIVERY_MODE:-none}" in
+  validate) delivery_label="연결 검증" ;;
+  deploy) delivery_label="앱 배포" ;;
+  *) delivery_label="앱 처리" ;;
+esac
+
 if [ "$run_development_delivery" = "true" ]; then
-  result_lines+=("$(result_line "Neki-dev 앱 처리" "$DEVELOPMENT_DELIVERY_RESULT")")
+  development_summary="$(append_result_line "$development_summary" "$delivery_label" "$DEVELOPMENT_DELIVERY_RESULT")"
 fi
 if [ "$run_production_delivery" = "true" ]; then
-  result_lines+=("$(result_line "Neki-iOS 앱 처리" "$PRODUCTION_DELIVERY_RESULT")")
+  production_summary="$(append_result_line "$production_summary" "$delivery_label" "$PRODUCTION_DELIVERY_RESULT")"
 fi
 if [ "$run_development_policy" = "true" ]; then
-  result_lines+=("$(result_line "Neki-dev 버전 정책" "$DEVELOPMENT_POLICY_RESULT")")
+  development_summary="$(append_result_line "$development_summary" "버전 정책" "$DEVELOPMENT_POLICY_RESULT")"
 fi
 if [ "$run_production_policy" = "true" ]; then
-  result_lines+=("$(result_line "Neki-iOS 버전 정책" "$PRODUCTION_POLICY_RESULT")")
+  production_summary="$(append_result_line "$production_summary" "버전 정책" "$PRODUCTION_POLICY_RESULT")"
 fi
-result_summary="$(printf '%s\n' "${result_lines[@]}")"
 
 payload=$(jq -n \
   --arg title "$title" \
@@ -106,7 +128,9 @@ payload=$(jq -n \
   --arg target_app "${TARGET_APP:-확인 불가}" \
   --arg versions "${TARGET_VERSIONS:-입력 검증 실패}" \
   --arg update_policy "$UPDATE_POLICY_INPUT" \
-  --arg result_summary "$result_summary" \
+  --arg prepare_summary "$prepare_summary" \
+  --arg development_summary "$development_summary" \
+  --arg production_summary "$production_summary" \
   --arg release_notes "$RELEASE_NOTES" \
   --arg actor "${ACTION_ACTOR:-확인 불가}" \
   --arg actor_url "${ACTION_ACTOR_URL:-}" \
@@ -129,7 +153,12 @@ payload=$(jq -n \
           value: ("**앱** · " + $target_app + "\n**버전** · " + $versions),
           inline: false
         },
-        {name: "🚦 단계별 결과", value: $result_summary, inline: false},
+        {name: "🧪 입력 검증", value: $prepare_summary, inline: false}
+      ] + (if $development_summary == "" then [] else [
+        {name: "🟣 Neki-dev", value: $development_summary, inline: false}
+      ] end) + (if $production_summary == "" then [] else [
+        {name: "🔵 Neki-iOS", value: $production_summary, inline: false}
+      ] end) + [
         {
           name: "⚙️ 실행 설정",
           value: ("**업데이트 정책** · " + $update_policy + "\n**브랜치** · `" + $ref_name + "`"),

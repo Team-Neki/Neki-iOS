@@ -231,6 +231,7 @@ jobs:
           UPDATE_POLICY_INPUT: ${{ inputs.update_policy }}
           RELEASE_NOTES: ${{ inputs.release_notes }}
           TARGET_VERSIONS: ${{ needs.prepare.outputs.target_versions }}
+          DELIVERY_MODE: ${{ needs.prepare.outputs.delivery_mode }}
           RUN_DELIVERY: ${{ needs.prepare.outputs.run_delivery }}
           RUN_VERSION_POLICY: ${{ needs.prepare.outputs.run_version_policy }}
           RUN_DEVELOPMENT: ${{ needs.prepare.outputs.run_development }}

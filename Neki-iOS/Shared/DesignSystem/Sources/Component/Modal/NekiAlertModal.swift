@@ -13,11 +13,6 @@ public enum NekiAlertStyle {
     case primarySecondary
 }
 
-public enum NekiAlertContentStyle {
-    case standard
-    case marketingConsent(description: Text)
-}
-
 /// 알림 모달 위에 보이는 아이콘입니다.
 public enum NekiAlertIcon {
     case questionMark

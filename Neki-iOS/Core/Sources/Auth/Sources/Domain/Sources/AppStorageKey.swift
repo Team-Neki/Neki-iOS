@@ -11,26 +11,8 @@ public struct AppStorageKey {
     public static let userSessionStatus: String = "UserSessionStatus"
     public static let recentLoginProvider: String = "RecentLoginProvider"
 
-    public static func marketingConsentAlertPresentationCount(userID: Int) -> String {
-        "MarketingConsentAlertPresentationCount_\(userID)"
-    }
-
-    public static func marketingConsentLastManagedAt(userID: Int) -> String {
-        "MarketingConsentLastManagedAt_\(userID)"
-    }
-
-    public static func marketingConsentManagementStatus(userID: Int) -> String {
-        "MarketingConsentManagementStatus_\(userID)"
-    }
-
     public static func notificationGuideRecord(userID: Int) -> String {
         "NotificationGuideRecord_\(userID)"
     }
 
-}
-
-public enum MarketingConsentManagementStatus: String {
-    case unconfirmed
-    case approved
-    case rejected
 }

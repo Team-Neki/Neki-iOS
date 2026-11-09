@@ -240,4 +240,11 @@ jobs:
           PRODUCTION_DELIVERY_RESULT: ${{ needs.production_delivery.result }}
           DEVELOPMENT_POLICY_RESULT: ${{ needs.development_version_policy.result }}
           PRODUCTION_POLICY_RESULT: ${{ needs.production_version_policy.result }}
+          # 재실행에서도 최초 actor가 아니라 이번 실행을 시작한 사용자를 표시합니다.
+          ACTION_ACTOR: ${{ github.triggering_actor }}
+          ACTION_ACTOR_URL: ${{ github.server_url }}/${{ github.triggering_actor }}
+          ACTION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ACTION_REF_NAME: ${{ github.ref_name }}
+          ACTION_RUN_NUMBER: ${{ github.run_number }}
+          ACTION_RUN_ATTEMPT: ${{ github.run_attempt }}
         run: scripts/ci/send_delivery_notification.sh

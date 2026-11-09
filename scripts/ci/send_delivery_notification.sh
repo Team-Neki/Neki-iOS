@@ -12,6 +12,22 @@ display_result() {
   esac
 }
 
+result_icon() {
+  case "$1" in
+    success) echo "✅" ;;
+    failure) echo "❌" ;;
+    cancelled) echo "⏹️" ;;
+    skipped) echo "⏭️" ;;
+    *) echo "❔" ;;
+  esac
+}
+
+result_line() {
+  local label="$1"
+  local result="$2"
+  printf '%s **%s** · %s' "$(result_icon "$result")" "$label" "$(display_result "$result")"
+}
+
 has_delivery_success="false"
 has_delivery_failure="false"
 has_policy_failure="false"
@@ -51,51 +67,85 @@ evaluate_policy_result "$run_production_policy" "$PRODUCTION_POLICY_RESULT"
 
 if [ "$PREPARE_RESULT" != "success" ] || [ "$has_delivery_failure" = "true" ]; then
   title="❌ 지금까지 Neki-iOS를 사랑해주셔서 감사합니다."
+  summary="요청한 작업 중 실패한 단계를 확인해 주세요."
   color=15548997
 elif [ "$has_policy_failure" = "true" ] && [ "$has_delivery_success" = "true" ]; then
   title="⚠️ 앱 배포는 완료됐지만 버전 정책 반영을 확인해주세요."
+  summary="앱 처리는 완료됐지만 버전 정책 반영을 확인해야 합니다."
   color=16705372
 elif [ "$has_policy_failure" = "true" ]; then
   title="❌ 지금까지 Neki-iOS를 사랑해주셔서 감사합니다."
+  summary="버전 정책 반영에 실패했습니다."
   color=15548997
 else
   title="✅ 우리 Neki-iOS 정상영업 합니다."
+  summary="요청한 단계가 모두 정상적으로 완료되었습니다."
   color=5763719
 fi
 
+# 실행한 단계만 남겨 동시 작업에서도 미실행 필드가 메시지를 밀어내지 않게 합니다.
+result_lines=("$(result_line "입력 검증" "$PREPARE_RESULT")")
+if [ "$run_development_delivery" = "true" ]; then
+  result_lines+=("$(result_line "Neki-dev 앱 처리" "$DEVELOPMENT_DELIVERY_RESULT")")
+fi
+if [ "$run_production_delivery" = "true" ]; then
+  result_lines+=("$(result_line "Neki-iOS 앱 처리" "$PRODUCTION_DELIVERY_RESULT")")
+fi
+if [ "$run_development_policy" = "true" ]; then
+  result_lines+=("$(result_line "Neki-dev 버전 정책" "$DEVELOPMENT_POLICY_RESULT")")
+fi
+if [ "$run_production_policy" = "true" ]; then
+  result_lines+=("$(result_line "Neki-iOS 버전 정책" "$PRODUCTION_POLICY_RESULT")")
+fi
+result_summary="$(printf '%s\n' "${result_lines[@]}")"
+
 payload=$(jq -n \
   --arg title "$title" \
+  --arg summary "$summary" \
   --arg operation "$OPERATION" \
-  --arg target_app "$TARGET_APP" \
+  --arg target_app "${TARGET_APP:-확인 불가}" \
   --arg versions "${TARGET_VERSIONS:-입력 검증 실패}" \
   --arg update_policy "$UPDATE_POLICY_INPUT" \
-  --arg prepare "$(display_result "$PREPARE_RESULT")" \
-  --arg development_delivery "$(display_result "$DEVELOPMENT_DELIVERY_RESULT")" \
-  --arg production_delivery "$(display_result "$PRODUCTION_DELIVERY_RESULT")" \
-  --arg development_policy "$(display_result "$DEVELOPMENT_POLICY_RESULT")" \
-  --arg production_policy "$(display_result "$PRODUCTION_POLICY_RESULT")" \
+  --arg result_summary "$result_summary" \
   --arg release_notes "$RELEASE_NOTES" \
+  --arg actor "${ACTION_ACTOR:-확인 불가}" \
+  --arg actor_url "${ACTION_ACTOR_URL:-}" \
+  --arg run_url "${ACTION_RUN_URL:-}" \
+  --arg ref_name "${ACTION_REF_NAME:-확인 불가}" \
+  --arg run_number "${ACTION_RUN_NUMBER:-?}" \
+  --arg run_attempt "${ACTION_RUN_ATTEMPT:-?}" \
   --argjson color "$color" \
-  '($release_notes | if length > 1024 then .[0:1023] + "…" else . end) as $display_notes |
-  {
-    embeds: [{
+  '($release_notes | if length > 1000 then .[0:999] + "…" else . end) as $display_notes |
+  ({
+    embeds: [({
       title: $title,
       color: $color,
+      description: ("**" + $operation + "**\n" + $summary),
+      author: ({name: ("실행자 · @" + $actor)} +
+        (if $actor_url == "" then {} else {url: $actor_url} end)),
       fields: ([
-        {name: "작업 종류", value: $operation, inline: true},
-        {name: "대상 앱", value: $target_app, inline: true},
-        {name: "대상 버전", value: $versions, inline: true},
-        {name: "업데이트 정책", value: $update_policy, inline: true},
-        {name: "입력 검증", value: $prepare, inline: true},
-        {name: "Neki-dev 앱 처리", value: $development_delivery, inline: true},
-        {name: "Neki-iOS 앱 처리", value: $production_delivery, inline: true},
-        {name: "Neki-dev 버전 정책", value: $development_policy, inline: true},
-        {name: "Neki-iOS 버전 정책", value: $production_policy, inline: true}
+        {
+          name: "📦 작업 대상",
+          value: ("**앱** · " + $target_app + "\n**버전** · " + $versions),
+          inline: false
+        },
+        {name: "🚦 단계별 결과", value: $result_summary, inline: false},
+        {
+          name: "⚙️ 실행 설정",
+          value: ("**업데이트 정책** · " + $update_policy + "\n**브랜치** · `" + $ref_name + "`"),
+          inline: false
+        }
       ] + (if $display_notes == "" then [] else [
-        {name: "릴리즈 노트", value: $display_notes, inline: false}
-      ] end))
-    }]
-  }')
+        {name: "📝 릴리즈 노트", value: $display_notes, inline: false}
+      ] end)),
+      footer: {text: ("Run #" + $run_number + " · Attempt " + $run_attempt)}
+    } + (if $run_url == "" then {} else {url: $run_url} end))]
+  })')
+
+if [ "${DISCORD_DRY_RUN:-false}" = "true" ]; then
+  printf '%s\n' "$payload"
+  exit 0
+fi
 
 curl --fail-with-body --silent --show-error \
   -H "Content-Type: application/json" \

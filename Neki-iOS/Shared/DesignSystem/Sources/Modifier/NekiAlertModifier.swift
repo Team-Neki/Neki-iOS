@@ -22,6 +22,7 @@ struct NekiAlertModifier: ViewModifier {
     
     let isProcessing: Bool
     let hasIcon: Bool
+    let icon: NekiAlertIcon
     
     // 액션 클로저
     let onConfirm: (() -> Void)?
@@ -50,7 +51,7 @@ struct NekiAlertModifier: ViewModifier {
                         }
                     }
                 
-                NekiAlertModal(hasIcon: hasIcon) {
+                NekiAlertModal(hasIcon: hasIcon, icon: icon) {
                     alertContent
                 } actions: {
                     buttonStack
@@ -189,6 +190,7 @@ public extension View {
         secondaryText: String? = nil,
         isProcessing: Bool = false,
         hasIcon: Bool = true,
+        icon: NekiAlertIcon = .questionMark,
         onConfirm: (() -> Void)? = nil,
         onCancel: (() -> Void)? = nil,
         onDismiss: (() -> Void)? = nil,
@@ -205,6 +207,7 @@ public extension View {
             secondaryText: secondaryText,
             isProcessing: isProcessing,
             hasIcon: hasIcon,
+            icon: icon,
             onConfirm: onConfirm,
             onCancel: onCancel,
             onDismiss: onDismiss,

@@ -45,6 +45,33 @@ def require_signing_identity!(team_id)
   )
 end
 
+def require_build_settings!(configuration)
+  project = FastlaneCore::Project.new(
+    project: DeploymentConfiguration::PROJECT,
+    scheme: configuration.fetch(:scheme),
+    configuration: configuration.fetch(:build_configuration),
+    destination: "generic/platform=iOS",
+    skip_package_dependencies_resolution: true,
+    disable_package_automatic_updates: true
+  )
+
+  expected_settings = {
+    "CONFIGURATION" => configuration.fetch(:build_configuration),
+    "PRODUCT_BUNDLE_IDENTIFIER" => configuration.fetch(:app_identifier),
+    "DEVELOPMENT_TEAM" => DeploymentConfiguration::TEAM_ID,
+    "CODE_SIGN_STYLE" => "Manual"
+  }
+  mismatches = expected_settings.filter_map do |name, expected_value|
+    actual_value = project.build_settings(key: name, optional: false)
+    next if actual_value == expected_value
+
+    "#{name}=#{actual_value.inspect} (expected #{expected_value.inspect})"
+  end
+  return if mismatches.empty?
+
+  UI.user_error!("Unexpected distribution build settings: #{mismatches.join(', ')}")
+end
+
 platform :ios do
   private_lane :prepare_distribution do |options|
     configuration = options.fetch(:configuration)
@@ -82,7 +109,7 @@ platform :ios do
     api_key
   end
 
-  desc "Validate distribution credentials without building or uploading"
+  desc "Validate distribution configuration and credentials without building or uploading"
   lane :validate_deployment do
     require_environment_variables!(
       %w[
@@ -101,6 +128,7 @@ platform :ios do
     configuration = DeploymentConfiguration.fetch(deployment_target)
 
     require_semantic_version!(marketing_version)
+    require_build_settings!(configuration)
     api_key = prepare_distribution(configuration: configuration)
 
     latest_testflight_build_number(
@@ -110,7 +138,7 @@ platform :ios do
       initial_build_number: 0
     )
 
-    UI.success("Deployment validation completed without building or uploading")
+    UI.success("Distribution configuration and credential validation completed without building or uploading")
   end
 
   desc "Build and distribute the selected Neki app"
@@ -163,6 +191,8 @@ platform :ios do
       configuration: configuration.fetch(:build_configuration),
       export_method: "app-store",
       export_team_id: DeploymentConfiguration::TEAM_ID,
+      skip_package_dependencies_resolution: true,
+      disable_package_automatic_updates: true,
       xcargs: [
         "MARKETING_VERSION=#{marketing_version}",
         "CURRENT_PROJECT_VERSION=#{build_number}"

@@ -97,16 +97,19 @@ runs:
 
         if [ "$DEPLOYMENT_TARGET" = "development" ]; then
           BUILD_SCHEME="Neki-iOS.Dev"
+          EXPECTED_BUNDLE_ID="com.OneTen.Neki-iOS-dev"
           XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Debug.xcconfig"
           FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
         else
           BUILD_SCHEME="Neki-iOS"
+          EXPECTED_BUNDLE_ID="com.OneTen.Neki-iOS"
           XCCONFIG_PATH="Neki-iOS/APP/Sources/Resources/Release.xcconfig"
           FIREBASE_PATH="Neki-iOS/APP/Sources/Resources/FirebaseConfig/Release/GoogleService-Info.plist"
         fi
 
         {
           echo "build_scheme=$BUILD_SCHEME"
+          echo "expected_bundle_id=$EXPECTED_BUNDLE_ID"
           echo "xcconfig_path=$XCCONFIG_PATH"
           echo "firebase_path=$FIREBASE_PATH"
         } >> "$GITHUB_OUTPUT"
@@ -121,6 +124,7 @@ runs:
       env:
         BUILD_XCCONFIG: ${{ inputs.build_xcconfig }}
         FIREBASE_PLIST: ${{ inputs.firebase_plist }}
+        EXPECTED_BUNDLE_ID: ${{ steps.configuration.outputs.expected_bundle_id }}
         XCCONFIG_PATH: ${{ steps.configuration.outputs.xcconfig_path }}
         FIREBASE_PATH: ${{ steps.configuration.outputs.firebase_path }}
       run: |
@@ -152,6 +156,12 @@ runs:
         rm -f -- "$FIREBASE_PATH"
         (umask 077; printf '%s' "$FIREBASE_PLIST" | base64 --decode > "$FIREBASE_PATH")
         plutil -lint "$FIREBASE_PATH"
+
+        FIREBASE_BUNDLE_ID="$(/usr/libexec/PlistBuddy -c 'Print :BUNDLE_ID' "$FIREBASE_PATH")"
+        if [ "$FIREBASE_BUNDLE_ID" != "$EXPECTED_BUNDLE_ID" ]; then
+          echo "::error::Firebase BUNDLE_ID does not match $EXPECTED_BUNDLE_ID"
+          exit 1
+        fi
 
     - name: Disable Macro Validation
       shell: bash
@@ -196,6 +206,9 @@ runs:
         ASC_KEY_CONTENT: ${{ inputs.asc_key_content }}
         MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
         MATCH_PASSWORD: ${{ inputs.match_password }}
+        # Hosted Runner의 응답 편차를 허용하되 실제 정지는 3분 안에 종료합니다.
+        FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: '60'
+        FASTLANE_XCODEBUILD_SETTINGS_RETRIES: '1'
       run: |
         set -euo pipefail
 

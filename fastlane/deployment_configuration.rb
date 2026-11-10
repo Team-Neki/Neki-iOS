@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "pathname"
-
 module DeploymentConfiguration
   TEAM_ID = "P85DW78LYM"
   PROJECT_ROOT = File.expand_path("..", __dir__)
@@ -31,15 +29,6 @@ module DeploymentConfiguration
 
   def self.resolve_project_path(path)
     File.expand_path(path, PROJECT_ROOT)
-  end
-
-  def self.cloned_source_packages_path
-    path = ENV.fetch("CLONED_SOURCE_PACKAGES_PATH")
-    unless Pathname.new(path).absolute?
-      raise ArgumentError, "CLONED_SOURCE_PACKAGES_PATH must be absolute: #{path}"
-    end
-
-    path
   end
 
   def self.fetch(target)

@@ -65,9 +65,9 @@ def require_build_settings!(configuration)
     scheme: configuration.fetch(:scheme),
     configuration: configuration.fetch(:build_configuration),
     destination: DeploymentConfiguration::IOS_DESTINATION,
-    cloned_source_packages_path: DeploymentConfiguration.cloned_source_packages_path,
     skip_package_dependencies_resolution: true,
-    disable_package_automatic_updates: true
+    disable_package_automatic_updates: true,
+    skip_package_repository_fetches: true
   )
   app_expectations = {
     "TARGET_NAME" => configuration.fetch(:app_target),
@@ -91,8 +91,8 @@ def require_build_settings!(configuration)
     "-project", DeploymentConfiguration::PROJECT,
     "-configuration", configuration.fetch(:build_configuration),
     "-sdk", "iphoneos",
-    "-clonedSourcePackagesDirPath", DeploymentConfiguration.cloned_source_packages_path,
-    "-disableAutomaticPackageResolution"
+    "-disableAutomaticPackageResolution",
+    "-skipPackageUpdates"
   ].shelljoin + " 2>&1"
   begin
     output = FastlaneCore::Project.run_command(
@@ -216,7 +216,6 @@ platform :ios do
         MATCH_GITHUB_TOKEN
         MATCH_PASSWORD
         FIREBASE_PATH
-        CLONED_SOURCE_PACKAGES_PATH
       ]
     )
 
@@ -253,7 +252,6 @@ platform :ios do
         MATCH_GITHUB_TOKEN
         MATCH_PASSWORD
         FIREBASE_PATH
-        CLONED_SOURCE_PACKAGES_PATH
       ]
     )
 
@@ -294,11 +292,11 @@ platform :ios do
       configuration: configuration.fetch(:build_configuration),
       # 연결 검증과 gym의 Archive 전 빌드 설정 조회가 동일한 명령을 사용합니다.
       destination: DeploymentConfiguration::IOS_DESTINATION,
-      cloned_source_packages_path: DeploymentConfiguration.cloned_source_packages_path,
       export_method: "app-store",
       export_team_id: DeploymentConfiguration::TEAM_ID,
       skip_package_dependencies_resolution: true,
       disable_package_automatic_updates: true,
+      skip_package_repository_fetches: true,
       xcargs: [
         "MARKETING_VERSION=#{marketing_version}",
         "CURRENT_PROJECT_VERSION=#{build_number}"

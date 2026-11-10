@@ -64,7 +64,7 @@ def require_build_settings!(configuration)
     project: DeploymentConfiguration::PROJECT,
     scheme: configuration.fetch(:scheme),
     configuration: configuration.fetch(:build_configuration),
-    destination: "generic/platform=iOS",
+    destination: DeploymentConfiguration::IOS_DESTINATION,
     skip_package_dependencies_resolution: true,
     disable_package_automatic_updates: true
   )
@@ -75,7 +75,8 @@ def require_build_settings!(configuration)
     "DEVELOPMENT_TEAM" => DeploymentConfiguration::TEAM_ID,
     "CODE_SIGN_STYLE" => "Manual"
   }
-  app_settings = app_expectations.to_h do |name, _|
+  app_setting_names = app_expectations.keys + ["PROVISIONING_PROFILE_SPECIFIER"]
+  app_settings = app_setting_names.to_h do |name|
     [name, project.build_settings(key: name, optional: false)]
   end
   require_expected_build_settings!(app_settings, app_expectations)
@@ -113,6 +114,37 @@ def require_build_settings!(configuration)
     "CODE_SIGN_STYLE" => "Manual"
   }
   require_expected_build_settings!(extension_settings, extension_expectations)
+
+  app_profile = app_settings.fetch("PROVISIONING_PROFILE_SPECIFIER").to_s.strip
+  extension_profile = extension_settings.fetch("PROVISIONING_PROFILE_SPECIFIER", "").strip
+  expected_profiles = {
+    configuration.fetch(:app_identifier) => app_profile,
+    configuration.fetch(:share_extension_app_identifier) => extension_profile
+  }
+  missing_specifiers = expected_profiles.select { |_, name| name.empty? }.keys
+  unless missing_specifiers.empty?
+    UI.user_error!(
+      "Missing PROVISIONING_PROFILE_SPECIFIER for: #{missing_specifiers.join(', ')}"
+    )
+  end
+
+  expected_profiles
+end
+
+def require_installed_provisioning_profiles!(expected_profiles)
+  # Archive가 요구하는 프로파일 이름과 Match가 실제 설치한 이름을 Bundle ID별로 대조합니다.
+  installed_profiles = Actions.lane_context[
+    Actions::SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING
+  ] || {}
+  mismatches = expected_profiles.filter_map do |identifier, expected_name|
+    installed_name = installed_profiles[identifier]
+    next if installed_name == expected_name
+
+    "#{identifier}=#{installed_name.inspect} (expected #{expected_name.inspect})"
+  end
+  return if mismatches.empty?
+
+  UI.user_error!("Provisioning profile mismatch: #{mismatches.join(', ')}")
 end
 
 def require_firebase_bundle_identifier!(configuration)
@@ -191,8 +223,9 @@ platform :ios do
 
     require_semantic_version!(marketing_version)
     require_firebase_bundle_identifier!(configuration)
-    require_build_settings!(configuration)
+    expected_profiles = require_build_settings!(configuration)
     api_key = prepare_distribution(configuration: configuration)
+    require_installed_provisioning_profiles!(expected_profiles)
 
     latest_testflight_build_number(
       api_key: api_key,
@@ -255,6 +288,8 @@ platform :ios do
       project: DeploymentConfiguration::PROJECT,
       scheme: configuration.fetch(:scheme),
       configuration: configuration.fetch(:build_configuration),
+      # 연결 검증과 gym의 Archive 전 빌드 설정 조회가 동일한 명령을 사용합니다.
+      destination: DeploymentConfiguration::IOS_DESTINATION,
       export_method: "app-store",
       export_team_id: DeploymentConfiguration::TEAM_ID,
       skip_package_dependencies_resolution: true,

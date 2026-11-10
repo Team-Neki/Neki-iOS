@@ -4,6 +4,7 @@ module DeploymentConfiguration
   TEAM_ID = "P85DW78LYM"
   PROJECT_ROOT = File.expand_path("..", __dir__)
   PROJECT = File.join(PROJECT_ROOT, "Neki-iOS.xcodeproj")
+  IOS_DESTINATION = "generic/platform=iOS"
   APP_TARGET = "Neki-iOS"
   SHARE_EXTENSION_TARGET = "NekiShareExtension"
 

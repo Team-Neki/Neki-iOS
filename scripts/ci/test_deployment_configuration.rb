@@ -7,6 +7,7 @@ expected_project = File.join(DeploymentConfiguration::PROJECT_ROOT, "Neki-iOS.xc
 abort "Project path is not absolute" unless Pathname.new(DeploymentConfiguration::PROJECT).absolute?
 abort "Project path changed: #{DeploymentConfiguration::PROJECT}" unless DeploymentConfiguration::PROJECT == expected_project
 abort "Project is missing: #{DeploymentConfiguration::PROJECT}" unless File.directory?(DeploymentConfiguration::PROJECT)
+abort "Unexpected iOS destination" unless DeploymentConfiguration::IOS_DESTINATION == "generic/platform=iOS"
 
 relative_path = "Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
 expected_path = File.join(DeploymentConfiguration::PROJECT_ROOT, relative_path)

@@ -9,6 +9,24 @@ abort "Project path changed: #{DeploymentConfiguration::PROJECT}" unless Deploym
 abort "Project is missing: #{DeploymentConfiguration::PROJECT}" unless File.directory?(DeploymentConfiguration::PROJECT)
 abort "Unexpected iOS destination" unless DeploymentConfiguration::IOS_DESTINATION == "generic/platform=iOS"
 
+original_source_packages_path = ENV["CLONED_SOURCE_PACKAGES_PATH"]
+begin
+  ENV["CLONED_SOURCE_PACKAGES_PATH"] = "/tmp/neki-spm-source-packages"
+  unless DeploymentConfiguration.cloned_source_packages_path == "/tmp/neki-spm-source-packages"
+    abort "SPM source packages path changed"
+  end
+
+  ENV["CLONED_SOURCE_PACKAGES_PATH"] = "relative/source-packages"
+  begin
+    DeploymentConfiguration.cloned_source_packages_path
+    abort "Relative SPM source packages path was accepted"
+  rescue ArgumentError
+    # The cache path must remain stable when Fastlane changes its working directory.
+  end
+ensure
+  ENV["CLONED_SOURCE_PACKAGES_PATH"] = original_source_packages_path
+end
+
 relative_path = "Neki-iOS/APP/Sources/Resources/FirebaseConfig/Debug/GoogleService-Info.plist"
 expected_path = File.join(DeploymentConfiguration::PROJECT_ROOT, relative_path)
 

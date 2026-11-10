@@ -161,11 +161,27 @@ runs:
         defaults write com.apple.dt.Xcode IDESkipMacroFingerprintValidation -bool YES
         defaults write com.apple.dt.Xcode IDESkipPackagePluginFingerprintValidation -bool YES
 
+    - name: Restore SPM source packages
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/neki-spm-source-packages
+        # 개발기와 상용기는 같은 lockfile을 사용하되 Xcode·Runner ABI가 다른 캐시는 섞지 않습니다.
+        key: spm-source-packages-${{ runner.os }}-${{ runner.arch }}-xcode-26.2-${{ hashFiles('Neki-iOS.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
     - name: Resolve SPM Dependencies
       shell: bash
       env:
         BUILD_SCHEME: ${{ steps.configuration.outputs.build_scheme }}
-      run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
+        CLONED_SOURCE_PACKAGES_PATH: ${{ runner.temp }}/neki-spm-source-packages
+      run: |
+        set -euo pipefail
+
+        mkdir -p "$CLONED_SOURCE_PACKAGES_PATH"
+        xcodebuild \
+          -resolvePackageDependencies \
+          -project ./Neki-iOS.xcodeproj \
+          -scheme "$BUILD_SCHEME" \
+          -clonedSourcePackagesDirPath "$CLONED_SOURCE_PACKAGES_PATH"
 
     - name: Create GitHub App token for Match
       id: match-app-token
@@ -197,6 +213,7 @@ runs:
         MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
         MATCH_PASSWORD: ${{ inputs.match_password }}
         FIREBASE_PATH: ${{ steps.configuration.outputs.firebase_path }}
+        CLONED_SOURCE_PACKAGES_PATH: ${{ runner.temp }}/neki-spm-source-packages
         # Hosted Runner의 응답 편차를 허용하되 실제 정지는 3분 안에 종료합니다.
         FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: '60'
         FASTLANE_XCODEBUILD_SETTINGS_RETRIES: '1'

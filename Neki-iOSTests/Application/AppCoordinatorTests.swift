@@ -47,6 +47,26 @@ struct AppCoordinatorTests {
         #expect(records.value == ["user \(user.id)", "user \(user.id)", "app_open"])
     }
 
+    @Test(
+        "업데이트 안내 바깥을 누르면 새 버전 안내는 닫고, 필수 업데이트 안내는 닫지 않는다",
+        arguments: [
+            (AppUpdateStatus.optionalUpdate, nil),
+            (.mustUpdate, .updateNeeded)
+        ] as [(AppUpdateStatus, AppCoordinator.VersionUpdateAlertType?)]
+    )
+    func didTapLaterAlert_closesOnlyOptionalUpdate(
+        status: AppUpdateStatus,
+        expected: AppCoordinator.VersionUpdateAlertType?
+    ) async {
+        let records = LockIsolated<[String]>([])
+        let store = makeStore(records: records)
+
+        await store.send(.splashSequenceCompleted(.signedIn(user), versionResult(status))).finish()
+        await store.send(.didTapLaterAlert).finish()
+
+        #expect(store.versionAlert == expected)
+    }
+
     @Test("로그인 화면에서 새로 로그인하면 앱 실행을 남기지 않는다")
     func moveToMainTab_afterNewLogin_doesNotLogAppOpen() async {
         var state = AppCoordinator.State()

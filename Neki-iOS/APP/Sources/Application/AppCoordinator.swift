@@ -219,6 +219,8 @@ struct AppCoordinator {
                 return .run { _ in await openURL(appStoreURL) }
                 
             case .didTapLaterAlert:
+                // 필수 업데이트 안내에는 나중에 할 선택지가 없으므로 바깥을 눌러도 닫지 않습니다.
+                guard state.versionAlert != .updateNeeded else { return .none }
                 state.versionAlert = nil
                 guard let pendingSessionStatus = state.pendingSessionStatus else { return .none }
                 state.pendingSessionStatus = nil

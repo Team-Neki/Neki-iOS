@@ -36,6 +36,15 @@ struct PoseFeature {
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
         
+        /// "N개의 포즈"에 보여 줄 개수입니다. 불러온 목록에 필터를 적용한 개수이고, 전체 개수는 #424에서 연결합니다.
+        ///
+        /// 아직 받은 포즈가 없으면 불러오는 중이거나 실패한 것이라 nil을 돌려줘 "0개"가 깜빡이지 않게 합니다. 끝까지 불러왔는데 비어 있으면 0입니다.
+        var displayedPoseCount: Int? {
+            let loadedPoses = isSelectedScrap ? scrappedPoses : generalPoses
+            guard loadedPoses.isEmpty == false || isCurrentLastPage else { return nil }
+            return visiblePoses.count
+        }
+        
         // Filter Options
         var selectedCountFilterOption: PeopleCountOption?
         /// 고른 관계 태그입니다. 고르면 인원수가 2인으로 바뀌고, 인원수가 2인이 아니게 되면 비워집니다.

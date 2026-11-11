@@ -1,4 +1,5 @@
 require "base64"
+require "cfpropertylist"
 require "shellwords"
 require File.expand_path(
   "deployment_configuration",
@@ -45,6 +46,127 @@ def require_signing_identity!(team_id)
   )
 end
 
+def require_expected_build_settings!(settings, expected_settings)
+  mismatches = expected_settings.filter_map do |name, expected_value|
+    actual_value = settings.fetch(name, nil)
+    next if actual_value == expected_value
+
+    "#{name}=#{actual_value.inspect} (expected #{expected_value.inspect})"
+  end
+  return if mismatches.empty?
+
+  UI.user_error!("Unexpected distribution build settings: #{mismatches.join(', ')}")
+end
+
+def require_build_settings!(configuration)
+  # build_app가 사용하는 Scheme 조회를 그대로 실행해 이번 타임아웃 회귀를 검증합니다.
+  project = FastlaneCore::Project.new(
+    project: DeploymentConfiguration::PROJECT,
+    scheme: configuration.fetch(:scheme),
+    configuration: configuration.fetch(:build_configuration),
+    destination: DeploymentConfiguration::IOS_DESTINATION,
+    skip_package_dependencies_resolution: true,
+    disable_package_automatic_updates: true,
+    skip_package_repository_fetches: true
+  )
+  app_expectations = {
+    "TARGET_NAME" => configuration.fetch(:app_target),
+    "CONFIGURATION" => configuration.fetch(:build_configuration),
+    "PRODUCT_BUNDLE_IDENTIFIER" => configuration.fetch(:app_identifier),
+    "DEVELOPMENT_TEAM" => DeploymentConfiguration::TEAM_ID,
+    "CODE_SIGN_STYLE" => "Manual"
+  }
+  app_setting_names = app_expectations.keys + ["PROVISIONING_PROFILE_SPECIFIER"]
+  app_settings = app_setting_names.to_h do |name|
+    [name, project.build_settings(key: name, optional: false)]
+  end
+  require_expected_build_settings!(app_settings, app_expectations)
+
+  # Scheme 조회에는 앱 타깃만 포함되므로 Share Extension은 타깃을 지정해 별도로 확인합니다.
+  extension_target = configuration.fetch(:share_extension_target)
+  command = [
+    "xcodebuild",
+    "-showBuildSettings",
+    "-target", extension_target,
+    "-project", DeploymentConfiguration::PROJECT,
+    "-configuration", configuration.fetch(:build_configuration),
+    "-sdk", "iphoneos",
+    "-disableAutomaticPackageResolution",
+    "-skipPackageUpdates"
+  ].shelljoin + " 2>&1"
+  begin
+    output = FastlaneCore::Project.run_command(
+      command,
+      timeout: FastlaneCore::Project.xcode_build_settings_timeout,
+      retries: FastlaneCore::Project.xcode_build_settings_retries,
+      print: true
+    )
+  rescue Timeout::Error
+    UI.user_error!("Share Extension build settings lookup timed out: #{extension_target}")
+  end
+  extension_settings = output.each_line.filter_map do |line|
+    match = line.match(/\A\s*([^=]+?)\s*=\s*(.*?)\s*\z/)
+    [match[1], match[2]] if match
+  end.to_h
+  extension_expectations = {
+    "TARGET_NAME" => extension_target,
+    "CONFIGURATION" => configuration.fetch(:build_configuration),
+    "PRODUCT_BUNDLE_IDENTIFIER" => configuration.fetch(:share_extension_app_identifier),
+    "DEVELOPMENT_TEAM" => DeploymentConfiguration::TEAM_ID,
+    "CODE_SIGN_STYLE" => "Manual"
+  }
+  require_expected_build_settings!(extension_settings, extension_expectations)
+
+  app_profile = app_settings.fetch("PROVISIONING_PROFILE_SPECIFIER").to_s.strip
+  extension_profile = extension_settings.fetch("PROVISIONING_PROFILE_SPECIFIER", "").strip
+  expected_profiles = {
+    configuration.fetch(:app_identifier) => app_profile,
+    configuration.fetch(:share_extension_app_identifier) => extension_profile
+  }
+  missing_specifiers = expected_profiles.select { |_, name| name.empty? }.keys
+  unless missing_specifiers.empty?
+    UI.user_error!(
+      "Missing PROVISIONING_PROFILE_SPECIFIER for: #{missing_specifiers.join(', ')}"
+    )
+  end
+
+  expected_profiles
+end
+
+def require_installed_provisioning_profiles!(expected_profiles)
+  # Archive가 요구하는 프로파일 이름과 Match가 실제 설치한 이름을 Bundle ID별로 대조합니다.
+  installed_profiles = Actions.lane_context[
+    Actions::SharedValues::MATCH_PROVISIONING_PROFILE_MAPPING
+  ] || {}
+  mismatches = expected_profiles.filter_map do |identifier, expected_name|
+    installed_name = installed_profiles[identifier]
+    next if installed_name == expected_name
+
+    "#{identifier}=#{installed_name.inspect} (expected #{expected_name.inspect})"
+  end
+  return if mismatches.empty?
+
+  UI.user_error!("Provisioning profile mismatch: #{mismatches.join(', ')}")
+end
+
+def require_firebase_bundle_identifier!(configuration)
+  # 환경별 Secret이 선택한 앱의 Firebase 설정인지 배포 설정의 단일 Bundle ID로 판정합니다.
+  firebase_path = DeploymentConfiguration.resolve_project_path(ENV.fetch("FIREBASE_PATH"))
+  unless File.file?(firebase_path) && File.readable?(firebase_path)
+    UI.user_error!("Firebase plist is not readable: #{firebase_path}")
+  end
+
+  plist = CFPropertyList::List.new(file: firebase_path)
+  firebase_configuration = CFPropertyList.native_types(plist.value)
+  actual_identifier = firebase_configuration.fetch("BUNDLE_ID", nil)
+  expected_identifier = configuration.fetch(:app_identifier)
+  return if actual_identifier == expected_identifier
+
+  UI.user_error!(
+    "Firebase BUNDLE_ID=#{actual_identifier.inspect} does not match #{expected_identifier.inspect}"
+  )
+end
+
 platform :ios do
   private_lane :prepare_distribution do |options|
     configuration = options.fetch(:configuration)
@@ -82,7 +204,7 @@ platform :ios do
     api_key
   end
 
-  desc "Validate distribution credentials without building or uploading"
+  desc "Validate distribution configuration and credentials without building or uploading"
   lane :validate_deployment do
     require_environment_variables!(
       %w[
@@ -93,6 +215,7 @@ platform :ios do
         ASC_KEY_CONTENT
         MATCH_GITHUB_TOKEN
         MATCH_PASSWORD
+        FIREBASE_PATH
       ]
     )
 
@@ -101,7 +224,10 @@ platform :ios do
     configuration = DeploymentConfiguration.fetch(deployment_target)
 
     require_semantic_version!(marketing_version)
+    require_firebase_bundle_identifier!(configuration)
+    expected_profiles = require_build_settings!(configuration)
     api_key = prepare_distribution(configuration: configuration)
+    require_installed_provisioning_profiles!(expected_profiles)
 
     latest_testflight_build_number(
       api_key: api_key,
@@ -110,7 +236,7 @@ platform :ios do
       initial_build_number: 0
     )
 
-    UI.success("Deployment validation completed without building or uploading")
+    UI.success("Distribution configuration and credential validation completed without building or uploading")
   end
 
   desc "Build and distribute the selected Neki app"
@@ -125,6 +251,7 @@ platform :ios do
         ASC_KEY_CONTENT
         MATCH_GITHUB_TOKEN
         MATCH_PASSWORD
+        FIREBASE_PATH
       ]
     )
 
@@ -135,6 +262,7 @@ platform :ios do
     configuration = DeploymentConfiguration.fetch(deployment_target)
 
     require_semantic_version!(marketing_version)
+    require_firebase_bundle_identifier!(configuration)
     unless %w[testflight app_store_review].include?(distribution_destination)
       UI.user_error!("Unsupported distribution destination: #{distribution_destination}")
     end
@@ -157,12 +285,18 @@ platform :ios do
     build_number = latest_build + 1
 
     # 입력 버전과 원격 기준 빌드 번호를 모든 Target에 동일하게 주입합니다.
+    # Composite Action에서 SPM을 한 번 해석했으므로 Archive에서는 그 결과만 사용합니다.
     ipa_path = build_app(
       project: DeploymentConfiguration::PROJECT,
       scheme: configuration.fetch(:scheme),
       configuration: configuration.fetch(:build_configuration),
+      # 연결 검증과 gym의 Archive 전 빌드 설정 조회가 동일한 명령을 사용합니다.
+      destination: DeploymentConfiguration::IOS_DESTINATION,
       export_method: "app-store",
       export_team_id: DeploymentConfiguration::TEAM_ID,
+      skip_package_dependencies_resolution: true,
+      disable_package_automatic_updates: true,
+      skip_package_repository_fetches: true,
       xcargs: [
         "MARKETING_VERSION=#{marketing_version}",
         "CURRENT_PROJECT_VERSION=#{build_number}"

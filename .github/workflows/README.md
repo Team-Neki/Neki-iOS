@@ -82,9 +82,9 @@ Actions에는 사용자가 직접 실행하는 `Neki-iOS 배포 및 버전 관�
 
 | 작업 | 실행 결과 |
 | --- | --- |
-| Neki-dev 연결 검증 | 개발기의 인증·서명·App Store Connect 연결만 검증 |
-| Neki-iOS 연결 검증 | 상용기의 인증·서명·App Store Connect 연결만 검증 |
-| Neki-iOS & Dev 연결 검증 | 두 앱의 연결을 병렬 검증 |
+| Neki-dev 연결 검증 | 개발기의 환경 리소스·SPM·빌드 설정·인증·서명·App Store Connect 연결 검증 |
+| Neki-iOS 연결 검증 | 상용기의 환경 리소스·SPM·빌드 설정·인증·서명·App Store Connect 연결 검증 |
+| Neki-iOS & Dev 연결 검증 | 두 앱의 전체 연결 항목을 병렬 검증 |
 | Neki-dev TestFlight 업로드 | 개발기만 TestFlight에 업로드 |
 | Neki-iOS TestFlight 업로드 | 상용기만 TestFlight에 업로드 |
 | Neki-iOS & Dev TestFlight 업로드 | 두 앱을 각각 TestFlight에 병렬 업로드 |
@@ -122,6 +122,12 @@ Neki-iOS 서버 정책을 적용할 때는 대상 버전이 App Store에 실제 
 
 부분 성공도 요청한 전체 작업이 완료된 것은 아니므로 GitHub Actions 워크플로는 실패 상태를 유지합니다. 다만 Discord에는 앱 업로드 성공과 버전 정책 실패가 분리되어 표시되므로 이미 업로드된 빌드를 중복 배포하지 않고 실패한 정책 작업만 다시 실행할 수 있습니다.
 
-연결 검증은 환경 리소스 복원, SPM 의존성 해석, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화까지만 수행합니다. Archive, 업로드와 버전 API PATCH는 실행하지 않습니다.
+Discord 알림은 실행자와 Actions 실행 링크를 먼저 보여주고, 작업 대상·입력 검증·Neki-dev·Neki-iOS·실행 설정을 세로 섹션으로 묶어 표시합니다. 앱별 섹션에는 실제 수행한 연결 검증·앱 배포·버전 정책만 표시하여 성공·부분 성공·실패 원인을 위에서 아래로 읽을 수 있도록 합니다.
+
+연결 검증은 xcconfig 필수 설정과 Firebase plist의 대상 Bundle ID 확인, SPM 의존성 해석, Scheme·Configuration별 빌드 설정과 Bundle ID·개발 Team·수동 서명 설정 확인, Xcode 프로젝트의 프로파일 지정값과 Match가 설치한 프로파일 이름 비교, GitHub App 토큰 발급, Ruby·Bundler 구성, App Store Connect 조회와 Match readonly 동기화를 수행합니다. 선행 단계에서 해석한 SPM 의존성은 Fastlane이 다시 해석하지 않습니다. Archive, IPA 생성, 업로드와 버전 API PATCH는 실행하지 않습니다.
+
+빌드 설정 조회는 앱 Scheme과 Share Extension 타깃을 각각 확인합니다. 앱 Scheme 조회와 `build_app`에는 같은 iOS destination을 명시하여 실제 배포의 사전 조회 경로를 재현하고, Extension 타깃 조회는 별도 서명 설정 누락을 Archive 전에 찾기 위해 분리합니다. Firebase Bundle ID는 `deployment_configuration.rb`의 앱 식별자를 기준으로 비교하여 Shell과 Fastlane에 같은 값을 중복 선언하지 않습니다.
+
+Hosted Runner의 응답 편차로 정상 조회를 반복 종료하지 않도록 최초 제한을 60초로 둡니다. 재시도는 한 번만 허용하여 일시 지연은 복구하되 실제 정지의 최대 대기는 60초와 120초를 합한 180초로 제한합니다.
 
 PR 본문이나 release 브랜치 머지를 배포 트리거로 사용하지 않습니다. 코드 검토·병합과 외부 배포를 분리하여 오기입이나 의도하지 않은 재실행이 실제 배포로 이어지는 것을 방지합니다.

@@ -165,7 +165,14 @@ runs:
       shell: bash
       env:
         BUILD_SCHEME: ${{ steps.configuration.outputs.build_scheme }}
-      run: xcodebuild -resolvePackageDependencies -project ./Neki-iOS.xcodeproj -scheme "$BUILD_SCHEME"
+      run: |
+        set -euo pipefail
+
+        xcodebuild \
+          -resolvePackageDependencies \
+          -project ./Neki-iOS.xcodeproj \
+          -scheme "$BUILD_SCHEME" \
+          -onlyUsePackageVersionsFromResolvedFile
 
     - name: Create GitHub App token for Match
       id: match-app-token
@@ -196,6 +203,10 @@ runs:
         ASC_KEY_CONTENT: ${{ inputs.asc_key_content }}
         MATCH_GITHUB_TOKEN: ${{ steps.match-app-token.outputs.token }}
         MATCH_PASSWORD: ${{ inputs.match_password }}
+        FIREBASE_PATH: ${{ steps.configuration.outputs.firebase_path }}
+        # Hosted Runner의 응답 편차를 허용하되 실제 정지는 3분 안에 종료합니다.
+        FASTLANE_XCODEBUILD_SETTINGS_TIMEOUT: '60'
+        FASTLANE_XCODEBUILD_SETTINGS_RETRIES: '1'
       run: |
         set -euo pipefail
 

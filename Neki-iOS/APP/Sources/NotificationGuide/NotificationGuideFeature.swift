@@ -15,6 +15,7 @@ import UserNotifications
 ///
 /// - 약관 동의를 마치고 들어오면, 이벤트·혜택 알림에 동의한 경우 모달 없이 OS 알림 팝업을 띄웁니다.
 /// - 그 밖에는 앱 버전마다 한 번 상태에 맞는 모달을 띄웁니다. 자동 안내는 하루에 한 번만 띄웁니다.
+/// - 공유로 사진을 가져오는 실행에서는 모달이 앨범 선택 화면을 막지 않도록 띄우지 않습니다.
 @Reducer
 struct NotificationGuideFeature {
     @ObservableState
@@ -27,6 +28,9 @@ struct NotificationGuideFeature {
         var isProcessing: Bool = false
         var isAwaitingSettingsReturn: Bool = false
         var consentAgreedAt: Date?
+        /// 이번 실행에서 공유로 사진 가져오기가 시작돼 업데이트 후 첫 진입 모달을 띄우지 않는지입니다.
+        /// 기록을 남기지 않으므로 다음 실행에서 다시 판단합니다.
+        var isSuppressedByShare: Bool = false
 
         var user: User? {
             guard case let .signedIn(user) = userSessionStatus else { return nil }
@@ -42,6 +46,7 @@ struct NotificationGuideFeature {
         // Parent Actions
         case mainTabAppeared(isFirstScreenCovered: Bool)
         case sceneDidBecomeActive
+        case shareEntryStarted
 
         // View Actions
         case confirmButtonTapped
@@ -87,7 +92,7 @@ struct NotificationGuideFeature {
                     }
 
                 case .regular:
-                    guard isFirstScreenCovered == false else { return .none }
+                    guard isFirstScreenCovered == false, state.isSuppressedByShare == false else { return .none }
                     return .run { send in
                         await send(.updateEntryAuthorizationResponse(Result {
                             try await pushNotificationClient.checkAuthorizationStatus()
@@ -107,7 +112,8 @@ struct NotificationGuideFeature {
                 return .none
 
             case let .updateEntryAuthorizationResponse(.success(status)):
-                guard let user = state.user else { return .none }
+                // 권한을 확인하는 사이에 공유가 들어왔으면 기록 없이 넘깁니다.
+                guard state.isSuppressedByShare == false, let user = state.user else { return .none }
                 let today = now.kstDay
                 let appVersion = appVersionClient.currentVersion().value
                 let record = guideRecord(for: user)
@@ -172,6 +178,14 @@ struct NotificationGuideFeature {
                 guard state.isAwaitingSettingsReturn else { return .none }
                 state.isAwaitingSettingsReturn = false
                 return finish(&state)
+
+            case .shareEntryStarted:
+                state.isSuppressedByShare = true
+                // 동의를 저장하는 중이면 저장 결과가 와서 다음 단계로 넘어갈 때까지 모달을 둡니다.
+                guard state.isProcessing == false else { return .none }
+                // 이미 띄운 모달은 닫습니다. 띄운 기록은 남아 있어 "다음에 하기"처럼 이 버전에서는 다시 띄우지 않습니다.
+                state.modal = nil
+                return .none
 
             case .delegate:
                 return .none

@@ -370,7 +370,11 @@ private extension MainTabCoordinator {
         case let .shareExtension(appGroupID):
             state.selectedTab = .archive
             state.archive.path.removeAll()
-            return .send(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))
+            // 알림 안내 모달이 앨범 선택 화면을 막지 않도록 안내에 먼저 알립니다.
+            return .concatenate(
+                .send(.notificationGuide(.shareEntryStarted)),
+                .send(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))
+            )
         }
     }
 }

@@ -147,6 +147,28 @@ struct MainTabCoordinatorTests {
         #expect(store.notificationGuide.modal == .consentAndEnable)
     }
 
+    @Test("공유로 사진을 가져오면 알림 안내에 알려 업데이트 후 첫 진입 모달을 띄우지 않는다")
+    func routeShareExtension_suppressesNotificationGuide() async {
+        let checks = LockIsolated(0)
+        let store = makeStore {
+            $0.$userSessionStatus.withLock { $0 = .signedIn(Self.user) }
+        } dependencies: {
+            $0.pushNotificationClient.checkAuthorizationStatus = {
+                checks.withValue { $0 += 1 }
+                return .notDetermined
+            }
+            // 앨범 선택 화면을 띄우면 닫힐 때까지 끝나지 않는 표시 효과가 남으므로, 가져올 사진이 없는 것으로 둡니다.
+            $0.sharedImageClient.fetchSharedImages = { _ in [] }
+        }
+
+        await store.send(.route(.shareExtension(appGroupID: "group.test"))).finish()
+        await store.send(.onAppear).finish()
+
+        #expect(store.notificationGuide.isSuppressedByShare)
+        #expect(store.notificationGuide.modal == nil)
+        #expect(checks.value == 0)
+    }
+
     @Test("알림 안내가 보낸 토스트를 메인 탭 토스트로 띄운다")
     func notificationGuideToast_showsMainTabToast() async {
         let store = makeStore()

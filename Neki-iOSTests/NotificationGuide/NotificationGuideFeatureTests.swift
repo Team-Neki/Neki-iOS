@@ -336,6 +336,82 @@ struct NotificationGuideFeatureTests {
         await store.send(.cancelButtonTapped)
     }
 
+    // MARK: - 공유로 들어온 실행
+
+    @Test("공유로 사진을 가져오는 실행에서는 업데이트 후 첫 진입 안내를 판단하지 않고 기록도 남기지 않는다")
+    func mainTabAppeared_afterShareEntry_skipsWithoutRecording() async {
+        let records = LockIsolated<[String]>([])
+        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(records: records)
+
+        await store.send(.shareEntryStarted) { $0.isSuppressedByShare = true }
+        await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
+
+        #expect(records.value.isEmpty)
+        #expect(record == NotificationGuideRecord())
+    }
+
+    @Test("알림 권한을 확인하는 사이에 공유가 들어오면 모달을 띄우지 않고 기록도 남기지 않는다")
+    func updateEntryAuthorizationResponse_afterShareEntry_skipsWithoutRecording() async {
+        let records = LockIsolated<[String]>([])
+        let clock = TestClock()
+        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(records: records) { _ in } dependencies: {
+            $0.pushNotificationClient.checkAuthorizationStatus = {
+                try await clock.sleep(for: .seconds(1))
+                return .notDetermined
+            }
+        }
+
+        await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
+        await store.send(.shareEntryStarted) { $0.isSuppressedByShare = true }
+        await clock.advance(by: .seconds(1))
+        await store.receive(\.updateEntryAuthorizationResponse.success)
+
+        #expect(record == NotificationGuideRecord())
+    }
+
+    @Test("떠 있던 안내 모달은 공유가 들어오면 닫는다. 띄운 기록은 남아 이 버전에서는 다시 띄우지 않는다")
+    func shareEntryStarted_closesPresentedModal() async {
+        let records = LockIsolated<[String]>([])
+        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(records: records)
+
+        await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
+        await store.receive(\.updateEntryAuthorizationResponse.success) { $0.modal = .consentAndEnable }
+        await store.send(.shareEntryStarted) {
+            $0.isSuppressedByShare = true
+            $0.modal = nil
+        }
+
+        #expect(record == NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version))
+    }
+
+    @Test("동의를 저장하는 중에 공유가 들어오면 모달을 닫지 않고 저장 결과를 기다린다")
+    func shareEntryStarted_whileProcessing_keepsModal() async {
+        let records = LockIsolated<[String]>([])
+        let store = makeStore(records: records) {
+            $0.modal = .consentAndEnable
+            $0.isProcessing = true
+        }
+
+        await store.send(.shareEntryStarted) { $0.isSuppressedByShare = true }
+    }
+
+    @Test("약관 동의 뒤 진입은 공유로 들어와도 OS 알림 팝업을 띄운다. 시스템 팝업은 앨범 선택 화면을 막지 않는다")
+    func mainTabAppeared_afterTermsWithShareEntry_requestsAuthorization() async {
+        let records = LockIsolated<[String]>([])
+        let store = makeStore(entry: .afterTermsAgreement(isMarketingTermAgreed: true), isMarketingAgreed: true, records: records)
+
+        await store.send(.shareEntryStarted) { $0.isSuppressedByShare = true }
+        await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
+        await store.receive(\.termsEntryAuthorizationResponse.success) { $0.isProcessing = true }
+        await store.receive(\.authorizationRequestFinished) { $0.isProcessing = false }
+        await store.receive(Self.isAuthorizationRequestDelegate)
+
+        #expect(records.value == ["check", "request"])
+    }
+
     // MARK: - 약관 동의 뒤 진입
 
     @Test("약관에서 이벤트·혜택 알림에 동의했고 아직 묻지 않았으면 모달 없이 OS 알림 팝업을 띄운다")

@@ -28,7 +28,6 @@ struct PoseView: View {
             masonryView
             
             filterBar
-                .padding(.horizontal, 20)
                 .padding(.vertical, 4)
                 .padding(.bottom, 12)
                 .background(.white)
@@ -134,35 +133,57 @@ private extension PoseView {
         }
     }
     
+    /// `북마크 | 인원수 · 친구 · 커플 · 썸` 순서의 태그 바입니다.
+    ///
+    /// 기본 글자 크기에서도 화면 폭을 거의 채워서, 글자를 키우면 잘리지 않고 가로로 넘기도록 스크롤로 감쌉니다.
     @ViewBuilder
     var filterBar: some View {
-        HStack(alignment: .center, spacing: 6) {
-            Button {
-                store.send(.onTapFilter)
-            } label: {
-                Text(store.selectedCountFilterOption?.displayName ?? "인원수")
-            }
-            .buttonStyle(
-                .nekiChip(
-                    isHighlighted: store.selectedCountFilterOption != nil,
-                    shape: .capsule,
-                    style: .dropdown
+        ScrollView(.horizontal) {
+            HStack(alignment: .center, spacing: 6) {
+                Button("북마크") {
+                    store.send(.onTapScrapMode)
+                }
+                .buttonStyle(
+                    .nekiChip(
+                        isHighlighted: store.state.isSelectedScrap,
+                        shape: .capsule,
+                        style: .normal
+                    )
                 )
-            )
-            
-            Button("북마크") {
-                store.send(.onTapScrapMode)
-            }
-            .buttonStyle(
-                .nekiChip(
-                    isHighlighted: store.state.isSelectedScrap,
-                    shape: .capsule,
-                    style: .normal
+                
+                Rectangle()
+                    .fill(.gray75)
+                    .frame(width: 0.5, height: 24)
+                
+                Button {
+                    store.send(.onTapFilter)
+                } label: {
+                    Text(store.selectedCountFilterOption?.displayName ?? "인원수")
+                }
+                .buttonStyle(
+                    .nekiChip(
+                        isHighlighted: store.selectedCountFilterOption != nil,
+                        shape: .capsule,
+                        style: .dropdown
+                    )
                 )
-            )
-            
-            Spacer()
+                
+                ForEach(PoseRelation.allCases, id: \.self) { relation in
+                    Button(relation.displayName) {
+                        store.send(.onTapRelationFilter(relation))
+                    }
+                    .buttonStyle(
+                        .nekiChip(
+                            isHighlighted: store.selectedRelationFilterOption == relation,
+                            shape: .capsule,
+                            style: .normal
+                        )
+                    )
+                }
+            }
         }
+        .scrollIndicators(.never)
+        .contentMargins(.horizontal, 20, for: .scrollContent)
     }
     
     @ViewBuilder

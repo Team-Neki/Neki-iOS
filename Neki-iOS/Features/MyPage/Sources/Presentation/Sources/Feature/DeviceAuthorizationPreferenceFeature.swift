@@ -80,7 +80,6 @@ struct DeviceAuthorizationPreferenceFeature {
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
     @Dependency(\.authClient) private var authClient
     @Dependency(\.openURL) private var openURL
-    @Dependency(\.date.now) private var now
     @Dependency(\.continuousClock) private var clock
     
     var body: some ReducerOf<Self> {
@@ -234,20 +233,6 @@ struct DeviceAuthorizationPreferenceFeature {
                     var user = currentUser
                     user.marketingTermAgreed = requestedValue
                     $0 = .signedIn(user)
-                }
-                if case let .signedIn(user) = state.userSessionStatus {
-                    let key = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
-                    UserDefaults.standard.set(2, forKey: key)
-                    UserDefaults.standard.set(
-                        now,
-                        forKey: AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
-                    )
-                    UserDefaults.standard.set(
-                        requestedValue
-                            ? MarketingConsentManagementStatus.approved.rawValue
-                            : MarketingConsentManagementStatus.rejected.rawValue,
-                        forKey: AppStorageKey.marketingConsentManagementStatus(userID: user.id)
-                    )
                 }
                 let message = requestedValue
                     ? "마케팅 알림 수신에 동의했어요."

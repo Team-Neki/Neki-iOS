@@ -8,6 +8,7 @@
 import ComposableArchitecture
 import Foundation
 import Testing
+import UserNotifications
 @testable import Neki_iOS
 
 @MainActor
@@ -108,6 +109,87 @@ struct MainTabCoordinatorTests {
         #expect(store.pose.path.count == 1)
         #expect(events.value.isEmpty)
     }
+
+    @Test("첫 화면이 다른 화면에 가려진 채 메인 탭이 나타나면 알림 안내를 판단하지 않는다")
+    func onAppear_firstScreenCovered_skipsNotificationGuide() async {
+        let checks = LockIsolated(0)
+        let store = makeStore {
+            $0.$userSessionStatus.withLock { $0 = .signedIn(Self.user) }
+            $0.destination = .qrScan(QRCodeScanFeature.State(user: Self.user))
+        } dependencies: {
+            $0.pushNotificationClient.checkAuthorizationStatus = {
+                checks.withValue { $0 += 1 }
+                return .notDetermined
+            }
+        }
+
+        let onAppear = store.send(.onAppear)
+        // 띄워 둔 화면은 닫힐 때까지 끝나지 않는 표시 효과를 남기므로, 닫은 뒤 효과가 모두 끝나기를 기다립니다.
+        await store.send(.destination(.dismiss)).finish()
+        await onAppear.finish()
+
+        #expect(checks.value == 0)
+        #expect(store.notificationGuide.hasStarted)
+    }
+
+    @Test("메인 탭이 나타나면 알림 안내가 알림 권한을 확인해 상태에 맞는 모달을 띄운다")
+    func onAppear_presentsNotificationGuideModal() async {
+        // 앱 저장소는 테스트 함수마다 하나라서, 다시 돌 때(반복 실행, 일부 테스트만 골라 동시 실행) 이전 실행이 남긴 안내 기록을 비우고 시작합니다.
+        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Self.user.id))) var guideRecord = NotificationGuideRecord()
+        $guideRecord.withLock { $0 = NotificationGuideRecord() }
+        let store = makeStore {
+            $0.$userSessionStatus.withLock { $0 = .signedIn(Self.user) }
+        } dependencies: {
+            $0.pushNotificationClient.checkAuthorizationStatus = { .notDetermined }
+            $0.appVersionClient.currentVersion = { AppVersion(value: "1.4.1") }
+            $0.date.now = Date(timeIntervalSince1970: 1_794_272_400)
+        }
+
+        await store.send(.onAppear).finish()
+
+        #expect(store.notificationGuide.modal == .consentAndEnable)
+    }
+
+    @Test("공유로 사진을 가져오면 알림 안내에 알려 업데이트 후 첫 진입 모달을 띄우지 않는다")
+    func routeShareExtension_suppressesNotificationGuide() async {
+        let checks = LockIsolated(0)
+        let store = makeStore {
+            $0.$userSessionStatus.withLock { $0 = .signedIn(Self.user) }
+        } dependencies: {
+            $0.pushNotificationClient.checkAuthorizationStatus = {
+                checks.withValue { $0 += 1 }
+                return .notDetermined
+            }
+            // 앨범 선택 화면을 띄우면 닫힐 때까지 끝나지 않는 표시 효과가 남으므로, 가져올 사진이 없는 것으로 둡니다.
+            $0.sharedImageClient.fetchSharedImages = { _ in [] }
+        }
+
+        await store.send(.route(.shareExtension(appGroupID: "group.test"))).finish()
+        await store.send(.onAppear).finish()
+
+        #expect(store.notificationGuide.isSuppressedByShare)
+        #expect(store.notificationGuide.modal == nil)
+        #expect(checks.value == 0)
+    }
+
+    @Test("알림 안내가 보낸 토스트를 메인 탭 토스트로 띄운다")
+    func notificationGuideToast_showsMainTabToast() async {
+        let store = makeStore()
+        let toast = NekiToastItem("11.10 이벤트·혜택 알림에 동의했어요.", style: .success)
+
+        await store.send(.notificationGuide(.delegate(.showToast(toast)))).finish()
+
+        #expect(store.toast == toast)
+    }
+
+    @Test("앱이 다시 활성화되면 알림 안내에 전해 설정에서 돌아온 것을 마무리한다")
+    func sceneDidBecomeActive_forwardsToNotificationGuide() async {
+        let store = makeStore { $0.notificationGuide.isAwaitingSettingsReturn = true }
+
+        await store.send(.sceneDidBecomeActive).finish()
+
+        #expect(store.notificationGuide.isAwaitingSettingsReturn == false)
+    }
 }
 
 
@@ -119,7 +201,8 @@ private extension MainTabCoordinatorTests {
     /// `MainTabCoordinator.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     func makeStore(
         events: LockIsolated<[String]> = .init([]),
-        update: (inout MainTabCoordinator.State) -> Void = { _ in }
+        update: (inout MainTabCoordinator.State) -> Void = { _ in },
+        dependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> StoreOf<MainTabCoordinator> {
         var state = MainTabCoordinator.State()
         state.map.root.appliedSearchQuery = PhotoBoothSearchQuery(rawValue: "강남")
@@ -131,6 +214,17 @@ private extension MainTabCoordinatorTests {
             $0.analyticsClient.logEvent = { event in
                 events.withValue { $0.append(event.name.value) }
             }
+            dependencies(&$0)
         }
     }
+
+    /// 필수 약관에 모두 동의한 테스트 사용자입니다.
+    static let user = User(
+        id: 900_002,
+        nickname: "테스트",
+        email: nil,
+        profileImageURL: nil,
+        providerType: .test,
+        allRequiredTermsAgreed: true
+    )
 }

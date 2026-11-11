@@ -37,12 +37,10 @@ struct MainTabCoordinator {
         var toast: NekiToastItem? = nil
         var isPermissionAlertPresented: Bool = false
         var isPushNotificationPermissionAlertPresented: Bool = false
-        var shouldPresentMarketingConsentAlert: Bool
-        var isMarketingConsentAlertPresented: Bool = false
-        var isUpdatingMarketingConsent: Bool = false
+        var notificationGuide: NotificationGuideFeature.State
 
-        init(shouldPresentMarketingConsentAlert: Bool = false) {
-            self.shouldPresentMarketingConsentAlert = shouldPresentMarketingConsentAlert
+        init(notificationGuideEntry: NotificationGuideEntry = .regular) {
+            self.notificationGuide = NotificationGuideFeature.State(entry: notificationGuideEntry)
         }
         
         var user: User {
@@ -84,6 +82,7 @@ struct MainTabCoordinator {
         case myPage(MyPageCoordinator.Action)
         case imagePicker(ImagePickerFeature.Action)
         case destination(PresentationAction<Destination.Action>)
+        case notificationGuide(NotificationGuideFeature.Action)
         
         // View Actions
         case onTapAddButton
@@ -100,13 +99,11 @@ struct MainTabCoordinator {
         case pushNotificationListAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case dismissPushNotificationPermissionAlert
         case openAppSettings
-        case dismissMarketingConsentAlert
-        case updateMarketingConsent(Bool)
-        case marketingConsentUpdateResponse(Bool, Result<Void, Error>)
         case route(AppRouteRequest)
         
         case onAppear
         case tabChanged(NekiTab)
+        case sceneDidBecomeActive
         
         case delegate(Delegate)
         enum Delegate {
@@ -117,9 +114,7 @@ struct MainTabCoordinator {
     
     @Dependency(\.qrScannerClient) private var qrScannerClient
     @Dependency(\.openURL) private var openURL
-    @Dependency(\.authClient) private var authClient
     @Dependency(\.pushNotificationClient) private var pushNotificationClient
-    @Dependency(\.date.now) private var now
     
     var body: some ReducerOf<Self> {
         BindingReducer()
@@ -129,19 +124,17 @@ struct MainTabCoordinator {
         Scope(state: \.map, action: \.map) { MapCoordinator() }
         Scope(state: \.myPage, action: \.myPage) { MyPageCoordinator() }
         Scope(state: \.imagePicker, action: \.imagePicker) { ImagePickerFeature() }
+        Scope(state: \.notificationGuide, action: \.notificationGuide) { NotificationGuideFeature() }
         
         Reduce { (state: inout State, action: Action) -> Effect<Action> in
             switch action {
             case .binding: return .none
                 
             case .onAppear:
-                if state.selectedTab == .archive,
-                   state.shouldPresentMarketingConsentAlert {
-                    state.shouldPresentMarketingConsentAlert = false
-                    state.isMarketingConsentAlertPresented = true
-                    recordMarketingConsentAlertPresentation(for: state.user)
-                }
-                return .send(.tabChanged(state.selectedTab))
+                return .merge(
+                    .send(.notificationGuide(.mainTabAppeared(isFirstScreenCovered: state.firstScreenCoverage.isCovered))),
+                    .send(.tabChanged(state.selectedTab))
+                )
                 
             case let .tabChanged(tab):
                 // 화면 진입 이벤트는 각 탭의 첫 화면이 보일 때 그 화면이 보내므로 여기서는 보내지 않습니다.
@@ -242,39 +235,6 @@ struct MainTabCoordinator {
                     await openURL(url)
                 }
 
-            case .dismissMarketingConsentAlert:
-                guard state.isUpdatingMarketingConsent == false else { return .none }
-                state.isMarketingConsentAlertPresented = false
-                recordMarketingConsentManaged(
-                    for: state.user,
-                    status: .unconfirmed
-                )
-                return .none
-
-            case let .updateMarketingConsent(isAgreed):
-                guard state.isUpdatingMarketingConsent == false else { return .none }
-                state.isUpdatingMarketingConsent = true
-                return .run { send in
-                    await send(.marketingConsentUpdateResponse(
-                        isAgreed,
-                        Result { try await authClient.updateMarketingConsent(isAgreed) }
-                    ))
-                }
-
-            case let .marketingConsentUpdateResponse(isAgreed, .success):
-                state.isUpdatingMarketingConsent = false
-                state.isMarketingConsentAlertPresented = false
-                state.user.marketingTermAgreed = isAgreed
-                recordMarketingConsentManaged(
-                    for: state.user,
-                    status: isAgreed ? .approved : .rejected
-                )
-                return .none
-
-            case .marketingConsentUpdateResponse(_, .failure):
-                state.isUpdatingMarketingConsent = false
-                return .none
-
             case let .route(request):
                 return route(state: &state, to: request)
                 
@@ -325,6 +285,13 @@ struct MainTabCoordinator {
                     await send(.setPhotosPickerPresented(true))
                 }
                 
+            case .sceneDidBecomeActive:
+                return .send(.notificationGuide(.sceneDidBecomeActive))
+                
+            case let .notificationGuide(.delegate(.showToast(item))):
+                state.toast = item
+                return .none
+                
             default:
                 return .none
             }
@@ -360,29 +327,6 @@ struct MainTabCoordinator {
 }
 
 private extension MainTabCoordinator {
-    func recordMarketingConsentAlertPresentation(for user: User) {
-        let countKey = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
-        UserDefaults.standard.set(
-            UserDefaults.standard.integer(forKey: countKey) + 1,
-            forKey: countKey
-        )
-        recordMarketingConsentManaged(for: user, status: .unconfirmed)
-    }
-
-    func recordMarketingConsentManaged(
-        for user: User,
-        status: MarketingConsentManagementStatus
-    ) {
-        UserDefaults.standard.set(
-            now,
-            forKey: AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
-        )
-        UserDefaults.standard.set(
-            status.rawValue,
-            forKey: AppStorageKey.marketingConsentManagementStatus(userID: user.id)
-        )
-    }
-
     func route(
         state: inout MainTabCoordinator.State,
         to request: AppRouteRequest
@@ -422,7 +366,11 @@ private extension MainTabCoordinator {
         case let .shareExtension(appGroupID):
             state.selectedTab = .archive
             state.archive.path.removeAll()
-            return .send(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))
+            // 알림 안내 모달이 앨범 선택 화면을 막지 않도록 안내에 먼저 알립니다.
+            return .concatenate(
+                .send(.notificationGuide(.shareEntryStarted)),
+                .send(.archive(.root(.addPhotoFromShareExtension(appGroupID: appGroupID))))
+            )
         }
     }
 }

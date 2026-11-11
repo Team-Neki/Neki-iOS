@@ -63,7 +63,6 @@ struct NotificationGuideFeature {
         case delegate(Delegate)
         enum Delegate {
             case showToast(NekiToastItem)
-            case didRequestNotificationAuthorization
         }
     }
 
@@ -163,11 +162,8 @@ struct NotificationGuideFeature {
                 return .none
 
             case .authorizationRequestFinished:
-                let finishEffect = finish(&state)
-                return .concatenate(
-                    .send(.delegate(.didRequestNotificationAuthorization)),
-                    finishEffect
-                )
+                // 서버 push 동의는 OS 팝업이 닫혀 앱이 다시 활성화될 때 AppCoordinator가 맞춥니다.
+                return finish(&state)
 
             case let .notificationSettingsOpened(isOpened):
                 guard isOpened == false else { return .none }

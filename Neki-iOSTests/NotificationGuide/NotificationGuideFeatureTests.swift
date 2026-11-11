@@ -156,7 +156,6 @@ struct NotificationGuideFeatureTests {
             $0.isProcessing = false
             $0.consentAgreedAt = nil
         }
-        await store.receive(Self.isAuthorizationRequestDelegate)
         await store.receive(Self.isToast(Fixture.agreedToastMessage))
 
         #expect(records.value == ["consent", "request"])
@@ -184,7 +183,6 @@ struct NotificationGuideFeatureTests {
             $0.isProcessing = false
             $0.consentAgreedAt = nil
         }
-        await store.receive(Self.isAuthorizationRequestDelegate)
         await store.receive(Self.isToast(Fixture.agreedToastMessage))
 
         #expect(records.value == ["consent", "request"])
@@ -200,7 +198,6 @@ struct NotificationGuideFeatureTests {
             $0.modal = nil
         }
         await store.receive(\.authorizationRequestFinished) { $0.isProcessing = false }
-        await store.receive(Self.isAuthorizationRequestDelegate)
 
         #expect(records.value == ["request"])
     }
@@ -407,7 +404,6 @@ struct NotificationGuideFeatureTests {
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
         await store.receive(\.termsEntryAuthorizationResponse.success) { $0.isProcessing = true }
         await store.receive(\.authorizationRequestFinished) { $0.isProcessing = false }
-        await store.receive(Self.isAuthorizationRequestDelegate)
 
         #expect(records.value == ["check", "request"])
     }
@@ -423,7 +419,6 @@ struct NotificationGuideFeatureTests {
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
         await store.receive(\.termsEntryAuthorizationResponse.success) { $0.isProcessing = true }
         await store.receive(\.authorizationRequestFinished) { $0.isProcessing = false }
-        await store.receive(Self.isAuthorizationRequestDelegate)
 
         #expect(records.value == ["check", "request"])
         #expect(record == NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version))
@@ -511,11 +506,6 @@ private extension NotificationGuideFeatureTests {
             guard case let .delegate(.showToast(item)) = action else { return false }
             return item.message == message
         }
-    }
-
-    static func isAuthorizationRequestDelegate(_ action: NotificationGuideFeature.Action) -> Bool {
-        guard case .delegate(.didRequestNotificationAuthorization) = action else { return false }
-        return true
     }
 }
 

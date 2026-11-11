@@ -109,7 +109,6 @@ struct MainTabCoordinator {
         enum Delegate {
             case signedOut
             case withdraw
-            case didRequestNotificationAuthorization
         }
     }
     
@@ -292,9 +291,6 @@ struct MainTabCoordinator {
             case let .notificationGuide(.delegate(.showToast(item))):
                 state.toast = item
                 return .none
-                
-            case .notificationGuide(.delegate(.didRequestNotificationAuthorization)):
-                return .send(.delegate(.didRequestNotificationAuthorization))
                 
             default:
                 return .none

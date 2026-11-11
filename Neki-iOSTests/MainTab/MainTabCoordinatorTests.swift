@@ -134,6 +134,9 @@ struct MainTabCoordinatorTests {
 
     @Test("메인 탭이 나타나면 알림 안내가 알림 권한을 확인해 상태에 맞는 모달을 띄운다")
     func onAppear_presentsNotificationGuideModal() async {
+        // 앱 저장소는 테스트 함수마다 하나라서, 다시 돌 때(반복 실행, 일부 테스트만 골라 동시 실행) 이전 실행이 남긴 안내 기록을 비우고 시작합니다.
+        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Self.user.id))) var guideRecord = NotificationGuideRecord()
+        $guideRecord.withLock { $0 = NotificationGuideRecord() }
         let store = makeStore {
             $0.$userSessionStatus.withLock { $0 = .signedIn(Self.user) }
         } dependencies: {

@@ -21,8 +21,7 @@ struct NotificationGuideFeatureTests {
         let records = LockIsolated<[String]>([])
         let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: "1.4.0")
         @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
-        $record.withLock { $0 = seeded }
-        let store = makeStore(records: records)
+        let store = makeStore(guideRecord: seeded, records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
         await store.receive(\.updateEntryAuthorizationResponse.success)
@@ -36,8 +35,7 @@ struct NotificationGuideFeatureTests {
         let records = LockIsolated<[String]>([])
         let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: Fixture.version)
         @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
-        $record.withLock { $0 = seeded }
-        let store = makeStore(records: records)
+        let store = makeStore(guideRecord: seeded, records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
         await store.receive(\.updateEntryAuthorizationResponse.success)
@@ -57,7 +55,7 @@ struct NotificationGuideFeatureTests {
         #expect(record == NotificationGuideRecord(updateEntryJudgedVersion: Fixture.version))
     }
 
-    /// 인자들이 같은 저장소를 쓰므로 순서대로 돌리고, 매번 기록을 새로 넣습니다.
+    /// 인자들이 같은 저장소를 쓰므로 순서대로 돌립니다.
     @Test(
         "알림 권한과 동의 상태에 맞는 모달을 띄우고 버전과 오늘 날짜를 남긴다",
         .serialized,
@@ -76,8 +74,12 @@ struct NotificationGuideFeatureTests {
     ) async {
         let records = LockIsolated<[String]>([])
         @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
-        $record.withLock { $0 = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: "1.4.0") }
-        let store = makeStore(isMarketingAgreed: isMarketingAgreed, authorizationStatus: status, records: records)
+        let store = makeStore(
+            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: "1.4.0"),
+            isMarketingAgreed: isMarketingAgreed,
+            authorizationStatus: status,
+            records: records
+        )
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
         await store.receive(\.updateEntryAuthorizationResponse.success) { $0.modal = expected }
@@ -436,7 +438,7 @@ struct NotificationGuideFeatureTests {
         #expect(record == NotificationGuideRecord(updateEntryJudgedVersion: Fixture.version))
     }
 
-    /// 인자들이 같은 저장소를 쓰므로 순서대로 돌리고, 매번 기록을 비웁니다.
+    /// 인자들이 같은 저장소를 쓰므로 순서대로 돌립니다.
     @Test(
         "약관에서 동의했어도 이미 알림 권한을 정했으면 OS 알림 팝업을 띄우지 않는다",
         .serialized,
@@ -445,7 +447,6 @@ struct NotificationGuideFeatureTests {
     func mainTabAppeared_afterTermsAlreadyDecided_doesNotRequest(status: UNAuthorizationStatus) async {
         let records = LockIsolated<[String]>([])
         @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
-        $record.withLock { $0 = NotificationGuideRecord() }
         let store = makeStore(
             entry: .afterTermsAgreement(isMarketingTermAgreed: true),
             isMarketingAgreed: true,
@@ -465,14 +466,20 @@ struct NotificationGuideFeatureTests {
 
 private extension NotificationGuideFeatureTests {
     /// 로그인한 사용자로 알림 안내 스토어를 만듭니다. 부른 클라이언트는 `records`에 이름으로 남깁니다.
+    ///
+    /// 앱 저장소는 테스트 함수마다 하나라서, 같은 테스트가 한 프로세스에서 다시 돌면(반복 실행, 일부 테스트만 골라 동시 실행) 이전 실행이 남긴 기록을 읽습니다.
+    /// 그래서 안내 기록을 매번 `guideRecord`로 덮어쓰고 시작합니다.
     func makeStore(
         entry: NotificationGuideEntry = .regular,
+        guideRecord: NotificationGuideRecord = NotificationGuideRecord(),
         isMarketingAgreed: Bool = false,
         authorizationStatus: UNAuthorizationStatus = .notDetermined,
         records: LockIsolated<[String]>,
         update: (inout NotificationGuideFeature.State) -> Void = { _ in },
         dependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> TestStoreOf<NotificationGuideFeature> {
+        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var storedRecord = NotificationGuideRecord()
+        $storedRecord.withLock { $0 = guideRecord }
         var state = NotificationGuideFeature.State(entry: entry)
         state.$userSessionStatus.withLock { $0 = .signedIn(Fixture.user(isMarketingAgreed: isMarketingAgreed)) }
         update(&state)

@@ -56,6 +56,12 @@ struct PoseFeature {
         /// 목록 조건이 바뀔 때마다 1씩 오릅니다. 화면은 값이 바뀌었는지만 보고 목록 맨 위로 이동합니다.
         var scrollToTopGeneration: UInt = .zero
         
+        // Sort
+        /// 8-1은 최신순 고정이라(위키 10/31) 정렬 메뉴를 열지 않고 "최신순" 글자만 보여 줍니다. 인기순 정렬을 도입할 때 켭니다.
+        static let isSortMenuEnabled = false
+        var selectedSortOption: PoseSortOption = .latest
+        var isSortMenuPresented: Bool = false
+        
         // Sheet Presentation
         var sheetItem: PoseView.SheetType?
         var selectedRandomPoseCountSelectionOption: PeopleCountOption = .solo
@@ -72,6 +78,12 @@ struct PoseFeature {
         case selectPeopleCount(PeopleCountOption)
         /// 관계 태그(친구·커플·썸) 칩을 눌렀을 때 받습니다.
         case onTapRelationFilter(PoseRelation)
+        /// 정렬 라벨을 눌렀을 때 받습니다. 정렬 메뉴가 꺼져 있으면 아무것도 하지 않습니다.
+        case onTapSortMenu
+        /// 정렬 메뉴에서 기준을 골랐을 때 받습니다. 서버 정렬은 인기순을 도입할 때 연결합니다.
+        case selectSortOption(PoseSortOption)
+        /// 정렬 메뉴 바깥을 눌렀을 때 받습니다.
+        case dismissSortMenu
         case selectPeopleCountForRandomPose(PeopleCountOption)
         case onTapRandomPoseRecommend
         case onTapStartRandomPoseCarousel
@@ -170,6 +182,20 @@ struct PoseFeature {
                     fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 }
                 return .merge(trackingEffect, fetchEffect)
+                
+            case .onTapSortMenu:
+                guard State.isSortMenuEnabled else { return .none }
+                state.isSortMenuPresented.toggle()
+                return .none
+                
+            case let .selectSortOption(option):
+                state.selectedSortOption = option
+                state.isSortMenuPresented = false
+                return .none
+                
+            case .dismissSortMenu:
+                state.isSortMenuPresented = false
+                return .none
                 
             case let .selectPeopleCountForRandomPose(option):
                 state.selectedRandomPoseCountSelectionOption = option

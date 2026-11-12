@@ -158,6 +158,7 @@ private extension NearPhotoBoothListSheet {
     @ViewBuilder
     func filterCell(_ brand: PhotoBoothBrand) -> some View {
         let isSelected: Bool = store.filteredBrands.contains(brand)
+        let brandNameStyle: FontStyle = isSelected ? .body14SemiBold : .body14Medium
         
         Button {
             store.send(.selectFilterOption(brand))
@@ -181,7 +182,8 @@ private extension NearPhotoBoothListSheet {
                     }
                 
                 Text(brandNameFormatter.format(brand: brand))
-                    .font(.neki(isSelected ? .body14SemiBold : .body14Medium))
+                    .font(.neki(brandNameStyle))
+                    .tracking(brandNameStyle.letterSpacing)
                     .foregroundStyle(isSelected ? .primary400 : .gray900)
                     .lineLimit(2)
                     .lineSpacing(4)

@@ -49,7 +49,10 @@ public enum FontStyle: CaseIterable {
         }
     }
     
-    var letterSpacing: CGFloat { .zero }
+    /// 자간입니다. 디자인 시스템 Text Styles는 모두 글자 크기의 -2%입니다.
+    ///
+    /// 줄 간격처럼 기본 글자 크기로 계산하므로, 글자 크기 설정을 키워도 값은 그대로입니다.
+    var letterSpacing: CGFloat { fontSize * -0.02 }
     
     var fontName: String {
         switch self {

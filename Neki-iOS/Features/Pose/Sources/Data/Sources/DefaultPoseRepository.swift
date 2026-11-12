@@ -139,6 +139,8 @@ public final actor DefaultPoseRepository {
     private let maxRetryCount: Int = 3
     private let maxCachedPagesPerScope: Int = 5
     private let maxRandomHistoryCount: Int = 50
+    /// 목록을 최신순(등록일 내림차순)으로 명시해 요청합니다. 화면의 "최신순"이 서버 기본 정렬에 기대지 않게 합니다.
+    private let latestFirstSortOrder: String = "DESC"
     
     @Dependency(\.networkProvider) private var networkProvider
     
@@ -446,7 +448,7 @@ extension DefaultPoseRepository: PoseRepository {
         if refresh { generalPages.removeAll() }
         else if let cachedResponse = cachedPageResponse(generalPages[page]) { return cachedResponse }
         
-        let endpoint = PoseEndpoint.fetchPoseList(page: page, size: pageSize, peopleCount: nil, sortBy: nil)
+        let endpoint = PoseEndpoint.fetchPoseList(page: page, size: pageSize, peopleCount: nil, sortBy: latestFirstSortOrder)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
@@ -469,7 +471,7 @@ extension DefaultPoseRepository: PoseRepository {
         if refresh { scrappedPages.removeAll() }
         else if let cachedResponse = cachedPageResponse(scrappedPages[page]) { return cachedResponse }
         
-        let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: nil)
+        let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: latestFirstSortOrder)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false

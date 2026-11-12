@@ -36,9 +36,40 @@ struct PoseFeature {
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
         
+        /// "N개의 포즈"에 보여 줄 개수입니다. 불러온 목록에 필터를 적용한 개수이고, 전체 개수는 #424에서 연결합니다.
+        ///
+        /// 아직 받은 포즈가 없으면 불러오는 중이거나 실패한 것이라 nil을 돌려줘 "0개"가 깜빡이지 않게 합니다. 끝까지 불러왔는데 비어 있으면 0입니다.
+        var displayedPoseCount: Int? {
+            let loadedPoses = isSelectedScrap ? scrappedPoses : generalPoses
+            guard loadedPoses.isEmpty == false || isCurrentLastPage else { return nil }
+            return visiblePoses.count
+        }
+        
         // Filter Options
         var selectedCountFilterOption: PeopleCountOption?
+        /// 고른 관계 태그입니다. 고르면 인원수가 2인으로 바뀌고, 인원수가 2인이 아니게 되면 비워집니다.
+        var selectedRelationFilterOption: PoseRelation?
         var isSelectedScrap: Bool = false
+        
+        /// 보이는 목록을 정하는 조건입니다.
+        ///
+        /// 관계 태그는 아직 목록을 거르지 않아 넣지 않았습니다(#424). 관계로 거르게 되면 여기와 `refreshVisiblePoses`에 함께 넣습니다.
+        struct ListCondition: Equatable {
+            let isScrap: Bool
+            let peopleCount: PeopleCountOption?
+        }
+        
+        var listCondition: ListCondition { ListCondition(isScrap: isSelectedScrap, peopleCount: selectedCountFilterOption) }
+        
+        // Scroll
+        /// 목록 조건이 바뀔 때마다 1씩 오릅니다. 화면은 값이 바뀌었는지만 보고 목록 맨 위로 이동합니다.
+        var scrollToTopGeneration: UInt = .zero
+        
+        // Sort
+        /// 8-1은 최신순 고정이라(위키 10/31) 정렬 메뉴를 열지 않고 "최신순" 글자만 보여 줍니다. 인기순 정렬을 도입할 때 켭니다.
+        static let isSortMenuEnabled = false
+        var selectedSortOption: PoseSortOption = .latest
+        var isSortMenuPresented: Bool = false
         
         // Sheet Presentation
         var sheetItem: PoseView.SheetType?
@@ -54,6 +85,14 @@ struct PoseFeature {
         case onTapFilter
         case onTapScrapMode
         case selectPeopleCount(PeopleCountOption)
+        /// 관계 태그(친구·커플·썸) 칩을 눌렀을 때 받습니다.
+        case onTapRelationFilter(PoseRelation)
+        /// 정렬 라벨을 눌렀을 때 받습니다. 정렬 메뉴가 꺼져 있으면 아무것도 하지 않습니다.
+        case onTapSortMenu
+        /// 정렬 메뉴에서 기준을 골랐을 때 받습니다. 서버 정렬은 인기순을 도입할 때 연결합니다.
+        case selectSortOption(PoseSortOption)
+        /// 정렬 메뉴 바깥을 눌렀을 때 받습니다.
+        case dismissSortMenu
         case selectPeopleCountForRandomPose(PeopleCountOption)
         case onTapRandomPoseRecommend
         case onTapStartRandomPoseCarousel
@@ -122,18 +161,24 @@ struct PoseFeature {
                 return .none
                 
             case let .selectPeopleCount(option):
-                let isDeselecting = state.selectedCountFilterOption == option
-                state.selectedCountFilterOption = isDeselecting ? nil : option
-                state.isSelectedScrap = false
-                refreshVisiblePoses(&state)
+                let previousCondition = state.listCondition
+                state.togglePeopleCountFilter(option)
+                applyListConditionChange(&state, from: previousCondition)
                 guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return .none }
                 let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
                 return .run { _ in await analytics.logEvent(event) }
                 
+            case let .onTapRelationFilter(relation):
+                // 관계 태그는 이벤트 명세에 없어 기록하지 않습니다. 북마크에서 일반 목록으로 돌아와도 인원수 선택처럼 다시 불러오지 않습니다.
+                let previousCondition = state.listCondition
+                state.toggleRelationFilter(relation)
+                applyListConditionChange(&state, from: previousCondition)
+                return .none
+                
             case .onTapScrapMode:
-                state.isSelectedScrap.toggle()
-                state.selectedCountFilterOption = nil
-                refreshVisiblePoses(&state)
+                let previousCondition = state.listCondition
+                state.toggleBookmarkFilter()
+                applyListConditionChange(&state, from: previousCondition)
                 
                 let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmarkFilter) }
                 let fetchEffect: Effect<Action>
@@ -146,6 +191,20 @@ struct PoseFeature {
                     fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
                 }
                 return .merge(trackingEffect, fetchEffect)
+                
+            case .onTapSortMenu:
+                guard State.isSortMenuEnabled else { return .none }
+                state.isSortMenuPresented.toggle()
+                return .none
+                
+            case let .selectSortOption(option):
+                state.selectedSortOption = option
+                state.isSortMenuPresented = false
+                return .none
+                
+            case .dismissSortMenu:
+                state.isSortMenuPresented = false
+                return .none
                 
             case let .selectPeopleCountForRandomPose(option):
                 state.selectedRandomPoseCountSelectionOption = option
@@ -297,5 +356,48 @@ private extension PoseFeature {
         }
         state.visiblePoses = visiblePoses
         state.lastVisiblePoseID = visiblePoses.last?.id
+    }
+    
+    /// 목록 조건이 바뀐 경우에만 보이는 목록을 다시 거르고, 화면이 맨 위로 이동하도록 세대를 올립니다.
+    func applyListConditionChange(_ state: inout State, from previousCondition: State.ListCondition) {
+        guard state.listCondition != previousCondition else { return }
+        refreshVisiblePoses(&state)
+        state.scrollToTopGeneration &+= 1
+    }
+}
+
+
+// MARK: - PoseFeature.State + Filter Rules
+
+extension PoseFeature.State {
+    /// 북마크 모드를 켜거나 끕니다. 고른 인원수와 관계 태그는 비웁니다.
+    mutating func toggleBookmarkFilter() {
+        isSelectedScrap.toggle()
+        selectedCountFilterOption = nil
+        selectedRelationFilterOption = nil
+    }
+    
+    /// 인원수를 고릅니다. 이미 고른 인원수를 다시 누르면 해제합니다.
+    ///
+    /// 북마크 모드는 끕니다. 인원수가 2인이 아니게 되면 관계 태그도 비웁니다.
+    mutating func togglePeopleCountFilter(_ option: PeopleCountOption) {
+        let newOption: PeopleCountOption? = selectedCountFilterOption == option ? nil : option
+        isSelectedScrap = false
+        selectedCountFilterOption = newOption
+        guard newOption != .duo else { return }
+        selectedRelationFilterOption = nil
+    }
+    
+    /// 관계 태그를 고릅니다. 이미 고른 태그를 다시 누르면 태그만 해제하고 2인은 남깁니다.
+    ///
+    /// 태그를 고르면 북마크 모드를 끄고 인원수를 2인으로 바꿉니다.
+    mutating func toggleRelationFilter(_ relation: PoseRelation) {
+        guard selectedRelationFilterOption != relation else {
+            selectedRelationFilterOption = nil
+            return
+        }
+        isSelectedScrap = false
+        selectedCountFilterOption = .duo
+        selectedRelationFilterOption = relation
     }
 }

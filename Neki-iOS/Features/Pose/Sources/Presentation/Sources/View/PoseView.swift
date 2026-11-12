@@ -151,6 +151,8 @@ private extension PoseView {
     }
     
     /// 태그 바와 "N개의 포즈"·정렬 행을 묶은 머리글입니다. 목록을 내리면 위로 숨습니다.
+    ///
+    /// 칩과 개수 행은 높이가 고정이라, 글자는 칩 안에 들어오는 AX3까지만 키웁니다. 더 키우면 태그 바 스크롤 영역에 글자가 잘립니다.
     @ViewBuilder
     var filterHeader: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -160,6 +162,7 @@ private extension PoseView {
             poseCountSortRow
         }
         .padding(.bottom, 12)
+        .dynamicTypeSize(...DynamicTypeSize.accessibility3)
     }
     
     /// `북마크 | 인원수 · 친구 · 커플 · 썸` 순서의 태그 바입니다.

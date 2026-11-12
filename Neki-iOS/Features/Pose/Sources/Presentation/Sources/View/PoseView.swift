@@ -251,9 +251,7 @@ private extension PoseView {
                 HStack(spacing: .zero) {
                     sortTitle
                     
-                    Image(.iconChevronDown)
-                        .renderingMode(.template)
-                        .foregroundStyle(.gray400)
+                    Image(.iconChipDown)
                 }
             }
         } else {

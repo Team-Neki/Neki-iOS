@@ -8,7 +8,7 @@
 import Foundation
 
 enum PoseEndpoint {
-    case fetchPoseList(page: PageID?, size: Int?, peopleCount: String?, sortBy: String?)
+    case fetchPoseList(page: PageID?, size: Int?, peopleCount: String?, relation: String?, sortBy: String?)
     case fetchScrappedPoseList(page: PageID?, size: Int?, sortBy: String?)
     case fetchPoseDetail(poseID: PoseID)
     case fetchRandomPose(peopleCount: String)
@@ -35,11 +35,12 @@ extension PoseEndpoint: Endpoint {
     
     var queryParameters: [String : String]? {
         switch self {
-        case let .fetchPoseList(page, size, peopleCount, sortBy):
+        case let .fetchPoseList(page, size, peopleCount, relation, sortBy):
             var params: [String: String] = [:]
             if let page { params["page"] = String(page) }
             if let size { params["size"] = String(size) }
             if let peopleCount { params["headCount"] = peopleCount }
+            if let relation { params["relation"] = relation }
             if let sortBy { params["sortOrder"] = sortBy }
             return params
             

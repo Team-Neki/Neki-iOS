@@ -13,6 +13,14 @@ import os
 struct PoseFeature {
     private enum CancelID: Hashable {
         case scrap(PoseID)
+        case generalList
+        case scrappedList
+    }
+    
+    /// 목록 응답이 어느 목록의 것인지 나타냅니다. 일반 목록은 요청한 조건을 함께 담아, 조건을 바꾼 뒤 늦게 온 응답을 가려냅니다.
+    enum ListScope: Equatable, Sendable {
+        case general(PoseListFilter)
+        case scrap
     }
     
     @ObservableState
@@ -32,6 +40,10 @@ struct PoseFeature {
         @ObservationIgnored let pageSize: Int = 20
         var isGeneralLoading: Bool = false
         var isScrappedLoading: Bool = false
+        /// `generalPoses`를 받은 조건입니다. 아직 받은 목록이 없으면 nil입니다.
+        var loadedGeneralFilter: PoseListFilter?
+        /// 마지막으로 요청한 일반 목록 조건입니다. 이 조건이 아닌 응답은 버립니다.
+        var requestedGeneralFilter: PoseListFilter?
         
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
@@ -52,14 +64,14 @@ struct PoseFeature {
         var isSelectedScrap: Bool = false
         
         /// 보이는 목록을 정하는 조건입니다.
-        ///
-        /// 관계 태그는 아직 목록을 거르지 않아 넣지 않았습니다(#424). 관계로 거르게 되면 여기와 `refreshVisiblePoses`에 함께 넣습니다.
         struct ListCondition: Equatable {
             let isScrap: Bool
-            let peopleCount: PeopleCountOption?
+            let filter: PoseListFilter
         }
         
-        var listCondition: ListCondition { ListCondition(isScrap: isSelectedScrap, peopleCount: selectedCountFilterOption) }
+        /// 서버에 보낼 일반 목록 조건입니다. 북마크 목록은 조건 없이 받고, 북마크를 켜면 인원수와 관계가 비워집니다.
+        var listFilter: PoseListFilter { PoseListFilter(peopleCount: selectedCountFilterOption, relation: selectedRelationFilterOption) }
+        var listCondition: ListCondition { ListCondition(isScrap: isSelectedScrap, filter: listFilter) }
         
         // Scroll
         /// 목록 조건이 바뀔 때마다 1씩 오릅니다. 화면은 값이 바뀌었는지만 보고 목록 맨 위로 이동합니다.
@@ -103,7 +115,7 @@ struct PoseFeature {
         case notificationButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
-        case fetchListResponse(isScrapResult: Bool, Result<PoseListPage, Error>)
+        case fetchListResponse(ListScope, page: Int, Result<PoseListPage, Error>)
         case updatePoseInList(Pose)
         case bookmarkResponse(Pose, Result<Void, Error>)
         
@@ -132,15 +144,7 @@ struct PoseFeature {
             case .onAppear:
                 // 화면 진입은 목록을 이미 불러왔어도 화면이 보일 때마다 기록합니다.
                 let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseView) }
-                let fetchEffect: Effect<Action>
-                if state.isSelectedScrap {
-                    guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return trackingEffect }
-                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
-                } else {
-                    guard state.isGeneralLoading == false, state.generalPoses.isEmpty else { return trackingEffect }
-                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
-                }
-                return .merge(trackingEffect, fetchEffect)
+                return .merge(trackingEffect, fetchFirstPageIfNeeded(&state))
                 
             case .fullScreenCoverDismissed:
                 return .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseView) }
@@ -149,12 +153,13 @@ struct PoseFeature {
                 if state.isSelectedScrap {
                     guard state.isScrappedLoading == false, state.isLastScrappedPage == false else { return .none }
                 } else {
-                    guard state.isGeneralLoading == false, state.isLastGeneralPage == false else { return .none }
+                    // 조건을 바꾼 뒤 새 첫 페이지가 오기 전에는 이전 조건의 다음 페이지를 부르지 않습니다.
+                    guard state.loadedGeneralFilter == state.listFilter, state.isGeneralLoading == false, state.isLastGeneralPage == false else { return .none }
                 }
-                return fetchPoses(state: &state, refreshNeeded: false)
+                return fetchNextPage(&state)
                 
             case .onRefresh:
-                return fetchPoses(state: &state, refreshNeeded: true)
+                return fetchFirstPage(&state, refresh: true)
                 
             case .onTapFilter:
                 state.sheetItem = .peopleCountFilter
@@ -163,34 +168,23 @@ struct PoseFeature {
             case let .selectPeopleCount(option):
                 let previousCondition = state.listCondition
                 state.togglePeopleCountFilter(option)
-                applyListConditionChange(&state, from: previousCondition)
-                guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return .none }
+                let listEffect = applyListConditionChange(&state, from: previousCondition)
+                guard let peopleCount = extractPeopleCount(from: state.selectedCountFilterOption) else { return listEffect }
                 let event = PoseAnalyticsEvent.poseFilterToggle(peopleCount: peopleCount)
-                return .run { _ in await analytics.logEvent(event) }
+                return .merge(listEffect, .run { _ in await analytics.logEvent(event) })
                 
             case let .onTapRelationFilter(relation):
-                // 관계 태그는 이벤트 명세에 없어 기록하지 않습니다. 북마크에서 일반 목록으로 돌아와도 인원수 선택처럼 다시 불러오지 않습니다.
+                // 관계 태그는 이벤트 명세에 없어 기록하지 않습니다.
                 let previousCondition = state.listCondition
                 state.toggleRelationFilter(relation)
-                applyListConditionChange(&state, from: previousCondition)
-                return .none
+                return applyListConditionChange(&state, from: previousCondition)
                 
             case .onTapScrapMode:
                 let previousCondition = state.listCondition
                 state.toggleBookmarkFilter()
-                applyListConditionChange(&state, from: previousCondition)
-                
+                let listEffect = applyListConditionChange(&state, from: previousCondition)
                 let trackingEffect: Effect<Action> = .run { _ in await analytics.logEvent(PoseAnalyticsEvent.poseBookmarkFilter) }
-                let fetchEffect: Effect<Action>
-                
-                if state.isSelectedScrap {
-                    guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return trackingEffect }
-                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
-                } else {
-                    guard state.isGeneralLoading == false, state.generalPoses.isEmpty else { return trackingEffect }
-                    fetchEffect = fetchPoses(state: &state, refreshNeeded: true)
-                }
-                return .merge(trackingEffect, fetchEffect)
+                return .merge(trackingEffect, listEffect)
                 
             case .onTapSortMenu:
                 guard State.isSortMenuEnabled else { return .none }
@@ -262,26 +256,44 @@ struct PoseFeature {
                 refreshVisiblePoses(&state)
                 return .none
                 
-            case let .fetchListResponse(isScrapResult, .success(page)):
-                if isScrapResult {
-                    state.isScrappedLoading = false
-                    state.isLastScrappedPage = page.hasNext == false
-                    if state.scrappedPage == .zero { state.scrappedPoses = IdentifiedArray(uniqueElements: page.poses) }
-                    else { state.scrappedPoses.append(contentsOf: page.poses) }
-                    if page.hasNext { state.scrappedPage += 1 }
-                } else {
+            case let .fetchListResponse(scope, page, .success(result)):
+                switch scope {
+                case let .general(filter):
+                    guard state.requestedGeneralFilter == filter else { return .none }
                     state.isGeneralLoading = false
-                    state.isLastGeneralPage = page.hasNext == false
-                    if state.generalPage == .zero { state.generalPoses = IdentifiedArray(uniqueElements: page.poses) }
-                    else { state.generalPoses.append(contentsOf: page.poses) }
-                    if page.hasNext { state.generalPage += 1 }
+                    state.isLastGeneralPage = result.hasNext == false
+                    if page == .zero {
+                        state.generalPoses = IdentifiedArray(uniqueElements: result.poses)
+                        state.loadedGeneralFilter = filter
+                    } else {
+                        state.generalPoses.append(contentsOf: result.poses)
+                    }
+                    if result.hasNext { state.generalPage = page + 1 }
+                    
+                case .scrap:
+                    state.isScrappedLoading = false
+                    state.isLastScrappedPage = result.hasNext == false
+                    if page == .zero {
+                        state.scrappedPoses = IdentifiedArray(uniqueElements: result.poses)
+                    } else {
+                        state.scrappedPoses.append(contentsOf: result.poses)
+                    }
+                    if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
                 return .none
                 
-            case let .fetchListResponse(isScrapResult, .failure(error)):
-                if isScrapResult { state.isScrappedLoading = false }
-                else { state.isGeneralLoading = false }
+            case let .fetchListResponse(scope, page, .failure(error)):
+                switch scope {
+                case let .general(filter):
+                    guard state.requestedGeneralFilter == filter else { return .none }
+                    state.isGeneralLoading = false
+                    // 첫 페이지를 못 받았으면 요청 기록을 지워, 화면에 다시 들어오거나 조건을 다시 고르면 다시 부르게 합니다.
+                    if page == .zero, state.loadedGeneralFilter != filter { state.requestedGeneralFilter = nil }
+                    
+                case .scrap:
+                    state.isScrappedLoading = false
+                }
                 
                 Logger.presentation.error("Pose List Fetching Failed: \(error)")
                 return .none
@@ -308,61 +320,72 @@ struct PoseFeature {
 // MARK: - PoseFeature + Helpers
 
 private extension PoseFeature {
-    func fetchPoses(state: inout State, refreshNeeded: Bool) -> Effect<Action> {
-        let isScrapMode = state.isSelectedScrap
-        
-        if isScrapMode {
-            state.isScrappedLoading = true
-            if refreshNeeded {
-                state.scrappedPage = .zero
-                state.isLastScrappedPage = false
-            }
-        } else {
-            state.isGeneralLoading = true
-            if refreshNeeded {
-                state.generalPage = .zero
-                state.isLastGeneralPage = false
-            }
+    /// 지금 조건의 목록을 아직 받지 않았고 부르는 중도 아니면 첫 페이지를 부릅니다.
+    func fetchFirstPageIfNeeded(_ state: inout State) -> Effect<Action> {
+        if state.isSelectedScrap {
+            guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return .none }
+            return fetchFirstPage(&state, refresh: true)
         }
         
-        let page = isScrapMode ? state.scrappedPage : state.generalPage
+        let filter = state.listFilter
+        guard state.loadedGeneralFilter != filter else { return .none }
+        guard state.isGeneralLoading == false || state.requestedGeneralFilter != filter else { return .none }
+        // 처음 받을 때는 저장소에 남은 이전 페이지를 쓰지 않습니다.
+        return fetchFirstPage(&state, refresh: state.loadedGeneralFilter == nil)
+    }
+    
+    func fetchFirstPage(_ state: inout State, refresh: Bool) -> Effect<Action> {
+        fetchPage(&state, page: .zero, refresh: refresh)
+    }
+    
+    func fetchNextPage(_ state: inout State) -> Effect<Action> {
+        fetchPage(&state, page: state.currentPage, refresh: false)
+    }
+    
+    /// 지금 목록의 한 페이지를 부릅니다. 같은 목록에서 부르던 요청은 취소합니다.
+    func fetchPage(_ state: inout State, page: Int, refresh: Bool) -> Effect<Action> {
         let pageSize = state.pageSize
+        
+        if state.isSelectedScrap {
+            state.isScrappedLoading = true
+            return .run { send in
+                await send(.fetchListResponse(.scrap, page: page, Result {
+                    try await poseClient.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refresh)
+                }))
+            }
+            .cancellable(id: CancelID.scrappedList, cancelInFlight: true)
+        }
+        
+        let filter = state.listFilter
+        state.isGeneralLoading = true
+        state.requestedGeneralFilter = filter
         return .run { send in
-            await send(.fetchListResponse(isScrapResult: isScrapMode, Result {
-                if isScrapMode {
-                    return try await poseClient.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refreshNeeded)
-                } else {
-                    return try await poseClient.fetchPoseList(page: page, pageSize: pageSize, refresh: refreshNeeded)
-                }
+            await send(.fetchListResponse(.general(filter), page: page, Result {
+                try await poseClient.fetchPoseList(page: page, pageSize: pageSize, filter: filter, refresh: refresh)
             }))
         }
+        .cancellable(id: CancelID.generalList, cancelInFlight: true)
     }
     
     func extractPeopleCount(from option: PeopleCountOption?) -> Int? { option?.rawValue }
 
+    /// 보이는 목록을 지금 조건으로 거릅니다.
+    ///
+    /// 서버가 거른 목록이면 그대로입니다. 조건을 바꾼 직후에는 새 첫 페이지가 오기 전까지 이미 받은 목록에서 맞는 포즈만 먼저 보여 줍니다.
     func refreshVisiblePoses(_ state: inout State) {
+        let filter = state.listFilter
         let targetPoses = state.isSelectedScrap ? state.scrappedPoses : state.generalPoses
-        guard let countOption = state.selectedCountFilterOption else {
-            state.visiblePoses = Array(targetPoses)
-            state.lastVisiblePoseID = state.visiblePoses.last?.id
-            return
-        }
-
-        var visiblePoses: [Pose] = []
-        visiblePoses.reserveCapacity(targetPoses.count)
-        targetPoses.forEach {
-            guard $0.peopleCountOption == countOption else { return }
-            visiblePoses.append($0)
-        }
+        let visiblePoses = targetPoses.elements.filter { filter.matches($0) }
         state.visiblePoses = visiblePoses
         state.lastVisiblePoseID = visiblePoses.last?.id
     }
     
-    /// 목록 조건이 바뀐 경우에만 보이는 목록을 다시 거르고, 화면이 맨 위로 이동하도록 세대를 올립니다.
-    func applyListConditionChange(_ state: inout State, from previousCondition: State.ListCondition) {
-        guard state.listCondition != previousCondition else { return }
+    /// 목록 조건이 바뀐 경우에만 보이는 목록을 다시 거르고, 화면이 맨 위로 이동하도록 세대를 올린 뒤 새 조건의 첫 페이지를 부릅니다.
+    func applyListConditionChange(_ state: inout State, from previousCondition: State.ListCondition) -> Effect<Action> {
+        guard state.listCondition != previousCondition else { return .none }
         refreshVisiblePoses(&state)
         state.scrollToTopGeneration &+= 1
+        return fetchFirstPageIfNeeded(&state)
     }
 }
 

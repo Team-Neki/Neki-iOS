@@ -509,9 +509,10 @@ extension PoseView {
 }
 
 private extension PoseView {
-    /// 인원수를 섞은 포즈 12개를 불러오는 미리보기 화면입니다. 서버와 분석 이벤트는 부르지 않습니다.
+    /// 인원수와 관계를 섞은 포즈 12개를 불러오는 미리보기 화면입니다. 서버처럼 조건으로 거르고, 서버와 분석 이벤트는 부르지 않습니다.
     static func preview(state: PoseFeature.State) -> some View {
         let peopleCounts: [PeopleCountOption] = [.solo, .duo, .trio]
+        let relations: [PoseID: PoseRelation] = [1: .friend, 4: .friend, 7: .couple, 10: .crush]
         let poses = (1...12).map { id in
             Pose(
                 id: id,
@@ -520,7 +521,8 @@ private extension PoseView {
                 isScrapped: false,
                 contentType: .jpeg,
                 width: 3,
-                height: 4
+                height: 4,
+                relation: relations[id]
             )
         }
         return NavigationStack {
@@ -528,7 +530,10 @@ private extension PoseView {
                 store: Store(initialState: state) {
                     PoseFeature()
                 } withDependencies: {
-                    $0.poseClient.fetchPoseList = { _, _, _ in PoseListPage(poses: poses, hasNext: false, totalCount: poses.count) }
+                    $0.poseClient.fetchPoseList = { _, _, filter, _ in
+                        let matchedPoses = poses.filter { filter.matches($0) }
+                        return PoseListPage(poses: matchedPoses, hasNext: false, totalCount: matchedPoses.count)
+                    }
                     $0.poseClient.fetchScrappedPoseList = { _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
                     $0.analyticsClient.logEvent = { _ in }
                 }

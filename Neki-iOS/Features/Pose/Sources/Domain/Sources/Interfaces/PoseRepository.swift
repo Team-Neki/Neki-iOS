@@ -18,7 +18,7 @@ public typealias PoseID = Int
 public typealias PageID = Int
 
 public protocol PoseRepository {
-    func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> PoseListPage
+    func fetchPoseList(page: PageID, pageSize: Int, filter: PoseListFilter, refresh: Bool) async throws -> PoseListPage
     func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> PoseListPage
     func fetchPoseDetail(id: PoseID) async throws -> Pose
     func scrapPose(poseID: PoseID) async throws

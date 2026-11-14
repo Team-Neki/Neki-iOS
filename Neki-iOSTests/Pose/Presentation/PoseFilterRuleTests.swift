@@ -113,20 +113,25 @@ struct PoseFilterRuleTests {
         #expect(state.selectedCountFilterOption == nil)
     }
 
-    @Test("2인을 고른 상태에서 관계 태그만 고르거나 바꾸거나 해제하면 목록 조건은 그대로다")
-    func relationOnlyChanges_keepListCondition() {
+    @Test("2인을 고른 상태에서 관계 태그를 고르거나 바꾸거나 해제하면 서버에 보낼 목록 조건이 바뀐다")
+    func relationChanges_changeListCondition() {
         var state = PoseFeature.State()
         state.togglePeopleCountFilter(.duo)
-        let condition = state.listCondition
+        var filters = [state.listCondition.filter]
 
         state.toggleRelationFilter(.friend)
-        #expect(state.listCondition == condition)
-
+        filters.append(state.listCondition.filter)
         state.toggleRelationFilter(.couple)
-        #expect(state.listCondition == condition)
-
+        filters.append(state.listCondition.filter)
         state.toggleRelationFilter(.couple)
-        #expect(state.listCondition == condition)
+        filters.append(state.listCondition.filter)
+
+        #expect(filters == [
+            PoseListFilter(peopleCount: .duo),
+            PoseListFilter(peopleCount: .duo, relation: .friend),
+            PoseListFilter(peopleCount: .duo, relation: .couple),
+            PoseListFilter(peopleCount: .duo)
+        ])
     }
 
     @Test("받은 포즈가 없고 끝까지 불러오지 않았으면 포즈 개수를 숨긴다")

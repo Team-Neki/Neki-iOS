@@ -20,7 +20,7 @@ struct DefaultPoseRepositoryListSortTests {
             DefaultPoseRepository()
         }
 
-        _ = try await repository.fetchPoseList(page: .zero, pageSize: 20, refresh: true)
+        _ = try await repository.fetchPoseList(page: .zero, pageSize: 20, filter: PoseListFilter(), refresh: true)
         _ = try await repository.fetchScrappedPoseList(page: .zero, pageSize: 20, refresh: true)
 
         #expect(await networkProvider.requestedPaths == ["/poses", "/poses/scrap"])

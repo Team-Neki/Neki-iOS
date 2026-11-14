@@ -64,6 +64,7 @@ struct PoseFeatureTests {
     func onAppear_whenPosesLoaded_logsPoseViewEveryTime() async {
         var state = PoseFeature.State()
         state.generalPoses = [makePose(id: 1, peopleCount: .solo)]
+        state.loadedGeneralFilter = PoseListFilter()
         let events = LockIsolated<[PoseAnalyticsEvent]>([])
         let store = makeStore(initialState: state, events: events)
 
@@ -91,23 +92,32 @@ struct PoseFeatureTests {
         #expect(entryPoint == "list")
     }
 
-    @Test("관계 태그를 고르면 2인 포즈만 보이고, 마지막으로 보이는 포즈와 개수도 2인 기준이다")
-    func onTapRelationFilter_showsDuoPosesOnly() async {
+    @Test("관계 태그를 고르면 새 목록이 오기 전에는 받아 둔 목록에서 그 관계의 2인 포즈만 먼저 보인다")
+    func onTapRelationFilter_beforeResponse_showsMatchingLoadedPoses() async {
         var state = PoseFeature.State()
         state.generalPoses = [
             makePose(id: 1, peopleCount: .solo),
-            makePose(id: 2, peopleCount: .duo),
-            makePose(id: 3, peopleCount: .trio),
-            makePose(id: 4, peopleCount: .duo),
-            makePose(id: 5, peopleCount: .solo)
+            makePose(id: 2, peopleCount: .duo, relation: .friend),
+            makePose(id: 3, peopleCount: .duo),
+            makePose(id: 4, peopleCount: .duo, relation: .friend),
+            makePose(id: 5, peopleCount: .duo, relation: .couple)
         ]
-        let store = makeStore(initialState: state)
+        state.loadedGeneralFilter = PoseListFilter()
+        let (gate, openGate) = AsyncStream<Void>.makeStream()
+        let store = makeStore(initialState: state) {
+            $0.poseClient.fetchPoseList = { _, _, _, _ in
+                for await _ in gate { break }
+                return PoseListPage(poses: [], hasNext: false, totalCount: .zero)
+            }
+        }
 
         await store.send(.onTapRelationFilter(.friend))
 
         #expect(store.state.visiblePoses.map(\.id) == [2, 4])
         #expect(store.state.lastVisiblePoseID == 4)
-        #expect(store.state.displayedPoseCount == 2)
+        openGate.yield()
+        openGate.finish()
+        await store.finish()
     }
 
     @Test("3인을 고른 상태에서 친구를 고르면 인원수가 바뀌어 맨 위로 이동 신호가 오른다")
@@ -121,8 +131,8 @@ struct PoseFeatureTests {
         #expect(store.state.scrollToTopGeneration == 1)
     }
 
-    @Test("2인이 그대로인 관계 선택·변경·해제는 맨 위로 이동 신호를 올리지 않는다")
-    func onTapRelationFilter_whenDuoStays_keepsScrollGeneration() async {
+    @Test("2인이 그대로여도 관계를 고르거나 바꾸거나 해제하면 목록이 바뀌어 맨 위로 이동 신호가 오른다")
+    func onTapRelationFilter_whenDuoStays_bumpsScrollGeneration() async {
         var state = PoseFeature.State()
         state.selectedCountFilterOption = .duo
         let store = makeStore(initialState: state)
@@ -130,8 +140,9 @@ struct PoseFeatureTests {
         await store.send(.onTapRelationFilter(.friend))
         await store.send(.onTapRelationFilter(.couple))
         await store.send(.onTapRelationFilter(.couple))
+        await store.finish()
 
-        #expect(store.state.scrollToTopGeneration == .zero)
+        #expect(store.state.scrollToTopGeneration == 3)
     }
 
     @Test("인원수 선택과 북마크 전환은 누를 때마다 맨 위로 이동 신호를 올린다")
@@ -242,7 +253,7 @@ private extension PoseFeatureTests {
                 events.withValue { $0.append(event) }
             }
             $0.poseClient.scrapPose = { _ in }
-            $0.poseClient.fetchPoseList = { _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
+            $0.poseClient.fetchPoseList = { _, _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
             $0.poseClient.fetchScrappedPoseList = { _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
             updateDependencies(&$0)
         }
@@ -250,7 +261,7 @@ private extension PoseFeatureTests {
         return store
     }
 
-    func makePose(id: PoseID, peopleCount: PeopleCountOption) -> Pose {
+    func makePose(id: PoseID, peopleCount: PeopleCountOption, relation: PoseRelation? = nil) -> Pose {
         Pose(
             id: id,
             peopleCountOption: peopleCount,
@@ -258,7 +269,8 @@ private extension PoseFeatureTests {
             isScrapped: false,
             contentType: .jpeg,
             width: nil,
-            height: nil
+            height: nil,
+            relation: relation
         )
     }
 }

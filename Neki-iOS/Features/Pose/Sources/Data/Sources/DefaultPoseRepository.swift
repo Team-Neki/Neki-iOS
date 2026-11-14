@@ -13,6 +13,7 @@ import os
 private struct Page {
     let poseIDs: [PoseID]
     let hasNext: Bool
+    let totalCount: Int?
 }
 
 private struct PoseEntityCache {
@@ -212,7 +213,7 @@ private extension DefaultPoseRepository {
                 guard let index = page.poseIDs.firstIndex(of: poseID) else { continue }
                 var currentIDs = page.poseIDs
                 currentIDs.remove(at: index)
-                scrappedPages[pageID] = Page(poseIDs: currentIDs, hasNext: page.hasNext)
+                scrappedPages[pageID] = Page(poseIDs: currentIDs, hasNext: page.hasNext, totalCount: page.totalCount)
             }
             return
         }
@@ -220,7 +221,7 @@ private extension DefaultPoseRepository {
         guard scrappedPages.isEmpty == false, let lastPageID = scrappedPages.keys.max(), let lastPage = scrappedPages[lastPageID], lastPage.poseIDs.contains(poseID) == false else { return }
         var currentIDs = lastPage.poseIDs
         currentIDs.append(poseID)
-        scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext)
+        scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext, totalCount: lastPage.totalCount)
     }
     
     func fetchRandomPose(
@@ -388,11 +389,11 @@ private extension DefaultPoseRepository {
         committedRandomPoseIDs = committedRandomPoseIDs.filter { $0.key >= minimumSequence }
     }
 
-    func cachedPageResponse(_ page: Page?) -> (poses: [Pose], hasNext: Bool)? {
+    func cachedPageResponse(_ page: Page?) -> PoseListPage? {
         guard let page,
               let poses = cache.values(for: page.poseIDs)
         else { return nil }
-        return (poses, page.hasNext)
+        return PoseListPage(poses: poses, hasNext: page.hasNext, totalCount: page.totalCount)
     }
 
     func initializeRandomPoseHistory(peopleCount: PeopleCountOption) async throws -> Pose {
@@ -444,7 +445,7 @@ private extension DefaultPoseRepository {
 // MARK: - DefaultPoseRepository + PoseRepository
 
 extension DefaultPoseRepository: PoseRepository {
-    public func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
+    public func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> PoseListPage {
         if refresh { generalPages.removeAll() }
         else if let cachedResponse = cachedPageResponse(generalPages[page]) { return cachedResponse }
         
@@ -452,6 +453,7 @@ extension DefaultPoseRepository: PoseRepository {
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
+        let totalCount = responseDTO.data?.totalCount
         
         var handled: [Pose] = []
         var poseIDs: [PoseID] = []
@@ -462,12 +464,12 @@ extension DefaultPoseRepository: PoseRepository {
             handled.append(pose)
             poseIDs.append(pose.id)
         }
-        generalPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
+        generalPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext, totalCount: totalCount)
         trimGeneralPagesIfNeeded()
-        return (handled, hasNext)
+        return PoseListPage(poses: handled, hasNext: hasNext, totalCount: totalCount)
     }
     
-    public func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
+    public func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> PoseListPage {
         if refresh { scrappedPages.removeAll() }
         else if let cachedResponse = cachedPageResponse(scrappedPages[page]) { return cachedResponse }
         
@@ -475,6 +477,7 @@ extension DefaultPoseRepository: PoseRepository {
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
+        let totalCount = responseDTO.data?.totalCount
         
         var handled: [Pose] = []
         var poseIDs: [PoseID] = []
@@ -487,9 +490,9 @@ extension DefaultPoseRepository: PoseRepository {
             handled.append(pose)
             poseIDs.append(pose.id)
         }
-        scrappedPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
+        scrappedPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext, totalCount: totalCount)
         trimScrappedPagesIfNeeded()
-        return (handled, hasNext)
+        return PoseListPage(poses: handled, hasNext: hasNext, totalCount: totalCount)
     }
     
     public func fetchPoseDetail(id: PoseID) async throws -> Pose {

@@ -9,7 +9,7 @@ import Foundation
 
 /// 2인 포즈에 붙는 관계 태그입니다. 태그 바의 칩 순서대로 선언합니다.
 ///
-/// 포즈 목록 응답에는 아직 관계 값이 없습니다. 값이 생기면 `DefaultPoseRepository`에서 서버 값과 연결합니다(#424).
+/// 서버 값은 `FRIEND`·`COUPLE`·`SSUM`입니다. 요청은 `DefaultPoseRepository`, 응답은 `PoseDTO`에서 바꿉니다.
 public enum PoseRelation: CaseIterable, Hashable, Sendable {
     case friend
     case couple

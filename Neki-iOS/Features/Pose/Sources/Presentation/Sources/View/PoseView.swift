@@ -528,8 +528,8 @@ private extension PoseView {
                 store: Store(initialState: state) {
                     PoseFeature()
                 } withDependencies: {
-                    $0.poseClient.fetchPoseList = { _, _, _ in (poses, false) }
-                    $0.poseClient.fetchScrappedPoseList = { _, _, _ in ([], false) }
+                    $0.poseClient.fetchPoseList = { _, _, _ in PoseListPage(poses: poses, hasNext: false, totalCount: poses.count) }
+                    $0.poseClient.fetchScrappedPoseList = { _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
                     $0.analyticsClient.logEvent = { _ in }
                 }
             )

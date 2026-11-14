@@ -103,7 +103,7 @@ struct PoseFeature {
         case notificationButtonTapped
         
         // Internal Actions (Async Results & Data Updates)
-        case fetchListResponse(isScrapResult: Bool, Result<(poses: [Pose], hasNext: Bool), Error>)
+        case fetchListResponse(isScrapResult: Bool, Result<PoseListPage, Error>)
         case updatePoseInList(Pose)
         case bookmarkResponse(Pose, Result<Void, Error>)
         
@@ -262,19 +262,19 @@ struct PoseFeature {
                 refreshVisiblePoses(&state)
                 return .none
                 
-            case let .fetchListResponse(isScrapResult, .success((poses, hasNext))):
+            case let .fetchListResponse(isScrapResult, .success(page)):
                 if isScrapResult {
                     state.isScrappedLoading = false
-                    state.isLastScrappedPage = hasNext == false
-                    if state.scrappedPage == .zero { state.scrappedPoses = IdentifiedArray(uniqueElements: poses) }
-                    else { state.scrappedPoses.append(contentsOf: poses) }
-                    if hasNext { state.scrappedPage += 1 }
+                    state.isLastScrappedPage = page.hasNext == false
+                    if state.scrappedPage == .zero { state.scrappedPoses = IdentifiedArray(uniqueElements: page.poses) }
+                    else { state.scrappedPoses.append(contentsOf: page.poses) }
+                    if page.hasNext { state.scrappedPage += 1 }
                 } else {
                     state.isGeneralLoading = false
-                    state.isLastGeneralPage = hasNext == false
-                    if state.generalPage == .zero { state.generalPoses = IdentifiedArray(uniqueElements: poses) }
-                    else { state.generalPoses.append(contentsOf: poses) }
-                    if hasNext { state.generalPage += 1 }
+                    state.isLastGeneralPage = page.hasNext == false
+                    if state.generalPage == .zero { state.generalPoses = IdentifiedArray(uniqueElements: page.poses) }
+                    else { state.generalPoses.append(contentsOf: page.poses) }
+                    if page.hasNext { state.generalPage += 1 }
                 }
                 refreshVisiblePoses(&state)
                 return .none

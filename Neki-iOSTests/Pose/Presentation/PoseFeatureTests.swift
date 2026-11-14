@@ -242,8 +242,8 @@ private extension PoseFeatureTests {
                 events.withValue { $0.append(event) }
             }
             $0.poseClient.scrapPose = { _ in }
-            $0.poseClient.fetchPoseList = { _, _, _ in ([], false) }
-            $0.poseClient.fetchScrappedPoseList = { _, _, _ in ([], false) }
+            $0.poseClient.fetchPoseList = { _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
+            $0.poseClient.fetchScrappedPoseList = { _, _, _ in PoseListPage(poses: [], hasNext: false, totalCount: .zero) }
             updateDependencies(&$0)
         }
         store.exhaustivity = .off

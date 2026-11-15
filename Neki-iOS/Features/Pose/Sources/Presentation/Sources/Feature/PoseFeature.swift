@@ -75,6 +75,7 @@ struct PoseFeature {
         /// 서버에 보낼 일반 목록 조건입니다. 북마크 목록은 조건 없이 받고, 북마크를 켜면 인원수와 관계가 비워집니다.
         var listFilter: PoseListFilter { PoseListFilter(peopleCount: selectedCountFilterOption, relation: selectedRelationFilterOption) }
         var listCondition: ListCondition { ListCondition(isScrap: isSelectedScrap, filter: listFilter) }
+        var currentListScope: ListScope { isSelectedScrap ? .scrap : .general(listFilter) }
         
         // Scroll
         /// 목록 조건이 바뀔 때마다 1씩 오릅니다. 화면은 값이 바뀌었는지만 보고 목록 맨 위로 이동합니다.
@@ -287,7 +288,10 @@ struct PoseFeature {
                     if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
-                return .none
+                
+                // 첫 페이지를 다시 받으면 화면에 이미 있던 카드는 새로 나타나지 않아, 다음 페이지를 부르는 마지막 카드의 onAppear가 오지 않습니다.
+                guard page == .zero, result.hasNext, scope == state.currentListScope else { return .none }
+                return .send(.loadMoreItems)
                 
             case let .fetchListResponse(scope, page, .failure(error)):
                 switch scope {

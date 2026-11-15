@@ -233,6 +233,21 @@ struct PoseFeatureTests {
         #expect(store.state.isLastGeneralPage)
     }
 
+    @Test("보이는 포즈의 끝 6개가 다음 페이지 신호 카드이고, 조건을 바꾸면 보이는 목록에서 다시 정한다")
+    func paginationTriggerPoseIDs_areLastVisiblePoses() async {
+        var state = PoseFeature.State()
+        state.requestedGeneralFilter = PoseListFilter()
+        let store = makeStore(initialState: state)
+        let poses = (1...10).map { makePose(id: $0, peopleCount: $0.isMultiple(of: 2) ? .duo : .solo) }
+
+        await store.send(.fetchListResponse(.general(PoseListFilter()), page: 0, .success(PoseListPage(poses: poses, hasNext: true, totalCount: 30))))
+        #expect(store.state.paginationTriggerPoseIDs == Set(5...10))
+
+        await store.send(.selectPeopleCount(.duo))
+        #expect(store.state.paginationTriggerPoseIDs == [2, 4, 6, 8, 10])
+        await store.finish()
+    }
+
     @Test("북마크 목록을 받기 전에 하트를 눌러도, 북마크 칩을 누르면 서버에서 북마크 목록을 받는다")
     func onTapScrapMode_afterBookmarkingBeforeLoad_fetchesScrappedList() async {
         let tappedPose = makePose(id: 3, peopleCount: .solo)

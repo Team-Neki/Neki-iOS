@@ -122,6 +122,26 @@ struct PoseFeatureTests {
         await store.finish()
     }
 
+    @Test("관계 태그를 고르면 2인과 그 관계로 첫 페이지를 받아, 받은 목록과 서버 전체 개수를 보여 준다")
+    func onTapRelationFilter_fetchesFirstPageWithDuoAndRelation() async {
+        let requests = LockIsolated<[ListRequest]>([])
+        let friendPoses = [makePose(id: 7, peopleCount: .duo, relation: .friend), makePose(id: 9, peopleCount: .duo, relation: .friend)]
+        let store = makeStore {
+            $0.poseClient.fetchPoseList = { page, _, filter, refresh in
+                requests.withValue { $0.append(ListRequest(page: page, filter: filter, refresh: refresh)) }
+                return PoseListPage(poses: friendPoses, hasNext: false, totalCount: 12)
+            }
+        }
+
+        await store.send(.onTapRelationFilter(.friend))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [ListRequest(page: 0, filter: PoseListFilter(peopleCount: .duo, relation: .friend), refresh: true)])
+        #expect(store.state.visiblePoses.map(\.id) == [7, 9])
+        #expect(store.state.displayedPoseCount == 12)
+    }
+
     @Test("3인을 고른 상태에서 친구를 고르면 인원수가 바뀌어 맨 위로 이동 신호가 오른다")
     func onTapRelationFilter_whenPeopleCountChanges_bumpsScrollGeneration() async {
         var state = PoseFeature.State()
@@ -145,6 +165,115 @@ struct PoseFeatureTests {
         await store.finish()
 
         #expect(store.state.scrollToTopGeneration == 3)
+    }
+
+    @Test("조건을 바꾼 뒤 늦게 온 이전 조건의 응답은 버린다")
+    func fetchListResponse_forPreviousFilter_isIgnored() async {
+        var state = PoseFeature.State()
+        state.toggleRelationFilter(.couple)
+        state.requestedGeneralFilter = PoseListFilter(peopleCount: .duo, relation: .couple)
+        state.isGeneralLoading = true
+        let store = makeStore(initialState: state)
+        let friendPage = PoseListPage(poses: [makePose(id: 1, peopleCount: .duo, relation: .friend)], hasNext: false, totalCount: 1)
+
+        await store.send(.fetchListResponse(.general(PoseListFilter(peopleCount: .duo, relation: .friend)), page: 0, .success(friendPage)))
+
+        #expect(store.state.generalPoses.isEmpty)
+        #expect(store.state.loadedGeneralFilter == nil)
+        #expect(store.state.isGeneralLoading)
+    }
+
+    @Test("응답에 전체 개수가 없으면 목록은 보여 주고 포즈 개수만 숨긴다")
+    func fetchListResponse_withoutTotalCount_hidesCountOnly() async {
+        var state = PoseFeature.State()
+        state.requestedGeneralFilter = PoseListFilter()
+        let store = makeStore(initialState: state)
+        let page = PoseListPage(poses: [makePose(id: 1, peopleCount: .solo)], hasNext: false, totalCount: nil)
+
+        await store.send(.fetchListResponse(.general(PoseListFilter()), page: 0, .success(page)))
+
+        #expect(store.state.visiblePoses.map(\.id) == [1])
+        #expect(store.state.displayedPoseCount == nil)
+    }
+
+    @Test("당겨서 새로고침해 첫 페이지를 다시 받으면 남은 페이지를 이어서 부른다")
+    func onRefresh_whenFirstPageHasNext_fetchesNextPage() async {
+        var state = PoseFeature.State()
+        state.generalPoses = IdentifiedArray(uniqueElements: (1...60).map { makePose(id: $0, peopleCount: .solo) })
+        state.loadedGeneralFilter = PoseListFilter()
+        state.requestedGeneralFilter = PoseListFilter()
+        state.generalPage = 2
+        state.isLastGeneralPage = true
+        let requests = LockIsolated<[ListRequest]>([])
+        let store = makeStore(initialState: state) {
+            $0.poseClient.fetchPoseList = { page, _, filter, refresh in
+                requests.withValue { $0.append(ListRequest(page: page, filter: filter, refresh: refresh)) }
+                let poses = (1...20).map { 100 + page * 20 + $0 }.map { Pose(id: $0, peopleCountOption: .solo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: nil, height: nil) }
+                return PoseListPage(poses: poses, hasNext: page == .zero, totalCount: 40)
+            }
+        }
+
+        await store.send(.onRefresh)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [
+            ListRequest(page: 0, filter: PoseListFilter(), refresh: true),
+            ListRequest(page: 1, filter: PoseListFilter(), refresh: false)
+        ])
+        #expect(store.state.generalPoses.map(\.id) == Array(101...140))
+        #expect(store.state.isLastGeneralPage)
+    }
+
+    @Test("북마크 목록을 받기 전에 하트를 눌러도, 북마크 칩을 누르면 서버에서 북마크 목록을 받는다")
+    func onTapScrapMode_afterBookmarkingBeforeLoad_fetchesScrappedList() async {
+        let tappedPose = makePose(id: 3, peopleCount: .solo)
+        var state = PoseFeature.State()
+        state.generalPoses = [tappedPose]
+        state.loadedGeneralFilter = PoseListFilter()
+        let scrappedPages = LockIsolated<[Int]>([])
+        let serverBookmarks = [makePose(id: 3, peopleCount: .solo, isScrapped: true), makePose(id: 8, peopleCount: .duo, isScrapped: true)]
+        let store = makeStore(initialState: state) {
+            $0.poseClient.fetchScrappedPoseList = { page, _, _ in
+                scrappedPages.withValue { $0.append(page) }
+                return PoseListPage(poses: serverBookmarks, hasNext: false, totalCount: 2)
+            }
+        }
+
+        await store.send(.onTapBookmark(tappedPose))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        await store.send(.onTapScrapMode)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(scrappedPages.value == [0])
+        #expect(store.state.visiblePoses.map(\.id) == [3, 8])
+        #expect(store.state.displayedPoseCount == 2)
+    }
+
+    @Test("북마크 목록을 받은 뒤에는 하트를 누르면 북마크 개수가 늘고, 다시 누르면 줄어든다")
+    func onTapBookmark_afterScrappedListLoaded_updatesBookmarkCount() async {
+        let pose = makePose(id: 5, peopleCount: .trio)
+        var state = PoseFeature.State()
+        state.generalPoses = [pose]
+        state.loadedGeneralFilter = PoseListFilter()
+        state.scrappedPoses = [makePose(id: 1, peopleCount: .solo, isScrapped: true)]
+        state.scrappedTotalCount = 1
+        state.isScrappedListLoaded = true
+        let store = makeStore(initialState: state)
+
+        await store.send(.onTapBookmark(pose))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        #expect(store.state.scrappedPoses.map(\.id) == [5, 1])
+        #expect(store.state.scrappedTotalCount == 2)
+
+        await store.send(.onTapBookmark(store.state.generalPoses[id: 5]!))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        #expect(store.state.scrappedPoses.map(\.id) == [1])
+        #expect(store.state.scrappedTotalCount == 1)
     }
 
     @Test("인원수 선택과 북마크 전환은 누를 때마다 맨 위로 이동 신호를 올린다")
@@ -263,18 +392,25 @@ private extension PoseFeatureTests {
         return store
     }
 
-    func makePose(id: PoseID, peopleCount: PeopleCountOption, relation: PoseRelation? = nil) -> Pose {
+    func makePose(id: PoseID, peopleCount: PeopleCountOption, relation: PoseRelation? = nil, isScrapped: Bool = false) -> Pose {
         Pose(
             id: id,
             peopleCountOption: peopleCount,
             imageURL: nil,
-            isScrapped: false,
+            isScrapped: isScrapped,
             contentType: .jpeg,
             width: nil,
             height: nil,
             relation: relation
         )
     }
+}
+
+/// 일반 목록 요청 하나입니다. 어떤 조건의 몇 번째 페이지를 새로고침으로 불렀는지 남깁니다.
+private struct ListRequest: Equatable {
+    let page: Int
+    let filter: PoseListFilter
+    let refresh: Bool
 }
 
 private struct BookmarkFailure: Error {}

@@ -163,4 +163,32 @@ struct PoseFilterRuleTests {
 
         #expect(state.displayedPoseCount == 3)
     }
+
+    @Test("조건이 비어 있으면 모든 포즈가 맞고, 인원수와 관계를 고르면 둘 다 맞는 포즈만 맞다")
+    func listFilter_matchesPeopleCountAndRelation() {
+        let poses = [
+            makePose(id: 1, peopleCount: .duo, relation: .friend),
+            makePose(id: 2, peopleCount: .duo, relation: nil),
+            makePose(id: 3, peopleCount: .solo, relation: nil)
+        ]
+
+        #expect(poses.filter(PoseListFilter().matches).map(\.id) == [1, 2, 3])
+        #expect(poses.filter(PoseListFilter(peopleCount: .duo).matches).map(\.id) == [1, 2])
+        #expect(poses.filter(PoseListFilter(peopleCount: .duo, relation: .friend).matches).map(\.id) == [1])
+    }
+}
+
+private extension PoseFilterRuleTests {
+    func makePose(id: PoseID, peopleCount: PeopleCountOption, relation: PoseRelation?) -> Pose {
+        Pose(
+            id: id,
+            peopleCountOption: peopleCount,
+            imageURL: nil,
+            isScrapped: false,
+            contentType: .jpeg,
+            width: nil,
+            height: nil,
+            relation: relation
+        )
+    }
 }

@@ -16,11 +16,11 @@ public struct NekiChipButtonStyle: ButtonStyle {
     let shape: Shape
     
     public func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             configuration.label
             
             if case .dropdown = style {
-                Image(.iconChevronDown)
+                Image(.iconChipDown)
             }
         }
         .frame(height: 20)

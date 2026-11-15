@@ -91,7 +91,7 @@ private extension PoseView {
                             .frame(height: .zero)
                             .id(Constants.scrollTopAnchorID)
                         
-                        MasonryGridView(
+                        LazyMasonryGridView(
                             items: store.visiblePoses,
                             columns: 2,
                             estimatedHeight: { item in
@@ -99,7 +99,7 @@ private extension PoseView {
                                       let height = item.height,
                                       width > 0,
                                       height > 0
-                                else { return nil }
+                                else { return Constants.unknownSizeEstimatedHeight }
 
                                 return CGFloat(height) / CGFloat(width)
                             }
@@ -112,7 +112,8 @@ private extension PoseView {
                                 store.send(.imageTapped(item))
                             }
                             .onAppear {
-                                guard item.id == store.lastVisiblePoseID else { return }
+                                // 지연 그리드라 화면 근처에 온 카드만 불립니다. 끝 근처 카드가 나타나면 다음 페이지를 부릅니다.
+                                guard store.paginationTriggerPoseIDs.contains(item.id) else { return }
                                 store.send(.loadMoreItems)
                             }
                         }
@@ -457,6 +458,8 @@ private extension PoseView {
         /// 태그 바(칩 34, 위아래 4), 간격 12, 개수 행 20, 아래 12를 더한 머리글 높이입니다. 목록 위 여백과 머리글을 숨길 때 올리는 거리에 함께 씁니다.
         static let filterHeaderHeight: CGFloat = 86
         static let scrollTopAnchorID = "POSE_SCROLL_TOP"
+        /// 크기를 모르는 포즈의 높이 비율(높이 ÷ 폭)입니다. 카드 이미지의 기본 비율(3:4)과 같습니다.
+        static let unknownSizeEstimatedHeight: CGFloat = 4 / 3
         /// 정렬 메뉴는 머리글 위에서 80(개수 행 6pt 아래)에 뜹니다.
         static let sortMenuTopPadding: CGFloat = 80
         static let sortMenuTrailingPadding: CGFloat = 19

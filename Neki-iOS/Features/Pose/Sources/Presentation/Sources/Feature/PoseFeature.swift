@@ -29,7 +29,8 @@ struct PoseFeature {
         var generalPoses: IdentifiedArrayOf<Pose> = []
         var scrappedPoses: IdentifiedArrayOf<Pose> = []
         var visiblePoses: [Pose] = []
-        var lastVisiblePoseID: PoseID?
+        /// 이 포즈 카드 중 하나가 화면 근처에 나타나면 다음 페이지를 부릅니다. 보이는 목록의 끝 몇 개라, 끝에 닿기 전에 미리 받습니다.
+        var paginationTriggerPoseIDs: Set<PoseID> = []
         
         // Pagination & Filter
         var generalPage: Int = .zero
@@ -38,6 +39,8 @@ struct PoseFeature {
         var isLastScrappedPage: Bool = false
         
         @ObservationIgnored let pageSize: Int = 20
+        /// 다음 페이지 신호를 보내는 끝 카드 수입니다. 두 열이라 끝에서 약 세 줄 전입니다.
+        static let paginationPrefetchCount = 6
         var isGeneralLoading: Bool = false
         var isScrappedLoading: Bool = false
         /// `generalPoses`를 받은 조건입니다. 아직 받은 목록이 없으면 nil입니다.
@@ -77,7 +80,6 @@ struct PoseFeature {
         /// 서버에 보낼 일반 목록 조건입니다. 북마크 목록은 조건 없이 받고, 북마크를 켜면 인원수와 관계가 비워집니다.
         var listFilter: PoseListFilter { PoseListFilter(peopleCount: selectedCountFilterOption, relation: selectedRelationFilterOption) }
         var listCondition: ListCondition { ListCondition(isScrap: isSelectedScrap, filter: listFilter) }
-        var currentListScope: ListScope { isSelectedScrap ? .scrap : .general(listFilter) }
         
         // Scroll
         /// 목록 조건이 바뀔 때마다 1씩 오릅니다. 화면은 값이 바뀌었는지만 보고 목록 맨 위로 이동합니다.
@@ -294,10 +296,7 @@ struct PoseFeature {
                     if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
-                
-                // 첫 페이지를 다시 받으면 화면에 이미 있던 카드는 새로 나타나지 않아, 다음 페이지를 부르는 마지막 카드의 onAppear가 오지 않습니다.
-                guard page == .zero, result.hasNext, scope == state.currentListScope else { return .none }
-                return .send(.loadMoreItems)
+                return .none
                 
             case let .fetchListResponse(scope, page, .failure(error)):
                 switch scope {
@@ -393,7 +392,7 @@ private extension PoseFeature {
         let targetPoses = state.isSelectedScrap ? state.scrappedPoses : state.generalPoses
         let visiblePoses = targetPoses.elements.filter { filter.matches($0) }
         state.visiblePoses = visiblePoses
-        state.lastVisiblePoseID = visiblePoses.last?.id
+        state.paginationTriggerPoseIDs = Set(visiblePoses.suffix(State.paginationPrefetchCount).map(\.id))
     }
     
     /// 목록 조건이 바뀐 경우에만 보이는 목록을 다시 거르고, 화면이 맨 위로 이동하도록 세대를 올린 뒤 새 조건의 첫 페이지를 부릅니다.

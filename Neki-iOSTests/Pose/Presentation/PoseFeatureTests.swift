@@ -115,7 +115,7 @@ struct PoseFeatureTests {
         await store.send(.onTapRelationFilter(.friend))
 
         #expect(store.state.visiblePoses.map(\.id) == [2, 4])
-        #expect(store.state.lastVisiblePoseID == 4)
+        #expect(store.state.paginationTriggerPoseIDs == [2, 4])
         #expect(store.state.displayedPoseCount == nil)
         openGate.yield()
         openGate.finish()
@@ -196,8 +196,8 @@ struct PoseFeatureTests {
         #expect(store.state.displayedPoseCount == nil)
     }
 
-    @Test("당겨서 새로고침해 첫 페이지를 다시 받으면 남은 페이지를 이어서 부른다")
-    func onRefresh_whenFirstPageHasNext_fetchesNextPage() async {
+    @Test("당겨서 새로고침하면 첫 페이지만 다시 받고, 다음 페이지는 끝 근처 카드가 나타날 때 받는다")
+    func onRefresh_fetchesFirstPageOnly_untilLoadMore() async {
         var state = PoseFeature.State()
         state.generalPoses = IdentifiedArray(uniqueElements: (1...60).map { makePose(id: $0, peopleCount: .solo) })
         state.loadedGeneralFilter = PoseListFilter()
@@ -214,6 +214,14 @@ struct PoseFeatureTests {
         }
 
         await store.send(.onRefresh)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [ListRequest(page: 0, filter: PoseListFilter(), refresh: true)])
+        #expect(store.state.generalPoses.map(\.id) == Array(101...120))
+        #expect(store.state.isLastGeneralPage == false)
+
+        await store.send(.loadMoreItems)
         await store.finish()
         await store.skipReceivedActions(strict: false)
 

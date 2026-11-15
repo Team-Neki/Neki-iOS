@@ -134,19 +134,33 @@ struct PoseFilterRuleTests {
         ])
     }
 
-    @Test("받은 포즈가 없고 끝까지 불러오지 않았으면 포즈 개수를 숨긴다")
-    func displayedPoseCount_whileFirstPageLoading_isNil() {
+    @Test("지금 조건의 첫 페이지를 받기 전에는 포즈 개수를 숨긴다")
+    func displayedPoseCount_beforeFirstPageOfCondition_isNil() {
         var state = PoseFeature.State()
-        state.isGeneralLoading = true
+        state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 51
+        state.toggleRelationFilter(.friend)
 
         #expect(state.displayedPoseCount == nil)
     }
 
-    @Test("끝까지 불러온 목록이 비어 있으면 포즈 개수를 0개로 보여 준다")
-    func displayedPoseCount_whenLastPageIsEmpty_isZero() {
+    @Test("지금 조건의 첫 페이지를 받았으면 서버가 알려 준 전체 개수를 보여 준다")
+    func displayedPoseCount_afterFirstPage_isTotalCount() {
         var state = PoseFeature.State()
-        state.isLastGeneralPage = true
+        state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 51
 
-        #expect(state.displayedPoseCount == 0)
+        #expect(state.displayedPoseCount == 51)
+    }
+
+    @Test("북마크 목록에서는 북마크 전체 개수를 보여 준다")
+    func displayedPoseCount_inBookmark_isScrappedTotalCount() {
+        var state = PoseFeature.State()
+        state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 51
+        state.scrappedTotalCount = 3
+        state.toggleBookmarkFilter()
+
+        #expect(state.displayedPoseCount == 3)
     }
 }

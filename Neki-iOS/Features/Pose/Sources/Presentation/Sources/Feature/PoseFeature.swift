@@ -44,17 +44,20 @@ struct PoseFeature {
         var loadedGeneralFilter: PoseListFilter?
         /// 마지막으로 요청한 일반 목록 조건입니다. 이 조건이 아닌 응답은 버립니다.
         var requestedGeneralFilter: PoseListFilter?
+        /// 서버가 알려 준 조건별 전체 개수입니다. 첫 페이지를 받을 때마다 바뀝니다.
+        var generalTotalCount: Int?
+        var scrappedTotalCount: Int?
         
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
         
-        /// "N개의 포즈"에 보여 줄 개수입니다. 불러온 목록에 필터를 적용한 개수이고, 전체 개수는 #424에서 연결합니다.
+        /// "N개의 포즈"에 보여 줄 개수입니다. 서버가 알려 준 지금 조건의 전체 개수입니다.
         ///
-        /// 아직 받은 포즈가 없으면 불러오는 중이거나 실패한 것이라 nil을 돌려줘 "0개"가 깜빡이지 않게 합니다. 끝까지 불러왔는데 비어 있으면 0입니다.
+        /// 조건을 바꾼 뒤 새 첫 페이지가 오기 전이거나 응답에 개수가 없으면 nil을 돌려줘 개수만 숨깁니다.
         var displayedPoseCount: Int? {
-            let loadedPoses = isSelectedScrap ? scrappedPoses : generalPoses
-            guard loadedPoses.isEmpty == false || isCurrentLastPage else { return nil }
-            return visiblePoses.count
+            if isSelectedScrap { return scrappedTotalCount }
+            guard loadedGeneralFilter == listFilter else { return nil }
+            return generalTotalCount
         }
         
         // Filter Options
@@ -249,9 +252,10 @@ struct PoseFeature {
                         state.scrappedPoses[id: pose.id] = pose
                     } else {
                         state.scrappedPoses.insert(pose, at: .zero)
+                        state.scrappedTotalCount = state.scrappedTotalCount.map { $0 + 1 }
                     }
-                } else {
-                    state.scrappedPoses.remove(id: pose.id)
+                } else if state.scrappedPoses.remove(id: pose.id) != nil {
+                    state.scrappedTotalCount = state.scrappedTotalCount.map { max($0 - 1, .zero) }
                 }
                 refreshVisiblePoses(&state)
                 return .none
@@ -265,6 +269,7 @@ struct PoseFeature {
                     if page == .zero {
                         state.generalPoses = IdentifiedArray(uniqueElements: result.poses)
                         state.loadedGeneralFilter = filter
+                        state.generalTotalCount = result.totalCount
                     } else {
                         state.generalPoses.append(contentsOf: result.poses)
                     }
@@ -275,6 +280,7 @@ struct PoseFeature {
                     state.isLastScrappedPage = result.hasNext == false
                     if page == .zero {
                         state.scrappedPoses = IdentifiedArray(uniqueElements: result.poses)
+                        state.scrappedTotalCount = result.totalCount
                     } else {
                         state.scrappedPoses.append(contentsOf: result.poses)
                     }

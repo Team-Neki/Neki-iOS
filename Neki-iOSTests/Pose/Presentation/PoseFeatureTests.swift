@@ -92,7 +92,7 @@ struct PoseFeatureTests {
         #expect(entryPoint == "list")
     }
 
-    @Test("관계 태그를 고르면 새 목록이 오기 전에는 받아 둔 목록에서 그 관계의 2인 포즈만 먼저 보인다")
+    @Test("관계 태그를 고르면 새 목록이 오기 전에는 받아 둔 목록에서 그 관계의 2인 포즈만 먼저 보이고 개수는 숨긴다")
     func onTapRelationFilter_beforeResponse_showsMatchingLoadedPoses() async {
         var state = PoseFeature.State()
         state.generalPoses = [
@@ -103,6 +103,7 @@ struct PoseFeatureTests {
             makePose(id: 5, peopleCount: .duo, relation: .couple)
         ]
         state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 5
         let (gate, openGate) = AsyncStream<Void>.makeStream()
         let store = makeStore(initialState: state) {
             $0.poseClient.fetchPoseList = { _, _, _, _ in
@@ -115,6 +116,7 @@ struct PoseFeatureTests {
 
         #expect(store.state.visiblePoses.map(\.id) == [2, 4])
         #expect(store.state.lastVisiblePoseID == 4)
+        #expect(store.state.displayedPoseCount == nil)
         openGate.yield()
         openGate.finish()
         await store.finish()

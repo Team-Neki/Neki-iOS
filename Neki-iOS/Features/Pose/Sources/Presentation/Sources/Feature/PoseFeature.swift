@@ -47,6 +47,8 @@ struct PoseFeature {
         /// 서버가 알려 준 조건별 전체 개수입니다. 첫 페이지를 받을 때마다 바뀝니다.
         var generalTotalCount: Int?
         var scrappedTotalCount: Int?
+        /// 북마크 목록을 서버에서 받았는지입니다. 받기 전에는 하트로 바꾼 포즈를 북마크 목록에 넣지 않고, 북마크 칩을 누를 때 서버에서 받습니다.
+        var isScrappedListLoaded: Bool = false
         
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
@@ -155,7 +157,7 @@ struct PoseFeature {
                 
             case .loadMoreItems:
                 if state.isSelectedScrap {
-                    guard state.isScrappedLoading == false, state.isLastScrappedPage == false else { return .none }
+                    guard state.isScrappedListLoaded, state.isScrappedLoading == false, state.isLastScrappedPage == false else { return .none }
                 } else {
                     // 조건을 바꾼 뒤 새 첫 페이지가 오기 전에는 이전 조건의 다음 페이지를 부르지 않습니다.
                     guard state.loadedGeneralFilter == state.listFilter, state.isGeneralLoading == false, state.isLastGeneralPage == false else { return .none }
@@ -248,15 +250,18 @@ struct PoseFeature {
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
                 if state.generalPoses.contains(where: { $0.id == pose.id }) { state.generalPoses[id: pose.id] = pose }
-                if pose.isScrapped {
-                    if state.scrappedPoses.contains(where: { $0.id == pose.id }) {
-                        state.scrappedPoses[id: pose.id] = pose
-                    } else {
-                        state.scrappedPoses.insert(pose, at: .zero)
-                        state.scrappedTotalCount = state.scrappedTotalCount.map { $0 + 1 }
+                // 북마크 목록을 서버에서 받기 전에는 손대지 않습니다. 하트로 넣은 포즈만 남으면 북마크 칩을 눌러도 목록을 받지 않게 됩니다.
+                if state.isScrappedListLoaded {
+                    if pose.isScrapped {
+                        if state.scrappedPoses.contains(where: { $0.id == pose.id }) {
+                            state.scrappedPoses[id: pose.id] = pose
+                        } else {
+                            state.scrappedPoses.insert(pose, at: .zero)
+                            state.scrappedTotalCount = state.scrappedTotalCount.map { $0 + 1 }
+                        }
+                    } else if state.scrappedPoses.remove(id: pose.id) != nil {
+                        state.scrappedTotalCount = state.scrappedTotalCount.map { max($0 - 1, .zero) }
                     }
-                } else if state.scrappedPoses.remove(id: pose.id) != nil {
-                    state.scrappedTotalCount = state.scrappedTotalCount.map { max($0 - 1, .zero) }
                 }
                 refreshVisiblePoses(&state)
                 return .none
@@ -282,6 +287,7 @@ struct PoseFeature {
                     if page == .zero {
                         state.scrappedPoses = IdentifiedArray(uniqueElements: result.poses)
                         state.scrappedTotalCount = result.totalCount
+                        state.isScrappedListLoaded = true
                     } else {
                         state.scrappedPoses.append(contentsOf: result.poses)
                     }
@@ -333,7 +339,7 @@ private extension PoseFeature {
     /// 지금 조건의 목록을 아직 받지 않았고 부르는 중도 아니면 첫 페이지를 부릅니다.
     func fetchFirstPageIfNeeded(_ state: inout State) -> Effect<Action> {
         if state.isSelectedScrap {
-            guard state.isScrappedLoading == false, state.scrappedPoses.isEmpty else { return .none }
+            guard state.isScrappedListLoaded == false, state.isScrappedLoading == false else { return .none }
             return fetchFirstPage(&state, refresh: true)
         }
         

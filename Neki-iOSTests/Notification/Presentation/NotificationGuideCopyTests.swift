@@ -14,7 +14,7 @@ struct NotificationGuideCopyTests {
         "모달마다 확정 문구와 버튼을 쓴다",
         arguments: [
             (
-                NotificationGuideModal.consentOnly,
+                NotificationGuideKind.consentOnly,
                 "새로운 브랜드·이벤트 소식을\n알림으로 받아보세요.\n(광고성 정보 수신 동의)",
                 "알림 받기"
             ),
@@ -29,22 +29,22 @@ struct NotificationGuideCopyTests {
                 "알림 받기"
             ),
             (
-                .openSettings(includesConsent: true),
+                .enableInSettings(includesConsent: true),
                 "설정 > 알림에서 켤 수 있어요.\n(광고성 정보 수신 동의 포함)",
                 "설정에서 켜기"
             ),
             (
-                .openSettings(includesConsent: false),
+                .enableInSettings(includesConsent: false),
                 "설정 > 알림에서 켤 수 있어요.",
                 "설정에서 켜기"
             )
-        ] as [(NotificationGuideModal, String, String)]
+        ] as [(NotificationGuideKind, String, String)]
     )
-    func copy_followsConfirmedText(modal: NotificationGuideModal, message: String, confirmButtonTitle: String) {
+    func copy_followsConfirmedText(modal: NotificationGuideKind, message: String, confirmButtonTitle: String) {
         #expect(modal.title == "놓치고 있던 소식들이 있어요!")
         #expect(modal.message == message)
         #expect(modal.confirmButtonTitle == confirmButtonTitle)
-        #expect(NotificationGuideModal.cancelButtonTitle == "다음에 하기")
+        #expect(NotificationGuideKind.cancelButtonTitle == "다음에 하기")
     }
 
     @Test("동의 토스트는 동의한 한국 시간 날짜를 보여 준다")

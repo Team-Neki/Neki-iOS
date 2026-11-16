@@ -37,7 +37,7 @@ struct NotificationGuideRecordTests {
     func updateEntry_newVersion_presentsModal() {
         let record = NotificationGuideRecord(lastAutomaticGuideDay: yesterday, updateEntryJudgedVersion: "1.4.0")
 
-        #expect(decide(record, permission: .requestable, isMarketingAgreed: false) == .present(.consentAndEnable))
+        #expect(decide(record, permission: .requestable, isMarketingAgreed: false) == .guide(.consentAndEnable))
     }
 
     @Test("넘기면 기록을 바꾸지 않는다")
@@ -63,7 +63,7 @@ struct NotificationGuideRecordTests {
     func apply_present_recordsVersionAndDay() {
         var record = NotificationGuideRecord()
 
-        record.apply(.present(.consentOnly), today: today, appVersion: version)
+        record.apply(.guide(.consentOnly), today: today, appVersion: version)
 
         #expect(record == NotificationGuideRecord(lastAutomaticGuideDay: today, updateEntryJudgedVersion: version))
     }

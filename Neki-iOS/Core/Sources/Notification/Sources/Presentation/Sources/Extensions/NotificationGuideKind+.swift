@@ -1,5 +1,5 @@
 //
-//  NotificationGuideModal+.swift
+//  NotificationGuideKind+.swift
 //  Neki-iOS
 //
 //  Created by J.H. Moon on 11/10/26.
@@ -7,7 +7,7 @@
 
 import Foundation
 
-extension NotificationGuideModal {
+extension NotificationGuideKind {
     static let cancelButtonTitle = "다음에 하기"
 
     var title: String {
@@ -22,9 +22,9 @@ extension NotificationGuideModal {
             "새로운 소식과 콘텐츠를 놓치지 않도록\n기기 알림을 켜주세요."
         case .consentAndEnable:
             "새로운 소식과 콘텐츠를 놓치지 않도록\n알림을 켜주세요.\n(광고성 정보 수신 동의 포함)"
-        case .openSettings(includesConsent: true):
+        case .enableInSettings(includesConsent: true):
             "설정 > 알림에서 켤 수 있어요.\n(광고성 정보 수신 동의 포함)"
-        case .openSettings(includesConsent: false):
+        case .enableInSettings(includesConsent: false):
             "설정 > 알림에서 켤 수 있어요."
         }
     }
@@ -33,7 +33,7 @@ extension NotificationGuideModal {
         switch self {
         case .consentOnly, .enableNotifications, .consentAndEnable:
             "알림 받기"
-        case .openSettings:
+        case .enableInSettings:
             "설정에서 켜기"
         }
     }

@@ -21,14 +21,14 @@ struct NotificationGuideRecord: Codable, Equatable, Sendable {
 
     /// 판단 결과를 기록에 남깁니다.
     ///
-    /// 모달을 띄울 때 버전과 날짜를 함께 남기므로, 취소·OS 거부·설정에서 켜지 않음은 모두 다음 버전까지 다시 띄우지 않습니다.
+    /// 안내할 때 버전과 날짜를 함께 남기므로, 취소·OS 거부·설정에서 켜지 않음은 모두 다음 버전까지 다시 띄우지 않습니다.
     mutating func apply(_ decision: NotificationGuideDecision, today: KSTDay, appVersion: String) {
         switch decision {
         case .skip:
             return
         case .markJudged:
             updateEntryJudgedVersion = appVersion
-        case .present:
+        case .guide:
             updateEntryJudgedVersion = appVersion
             lastAutomaticGuideDay = today
         }
@@ -39,12 +39,12 @@ struct NotificationGuideRecord: Codable, Equatable, Sendable {
 enum NotificationGuideDecision: Equatable, Sendable {
     /// 이번엔 판단하지 않습니다. 기록도 남기지 않아 다음 실행에 다시 판단합니다.
     case skip
-    /// 띄울 모달이 없어 이 버전을 판단한 것으로만 남깁니다.
+    /// 안내할 것이 없어 이 버전을 판단한 것으로만 남깁니다.
     case markJudged
-    /// 모달을 띄웁니다.
-    case present(NotificationGuideModal)
+    /// 이 종류로 안내합니다.
+    case guide(NotificationGuideKind)
 
-    /// 오늘 다른 자동 안내를 띄웠는지, 이 버전을 판단했는지를 먼저 보고, 그다음 상태에 맞는 모달을 고릅니다.
+    /// 오늘 다른 자동 안내를 띄웠는지, 이 버전을 판단했는지를 먼저 보고, 그다음 상태에 맞는 안내 종류를 고릅니다.
     static func updateEntry(
         record: NotificationGuideRecord,
         today: KSTDay,
@@ -54,9 +54,9 @@ enum NotificationGuideDecision: Equatable, Sendable {
     ) -> Self {
         guard record.lastAutomaticGuideDay != today else { return .skip }
         guard record.updateEntryJudgedVersion != appVersion else { return .skip }
-        guard let modal = NotificationGuideModal(permission: permission, isMarketingAgreed: isMarketingAgreed) else {
+        guard let kind = NotificationGuideKind(permission: permission, isMarketingAgreed: isMarketingAgreed) else {
             return .markJudged
         }
-        return .present(modal)
+        return .guide(kind)
     }
 }

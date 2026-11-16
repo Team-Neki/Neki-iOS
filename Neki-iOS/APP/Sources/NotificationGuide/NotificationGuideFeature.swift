@@ -24,7 +24,8 @@ struct NotificationGuideFeature {
 
         var entry: NotificationGuideEntry
         var hasStarted: Bool = false
-        var modal: NotificationGuideModal?
+        /// 지금 띄운 모달의 안내 종류입니다.
+        var modal: NotificationGuideKind?
         var isProcessing: Bool = false
         var isAwaitingSettingsReturn: Bool = false
         var consentAgreedAt: Date?
@@ -124,7 +125,7 @@ struct NotificationGuideFeature {
                     isMarketingAgreed: user.marketingTermAgreed
                 )
                 record.withLock { $0.apply(decision, today: today, appVersion: appVersion) }
-                if case let .present(modal) = decision { state.modal = modal }
+                if case let .guide(kind) = decision { state.modal = kind }
                 return .none
 
             case let .updateEntryAuthorizationResponse(.failure(error)):
@@ -198,10 +199,29 @@ private extension NotificationGuideFeature {
         )
     }
 
+    /// 확인 버튼을 누른 뒤 할 일입니다. OS 알림 팝업과 설정 이동은 이 기능이 정합니다.
+    enum NextStep {
+        /// 더 할 일 없이 마무리합니다.
+        case complete
+        case requestAuthorization
+        case openNotificationSettings
+
+        init(_ kind: NotificationGuideKind) {
+            switch kind {
+            case .consentOnly:
+                self = .complete
+            case .enableNotifications, .consentAndEnable:
+                self = .requestAuthorization
+            case .enableInSettings:
+                self = .openNotificationSettings
+            }
+        }
+    }
+
     /// 모달을 닫고 확인 뒤 할 일을 이어 갑니다.
-    func proceed(_ state: inout State, after modal: NotificationGuideModal) -> Effect<Action> {
+    func proceed(_ state: inout State, after modal: NotificationGuideKind) -> Effect<Action> {
         state.modal = nil
-        switch modal.nextStep {
+        switch NextStep(modal) {
         case .complete:
             return finish(&state)
 

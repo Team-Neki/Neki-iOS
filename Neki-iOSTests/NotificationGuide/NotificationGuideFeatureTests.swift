@@ -60,17 +60,17 @@ struct NotificationGuideFeatureTests {
         "알림 권한과 동의 상태에 맞는 모달을 띄우고 버전과 오늘 날짜를 남긴다",
         .serialized,
         arguments: [
-            (UNAuthorizationStatus.authorized, false, NotificationGuideModal.consentOnly),
+            (UNAuthorizationStatus.authorized, false, NotificationGuideKind.consentOnly),
             (.notDetermined, true, .enableNotifications),
             (.notDetermined, false, .consentAndEnable),
-            (.denied, true, .openSettings(includesConsent: false)),
-            (.denied, false, .openSettings(includesConsent: true))
-        ] as [(UNAuthorizationStatus, Bool, NotificationGuideModal)]
+            (.denied, true, .enableInSettings(includesConsent: false)),
+            (.denied, false, .enableInSettings(includesConsent: true))
+        ] as [(UNAuthorizationStatus, Bool, NotificationGuideKind)]
     )
     func mainTabAppeared_newVersion_presentsModal(
         status: UNAuthorizationStatus,
         isMarketingAgreed: Bool,
-        expected: NotificationGuideModal
+        expected: NotificationGuideKind
     ) async {
         let records = LockIsolated<[String]>([])
         @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
@@ -209,7 +209,7 @@ struct NotificationGuideFeatureTests {
         let records = LockIsolated<[String]>([])
         let openedURLs = LockIsolated<[URL]>([])
         let store = makeStore(authorizationStatus: .denied, records: records) {
-            $0.modal = .openSettings(includesConsent: true)
+            $0.modal = .enableInSettings(includesConsent: true)
         } dependencies: {
             $0.openURL = OpenURLEffect { url in
                 records.withValue { $0.append("open") }
@@ -241,7 +241,7 @@ struct NotificationGuideFeatureTests {
     func confirm_openSettingsWithoutConsent_opensSettingsOnly() async {
         let records = LockIsolated<[String]>([])
         let store = makeStore(isMarketingAgreed: true, authorizationStatus: .denied, records: records) {
-            $0.modal = .openSettings(includesConsent: false)
+            $0.modal = .enableInSettings(includesConsent: false)
         }
 
         await store.send(.confirmButtonTapped) {
@@ -262,7 +262,7 @@ struct NotificationGuideFeatureTests {
     func confirm_openSettingsFails_finishesWithToast() async {
         let records = LockIsolated<[String]>([])
         let store = makeStore(authorizationStatus: .denied, records: records) {
-            $0.modal = .openSettings(includesConsent: true)
+            $0.modal = .enableInSettings(includesConsent: true)
         } dependencies: {
             $0.openURL = OpenURLEffect { _ in false }
         }

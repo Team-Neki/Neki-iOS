@@ -13,7 +13,7 @@ struct NotificationGuideModalModifier: ViewModifier {
     let store: StoreOf<NotificationGuideFeature>
 
     /// 모달이 닫히는 동안 문구가 비지 않도록 마지막에 띄운 모달을 남겨 둡니다.
-    @State private var displayedModal: NotificationGuideModal?
+    @State private var displayedModal: NotificationGuideKind?
 
     func body(content: Content) -> some View {
         let modal = store.modal ?? displayedModal
@@ -28,7 +28,7 @@ struct NotificationGuideModalModifier: ViewModifier {
                 title: modal?.title ?? "",
                 subtitle: modal?.message ?? "",
                 confirmText: modal?.confirmButtonTitle ?? "",
-                cancelText: NotificationGuideModal.cancelButtonTitle,
+                cancelText: NotificationGuideKind.cancelButtonTitle,
                 isProcessing: store.isProcessing,
                 hasIcon: true,
                 icon: .bell,

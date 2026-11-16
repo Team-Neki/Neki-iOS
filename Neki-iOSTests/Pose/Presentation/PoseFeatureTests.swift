@@ -339,6 +339,33 @@ struct PoseFeatureTests {
         #expect(store.state.scrappedTotalCount == 1)
     }
 
+    @Test("북마크 목록의 받지 않은 뒷페이지에 있는 포즈를 해제해도 북마크 개수가 하나 준다")
+    func onTapBookmark_unbookmarkingUnloadedPose_decrementsBookmarkCount() async {
+        let pose = makePose(id: 30, peopleCount: .duo, isScrapped: true)
+        let store = makeStore(initialState: makePartiallyLoadedBookmarkState(with: pose))
+
+        await store.send(.onTapBookmark(pose))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(store.state.scrappedPoses.count == 20)
+        #expect(store.state.scrappedTotalCount == 50)
+    }
+
+    @Test("받지 않은 뒷페이지에 있는 포즈의 북마크 해제가 실패해 되돌리면 북마크 개수도 원래대로 돌아온다")
+    func onTapBookmark_unbookmarkingUnloadedPoseFails_restoresBookmarkCount() async {
+        let pose = makePose(id: 30, peopleCount: .duo, isScrapped: true)
+        let store = makeStore(initialState: makePartiallyLoadedBookmarkState(with: pose)) {
+            $0.poseClient.scrapPose = { _ in throw BookmarkFailure() }
+        }
+
+        await store.send(.onTapBookmark(pose))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(store.state.generalPoses[id: 30]?.isScrapped == true)
+        #expect(store.state.scrappedTotalCount == 51)
+    }
 
     @Test("인원수 선택과 북마크 전환은 누를 때마다 맨 위로 이동 신호를 올린다")
     func peopleCountAndBookmark_bumpScrollGenerationEveryTime() async {
@@ -467,6 +494,17 @@ private extension PoseFeatureTests {
             height: nil,
             relation: relation
         )
+    }
+
+    /// 북마크 51개 중 앞 20개(1~20)만 받은 상태입니다. 일반 목록의 `pose`는 받지 않은 뒷페이지에 있는 북마크입니다.
+    func makePartiallyLoadedBookmarkState(with pose: Pose) -> PoseFeature.State {
+        var state = PoseFeature.State()
+        state.generalPoses = [pose]
+        state.loadedGeneralFilter = PoseListFilter()
+        state.scrappedPoses = IdentifiedArray(uniqueElements: (1...20).map { makePose(id: $0, peopleCount: .solo, isScrapped: true) })
+        state.scrappedTotalCount = 51
+        state.isScrappedListLoaded = true
+        return state
     }
 }
 

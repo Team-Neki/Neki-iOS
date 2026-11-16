@@ -261,7 +261,9 @@ struct PoseFeature {
                             state.scrappedPoses.insert(pose, at: .zero)
                             state.scrappedTotalCount = state.scrappedTotalCount.map { $0 + 1 }
                         }
-                    } else if state.scrappedPoses.remove(id: pose.id) != nil {
+                    } else {
+                        // 받은 북마크 목록에 없는 포즈(아직 받지 않은 뒷페이지)를 해제해도 서버 개수는 하나 줄어듭니다. 목록에 있는지는 목록에서 뺄 때만 봅니다.
+                        state.scrappedPoses.remove(id: pose.id)
                         state.scrappedTotalCount = state.scrappedTotalCount.map { max($0 - 1, .zero) }
                     }
                 }

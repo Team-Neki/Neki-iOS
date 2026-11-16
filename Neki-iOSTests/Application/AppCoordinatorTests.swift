@@ -74,7 +74,7 @@ struct AppCoordinatorTests {
         let records = LockIsolated<[String]>([])
         let store = makeStore(initialState: state, records: records)
 
-        await store.send(.route(.auth(.delegate(.moveToMainTab(user, notificationGuideEntry: .regular))))).finish()
+        await store.send(.route(.auth(.delegate(.moveToMainTab(user, completion: .loggedIn))))).finish()
 
         #expect(records.value == ["user \(user.id)"])
     }
@@ -91,19 +91,26 @@ struct AppCoordinatorTests {
         #expect(mainTab(of: store)?.notificationGuide.entry == .afterTermsAgreement(isMarketingTermAgreed: true))
     }
 
-    @Test("로그인 경로에서 받은 알림 안내 진입 경로를 메인 탭까지 넘긴다")
-    func moveToMainTab_passesNotificationGuideEntry() async {
+    @Test(
+        "로그인 결과를 알림 안내 진입 경로로 바꿔 메인 탭에 넘긴다",
+        arguments: [
+            (LoginCoordinator.Completion.loggedIn, NotificationGuideEntry.regular),
+            (.agreedToTerms(isMarketingTermAgreed: true), .afterTermsAgreement(isMarketingTermAgreed: true)),
+            (.agreedToTerms(isMarketingTermAgreed: false), .afterTermsAgreement(isMarketingTermAgreed: false)),
+        ]
+    )
+    func moveToMainTab_mapsLoginCompletionToNotificationGuideEntry(
+        completion: LoginCoordinator.Completion,
+        expectedEntry: NotificationGuideEntry
+    ) async {
         var state = AppCoordinator.State()
         state.route = .auth(LoginCoordinator.State())
         let records = LockIsolated<[String]>([])
         let store = makeStore(initialState: state, records: records)
 
-        await store.send(.route(.auth(.delegate(.moveToMainTab(
-            user,
-            notificationGuideEntry: .afterTermsAgreement(isMarketingTermAgreed: false)
-        ))))).finish()
+        await store.send(.route(.auth(.delegate(.moveToMainTab(user, completion: completion))))).finish()
 
-        #expect(mainTab(of: store)?.notificationGuide.entry == .afterTermsAgreement(isMarketingTermAgreed: false))
+        #expect(mainTab(of: store)?.notificationGuide.entry == expectedEntry)
     }
 
     @Test("자동 로그인으로 메인에 들어가면 업데이트 후 첫 진입 안내를 판단한다")

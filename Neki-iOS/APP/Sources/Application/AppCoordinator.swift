@@ -256,7 +256,7 @@ struct AppCoordinator {
                 state.route = .auth(.init())
                 return .none
 
-            case let .route(.auth(.delegate(.moveToMainTab(user, notificationGuideEntry)))):
+            case let .route(.auth(.delegate(.moveToMainTab(user, completion)))):
                 let signedInStatus = UserSessionStatus.signedIn(user)
                 state.pendingAnalyticsSessionStatus = signedInStatus
                 state.$userSessionStatus.withLock { $0 = signedInStatus }
@@ -265,7 +265,7 @@ struct AppCoordinator {
                     configureAnalyticsSession(
                         state: &state,
                         status: signedInStatus,
-                        notificationGuideEntry: notificationGuideEntry
+                        notificationGuideEntry: NotificationGuideEntry(completion)
                     )
                 )
 
@@ -354,6 +354,18 @@ struct AppCoordinator {
             default:
                 return .none
             }
+        }
+    }
+}
+
+private extension NotificationGuideEntry {
+    /// 로그인 결과를 알림 안내 진입 경로로 바꿉니다.
+    init(_ completion: LoginCoordinator.Completion) {
+        switch completion {
+        case .loggedIn:
+            self = .regular
+        case let .agreedToTerms(isMarketingTermAgreed):
+            self = .afterTermsAgreement(isMarketingTermAgreed: isMarketingTermAgreed)
         }
     }
 }

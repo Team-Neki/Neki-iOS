@@ -67,6 +67,9 @@ struct PoseCoordinator {
             case let .path(.element(_, action: .detail(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 
+            case let .path(.element(_, action: .detail(.delegate(.poseFetched(pose))))):
+                return .send(.root(.syncPoseInList(pose)))
+                
             case let .path(.element(_, action: .randomPose(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 

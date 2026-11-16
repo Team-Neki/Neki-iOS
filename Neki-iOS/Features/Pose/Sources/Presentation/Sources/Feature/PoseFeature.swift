@@ -124,7 +124,10 @@ struct PoseFeature {
         
         // Internal Actions (Async Results & Data Updates)
         case fetchListResponse(ListScope, page: Int, Result<PoseListPage, Error>)
+        /// 하트로 북마크를 바꿨을 때(누름·실패 되돌림) 받습니다. 바꾼 만큼 북마크 목록과 개수에 반영합니다.
         case updatePoseInList(Pose)
+        /// 상세 화면이 서버에서 받은 포즈 정보를 받습니다. 북마크를 바꾼 것이 아니어서 이미 받은 카드만 맞춥니다.
+        case syncPoseInList(Pose)
         case bookmarkResponse(Pose, Result<Void, Error>)
         
         // Delegate Action
@@ -251,22 +254,12 @@ struct PoseFeature {
                 
                 // MARK: - Internal Actions
             case let .updatePoseInList(pose):
-                if state.generalPoses.contains(where: { $0.id == pose.id }) { state.generalPoses[id: pose.id] = pose }
-                // 북마크 목록을 서버에서 받기 전에는 손대지 않습니다. 하트로 넣은 포즈만 남으면 북마크 칩을 눌러도 목록을 받지 않게 됩니다.
-                if state.isScrappedListLoaded {
-                    if pose.isScrapped {
-                        if state.scrappedPoses.contains(where: { $0.id == pose.id }) {
-                            state.scrappedPoses[id: pose.id] = pose
-                        } else {
-                            state.scrappedPoses.insert(pose, at: .zero)
-                            state.scrappedTotalCount = state.scrappedTotalCount.map { $0 + 1 }
-                        }
-                    } else {
-                        // 받은 북마크 목록에 없는 포즈(아직 받지 않은 뒷페이지)를 해제해도 서버 개수는 하나 줄어듭니다. 목록에 있는지는 목록에서 뺄 때만 봅니다.
-                        state.scrappedPoses.remove(id: pose.id)
-                        state.scrappedTotalCount = state.scrappedTotalCount.map { max($0 - 1, .zero) }
-                    }
-                }
+                state.applyBookmarkChange(pose)
+                refreshVisiblePoses(&state)
+                return .none
+                
+            case let .syncPoseInList(pose):
+                state.syncFetchedPose(pose)
                 refreshVisiblePoses(&state)
                 return .none
                 
@@ -448,5 +441,46 @@ extension PoseFeature.State {
         isSelectedScrap = false
         selectedCountFilterOption = .duo
         selectedRelationFilterOption = relation
+    }
+}
+
+
+// MARK: - PoseFeature.State + Bookmark List
+
+extension PoseFeature.State {
+    /// 하트로 바꾼 북마크(누름·실패 되돌림)를 받은 목록과 북마크 개수에 반영합니다.
+    ///
+    /// 북마크가 실제로 바뀐 것이므로, 받은 북마크 목록에 없는 포즈를 해제해도 개수를 줄입니다.
+    mutating func applyBookmarkChange(_ pose: Pose) {
+        if generalPoses.contains(where: { $0.id == pose.id }) { generalPoses[id: pose.id] = pose }
+        // 북마크 목록을 서버에서 받기 전에는 손대지 않습니다. 하트로 넣은 포즈만 남으면 북마크 칩을 눌러도 목록을 받지 않게 됩니다.
+        guard isScrappedListLoaded else { return }
+        if pose.isScrapped {
+            if scrappedPoses.contains(where: { $0.id == pose.id }) {
+                scrappedPoses[id: pose.id] = pose
+            } else {
+                scrappedPoses.insert(pose, at: .zero)
+                scrappedTotalCount = scrappedTotalCount.map { $0 + 1 }
+            }
+        } else {
+            // 받은 북마크 목록에 없는 포즈(아직 받지 않은 뒷페이지)를 해제해도 서버 개수는 하나 줄어듭니다. 목록에 있는지는 목록에서 뺄 때만 봅니다.
+            scrappedPoses.remove(id: pose.id)
+            scrappedTotalCount = scrappedTotalCount.map { max($0 - 1, .zero) }
+        }
+    }
+    
+    /// 서버에서 받은 포즈 정보로 이미 받은 카드만 맞춥니다.
+    ///
+    /// 북마크를 바꾼 것이 아니므로 받은 목록에 없는 포즈는 넣지 않고 개수도 그대로 둡니다. 받지 않은 뒷페이지의 북마크인지, 북마크하지 않은 포즈인지 알 수 없기 때문입니다.
+    /// 받은 북마크 목록에 있는데 북마크가 아니면 다른 곳에서 해제된 것이라, 목록에서 빼고 개수를 줄입니다.
+    mutating func syncFetchedPose(_ pose: Pose) {
+        if generalPoses.contains(where: { $0.id == pose.id }) { generalPoses[id: pose.id] = pose }
+        guard scrappedPoses.contains(where: { $0.id == pose.id }) else { return }
+        if pose.isScrapped {
+            scrappedPoses[id: pose.id] = pose
+        } else {
+            scrappedPoses.remove(id: pose.id)
+            scrappedTotalCount = scrappedTotalCount.map { max($0 - 1, .zero) }
+        }
     }
 }

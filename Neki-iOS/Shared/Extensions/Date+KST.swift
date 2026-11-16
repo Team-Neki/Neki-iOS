@@ -30,14 +30,6 @@ struct KSTDay: Codable, Hashable, Sendable {
     var monthDayText: String {
         String(format: "%02d.%02d", month, day)
     }
-
-    /// `earlier`부터 이 날짜까지 지난 날 수입니다. 같은 날이면 0입니다.
-    func days(since earlier: KSTDay) -> Int {
-        guard let start = Self.calendar.date(from: earlier.dateComponents),
-              let end = Self.calendar.date(from: dateComponents)
-        else { return 0 }
-        return Self.calendar.dateComponents([.day], from: start, to: end).day ?? 0
-    }
 }
 
 extension Date {
@@ -53,8 +45,4 @@ private extension KSTDay {
         calendar.timeZone = TimeZone(identifier: "Asia/Seoul")!
         return calendar
     }()
-
-    var dateComponents: DateComponents {
-        DateComponents(year: year, month: month, day: day)
-    }
 }

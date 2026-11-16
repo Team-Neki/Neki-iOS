@@ -13,6 +13,8 @@ struct NotificationGuideRecordTests {
     private let today = KSTDay(year: 2026, month: 11, day: 10)
     private let yesterday = KSTDay(year: 2026, month: 11, day: 9)
     private let version = "1.4.1"
+    /// 2026-11-10 10:00 한국 시간
+    private let now = Date(timeIntervalSince1970: 1_794_272_400)
 
     @Test("오늘 자동 안내를 띄웠으면 이 버전을 판단하지 않았어도 넘긴다")
     func updateEntry_guideShownToday_skips() {
@@ -74,7 +76,7 @@ struct NotificationGuideRecordTests {
         NotificationGuideRecord(
             lastAutomaticGuideDay: KSTDay(year: 2026, month: 11, day: 10),
             updateEntryJudgedVersion: "1.4.1",
-            photoBoothDetailGuidedDay: KSTDay(year: 2026, month: 11, day: 10)
+            photoBoothDetailGuidedAt: Date(timeIntervalSince1970: 1_794_272_400)
         )
     ])
     func codable_roundTrip_keepsRecord(record: NotificationGuideRecord) throws {
@@ -84,8 +86,8 @@ struct NotificationGuideRecordTests {
         #expect(decoded == record)
     }
 
-    @Test("지점 상세 날짜가 없던 기록도 읽는다")
-    func decode_withoutPhotoBoothDetailDay_readsRecord() throws {
+    @Test("지점 상세 시각이 없던 기록도 읽는다")
+    func decode_withoutPhotoBoothDetailGuidedAt_readsRecord() throws {
         let data = Data(#"{"lastAutomaticGuideDay":{"year":2026,"month":11,"day":9},"updateEntryJudgedVersion":"1.4.1"}"#.utf8)
 
         let decoded = try JSONDecoder().decode(NotificationGuideRecord.self, from: data)
@@ -103,14 +105,15 @@ struct NotificationGuideRecordTests {
     }
 
     @Test(
-        "지점 상세에서 안내한 날부터 7일 안이면 넘기고, 7일이 지나면 다시 안내한다",
+        "지점 상세에서 안내한 지 7일이 지나지 않았으면 넘기고, 7일이 지나면 다시 안내한다",
         arguments: [
-            (KSTDay(year: 2026, month: 11, day: 4), NotificationGuideDecision.skip),
-            (KSTDay(year: 2026, month: 11, day: 3), .guide(.consentAndEnable))
-        ]
+            (-(7 * 86_400 - 1), NotificationGuideDecision.skip),
+            (-7 * 86_400, .guide(.consentAndEnable))
+        ] as [(TimeInterval, NotificationGuideDecision)]
     )
-    func photoBoothDetail_pathRepeat_waitsSevenDays(guidedDay: KSTDay, expected: NotificationGuideDecision) {
-        let record = NotificationGuideRecord(lastAutomaticGuideDay: guidedDay, photoBoothDetailGuidedDay: guidedDay)
+    func photoBoothDetail_pathRepeat_waitsSevenDays(offset: TimeInterval, expected: NotificationGuideDecision) {
+        let guidedAt = now.addingTimeInterval(offset)
+        let record = NotificationGuideRecord(lastAutomaticGuideDay: guidedAt.kstDay, photoBoothDetailGuidedAt: guidedAt)
 
         #expect(decidePhotoBoothDetail(record, permission: .requestable, isMarketingAgreed: false) == expected)
     }
@@ -127,25 +130,25 @@ struct NotificationGuideRecordTests {
         #expect(decidePhotoBoothDetail(NotificationGuideRecord(), permission: .enabled, isMarketingAgreed: true) == .skip)
     }
 
-    @Test("지점 상세에서 안내하면 오늘 날짜를 하루 한 번 기록과 이 경로 기록에 함께 남긴다")
-    func applyPhotoBoothDetail_guide_recordsDays() {
+    @Test("지점 상세에서 안내하면 하루 한 번 기록에는 오늘 날짜를, 이 경로 기록에는 안내한 시각을 남긴다")
+    func applyPhotoBoothDetail_guide_recordsDayAndTime() {
         var record = NotificationGuideRecord(lastAutomaticGuideDay: yesterday, updateEntryJudgedVersion: version)
 
-        record.applyPhotoBoothDetail(.guide(.consentOnly), today: today)
+        record.applyPhotoBoothDetail(.guide(.consentOnly), now: now)
 
         #expect(record == NotificationGuideRecord(
             lastAutomaticGuideDay: today,
             updateEntryJudgedVersion: version,
-            photoBoothDetailGuidedDay: today
+            photoBoothDetailGuidedAt: now
         ))
     }
 
     @Test("지점 상세에서 안내하지 않으면 기록을 바꾸지 않는다")
     func applyPhotoBoothDetail_skip_keepsRecord() {
-        let original = NotificationGuideRecord(lastAutomaticGuideDay: yesterday, photoBoothDetailGuidedDay: yesterday)
+        let original = NotificationGuideRecord(lastAutomaticGuideDay: yesterday, photoBoothDetailGuidedAt: now.addingTimeInterval(-86_400))
         var record = original
 
-        record.applyPhotoBoothDetail(.skip, today: today)
+        record.applyPhotoBoothDetail(.skip, now: now)
 
         #expect(record == original)
     }
@@ -173,7 +176,7 @@ private extension NotificationGuideRecordTests {
     ) -> NotificationGuideDecision {
         .photoBoothDetail(
             record: record,
-            today: today,
+            now: now,
             permission: permission,
             isMarketingAgreed: isMarketingAgreed
         )

@@ -13,17 +13,17 @@ struct NotificationGuideRecord: Codable, Equatable, Sendable {
     var lastAutomaticGuideDay: KSTDay?
     /// 업데이트 후 첫 진입 안내를 판단한 앱 버전입니다. 버전마다 한 번만 판단합니다.
     var updateEntryJudgedVersion: String?
-    /// 지점 상세 진입에서 마지막으로 안내한 한국 시간 날짜입니다. 이 경로는 안내한 날부터 7일 안에는 다시 안내하지 않습니다.
-    var photoBoothDetailGuidedDay: KSTDay?
+    /// 지점 상세 진입에서 마지막으로 안내한 시각입니다. 이 경로는 안내한 때부터 7일이 지나야 다시 안내합니다.
+    var photoBoothDetailGuidedAt: Date?
 
     init(
         lastAutomaticGuideDay: KSTDay? = nil,
         updateEntryJudgedVersion: String? = nil,
-        photoBoothDetailGuidedDay: KSTDay? = nil
+        photoBoothDetailGuidedAt: Date? = nil
     ) {
         self.lastAutomaticGuideDay = lastAutomaticGuideDay
         self.updateEntryJudgedVersion = updateEntryJudgedVersion
-        self.photoBoothDetailGuidedDay = photoBoothDetailGuidedDay
+        self.photoBoothDetailGuidedAt = photoBoothDetailGuidedAt
     }
 
     /// 사용자별 기록을 저장하는 키입니다.
@@ -48,11 +48,11 @@ struct NotificationGuideRecord: Codable, Equatable, Sendable {
 
     /// 지점 상세 진입의 판단 결과를 기록에 남깁니다.
     ///
-    /// 안내할 때 이 경로의 날짜도 함께 남기므로, 취소·OS 거부·설정에서 켜지 않음은 모두 7일 뒤에 다시 안내합니다.
-    mutating func applyPhotoBoothDetail(_ decision: NotificationGuideDecision, today: KSTDay) {
+    /// 안내할 때 이 경로의 시각도 함께 남기므로, 취소·OS 거부·설정에서 켜지 않음은 모두 7일 뒤에 다시 안내합니다.
+    mutating func applyPhotoBoothDetail(_ decision: NotificationGuideDecision, now: Date) {
         guard case .guide = decision else { return }
-        lastAutomaticGuideDay = today
-        photoBoothDetailGuidedDay = today
+        lastAutomaticGuideDay = now.kstDay
+        photoBoothDetailGuidedAt = now
     }
 }
 
@@ -65,8 +65,8 @@ enum NotificationGuideDecision: Equatable, Sendable {
     /// 이 종류로 안내합니다.
     case guide(NotificationGuideKind)
 
-    /// 경로별로 다시 안내하기까지 기다리는 날 수입니다. 그 경로에서 안내한 날부터 7일이 지나야 다시 안내합니다.
-    static let pathRepeatDays = 7
+    /// 경로별로 다시 안내하기까지 기다리는 시간입니다. 그 경로에서 안내한 때부터 7일이 지나야 다시 안내합니다.
+    static let pathRepeatInterval: TimeInterval = 60 * 60 * 24 * 7
 
     /// 오늘 다른 자동 안내를 띄웠는지, 이 버전을 판단했는지를 먼저 보고, 그다음 상태에 맞는 안내 종류를 고릅니다.
     static func updateEntry(
@@ -86,16 +86,16 @@ enum NotificationGuideDecision: Equatable, Sendable {
 
     /// 지점 상세에 들어왔을 때의 안내를 정합니다.
     ///
-    /// 오늘 다른 자동 안내를 띄웠는지, 이 경로에서 7일 안에 안내했는지를 먼저 보고, 그다음 상태에 맞는 안내 종류를 고릅니다.
+    /// 오늘 다른 자동 안내를 띄웠는지, 이 경로에서 안내한 지 7일이 지났는지를 먼저 보고, 그다음 상태에 맞는 안내 종류를 고릅니다.
     /// 알림이 켜져 있고 동의도 했으면 안내하지 않고 기록도 남기지 않습니다.
     static func photoBoothDetail(
         record: NotificationGuideRecord,
-        today: KSTDay,
+        now: Date,
         permission: NotificationPermission,
         isMarketingAgreed: Bool
     ) -> Self {
-        guard record.lastAutomaticGuideDay != today else { return .skip }
-        if let guidedDay = record.photoBoothDetailGuidedDay, today.days(since: guidedDay) < pathRepeatDays {
+        guard record.lastAutomaticGuideDay != now.kstDay else { return .skip }
+        if let guidedAt = record.photoBoothDetailGuidedAt, now.timeIntervalSince(guidedAt) < pathRepeatInterval {
             return .skip
         }
         guard let kind = NotificationGuideKind(permission: permission, isMarketingAgreed: isMarketingAgreed) else {

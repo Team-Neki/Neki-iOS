@@ -463,7 +463,7 @@ struct NotificationGuideFeatureTests {
 
     // MARK: - 지점 상세 진입
 
-    @Test("지점 상세에 들어오면 상태에 맞는 모달을 띄우고 오늘 날짜를 하루 한 번 기록과 이 경로 기록에 남긴다")
+    @Test("지점 상세에 들어오면 상태에 맞는 모달을 띄우고 하루 한 번 기록과 이 경로 기록을 남긴다")
     func photoBoothDetailEntered_presentsModalAndRecordsDays() async {
         let records = LockIsolated<[String]>([])
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
@@ -479,15 +479,15 @@ struct NotificationGuideFeatureTests {
         #expect(record == NotificationGuideRecord(
             lastAutomaticGuideDay: Fixture.today,
             updateEntryJudgedVersion: Fixture.version,
-            photoBoothDetailGuidedDay: Fixture.today
+            photoBoothDetailGuidedAt: Fixture.now
         ))
     }
 
     @Test("지점 상세에서 안내한 지 7일이 지나지 않았으면 모달을 띄우지 않고 기록도 바꾸지 않는다")
     func photoBoothDetailEntered_withinSevenDays_skips() async {
         let records = LockIsolated<[String]>([])
-        let guidedDay = KSTDay(year: 2026, month: 11, day: 4)
-        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: guidedDay, photoBoothDetailGuidedDay: guidedDay)
+        let guidedAt = Fixture.now.addingTimeInterval(-6 * 86_400)
+        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: guidedAt.kstDay, photoBoothDetailGuidedAt: guidedAt)
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
@@ -500,9 +500,9 @@ struct NotificationGuideFeatureTests {
     @Test("지점 상세에서 안내한 지 7일이 지나면 다시 모달을 띄운다")
     func photoBoothDetailEntered_afterSevenDays_presentsModal() async {
         let records = LockIsolated<[String]>([])
-        let guidedDay = KSTDay(year: 2026, month: 11, day: 3)
+        let guidedAt = Fixture.now.addingTimeInterval(-7 * 86_400)
         let store = makeStore(
-            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: guidedDay, photoBoothDetailGuidedDay: guidedDay),
+            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: guidedAt.kstDay, photoBoothDetailGuidedAt: guidedAt),
             records: records
         )
 

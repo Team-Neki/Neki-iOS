@@ -147,15 +147,15 @@ struct NotificationGuideFeature {
             case let .photoBoothDetailAuthorizationResponse(.success(status)):
                 // 권한을 확인하는 사이에 다른 안내를 띄웠으면 넘깁니다.
                 guard state.modal == nil, state.isProcessing == false, let user = state.user else { return .none }
-                let today = now.kstDay
+                let currentDate = now
                 let record = guideRecord(for: user)
                 let decision = NotificationGuideDecision.photoBoothDetail(
                     record: record.wrappedValue,
-                    today: today,
+                    now: currentDate,
                     permission: NotificationPermission(status),
                     isMarketingAgreed: user.marketingTermAgreed
                 )
-                record.withLock { $0.applyPhotoBoothDetail(decision, today: today) }
+                record.withLock { $0.applyPhotoBoothDetail(decision, now: currentDate) }
                 if case let .guide(kind) = decision { state.modal = kind }
                 return .none
 

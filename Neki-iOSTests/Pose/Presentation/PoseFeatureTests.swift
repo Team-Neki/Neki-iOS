@@ -183,6 +183,46 @@ struct PoseFeatureTests {
         #expect(store.state.isGeneralLoading)
     }
 
+    @Test("받아 둔 조건으로 돌아오면 다른 조건으로 부르던 요청을 취소해, 늦게 온 응답이 목록을 바꾸지 않는다")
+    func returningToLoadedFilter_cancelsOtherFilterRequest() async {
+        let duoFilter = PoseListFilter(peopleCount: .duo)
+        var state = PoseFeature.State()
+        state.selectedCountFilterOption = .duo
+        state.generalPoses = [makePose(id: 1, peopleCount: .duo), makePose(id: 2, peopleCount: .duo, relation: .couple)]
+        state.loadedGeneralFilter = duoFilter
+        state.requestedGeneralFilter = duoFilter
+        state.generalTotalCount = 157
+        state.generalPage = 1
+        let friendPage = PoseListPage(poses: [makePose(id: 101, peopleCount: .duo, relation: .friend)], hasNext: false, totalCount: 51)
+        let requests = LockIsolated<[ListRequest]>([])
+        let (gate, openGate) = AsyncStream<Void>.makeStream()
+        let store = makeStore(initialState: state) {
+            $0.poseClient.fetchPoseList = { page, _, filter, refresh in
+                requests.withValue { $0.append(ListRequest(page: page, filter: filter, refresh: refresh)) }
+                guard filter.relation == .friend else { return PoseListPage(poses: [], hasNext: false, totalCount: 157) }
+                for await _ in gate { break }
+                return friendPage
+            }
+        }
+
+        // 친구 칩을 빠르게 두 번 누릅니다. 2인+친구 응답은 2인으로 돌아온 뒤에 옵니다.
+        await store.send(.onTapRelationFilter(.friend))
+        await store.send(.onTapRelationFilter(.friend))
+        openGate.yield()
+        openGate.finish()
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(store.state.loadedGeneralFilter == duoFilter)
+        #expect(store.state.visiblePoses.map(\.id) == [1, 2])
+        #expect(store.state.displayedPoseCount == 157)
+        #expect(store.state.isGeneralLoading == false)
+
+        await store.send(.loadMoreItems)
+        await store.finish()
+        #expect(requests.value.last == ListRequest(page: 1, filter: duoFilter, refresh: false))
+    }
+
     @Test("응답에 전체 개수가 없으면 목록은 보여 주고 포즈 개수만 숨긴다")
     func fetchListResponse_withoutTotalCount_hidesCountOnly() async {
         var state = PoseFeature.State()
@@ -298,6 +338,7 @@ struct PoseFeatureTests {
         #expect(store.state.scrappedPoses.map(\.id) == [1])
         #expect(store.state.scrappedTotalCount == 1)
     }
+
 
     @Test("인원수 선택과 북마크 전환은 누를 때마다 맨 위로 이동 신호를 올린다")
     func peopleCountAndBookmark_bumpScrollGenerationEveryTime() async {

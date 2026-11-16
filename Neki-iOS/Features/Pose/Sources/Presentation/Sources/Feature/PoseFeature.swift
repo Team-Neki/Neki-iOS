@@ -336,6 +336,8 @@ struct PoseFeature {
 
 private extension PoseFeature {
     /// 지금 조건의 목록을 아직 받지 않았고 부르는 중도 아니면 첫 페이지를 부릅니다.
+    ///
+    /// 받아 둔 조건으로 돌아왔으면 새로 부르지 않고, 다른 조건으로 부르던 요청만 정리합니다.
     func fetchFirstPageIfNeeded(_ state: inout State) -> Effect<Action> {
         if state.isSelectedScrap {
             guard state.isScrappedListLoaded == false, state.isScrappedLoading == false else { return .none }
@@ -343,7 +345,14 @@ private extension PoseFeature {
         }
         
         let filter = state.listFilter
-        guard state.loadedGeneralFilter != filter else { return .none }
+        if state.loadedGeneralFilter == filter {
+            // 다른 조건의 응답이 늦게 와서 받아 둔 목록을 덮어쓰지 않도록, 그 요청을 취소하고 요청 기록을 이 조건으로 되돌립니다.
+            // 취소한 요청은 응답을 보내지 않으므로 불러오는 중 표시도 여기서 끕니다. 그래야 이 조건의 다음 페이지를 부를 수 있습니다.
+            guard state.requestedGeneralFilter != filter else { return .none }
+            state.requestedGeneralFilter = filter
+            state.isGeneralLoading = false
+            return .cancel(id: CancelID.generalList)
+        }
         guard state.isGeneralLoading == false || state.requestedGeneralFilter != filter else { return .none }
         // 처음 받을 때는 저장소에 남은 이전 페이지를 쓰지 않습니다.
         return fetchFirstPage(&state, refresh: state.loadedGeneralFilter == nil)

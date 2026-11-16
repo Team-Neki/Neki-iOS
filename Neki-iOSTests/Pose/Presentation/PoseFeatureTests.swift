@@ -367,6 +367,148 @@ struct PoseFeatureTests {
         #expect(store.state.scrappedTotalCount == 51)
     }
 
+    @Test("북마크 탭 밖에서 북마크를 바꾸면, 북마크 탭에 들어갈 때 첫 페이지부터 다시 받아 서버 목록과 개수로 맞춘다")
+    func enteringBookmarkTab_afterBookmarkChangeOutside_refetchesFirstPage() async {
+        let server = OffsetBookmarkServer(ids: Array(1...51))
+        let newBookmark = makePose(id: 100, peopleCount: .solo)
+        var state = makeBookmarkLoadedState(server.page(0, size: 20), nextPage: 1, isBookmarkTab: false)
+        state.generalPoses = [newBookmark]
+        state.loadedGeneralFilter = PoseListFilter()
+        state.requestedGeneralFilter = PoseListFilter()
+        let requests = LockIsolated<[ScrapListRequest]>([])
+        let store = makeStore(initialState: state) {
+            $0.poseClient.scrapPose = { server.toggle($0) }
+            $0.poseClient.fetchScrappedPoseList = { page, size, refresh in
+                requests.withValue { $0.append(ScrapListRequest(page: page, refresh: refresh)) }
+                return server.page(page, size: size)
+            }
+        }
+
+        await store.send(.onTapBookmark(newBookmark))
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        await store.send(.onTapScrapMode)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [ScrapListRequest(page: 0, refresh: true)])
+        #expect(store.state.visiblePoses.map(\.id) == server.page(0, size: 20).poses.map(\.id))
+        #expect(store.state.displayedPoseCount == 52)
+
+        // 그 뒤로 바꾼 것이 없으면 탭을 오가도 다시 받지 않습니다.
+        await store.send(.onTapScrapMode)
+        await store.send(.onTapScrapMode)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        #expect(requests.value.count == 1)
+    }
+
+    @Test("북마크 목록을 받는 사이에 북마크를 바꾸면, 바꾸기 전 내용일 수 있는 응답은 버리고 다시 받는다")
+    func scrappedListResponse_afterBookmarkChangeDuringRequest_isDiscardedAndRefetched() async {
+        let server = OffsetBookmarkServer(ids: Array(1...51))
+        let requests = LockIsolated<[ScrapListRequest]>([])
+        let (gate, openGate) = AsyncStream<Void>.makeStream()
+        let (requested, markRequested) = AsyncStream<Void>.makeStream()
+        let store = makeStore(initialState: makeBookmarkLoadedState(server.page(0, size: 20), nextPage: 1)) {
+            $0.poseClient.scrapPose = { server.toggle($0) }
+            $0.poseClient.fetchScrappedPoseList = { page, size, refresh in
+                let requestCount = requests.withValue {
+                    $0.append(ScrapListRequest(page: page, refresh: refresh))
+                    return $0.count
+                }
+                // 응답은 요청을 받은 때의 서버 목록입니다. 첫 요청은 북마크를 바꿀 때까지 붙잡아 둡니다.
+                let response = server.page(page, size: size)
+                if requestCount == 1 {
+                    markRequested.yield()
+                    for await _ in gate { break }
+                }
+                return response
+            }
+        }
+
+        // 당겨서 새로고침하는 사이에 5번째 북마크를 해제합니다.
+        await store.send(.onRefresh)
+        for await _ in requested { break }
+        await store.send(.onTapBookmark(makePose(id: 5, peopleCount: .solo, isScrapped: true)))
+        openGate.yield()
+        openGate.finish()
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [ScrapListRequest(page: 0, refresh: true), ScrapListRequest(page: 0, refresh: true)])
+        #expect(store.state.visiblePoses.map(\.id) == server.page(0, size: 20).poses.map(\.id))
+        #expect(store.state.displayedPoseCount == 50)
+    }
+
+    @Test("북마크 탭에서 해제한 뒤 다음 페이지를 받으면 앞 페이지부터 다시 받아, 빠지거나 겹치는 포즈가 없다")
+    func loadMore_afterUnbookmarkingLoadedPoses_refetchesFromPreviousPage() async {
+        let server = OffsetBookmarkServer(ids: Array(1...51))
+        let requests = LockIsolated<[ScrapListRequest]>([])
+        let store = makeStore(initialState: makeBookmarkLoadedState(server.page(0, size: 20), nextPage: 1)) {
+            $0.poseClient.scrapPose = { server.toggle($0) }
+            $0.poseClient.fetchScrappedPoseList = { page, size, refresh in
+                requests.withValue { $0.append(ScrapListRequest(page: page, refresh: refresh)) }
+                return server.page(page, size: size)
+            }
+        }
+
+        // 51개 중 1~20번째를 받고 5·9·12번째를 해제하면, 서버에서는 21~23번째가 앞 페이지 자리로 당겨집니다.
+        for id in [5, 9, 12] {
+            await store.send(.onTapBookmark(makePose(id: id, peopleCount: .solo, isScrapped: true)))
+        }
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        await store.send(.loadMoreItems)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [ScrapListRequest(page: 0, refresh: true), ScrapListRequest(page: 1, refresh: false)])
+        #expect(store.state.scrappedPoses.map(\.id) == Array(server.ids.value.prefix(40)))
+
+        // 그 뒤로 해제한 것이 없으면 다음 페이지만 받습니다.
+        await store.send(.loadMoreItems)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value.count == 3)
+        #expect(requests.value.last == ScrapListRequest(page: 2, refresh: false))
+        #expect(store.state.scrappedPoses.map(\.id) == server.ids.value)
+        #expect(store.state.displayedPoseCount == 48)
+        #expect(store.state.isLastScrappedPage)
+    }
+
+    @Test("한 페이지보다 많이 해제했으면 그만큼 더 앞 페이지부터 다시 받는다")
+    func loadMore_afterUnbookmarkingMoreThanPage_refetchesFromEarlierPage() async {
+        let server = OffsetBookmarkServer(ids: Array(1...51))
+        let loaded = PoseListPage(poses: server.page(0, size: 20).poses + server.page(1, size: 20).poses, hasNext: true, totalCount: 51)
+        let requests = LockIsolated<[ScrapListRequest]>([])
+        let store = makeStore(initialState: makeBookmarkLoadedState(loaded, nextPage: 2)) {
+            $0.poseClient.scrapPose = { server.toggle($0) }
+            $0.poseClient.fetchScrappedPoseList = { page, size, refresh in
+                requests.withValue { $0.append(ScrapListRequest(page: page, refresh: refresh)) }
+                return server.page(page, size: size)
+            }
+        }
+
+        for id in 1...21 {
+            await store.send(.onTapBookmark(makePose(id: id, peopleCount: .solo, isScrapped: true)))
+        }
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+        await store.send(.loadMoreItems)
+        await store.finish()
+        await store.skipReceivedActions(strict: false)
+
+        #expect(requests.value == [
+            ScrapListRequest(page: 0, refresh: true),
+            ScrapListRequest(page: 1, refresh: false),
+            ScrapListRequest(page: 2, refresh: false)
+        ])
+        #expect(store.state.scrappedPoses.map(\.id) == server.ids.value)
+        #expect(store.state.displayedPoseCount == 30)
+        #expect(store.state.isLastScrappedPage)
+    }
+
     @Test("인원수 선택과 북마크 전환은 누를 때마다 맨 위로 이동 신호를 올린다")
     func peopleCountAndBookmark_bumpScrollGenerationEveryTime() async {
         var state = PoseFeature.State()
@@ -506,6 +648,19 @@ private extension PoseFeatureTests {
         state.isScrappedListLoaded = true
         return state
     }
+
+    /// 서버에서 북마크 목록을 `nextPage` 앞 페이지까지 받은 상태입니다. `isBookmarkTab`이면 북마크 탭을 보고 있습니다.
+    func makeBookmarkLoadedState(_ loaded: PoseListPage, nextPage: Int, isBookmarkTab: Bool = true) -> PoseFeature.State {
+        var state = PoseFeature.State()
+        state.isSelectedScrap = isBookmarkTab
+        state.scrappedPoses = IdentifiedArray(uniqueElements: loaded.poses)
+        state.scrappedTotalCount = loaded.totalCount
+        state.isScrappedListLoaded = true
+        state.scrappedPage = nextPage
+        state.isLastScrappedPage = loaded.hasNext == false
+        if isBookmarkTab { state.visiblePoses = loaded.poses }
+        return state
+    }
 }
 
 /// 일반 목록 요청 하나입니다. 어떤 조건의 몇 번째 페이지를 새로고침으로 불렀는지 남깁니다.
@@ -513,6 +668,43 @@ private struct ListRequest: Equatable {
     let page: Int
     let filter: PoseListFilter
     let refresh: Bool
+}
+
+/// 북마크 목록 요청 하나입니다. 몇 번째 페이지를 새로고침으로 불렀는지 남깁니다.
+private struct ScrapListRequest: Equatable {
+    let page: Int
+    let refresh: Bool
+}
+
+/// 서버처럼 북마크 목록을 자리로 잘라 주는 흉내 서버입니다.
+///
+/// 해제하면 뒤 포즈가 앞으로 당겨지고, 새 북마크는 맨 앞에 들어갑니다.
+private struct OffsetBookmarkServer: Sendable {
+    let ids: LockIsolated<[PoseID]>
+
+    init(ids: [PoseID]) {
+        self.ids = LockIsolated(ids)
+    }
+
+    func page(_ page: Int, size: Int) -> PoseListPage {
+        let ids = ids.value
+        let start = min(page * size, ids.count)
+        let end = min(start + size, ids.count)
+        let poses = ids[start..<end].map {
+            Pose(id: $0, peopleCountOption: .solo, imageURL: nil, isScrapped: true, contentType: .jpeg, width: nil, height: nil)
+        }
+        return PoseListPage(poses: poses, hasNext: end < ids.count, totalCount: ids.count)
+    }
+
+    func toggle(_ id: PoseID) {
+        ids.withValue { ids in
+            if let index = ids.firstIndex(of: id) {
+                ids.remove(at: index)
+            } else {
+                ids.insert(id, at: .zero)
+            }
+        }
+    }
 }
 
 private struct BookmarkFailure: Error {}

@@ -214,6 +214,11 @@ private extension DefaultPoseRepository {
         return handled
     }
     
+    /// 진행 중인 북마크 요청이 모두 끝날 때까지 기다립니다. 요청이 실패해도 기다리기만 합니다.
+    func waitForPendingScrapRequests() async {
+        for task in Array(scrapTasks.values) { _ = await task.result }
+    }
+    
     /// 스크랩 목록에서 캐시를 갱신합니다. (스크랩 등록 또는 취소 시)
     /// - Parameters:
     ///     - poseID: 대상 포즈 식별자
@@ -494,6 +499,8 @@ extension DefaultPoseRepository: PoseRepository {
         if refresh { scrappedPages.removeAll() }
         else if let cachedResponse = cachedPageResponse(scrappedPages[page]) { return cachedResponse }
         
+        // 북마크 요청이 서버에 닿기 전에 목록을 받으면 방금 누른 북마크가 빠지거나 해제한 포즈가 다시 오므로, 진행 중인 북마크 요청이 끝난 뒤 받습니다.
+        await waitForPendingScrapRequests()
         let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: latestFirstSortOrder)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []

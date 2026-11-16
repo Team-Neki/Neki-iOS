@@ -52,6 +52,14 @@ struct PoseFeature {
         var scrappedTotalCount: Int?
         /// 북마크 목록을 서버에서 받았는지입니다. 받기 전에는 하트로 바꾼 포즈를 북마크 목록에 넣지 않고, 북마크 칩을 누를 때 서버에서 받습니다.
         var isScrappedListLoaded: Bool = false
+        /// 북마크 탭 밖에서 북마크를 바꿔, 받아 둔 북마크 목록의 순서와 개수가 서버와 다를 수 있는지입니다. 북마크 탭에 들어갈 때 첫 페이지부터 다시 받습니다.
+        var isScrappedListStale: Bool = false
+        /// 받아 둔 북마크 목록에서 뺀 포즈 수입니다. 서버 목록도 그만큼 앞으로 당겨져 있어, 다음 페이지를 받을 때 그만큼 앞에서부터 다시 받습니다.
+        var scrappedListShift: Int = .zero
+        /// 북마크가 바뀔 때마다 1씩 오릅니다.
+        var bookmarkGeneration: UInt = .zero
+        /// 북마크 목록을 요청할 때의 `bookmarkGeneration`입니다. 응답이 올 때 값이 다르면 그 사이 북마크가 바뀐 것이라 응답을 버립니다.
+        var requestedScrappedListGeneration: UInt?
         
         var currentPage: Int { isSelectedScrap ? scrappedPage : generalPage }
         var isCurrentLastPage: Bool { isSelectedScrap ? isLastScrappedPage : isLastGeneralPage }
@@ -280,14 +288,22 @@ struct PoseFeature {
                     
                 case .scrap:
                     state.isScrappedLoading = false
+                    // 요청한 뒤 북마크가 바뀌었으면 바뀌기 전 내용일 수 있어 버리고 다시 받습니다.
+                    guard state.requestedScrappedListGeneration == state.bookmarkGeneration else {
+                        return refetchDiscardedScrappedList(&state, page: page)
+                    }
                     state.isLastScrappedPage = result.hasNext == false
                     if page == .zero {
                         state.scrappedPoses = IdentifiedArray(uniqueElements: result.poses)
                         state.scrappedTotalCount = result.totalCount
                         state.isScrappedListLoaded = true
+                        state.isScrappedListStale = false
                     } else {
+                        // 앞 페이지부터 다시 받았으면 이미 받은 포즈는 건너뛰고, 당겨진 포즈만 끝에 붙습니다.
                         state.scrappedPoses.append(contentsOf: result.poses)
                     }
+                    // 요청할 때 당겨져 있던 만큼을 다시 받았습니다.
+                    state.scrappedListShift = .zero
                     if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
@@ -335,6 +351,8 @@ private extension PoseFeature {
     /// 받아 둔 조건으로 돌아왔으면 새로 부르지 않고, 다른 조건으로 부르던 요청만 정리합니다.
     func fetchFirstPageIfNeeded(_ state: inout State) -> Effect<Action> {
         if state.isSelectedScrap {
+            // 북마크 탭 밖에서 북마크를 바꿨으면 받아 둔 목록이 있어도 첫 페이지부터 다시 받습니다. 다음 페이지를 받던 요청은 취소됩니다.
+            if state.isScrappedListStale { return fetchFirstPage(&state, refresh: true) }
             guard state.isScrappedListLoaded == false, state.isScrappedLoading == false else { return .none }
             return fetchFirstPage(&state, refresh: true)
         }
@@ -358,23 +376,21 @@ private extension PoseFeature {
     }
     
     func fetchNextPage(_ state: inout State) -> Effect<Action> {
-        fetchPage(&state, page: state.currentPage, refresh: false)
+        guard state.isSelectedScrap, state.scrappedListShift > .zero else {
+            return fetchPage(&state, page: state.currentPage, refresh: false)
+        }
+        // 받아 둔 북마크를 뺀 만큼 서버 목록이 앞으로 당겨져, 다음 페이지만 받으면 당겨진 포즈가 빠집니다. 그 포즈가 있는 앞 페이지부터 다시 받습니다.
+        // 저장소에 남은 앞 페이지는 빼기 전 내용이라, 저장소 기억을 비우고 서버에서 받습니다.
+        let nextPage = state.scrappedPage
+        let pagesBack = (state.scrappedListShift + state.pageSize - 1) / state.pageSize
+        return fetchScrappedPages(&state, pages: max(nextPage - pagesBack, .zero)...nextPage, refresh: true)
     }
     
     /// 지금 목록의 한 페이지를 부릅니다. 같은 목록에서 부르던 요청은 취소합니다.
     func fetchPage(_ state: inout State, page: Int, refresh: Bool) -> Effect<Action> {
+        if state.isSelectedScrap { return fetchScrappedPages(&state, pages: page...page, refresh: refresh) }
+        
         let pageSize = state.pageSize
-        
-        if state.isSelectedScrap {
-            state.isScrappedLoading = true
-            return .run { send in
-                await send(.fetchListResponse(.scrap, page: page, Result {
-                    try await poseClient.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refresh)
-                }))
-            }
-            .cancellable(id: CancelID.scrappedList, cancelInFlight: true)
-        }
-        
         let filter = state.listFilter
         state.isGeneralLoading = true
         state.requestedGeneralFilter = filter
@@ -384,6 +400,38 @@ private extension PoseFeature {
             }))
         }
         .cancellable(id: CancelID.generalList, cancelInFlight: true)
+    }
+    
+    /// 북마크 목록의 페이지들을 차례로 받아 한 응답으로 합칩니다. 같은 목록에서 부르던 요청은 취소합니다.
+    ///
+    /// `refresh`면 첫 페이지를 받을 때 저장소에 남은 북마크 페이지를 지웁니다. 응답은 마지막 페이지 번호로 보냅니다.
+    func fetchScrappedPages(_ state: inout State, pages: ClosedRange<Int>, refresh: Bool) -> Effect<Action> {
+        let pageSize = state.pageSize
+        state.isScrappedLoading = true
+        state.requestedScrappedListGeneration = state.bookmarkGeneration
+        return .run { send in
+            await send(.fetchListResponse(.scrap, page: pages.upperBound, Result {
+                var poses: [Pose] = []
+                var lastPage = PoseListPage(poses: [], hasNext: false, totalCount: nil)
+                for page in pages {
+                    lastPage = try await poseClient.fetchScrappedPoseList(page: page, pageSize: pageSize, refresh: refresh && page == pages.lowerBound)
+                    poses.append(contentsOf: lastPage.poses)
+                }
+                return PoseListPage(poses: poses, hasNext: lastPage.hasNext, totalCount: lastPage.totalCount)
+            }))
+        }
+        .cancellable(id: CancelID.scrappedList, cancelInFlight: true)
+    }
+    
+    /// 버린 북마크 목록 응답을 다시 받습니다.
+    ///
+    /// 북마크 탭을 보고 있지 않으면 지금 받지 않고, 북마크 탭에 들어올 때 첫 페이지부터 받게 합니다.
+    func refetchDiscardedScrappedList(_ state: inout State, page: Int) -> Effect<Action> {
+        guard state.isSelectedScrap else {
+            if state.isScrappedListLoaded { state.isScrappedListStale = true }
+            return .none
+        }
+        return page == .zero ? fetchFirstPage(&state, refresh: true) : fetchNextPage(&state)
     }
     
     func extractPeopleCount(from option: PeopleCountOption?) -> Int? { option?.rawValue }
@@ -453,6 +501,7 @@ extension PoseFeature.State {
     /// 북마크가 실제로 바뀐 것이므로, 받은 북마크 목록에 없는 포즈를 해제해도 개수를 줄입니다.
     mutating func applyBookmarkChange(_ pose: Pose) {
         if generalPoses.contains(where: { $0.id == pose.id }) { generalPoses[id: pose.id] = pose }
+        recordBookmarkChange()
         // 북마크 목록을 서버에서 받기 전에는 손대지 않습니다. 하트로 넣은 포즈만 남으면 북마크 칩을 눌러도 목록을 받지 않게 됩니다.
         guard isScrappedListLoaded else { return }
         if pose.isScrapped {
@@ -464,7 +513,7 @@ extension PoseFeature.State {
             }
         } else {
             // 받은 북마크 목록에 없는 포즈(아직 받지 않은 뒷페이지)를 해제해도 서버 개수는 하나 줄어듭니다. 목록에 있는지는 목록에서 뺄 때만 봅니다.
-            scrappedPoses.remove(id: pose.id)
+            if scrappedPoses.remove(id: pose.id) != nil { scrappedListShift += 1 }
             scrappedTotalCount = scrappedTotalCount.map { max($0 - 1, .zero) }
         }
     }
@@ -479,8 +528,19 @@ extension PoseFeature.State {
         if pose.isScrapped {
             scrappedPoses[id: pose.id] = pose
         } else {
+            recordBookmarkChange()
             scrappedPoses.remove(id: pose.id)
+            scrappedListShift += 1
             scrappedTotalCount = scrappedTotalCount.map { max($0 - 1, .zero) }
         }
+    }
+    
+    /// 북마크가 바뀐 것을 기록합니다.
+    ///
+    /// 받는 중인 북마크 목록 응답은 바뀌기 전 내용일 수 있어 버리게 합니다.
+    /// 받아 둔 북마크 목록이 있는데 북마크 탭 밖에서 바뀌었으면, 순서와 개수를 서버 기준으로 맞추도록 북마크 탭에 들어갈 때 첫 페이지부터 다시 받게 합니다.
+    private mutating func recordBookmarkChange() {
+        bookmarkGeneration &+= 1
+        if isScrappedListLoaded, isSelectedScrap == false { isScrappedListStale = true }
     }
 }

@@ -141,7 +141,9 @@ public final actor DefaultPoseRepository {
     private let maxRetryCount: Int = 3
     private let maxCachedPagesPerScope: Int = 5
     private let maxRandomHistoryCount: Int = 50
-    /// 목록을 최신순(등록일 내림차순)으로 명시해 요청합니다. 화면의 "최신순"이 서버 기본 정렬에 기대지 않게 합니다.
+    /// 포즈 목록을 최신순(등록일 내림차순)으로 명시해 요청하는 `sort` 값입니다. 화면의 "최신순"이 서버 기본 정렬에 기대지 않게 합니다.
+    private let latestFirstSort: String = "LATEST"
+    /// 북마크 목록을 최신순으로 요청하는 `sortOrder` 값입니다. 북마크 목록 API는 정렬 기준 없이 방향만 받습니다.
     private let latestFirstSortOrder: String = "DESC"
     
     @Dependency(\.networkProvider) private var networkProvider
@@ -467,7 +469,7 @@ extension DefaultPoseRepository: PoseRepository {
             size: pageSize,
             peopleCount: filter.peopleCount.map(convertToRawValue),
             relation: filter.relation.map(convertToRawValue),
-            sortBy: latestFirstSortOrder
+            sortBy: latestFirstSort
         )
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []

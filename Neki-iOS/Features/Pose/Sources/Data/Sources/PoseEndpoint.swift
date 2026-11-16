@@ -41,7 +41,7 @@ extension PoseEndpoint: Endpoint {
             if let size { params["size"] = String(size) }
             if let peopleCount { params["headCount"] = peopleCount }
             if let relation { params["relation"] = relation }
-            if let sortBy { params["sortOrder"] = sortBy }
+            if let sortBy { params["sort"] = sortBy }
             return params
             
         case .fetchPoseDetail:

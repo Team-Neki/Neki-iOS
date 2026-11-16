@@ -11,7 +11,7 @@ import Testing
 @testable import Neki_iOS
 
 struct DefaultPoseRepositoryListSortTests {
-    @Test("포즈 목록과 북마크 목록은 최신순(DESC)으로 요청한다")
+    @Test("포즈 목록은 sort=LATEST로, 북마크 목록은 sortOrder=DESC로 최신순을 요청한다")
     func fetchLists_requestLatestFirst() async throws {
         let networkProvider = PoseListNetworkProviderStub()
         let repository = makeRepository(networkProvider)
@@ -21,7 +21,7 @@ struct DefaultPoseRepositoryListSortTests {
 
         #expect(await networkProvider.requestedPaths == ["/poses", "/poses/scrap"])
         #expect(await networkProvider.requestedQueries == [
-            ["page": "0", "size": "20", "sortOrder": "DESC"],
+            ["page": "0", "size": "20", "sort": "LATEST"],
             ["page": "0", "size": "20", "sortOrder": "DESC"]
         ])
     }
@@ -35,8 +35,8 @@ struct DefaultPoseRepositoryListSortTests {
         _ = try await repository.fetchPoseList(page: .zero, pageSize: 20, filter: PoseListFilter(peopleCount: .overQuartet), refresh: true)
 
         #expect(await networkProvider.requestedQueries == [
-            ["page": "1", "size": "20", "headCount": "TWO", "relation": "SSUM", "sortOrder": "DESC"],
-            ["page": "0", "size": "20", "headCount": "FIVE_OR_MORE", "sortOrder": "DESC"]
+            ["page": "1", "size": "20", "headCount": "TWO", "relation": "SSUM", "sort": "LATEST"],
+            ["page": "0", "size": "20", "headCount": "FIVE_OR_MORE", "sort": "LATEST"]
         ])
     }
 

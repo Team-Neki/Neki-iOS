@@ -31,13 +31,7 @@ struct DeviceAuthorizationPreferenceFeature {
         var isCameraAuthorized: Bool { cameraAuthorizationStatus == .authorized }
         var isLocationAuthorized: Bool { locationAuthorizationStatus == .authorizedAlways || locationAuthorizationStatus == .authorizedWhenInUse }
         var isPhotosAuthorized: Bool { photosAuthorizationStatus == .authorized || photosAuthorizationStatus == .limited }
-        var isNotificationAuthorized: Bool {
-            switch notificationAuthorizationStatus {
-            case .authorized, .provisional, .ephemeral: true
-            case .notDetermined, .denied: false
-            @unknown default: false
-            }
-        }
+        var isNotificationAuthorized: Bool { NotificationPermission(notificationAuthorizationStatus) == .enabled }
     }
     
     enum Action: BindableAction {

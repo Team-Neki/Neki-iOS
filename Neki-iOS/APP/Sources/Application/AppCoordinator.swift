@@ -294,7 +294,7 @@ struct AppCoordinator {
                 .cancellable(id: CancelID.pushNotificationAuthorizationCheck, cancelInFlight: true)
 
             case let .checkPushNotificationAuthorizationResponse(.success(status)):
-                let currentAgreement = status.isPushNotificationAgreed
+                let currentAgreement = NotificationPermission(status) == .enabled
                 guard state.hasSynchronizedPushNotification == false ||
                       state.lastSynchronizedPushAgreement != currentAgreement
                 else { return .none }
@@ -320,7 +320,7 @@ struct AppCoordinator {
                 let shouldRetry = state.shouldRetryPushNotificationSynchronization
                 state.shouldRetryPushNotificationSynchronization = false
                 state.hasSynchronizedPushNotification = true
-                state.lastSynchronizedPushAgreement = status.isPushNotificationAgreed
+                state.lastSynchronizedPushAgreement = NotificationPermission(status) == .enabled
                 Logger.presentation.debug("Push notification synchronization succeeded")
                 guard shouldRetry else { return .none }
                 state.hasSynchronizedPushNotification = false
@@ -366,19 +366,6 @@ private extension NotificationGuideEntry {
             self = .regular
         case let .agreedToTerms(isMarketingTermAgreed):
             self = .afterTermsAgreement(isMarketingTermAgreed: isMarketingTermAgreed)
-        }
-    }
-}
-
-private extension UNAuthorizationStatus {
-    var isPushNotificationAgreed: Bool {
-        switch self {
-        case .authorized, .provisional, .ephemeral:
-            true
-        case .notDetermined, .denied:
-            false
-        @unknown default:
-            false
         }
     }
 }

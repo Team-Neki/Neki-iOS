@@ -204,7 +204,7 @@ struct MainTabCoordinator {
                         } else {
                             resolvedStatus = status
                         }
-                        if resolvedStatus.canPresentNotificationList {
+                        if NotificationPermission(resolvedStatus) == .enabled {
                             _ = try? await pushNotificationClient.synchronizeDeviceToken()
                         }
                         return resolvedStatus
@@ -212,7 +212,7 @@ struct MainTabCoordinator {
                 }
 
             case let .pushNotificationListAuthorizationResponse(.success(status)):
-                guard status.canPresentNotificationList else {
+                guard NotificationPermission(status) == .enabled else {
                     state.isPushNotificationPermissionAlertPresented = true
                     return .none
                 }
@@ -390,15 +390,5 @@ extension MainTabCoordinator {
         let tab: NekiTab
         let isOnTop: Bool
         let isCovered: Bool
-    }
-}
-
-private extension UNAuthorizationStatus {
-    var canPresentNotificationList: Bool {
-        switch self {
-        case .authorized, .provisional, .ephemeral: true
-        case .notDetermined, .denied: false
-        @unknown default: false
-        }
     }
 }

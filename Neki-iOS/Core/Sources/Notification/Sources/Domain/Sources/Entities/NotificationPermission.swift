@@ -8,7 +8,7 @@
 import Foundation
 import UserNotifications
 
-/// 기기 알림 권한을 알림 안내에서 쓰는 세 가지 상태로 나눈 값입니다.
+/// 기기 알림 권한을 앱에서 쓰는 세 가지 상태로 나눈 값입니다. 알림 권한은 이 값으로만 해석합니다.
 enum NotificationPermission: Equatable, Sendable {
     /// 알림이 켜져 있습니다(허용, 임시 허용, 앱 클립 임시 허용).
     case enabled

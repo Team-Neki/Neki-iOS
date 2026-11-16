@@ -34,6 +34,19 @@ struct KSTDayTests {
 
         #expect(decoded == day)
     }
+
+    @Test(
+        "지난 날 수를 한국 날짜로 센다",
+        arguments: [
+            (KSTDay(year: 2026, month: 11, day: 10), KSTDay(year: 2026, month: 11, day: 10), 0),
+            (KSTDay(year: 2026, month: 11, day: 10), KSTDay(year: 2026, month: 11, day: 4), 6),
+            (KSTDay(year: 2026, month: 11, day: 4), KSTDay(year: 2026, month: 10, day: 28), 7),
+            (KSTDay(year: 2027, month: 1, day: 3), KSTDay(year: 2026, month: 12, day: 27), 7)
+        ]
+    )
+    func days_sinceEarlierDay_countsCalendarDays(day: KSTDay, earlier: KSTDay, expected: Int) {
+        #expect(day.days(since: earlier) == expected)
+    }
 }
 
 private extension KSTDayTests {

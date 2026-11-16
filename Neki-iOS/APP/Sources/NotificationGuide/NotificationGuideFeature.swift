@@ -124,7 +124,7 @@ struct NotificationGuideFeature {
                     permission: NotificationPermission(status),
                     isMarketingAgreed: user.marketingTermAgreed
                 )
-                record.withLock { $0.apply(decision, today: today, appVersion: appVersion) }
+                record.withLock { $0.applyUpdateEntry(decision, today: today, appVersion: appVersion) }
                 if case let .guide(kind) = decision { state.modal = kind }
                 return .none
 

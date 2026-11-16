@@ -15,6 +15,7 @@ import UserNotifications
 ///
 /// - 약관 동의를 마치고 들어오면, 이벤트·혜택 알림에 동의한 경우 모달 없이 OS 알림 팝업을 띄웁니다.
 /// - 그 밖에는 앱 버전마다 한 번 상태에 맞는 모달을 띄웁니다. 자동 안내는 하루에 한 번만 띄웁니다.
+/// - 지점 상세에 들어오면, 이 경로에서 안내한 지 7일이 지났을 때 상태에 맞는 모달을 띄웁니다. 허용하든 취소하든 상세는 그대로 둡니다.
 /// - 공유로 사진을 가져오는 실행에서는 모달이 앨범 선택 화면을 막지 않도록 띄우지 않습니다.
 @Reducer
 struct NotificationGuideFeature {
@@ -48,6 +49,7 @@ struct NotificationGuideFeature {
         case mainTabAppeared(isFirstScreenCovered: Bool)
         case sceneDidBecomeActive
         case shareEntryStarted
+        case photoBoothDetailEntered
 
         // View Actions
         case confirmButtonTapped
@@ -56,6 +58,7 @@ struct NotificationGuideFeature {
         // Internal Actions
         case termsEntryAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case updateEntryAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
+        case photoBoothDetailAuthorizationResponse(Result<UNAuthorizationStatus, Error>)
         case marketingConsentResponse(Result<Void, Error>)
         case authorizationRequestFinished
         case notificationSettingsOpened(Bool)
@@ -130,6 +133,34 @@ struct NotificationGuideFeature {
 
             case let .updateEntryAuthorizationResponse(.failure(error)):
                 Logger.presentation.error("업데이트 후 첫 진입 알림 권한 확인 실패: \(error)")
+                return .none
+
+            case .photoBoothDetailEntered:
+                // 다른 안내를 띄웠거나 처리하는 중이면 겹쳐 띄우지 않습니다.
+                guard state.user != nil, state.modal == nil, state.isProcessing == false else { return .none }
+                return .run { send in
+                    await send(.photoBoothDetailAuthorizationResponse(Result {
+                        try await pushNotificationClient.checkAuthorizationStatus()
+                    }))
+                }
+
+            case let .photoBoothDetailAuthorizationResponse(.success(status)):
+                // 권한을 확인하는 사이에 다른 안내를 띄웠으면 넘깁니다.
+                guard state.modal == nil, state.isProcessing == false, let user = state.user else { return .none }
+                let today = now.kstDay
+                let record = guideRecord(for: user)
+                let decision = NotificationGuideDecision.photoBoothDetail(
+                    record: record.wrappedValue,
+                    today: today,
+                    permission: NotificationPermission(status),
+                    isMarketingAgreed: user.marketingTermAgreed
+                )
+                record.withLock { $0.applyPhotoBoothDetail(decision, today: today) }
+                if case let .guide(kind) = decision { state.modal = kind }
+                return .none
+
+            case let .photoBoothDetailAuthorizationResponse(.failure(error)):
+                Logger.presentation.error("지점 상세 진입 알림 권한 확인 실패: \(error)")
                 return .none
 
             case .confirmButtonTapped:

@@ -172,6 +172,24 @@ struct MainTabCoordinatorTests {
         #expect(checks.value == 0)
     }
 
+    @Test("지도에서 지점 상세를 열면 알림 안내가 알림 권한을 확인해 상태에 맞는 모달을 띄운다")
+    func mapPhotoBoothDetailOpened_presentsNotificationGuideModal() async {
+        // 앱 저장소는 테스트 함수마다 하나라서, 다시 돌 때 이전 실행이 남긴 안내 기록을 비우고 시작합니다.
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Self.user.id))) var guideRecord = NotificationGuideRecord()
+        $guideRecord.withLock { $0 = NotificationGuideRecord() }
+        let store = makeStore {
+            $0.$userSessionStatus.withLock { $0 = .signedIn(Self.user) }
+        } dependencies: {
+            $0.pushNotificationClient.checkAuthorizationStatus = { .notDetermined }
+            $0.date.now = Date(timeIntervalSince1970: 1_794_272_400)
+        }
+
+        await store.send(.map(.root(.didTapBooth(Self.photoBooth)))).finish()
+
+        #expect(store.map.root.selectedBooth == Self.photoBooth)
+        #expect(store.notificationGuide.modal == .consentAndEnable)
+    }
+
     @Test("알림 안내가 보낸 토스트를 메인 탭 토스트로 띄운다")
     func notificationGuideToast_showsMainTabToast() async {
         let store = makeStore()
@@ -216,6 +234,17 @@ private extension MainTabCoordinatorTests {
             }
             dependencies(&$0)
         }
+    }
+
+    /// 지도에서 고르는 테스트 지점입니다.
+    static var photoBooth: PhotoBooth {
+        PhotoBooth(
+            id: "1",
+            brand: PhotoBoothBrand(id: 2, name: "인생네컷", englishName: "LIFE4CUT", imageURL: nil),
+            name: "강남1호점",
+            coordinate: .init(latitude: 37.5021077, longitude: 127.0271830),
+            address: "서울 강남구 강남대로102길 16"
+        )
     }
 
     /// 필수 약관에 모두 동의한 테스트 사용자입니다.

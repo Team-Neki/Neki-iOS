@@ -255,6 +255,9 @@ struct MainTabCoordinator {
                 state.toast = item
                 return .none
                 
+            case .map(.delegate(.didOpenPhotoBoothDetail)):
+                return .send(.notificationGuide(.photoBoothDetailEntered))
+                
             case .myPage(.delegate(.didLogout)):
                 return .run { send in
                     await send(.archive(.root(.clearData)))

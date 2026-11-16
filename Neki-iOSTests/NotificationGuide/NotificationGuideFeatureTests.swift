@@ -460,6 +460,90 @@ struct NotificationGuideFeatureTests {
         #expect(records.value == ["check"])
         #expect(record == NotificationGuideRecord(updateEntryJudgedVersion: Fixture.version))
     }
+
+    // MARK: - 지점 상세 진입
+
+    @Test("지점 상세에 들어오면 상태에 맞는 모달을 띄우고 오늘 날짜를 하루 한 번 기록과 이 경로 기록에 남긴다")
+    func photoBoothDetailEntered_presentsModalAndRecordsDays() async {
+        let records = LockIsolated<[String]>([])
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(
+            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: Fixture.version),
+            records: records
+        )
+
+        await store.send(.photoBoothDetailEntered)
+        await store.receive(\.photoBoothDetailAuthorizationResponse.success) { $0.modal = .consentAndEnable }
+
+        #expect(records.value == ["check"])
+        #expect(record == NotificationGuideRecord(
+            lastAutomaticGuideDay: Fixture.today,
+            updateEntryJudgedVersion: Fixture.version,
+            photoBoothDetailGuidedDay: Fixture.today
+        ))
+    }
+
+    @Test("지점 상세에서 안내한 지 7일이 지나지 않았으면 모달을 띄우지 않고 기록도 바꾸지 않는다")
+    func photoBoothDetailEntered_withinSevenDays_skips() async {
+        let records = LockIsolated<[String]>([])
+        let guidedDay = KSTDay(year: 2026, month: 11, day: 4)
+        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: guidedDay, photoBoothDetailGuidedDay: guidedDay)
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(guideRecord: seeded, records: records)
+
+        await store.send(.photoBoothDetailEntered)
+        await store.receive(\.photoBoothDetailAuthorizationResponse.success)
+
+        #expect(record == seeded)
+    }
+
+    @Test("지점 상세에서 안내한 지 7일이 지나면 다시 모달을 띄운다")
+    func photoBoothDetailEntered_afterSevenDays_presentsModal() async {
+        let records = LockIsolated<[String]>([])
+        let guidedDay = KSTDay(year: 2026, month: 11, day: 3)
+        let store = makeStore(
+            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: guidedDay, photoBoothDetailGuidedDay: guidedDay),
+            records: records
+        )
+
+        await store.send(.photoBoothDetailEntered)
+        await store.receive(\.photoBoothDetailAuthorizationResponse.success) { $0.modal = .consentAndEnable }
+    }
+
+    @Test("오늘 다른 자동 안내를 띄웠으면 지점 상세에서 모달을 띄우지 않는다")
+    func photoBoothDetailEntered_guideShownToday_skips() async {
+        let records = LockIsolated<[String]>([])
+        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version)
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(guideRecord: seeded, records: records)
+
+        await store.send(.photoBoothDetailEntered)
+        await store.receive(\.photoBoothDetailAuthorizationResponse.success)
+
+        #expect(record == seeded)
+    }
+
+    @Test("알림이 켜져 있고 동의도 했으면 지점 상세에서 모달을 띄우지 않고 기록도 남기지 않는다")
+    func photoBoothDetailEntered_enabledAndAgreed_skipsWithoutRecording() async {
+        let records = LockIsolated<[String]>([])
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        let store = makeStore(isMarketingAgreed: true, authorizationStatus: .authorized, records: records)
+
+        await store.send(.photoBoothDetailEntered)
+        await store.receive(\.photoBoothDetailAuthorizationResponse.success)
+
+        #expect(record == NotificationGuideRecord())
+    }
+
+    @Test("다른 안내 모달이 떠 있으면 지점 상세에 들어와도 알림 권한을 확인하지 않는다")
+    func photoBoothDetailEntered_whileModalPresented_ignores() async {
+        let records = LockIsolated<[String]>([])
+        let store = makeStore(records: records) { $0.modal = .consentOnly }
+
+        await store.send(.photoBoothDetailEntered)
+
+        #expect(records.value.isEmpty)
+    }
 }
 
 // MARK: - Helpers

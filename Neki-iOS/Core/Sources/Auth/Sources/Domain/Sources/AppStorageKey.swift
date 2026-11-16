@@ -10,9 +10,4 @@ import Foundation
 public struct AppStorageKey {
     public static let userSessionStatus: String = "UserSessionStatus"
     public static let recentLoginProvider: String = "RecentLoginProvider"
-
-    public static func notificationGuideRecord(userID: Int) -> String {
-        "NotificationGuideRecord_\(userID)"
-    }
-
 }

@@ -195,7 +195,7 @@ private extension NotificationGuideFeature {
     func guideRecord(for user: User) -> Shared<NotificationGuideRecord> {
         Shared(
             wrappedValue: NotificationGuideRecord(),
-            .appStorage(AppStorageKey.notificationGuideRecord(userID: user.id))
+            .appStorage(NotificationGuideRecord.storageKey(userID: user.id))
         )
     }
 

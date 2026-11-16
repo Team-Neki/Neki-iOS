@@ -20,7 +20,7 @@ struct NotificationGuideFeatureTests {
     func mainTabAppeared_guideShownToday_skipsWithoutRecording() async {
         let records = LockIsolated<[String]>([])
         let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: "1.4.0")
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
@@ -34,7 +34,7 @@ struct NotificationGuideFeatureTests {
     func mainTabAppeared_versionJudged_skips() async {
         let records = LockIsolated<[String]>([])
         let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: Fixture.version)
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
@@ -46,7 +46,7 @@ struct NotificationGuideFeatureTests {
     @Test("알림이 켜져 있고 동의도 했으면 모달 없이 이 버전을 판단한 것으로 남긴다")
     func mainTabAppeared_enabledAndAgreed_marksJudged() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(isMarketingAgreed: true, authorizationStatus: .authorized, records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
@@ -73,7 +73,7 @@ struct NotificationGuideFeatureTests {
         expected: NotificationGuideKind
     ) async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(
             guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: "1.4.0"),
             isMarketingAgreed: isMarketingAgreed,
@@ -90,7 +90,7 @@ struct NotificationGuideFeatureTests {
     @Test("첫 화면이 다른 화면에 가려져 있으면 판단하지 않고 기록도 남기지 않는다")
     func mainTabAppeared_firstScreenCovered_skips() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: true)) { $0.hasStarted = true }
@@ -114,7 +114,7 @@ struct NotificationGuideFeatureTests {
     @Test("알림 권한을 확인하지 못하면 기록하지 않는다")
     func mainTabAppeared_authorizationCheckFails_recordsNothing() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(records: records) { _ in } dependencies: {
             $0.pushNotificationClient.checkAuthorizationStatus = { throw Failure() }
         }
@@ -340,7 +340,7 @@ struct NotificationGuideFeatureTests {
     @Test("공유로 사진을 가져오는 실행에서는 업데이트 후 첫 진입 안내를 판단하지 않고 기록도 남기지 않는다")
     func mainTabAppeared_afterShareEntry_skipsWithoutRecording() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(records: records)
 
         await store.send(.shareEntryStarted) { $0.isSuppressedByShare = true }
@@ -354,7 +354,7 @@ struct NotificationGuideFeatureTests {
     func updateEntryAuthorizationResponse_afterShareEntry_skipsWithoutRecording() async {
         let records = LockIsolated<[String]>([])
         let clock = TestClock()
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(records: records) { _ in } dependencies: {
             $0.pushNotificationClient.checkAuthorizationStatus = {
                 try await clock.sleep(for: .seconds(1))
@@ -373,7 +373,7 @@ struct NotificationGuideFeatureTests {
     @Test("떠 있던 안내 모달은 공유가 들어오면 닫는다. 띄운 기록은 남아 이 버전에서는 다시 띄우지 않는다")
     func shareEntryStarted_closesPresentedModal() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
@@ -415,7 +415,7 @@ struct NotificationGuideFeatureTests {
     @Test("약관에서 이벤트·혜택 알림에 동의했고 아직 묻지 않았으면 모달 없이 OS 알림 팝업을 띄운다")
     func mainTabAppeared_afterTermsWithConsent_requestsAuthorization() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(entry: .afterTermsAgreement(isMarketingTermAgreed: true), isMarketingAgreed: true, records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
@@ -429,7 +429,7 @@ struct NotificationGuideFeatureTests {
     @Test("약관에서 이벤트·혜택 알림에 동의하지 않았으면 아무것도 띄우지 않고 이 버전을 판단한 것으로 남긴다")
     func mainTabAppeared_afterTermsWithoutConsent_marksJudgedOnly() async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(entry: .afterTermsAgreement(isMarketingTermAgreed: false), records: records)
 
         await store.send(.mainTabAppeared(isFirstScreenCovered: true)) { $0.hasStarted = true }
@@ -446,7 +446,7 @@ struct NotificationGuideFeatureTests {
     )
     func mainTabAppeared_afterTermsAlreadyDecided_doesNotRequest(status: UNAuthorizationStatus) async {
         let records = LockIsolated<[String]>([])
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var record = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(
             entry: .afterTermsAgreement(isMarketingTermAgreed: true),
             isMarketingAgreed: true,
@@ -478,7 +478,7 @@ private extension NotificationGuideFeatureTests {
         update: (inout NotificationGuideFeature.State) -> Void = { _ in },
         dependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> TestStoreOf<NotificationGuideFeature> {
-        @Shared(.appStorage(AppStorageKey.notificationGuideRecord(userID: Fixture.userID))) var storedRecord = NotificationGuideRecord()
+        @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var storedRecord = NotificationGuideRecord()
         $storedRecord.withLock { $0 = guideRecord }
         var state = NotificationGuideFeature.State(entry: entry)
         state.$userSessionStatus.withLock { $0 = .signedIn(Fixture.user(isMarketingAgreed: isMarketingAgreed)) }

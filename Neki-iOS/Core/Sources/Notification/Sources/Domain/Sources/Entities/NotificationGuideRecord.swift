@@ -19,6 +19,11 @@ struct NotificationGuideRecord: Codable, Equatable, Sendable {
         self.updateEntryJudgedVersion = updateEntryJudgedVersion
     }
 
+    /// 사용자별 기록을 저장하는 키입니다.
+    static func storageKey(userID: Int) -> String {
+        "NotificationGuideRecord_\(userID)"
+    }
+
     /// 판단 결과를 기록에 남깁니다.
     ///
     /// 안내할 때 버전과 날짜를 함께 남기므로, 취소·OS 거부·설정에서 켜지 않음은 모두 다음 버전까지 다시 띄우지 않습니다.

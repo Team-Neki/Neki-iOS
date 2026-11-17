@@ -245,7 +245,9 @@ private extension DefaultPoseRepository {
         excluding excludedIDs: Set<PoseID>
     ) async throws -> Pose {
         let peopleCountValue = convertToRawValue(peopleCount)
-        let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue)
+        // 최근 본 포즈를 제외 ID로 보내 서버가 그 포즈를 빼고 고르게 합니다.
+        // 서버가 제외를 지키지 않거나 요청이 실패할 때를 위해 아래의 겹침 확인과 앱 메모리 대체는 그대로 둡니다.
+        let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue, excludedPoseIDs: excludedIDs.sorted())
         
         @Sendable func requestSinglePose() async throws -> Pose {
             try Task.checkCancellation()

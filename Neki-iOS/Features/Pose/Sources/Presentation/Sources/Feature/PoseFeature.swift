@@ -145,6 +145,8 @@ struct PoseFeature {
             case didTapStartRandomPose(PeopleCountOption)
             case qrScanButtonTapped
             case requestNotificationList
+            /// 다음 페이지를 받아 보이는 목록에 붙였을 때 보냅니다. 열린 상세 화면이 늘어난 목록을 이어 넘깁니다.
+            case didLoadMorePoses
         }
         
         // Binding Action
@@ -307,7 +309,8 @@ struct PoseFeature {
                     if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
-                return .none
+                // 다음 페이지를 받았으면 열린 상세 화면이 이어 넘기도록 알립니다.
+                return page == .zero ? .none : .send(.delegate(.didLoadMorePoses))
                 
             case let .fetchListResponse(scope, page, .failure(error)):
                 switch scope {

@@ -74,6 +74,12 @@ struct PoseCoordinator {
             case .path(.element(_, action: .detail(.delegate(.requestMorePoses)))):
                 return .send(.root(.loadMoreItems))
                 
+            case .root(.delegate(.didLoadMorePoses)):
+                // 그리드 목록이 다음 페이지를 받으면 열린 상세 화면에 늘어난 목록을 넘깁니다. 이어 붙일지는 상세 화면이 정합니다.
+                let poses = state.root.visiblePoses
+                let detailIDs = state.path.ids.filter { state.path[id: $0]?.detail != nil }
+                return .merge(detailIDs.map { .send(.path(.element(id: $0, action: .detail(.appendPoses(poses))))) })
+                
             case let .path(.element(_, action: .randomPose(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 

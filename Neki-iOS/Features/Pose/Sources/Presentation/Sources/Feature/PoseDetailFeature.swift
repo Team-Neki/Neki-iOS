@@ -17,7 +17,7 @@ struct PoseDetailFeature {
         var selectedID: PoseID
         /// 그리드 목록을 이어 넘기는 상세인지입니다.
         ///
-        /// 그리드에서 연 상세는 끝 가까이 넘기면 다음 페이지를 요청합니다.
+        /// 그리드에서 연 상세는 끝 가까이 넘기면 다음 페이지를 요청하고, 그리드 목록이 받은 포즈를 끝에 붙입니다.
         /// 랜덤 포즈에서 연 상세는 그 랜덤 포즈가 목록에 없으면 목록 끝에 붙여 열기 때문에, 그 뒤로 그리드 목록을 잇지 않습니다.
         let followsList: Bool
         var currentPose: Pose? { poses[id: selectedID] }
@@ -71,6 +71,8 @@ struct PoseDetailFeature {
         case didTapBackButton
         
         // Internal Actions
+        /// 그리드 목록이 다음 페이지를 받으면 늘어난 목록을 받습니다. 상세에 없는 포즈만 끝에 붙입니다.
+        case appendPoses([Pose])
         case poseDetailResponse(PoseID, Result<Pose, Error>)
         case scrapResponse(Pose, Result<Void, Error>)
         
@@ -126,6 +128,13 @@ struct PoseDetailFeature {
                 return .run { _ in await dismiss() }
                 
                 // MARK: - Internal Actions
+            case let .appendPoses(poses):
+                guard state.followsList else { return .none }
+                // 이미 있는 포즈는 건너뛰므로, 북마크를 해제해 그리드 목록에서 빠진 포즈도 상세에서는 제자리에 남습니다.
+                state.poses.append(contentsOf: poses)
+                // 붙인 포즈가 적어 아직 끝 가까이면 다시 요청합니다. 마지막 페이지까지 받았으면 그리드 목록이 더 받지 않습니다.
+                return requestMorePosesIfNeeded(state)
+                
             case let .poseDetailResponse(requestID, .success(pose)):
                 guard state.selectedID == requestID || state.poses[id: pose.id] != nil else { return .none }
                 state.updatePose(pose)

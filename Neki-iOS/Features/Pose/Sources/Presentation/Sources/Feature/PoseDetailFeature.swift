@@ -60,7 +60,10 @@ struct PoseDetailFeature {
         // Delegate Actions
         case delegate(Delegate)
         enum Delegate {
+            /// 하트를 누르거나 북마크 요청이 실패해 되돌렸을 때 보냅니다.
             case poseUpdated(Pose)
+            /// 서버에서 포즈 정보를 받았을 때 보냅니다. 북마크를 바꾼 것이 아니어서 하트 변경과 나눠 알립니다.
+            case poseFetched(Pose)
         }
     }
     
@@ -107,7 +110,7 @@ struct PoseDetailFeature {
             case let .poseDetailResponse(requestID, .success(pose)):
                 guard state.selectedID == requestID || state.poses[id: pose.id] != nil else { return .none }
                 state.updatePose(pose)
-                return .send(.delegate(.poseUpdated(pose)))
+                return .send(.delegate(.poseFetched(pose)))
 
             case let .poseDetailResponse(requestID, .failure(error)):
                 if error is CancellationError { return .none }

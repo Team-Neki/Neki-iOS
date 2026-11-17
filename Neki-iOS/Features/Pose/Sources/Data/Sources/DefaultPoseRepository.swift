@@ -13,6 +13,7 @@ import os
 private struct Page {
     let poseIDs: [PoseID]
     let hasNext: Bool
+    let totalCount: Int?
 }
 
 private struct PoseEntityCache {
@@ -124,7 +125,8 @@ private struct PoseEntityCache {
 
 public final actor DefaultPoseRepository {
     private var cache = PoseEntityCache(maxCount: 300)
-    private var generalPages: [PageID: Page] = [:]
+    /// 조건마다 받은 페이지입니다. 조건이 다른 목록끼리 섞이지 않게 나눠 둡니다.
+    private var generalPages: [PoseListFilter: [PageID: Page]] = [:]
     private var scrappedPages: [PageID: Page] = [:]
     private var activeRandomPosePeopleCount: PeopleCountOption = .solo
     private var randomPoseHistoryIDs: [PoseID] = []
@@ -139,7 +141,9 @@ public final actor DefaultPoseRepository {
     private let maxRetryCount: Int = 3
     private let maxCachedPagesPerScope: Int = 5
     private let maxRandomHistoryCount: Int = 50
-    /// 목록을 최신순(등록일 내림차순)으로 명시해 요청합니다. 화면의 "최신순"이 서버 기본 정렬에 기대지 않게 합니다.
+    /// 포즈 목록을 최신순(등록일 내림차순)으로 명시해 요청하는 `sort` 값입니다. 화면의 "최신순"이 서버 기본 정렬에 기대지 않게 합니다.
+    private let latestFirstSort: String = "LATEST"
+    /// 북마크 목록을 최신순으로 요청하는 `sortOrder` 값입니다. 북마크 목록 API는 정렬 기준 없이 방향만 받습니다.
     private let latestFirstSortOrder: String = "DESC"
     
     @Dependency(\.networkProvider) private var networkProvider
@@ -158,6 +162,14 @@ private extension DefaultPoseRepository {
         case .trio: return "THREE"
         case .quartet: return "FOUR"
         case .overQuartet: return "FIVE_OR_MORE"
+        }
+    }
+    
+    func convertToRawValue(_ relation: PoseRelation) -> String {
+        switch relation {
+        case .friend: return "FRIEND"
+        case .couple: return "COUPLE"
+        case .crush: return "SSUM"
         }
     }
     
@@ -202,6 +214,11 @@ private extension DefaultPoseRepository {
         return handled
     }
     
+    /// 진행 중인 북마크 요청이 모두 끝날 때까지 기다립니다. 요청이 실패해도 기다리기만 합니다.
+    func waitForPendingScrapRequests() async {
+        for task in Array(scrapTasks.values) { _ = await task.result }
+    }
+    
     /// 스크랩 목록에서 캐시를 갱신합니다. (스크랩 등록 또는 취소 시)
     /// - Parameters:
     ///     - poseID: 대상 포즈 식별자
@@ -212,7 +229,7 @@ private extension DefaultPoseRepository {
                 guard let index = page.poseIDs.firstIndex(of: poseID) else { continue }
                 var currentIDs = page.poseIDs
                 currentIDs.remove(at: index)
-                scrappedPages[pageID] = Page(poseIDs: currentIDs, hasNext: page.hasNext)
+                scrappedPages[pageID] = Page(poseIDs: currentIDs, hasNext: page.hasNext, totalCount: page.totalCount)
             }
             return
         }
@@ -220,7 +237,7 @@ private extension DefaultPoseRepository {
         guard scrappedPages.isEmpty == false, let lastPageID = scrappedPages.keys.max(), let lastPage = scrappedPages[lastPageID], lastPage.poseIDs.contains(poseID) == false else { return }
         var currentIDs = lastPage.poseIDs
         currentIDs.append(poseID)
-        scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext)
+        scrappedPages[lastPageID] = Page(poseIDs: currentIDs, hasNext: lastPage.hasNext, totalCount: lastPage.totalCount)
     }
     
     func fetchRandomPose(
@@ -310,9 +327,11 @@ private extension DefaultPoseRepository {
     }
 
     func removePagesContainingMissingCachedPose() {
-        for (pageID, page) in generalPages {
-            guard page.poseIDs.contains(where: { cache.contains($0) == false }) else { continue }
-            generalPages[pageID] = nil
+        for (filter, pages) in generalPages {
+            for (pageID, page) in pages {
+                guard page.poseIDs.contains(where: { cache.contains($0) == false }) else { continue }
+                generalPages[filter]?[pageID] = nil
+            }
         }
 
         for (pageID, page) in scrappedPages {
@@ -335,9 +354,11 @@ private extension DefaultPoseRepository {
     }
 
     func removeEvictedReferences(_ removedIDs: Set<PoseID>) {
-        for (pageID, page) in generalPages {
-            guard page.poseIDs.contains(where: { removedIDs.contains($0) }) else { continue }
-            generalPages[pageID] = nil
+        for (filter, pages) in generalPages {
+            for (pageID, page) in pages {
+                guard page.poseIDs.contains(where: { removedIDs.contains($0) }) else { continue }
+                generalPages[filter]?[pageID] = nil
+            }
         }
 
         for (pageID, page) in scrappedPages {
@@ -356,10 +377,10 @@ private extension DefaultPoseRepository {
         committedRandomPoseIDs = committedRandomPoseIDs.filter { removedIDs.contains($0.value) == false }
     }
 
-    func trimGeneralPagesIfNeeded() {
-        guard generalPages.count > maxCachedPagesPerScope else { return }
-        let removablePageIDs = generalPages.keys.sorted().prefix(generalPages.count - maxCachedPagesPerScope)
-        removablePageIDs.forEach { generalPages[$0] = nil }
+    func trimGeneralPagesIfNeeded(for filter: PoseListFilter) {
+        guard let pages = generalPages[filter], pages.count > maxCachedPagesPerScope else { return }
+        let removablePageIDs = pages.keys.sorted().prefix(pages.count - maxCachedPagesPerScope)
+        removablePageIDs.forEach { generalPages[filter]?[$0] = nil }
         trimPoseCacheIfNeeded()
     }
 
@@ -388,11 +409,11 @@ private extension DefaultPoseRepository {
         committedRandomPoseIDs = committedRandomPoseIDs.filter { $0.key >= minimumSequence }
     }
 
-    func cachedPageResponse(_ page: Page?) -> (poses: [Pose], hasNext: Bool)? {
+    func cachedPageResponse(_ page: Page?) -> PoseListPage? {
         guard let page,
               let poses = cache.values(for: page.poseIDs)
         else { return nil }
-        return (poses, page.hasNext)
+        return PoseListPage(poses: poses, hasNext: page.hasNext, totalCount: page.totalCount)
     }
 
     func initializeRandomPoseHistory(peopleCount: PeopleCountOption) async throws -> Pose {
@@ -444,14 +465,21 @@ private extension DefaultPoseRepository {
 // MARK: - DefaultPoseRepository + PoseRepository
 
 extension DefaultPoseRepository: PoseRepository {
-    public func fetchPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
+    public func fetchPoseList(page: PageID, pageSize: Int, filter: PoseListFilter, refresh: Bool) async throws -> PoseListPage {
         if refresh { generalPages.removeAll() }
-        else if let cachedResponse = cachedPageResponse(generalPages[page]) { return cachedResponse }
+        else if let cachedResponse = cachedPageResponse(generalPages[filter]?[page]) { return cachedResponse }
         
-        let endpoint = PoseEndpoint.fetchPoseList(page: page, size: pageSize, peopleCount: nil, sortBy: latestFirstSortOrder)
+        let endpoint = PoseEndpoint.fetchPoseList(
+            page: page,
+            size: pageSize,
+            peopleCount: filter.peopleCount.map(convertToRawValue),
+            relation: filter.relation.map(convertToRawValue),
+            sortBy: latestFirstSort
+        )
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
+        let totalCount = responseDTO.data?.totalCount
         
         var handled: [Pose] = []
         var poseIDs: [PoseID] = []
@@ -462,19 +490,22 @@ extension DefaultPoseRepository: PoseRepository {
             handled.append(pose)
             poseIDs.append(pose.id)
         }
-        generalPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
-        trimGeneralPagesIfNeeded()
-        return (handled, hasNext)
+        generalPages[filter, default: [:]][page] = Page(poseIDs: poseIDs, hasNext: hasNext, totalCount: totalCount)
+        trimGeneralPagesIfNeeded(for: filter)
+        return PoseListPage(poses: handled, hasNext: hasNext, totalCount: totalCount)
     }
     
-    public func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> (poses: [Pose], hasNext: Bool) {
+    public func fetchScrappedPoseList(page: PageID, pageSize: Int, refresh: Bool) async throws -> PoseListPage {
         if refresh { scrappedPages.removeAll() }
         else if let cachedResponse = cachedPageResponse(scrappedPages[page]) { return cachedResponse }
         
+        // 북마크 요청이 서버에 닿기 전에 목록을 받으면 방금 누른 북마크가 빠지거나 해제한 포즈가 다시 오므로, 진행 중인 북마크 요청이 끝난 뒤 받습니다.
+        await waitForPendingScrapRequests()
         let endpoint = PoseEndpoint.fetchScrappedPoseList(page: page, size: pageSize, sortBy: latestFirstSortOrder)
         let responseDTO: BaseResponseDTO<PoseListDTO.Response> = try await networkProvider.request(endpoint: endpoint)
         let items = responseDTO.data?.items ?? []
         let hasNext = responseDTO.data?.hasNext ?? false
+        let totalCount = responseDTO.data?.totalCount
         
         var handled: [Pose] = []
         var poseIDs: [PoseID] = []
@@ -487,9 +518,9 @@ extension DefaultPoseRepository: PoseRepository {
             handled.append(pose)
             poseIDs.append(pose.id)
         }
-        scrappedPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext)
+        scrappedPages[page] = Page(poseIDs: poseIDs, hasNext: hasNext, totalCount: totalCount)
         trimScrappedPagesIfNeeded()
-        return (handled, hasNext)
+        return PoseListPage(poses: handled, hasNext: hasNext, totalCount: totalCount)
     }
     
     public func fetchPoseDetail(id: PoseID) async throws -> Pose {

@@ -113,35 +113,82 @@ struct PoseFilterRuleTests {
         #expect(state.selectedCountFilterOption == nil)
     }
 
-    @Test("2인을 고른 상태에서 관계 태그만 고르거나 바꾸거나 해제하면 목록 조건은 그대로다")
-    func relationOnlyChanges_keepListCondition() {
+    @Test("2인을 고른 상태에서 관계 태그를 고르거나 바꾸거나 해제하면 서버에 보낼 목록 조건이 바뀐다")
+    func relationChanges_changeListCondition() {
         var state = PoseFeature.State()
         state.togglePeopleCountFilter(.duo)
-        let condition = state.listCondition
+        var filters = [state.listCondition.filter]
 
         state.toggleRelationFilter(.friend)
-        #expect(state.listCondition == condition)
-
+        filters.append(state.listCondition.filter)
         state.toggleRelationFilter(.couple)
-        #expect(state.listCondition == condition)
-
+        filters.append(state.listCondition.filter)
         state.toggleRelationFilter(.couple)
-        #expect(state.listCondition == condition)
+        filters.append(state.listCondition.filter)
+
+        #expect(filters == [
+            PoseListFilter(peopleCount: .duo),
+            PoseListFilter(peopleCount: .duo, relation: .friend),
+            PoseListFilter(peopleCount: .duo, relation: .couple),
+            PoseListFilter(peopleCount: .duo)
+        ])
     }
 
-    @Test("받은 포즈가 없고 끝까지 불러오지 않았으면 포즈 개수를 숨긴다")
-    func displayedPoseCount_whileFirstPageLoading_isNil() {
+    @Test("지금 조건의 첫 페이지를 받기 전에는 포즈 개수를 숨긴다")
+    func displayedPoseCount_beforeFirstPageOfCondition_isNil() {
         var state = PoseFeature.State()
-        state.isGeneralLoading = true
+        state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 51
+        state.toggleRelationFilter(.friend)
 
         #expect(state.displayedPoseCount == nil)
     }
 
-    @Test("끝까지 불러온 목록이 비어 있으면 포즈 개수를 0개로 보여 준다")
-    func displayedPoseCount_whenLastPageIsEmpty_isZero() {
+    @Test("지금 조건의 첫 페이지를 받았으면 서버가 알려 준 전체 개수를 보여 준다")
+    func displayedPoseCount_afterFirstPage_isTotalCount() {
         var state = PoseFeature.State()
-        state.isLastGeneralPage = true
+        state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 51
 
-        #expect(state.displayedPoseCount == 0)
+        #expect(state.displayedPoseCount == 51)
+    }
+
+    @Test("북마크 목록에서는 북마크 전체 개수를 보여 준다")
+    func displayedPoseCount_inBookmark_isScrappedTotalCount() {
+        var state = PoseFeature.State()
+        state.loadedGeneralFilter = PoseListFilter()
+        state.generalTotalCount = 51
+        state.scrappedTotalCount = 3
+        state.toggleBookmarkFilter()
+
+        #expect(state.displayedPoseCount == 3)
+    }
+
+    @Test("조건이 비어 있으면 모든 포즈가 맞고, 인원수와 관계를 고르면 둘 다 맞는 포즈만 맞다")
+    func listFilter_matchesPeopleCountAndRelation() {
+        let poses = [
+            makePose(id: 1, peopleCount: .duo, relation: .friend),
+            makePose(id: 2, peopleCount: .duo, relation: nil),
+            makePose(id: 3, peopleCount: .solo, relation: nil)
+        ]
+
+        #expect(poses.filter(PoseListFilter().matches).map(\.id) == [1, 2, 3])
+        #expect(poses.filter(PoseListFilter(peopleCount: .duo).matches).map(\.id) == [1, 2])
+        #expect(poses.filter(PoseListFilter(peopleCount: .duo, relation: .friend).matches).map(\.id) == [1])
+    }
+}
+
+private extension PoseFilterRuleTests {
+    func makePose(id: PoseID, peopleCount: PeopleCountOption, relation: PoseRelation?) -> Pose {
+        Pose(
+            id: id,
+            peopleCountOption: peopleCount,
+            imageURL: nil,
+            isScrapped: false,
+            contentType: .jpeg,
+            width: nil,
+            height: nil,
+            relation: relation
+        )
     }
 }

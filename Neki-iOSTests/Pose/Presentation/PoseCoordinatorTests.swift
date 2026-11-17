@@ -95,6 +95,104 @@ struct PoseCoordinatorTests {
         #expect(startCount == 1)
         #expect(otherEvents == [.randomPoseSuggestionEnd(totalSwipeCount: 0)])
     }
+
+    @Test("북마크하지 않은 포즈의 상세를 열고 넘겨도 북마크 개수는 그대로다")
+    func poseDetail_fetchingUnbookmarkedPoses_keepsBookmarkCount() async throws {
+        let poses = (101...104).map { makePose(id: $0) }
+        let posesByID = Dictionary(uniqueKeysWithValues: poses.map { ($0.id, $0) })
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: poses)) {
+            $0.poseClient.fetchPoseDetail = { id in
+                guard let pose = posesByID[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+        }
+
+        store.send(.root(.delegate(.didTapImage(poses[0]))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        for poseID in [102, 103, 104, 101] {
+            await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(poseID))))).finish()
+        }
+
+        #expect(store.root.scrappedTotalCount == 51)
+        #expect(store.root.scrappedPoses.map(\.id) == Array(1...20))
+    }
+
+    @Test("받지 않은 뒷페이지에 있는 북마크의 상세를 열어도 북마크 목록과 개수는 그대로다")
+    func poseDetail_fetchingUnloadedBookmark_keepsBookmarkList() async throws {
+        let laterBookmark = makePose(id: 35, isScrapped: true)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [laterBookmark])) {
+            $0.poseClient.fetchPoseDetail = { _ in laterBookmark }
+        }
+
+        store.send(.root(.delegate(.didTapImage(laterBookmark))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+
+        #expect(store.root.scrappedTotalCount == 51)
+        #expect(store.root.scrappedPoses.map(\.id) == Array(1...20))
+    }
+
+    @Test("랜덤 포즈에서 연 상세가 포즈를 받아도 북마크 개수는 그대로다")
+    func randomPoseDetail_fetchingPose_keepsBookmarkCount() async throws {
+        let randomPose = makePose(id: 500)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [])) {
+            $0.poseClient.fetchPoseDetail = { _ in randomPose }
+        }
+
+        store.send(.root(.delegate(.didTapStartRandomPose(.solo))))
+        // 랜덤 포즈 화면의 상세 버튼이 보내는 화면 전환입니다. 화면을 띄우는 액션의 효과는 화면이 닫힐 때까지 끝나지 않아 기다리지 않습니다.
+        store.send(.routeToDetail(randomPose))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+
+        #expect(store.root.scrappedTotalCount == 51)
+        #expect(store.root.scrappedPoses.map(\.id) == Array(1...20))
+    }
+
+    @Test("북마크 탭에서 연 상세에서 북마크를 해제하고 넘겼다 돌아와도 북마크 개수는 하나만 준다")
+    func bookmarkDetail_unbookmarkingThenRevisiting_decrementsBookmarkCountOnce() async throws {
+        let bookmarkedPoses = Dictionary(uniqueKeysWithValues: (1...20).map { ($0, makePose(id: $0, isScrapped: true)) })
+        let unbookmarkedPose = makePose(id: 5)
+        let isServerBookmarked = LockIsolated(true)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [], isBookmarkTab: true)) {
+            $0.poseClient.scrapPose = { _ in isServerBookmarked.setValue(false) }
+            $0.poseClient.fetchPoseDetail = { id in
+                if id == unbookmarkedPose.id, isServerBookmarked.value == false { return unbookmarkedPose }
+                guard let pose = bookmarkedPoses[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+        }
+
+        let pose = try #require(store.root.scrappedPoses[id: 5])
+        store.send(.root(.delegate(.didTapImage(pose))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.onTapScrap)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(6))))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(5))))).finish()
+
+        #expect(store.root.scrappedTotalCount == 50)
+        #expect(store.root.scrappedPoses[id: 5] == nil)
+    }
+
+    @Test("상세에서 하트로 북마크하면 북마크 목록 맨 앞에 넣고 개수가 하나 는다")
+    func poseDetail_bookmarking_insertsAtTopAndIncrementsCount() async throws {
+        let pose = makePose(id: 101)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [pose])) {
+            $0.poseClient.fetchPoseDetail = { _ in pose }
+            $0.poseClient.scrapPose = { _ in }
+        }
+
+        store.send(.root(.delegate(.didTapImage(pose))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.onTapScrap)))).finish()
+
+        #expect(store.root.scrappedTotalCount == 52)
+        #expect(store.root.scrappedPoses.first?.id == 101)
+        #expect(store.root.generalPoses[id: 101]?.isScrapped == true)
+    }
 }
 
 
@@ -106,9 +204,10 @@ private extension PoseCoordinatorTests {
     /// `PoseCoordinator.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     func makeStore(
         events: LockIsolated<[PoseAnalyticsEvent]>,
+        initialState: PoseCoordinator.State = PoseCoordinator.State(),
         dependencies updateDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> StoreOf<PoseCoordinator> {
-        Store(initialState: PoseCoordinator.State()) {
+        Store(initialState: initialState) {
             PoseCoordinator()
         } withDependencies: {
             $0.analyticsClient.logEvent = { event in
@@ -127,17 +226,34 @@ private extension PoseCoordinatorTests {
         return (startCount, events.filter { $0 != .randomPoseSuggestionStart })
     }
 
-    func makePose(id: PoseID) -> Pose {
+    func makePose(id: PoseID, isScrapped: Bool = false) -> Pose {
         Pose(
             id: id,
             peopleCountOption: .solo,
             imageURL: nil,
-            isScrapped: false,
+            isScrapped: isScrapped,
             contentType: .jpeg,
             width: nil,
             height: nil
         )
     }
+
+    /// 북마크 51개 중 앞 20개(1~20)를 받은 포즈 화면입니다.
+    ///
+    /// 전체 탭에는 `general`이 보이고, `isBookmarkTab`이면 북마크 탭을 보고 있습니다.
+    func makeBookmarkLoadedState(general: [Pose], isBookmarkTab: Bool = false) -> PoseCoordinator.State {
+        var state = PoseCoordinator.State()
+        state.root.generalPoses = IdentifiedArray(uniqueElements: general)
+        state.root.loadedGeneralFilter = PoseListFilter()
+        state.root.scrappedPoses = IdentifiedArray(uniqueElements: (1...20).map { makePose(id: $0, isScrapped: true) })
+        state.root.scrappedTotalCount = 51
+        state.root.isScrappedListLoaded = true
+        state.root.isSelectedScrap = isBookmarkTab
+        state.root.visiblePoses = isBookmarkTab ? state.root.scrappedPoses.elements : general
+        return state
+    }
 }
 
 private struct RandomPoseFailure: Error {}
+
+private struct UnknownPoseFailure: Error {}

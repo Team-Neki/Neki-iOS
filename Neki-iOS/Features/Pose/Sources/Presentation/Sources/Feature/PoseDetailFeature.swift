@@ -18,7 +18,7 @@ struct PoseDetailFeature {
         /// 그리드 목록을 이어 넘기는 상세인지입니다.
         ///
         /// 그리드에서 연 상세는 끝 가까이 넘기면 다음 페이지를 요청하고, 그리드 목록이 받은 포즈를 끝에 붙입니다.
-        /// 랜덤 포즈에서 연 상세는 그 랜덤 포즈가 목록에 없으면 목록 끝에 붙여 열기 때문에, 그 뒤로 그리드 목록을 잇지 않습니다.
+        /// 랜덤 포즈에서 연 상세는 그리드 목록을 잇지 않습니다. 랜덤 포즈 화면의 상세 버튼이 #247로 막혀 지금은 열리지 않고, 되살릴 때를 위해 남긴 경로라 이전 동작을 그대로 둡니다.
         let followsList: Bool
         var currentPose: Pose? { poses[id: selectedID] }
         var isScrapped: Bool { currentPose?.isScrapped ?? false }

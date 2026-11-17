@@ -88,7 +88,7 @@ struct PoseCoordinator {
                 return .send(.routeToDetail(pose))
                 
             case let .routeToDetail(pose):
-                // 랜덤 포즈가 그리드 목록에 없으면 목록 끝에 붙어 열리므로, 그 뒤로 그리드의 다음 페이지를 잇지 않습니다.
+                // 랜덤 포즈 화면의 상세 버튼이 #247로 막혀 지금은 불리지 않습니다. 되살릴 때를 위해 남긴 경로라 이전처럼 그리드 목록을 잇지 않습니다.
                 state.path.append(.detail(PoseDetailFeature.State(
                     poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
                     selectedPose: pose,

@@ -46,7 +46,7 @@ extension PushNotificationClient: DependencyKey {
                 let authorizationStatus = await repository.checkAuthorizationStatus()
                 try await repository.updateDeviceToken(
                     deviceToken,
-                    isPushNotificationAgreed: authorizationStatus.isPushNotificationAgreed
+                    isPushNotificationAgreed: NotificationPermission(authorizationStatus) == .enabled
                 )
                 return authorizationStatus
             },
@@ -89,19 +89,6 @@ extension PushNotificationClient: TestDependencyKey {
         events: { AsyncStream { $0.finish() } },
         publishEvent: { _ in }
     )
-}
-
-private extension UNAuthorizationStatus {
-    var isPushNotificationAgreed: Bool {
-        switch self {
-        case .authorized, .provisional, .ephemeral:
-            true
-        case .notDetermined, .denied:
-            false
-        @unknown default:
-            false
-        }
-    }
 }
 
 public extension DependencyValues {

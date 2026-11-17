@@ -14,7 +14,6 @@ import UserNotifications
 struct AppCoordinator {
     enum Constants {
         static let versionCheckInterval: TimeInterval = 60 *  60 * 24 // 1일
-        static let marketingConsentAlertRevisitInterval: TimeInterval = 60 * 60 * 24 * 7 // 7일
     }
     
     @ObservableState
@@ -68,7 +67,7 @@ struct AppCoordinator {
         case splashSequenceCompleted(UserSessionStatus, AppVersionClient.VersionResult)
         case userSessionStatusChanged(UserSessionStatus)
         case sessionExpirationReceived(UserSessionStatus, observationID: UUID)
-        case analyticsSessionConfigured(UserSessionStatus, shouldPresentMarketingConsentAlert: Bool)
+        case analyticsSessionConfigured(UserSessionStatus, notificationGuideEntry: NotificationGuideEntry)
         case scenePhaseChanged(ScenePhase)
         case backgroundVersionCheckResult(Result<AppVersionClient.VersionResult, Error>)
         case executePendingRouteIfNeeded
@@ -151,7 +150,10 @@ struct AppCoordinator {
                 
             case let .scenePhaseChanged(phase):
                 guard phase == .active else { return .none }
-                let authorizationEffect: Effect<Action> = .send(.checkPushNotificationAuthorization)
+                let authorizationEffect: Effect<Action> = .merge(
+                    .send(.checkPushNotificationAuthorization),
+                    forwardSceneActivationToMainTab(state: state)
+                )
 
                 guard state.versionAlert != .updateNeeded else { return authorizationEffect }
                 guard state.lastVersionCheckedTime.map({ now.timeIntervalSince($0) >= Constants.versionCheckInterval }) ?? true else { return authorizationEffect }
@@ -217,6 +219,8 @@ struct AppCoordinator {
                 return .run { _ in await openURL(appStoreURL) }
                 
             case .didTapLaterAlert:
+                // 필수 업데이트 안내에는 나중에 할 선택지가 없으므로 바깥을 눌러도 닫지 않습니다.
+                guard state.versionAlert != .updateNeeded else { return .none }
                 state.versionAlert = nil
                 guard let pendingSessionStatus = state.pendingSessionStatus else { return .none }
                 state.pendingSessionStatus = nil
@@ -234,7 +238,7 @@ struct AppCoordinator {
             case let .userSessionStatusChanged(newStatus):
                 return handleSessionStatusChanged(state: &state, status: newStatus)
 
-            case let .analyticsSessionConfigured(status, shouldPresentMarketingConsentAlert):
+            case let .analyticsSessionConfigured(status, notificationGuideEntry):
                 guard state.pendingAnalyticsSessionStatus == status else { return .none }
                 state.pendingAnalyticsSessionStatus = nil
                 let appOpenEffect = logAppOpenIfAutoLoggedIn(route: state.route, status: status)
@@ -243,7 +247,7 @@ struct AppCoordinator {
                     navigateToNextScreen(
                         state: &state,
                         sessionStatus: status,
-                        shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                        notificationGuideEntry: notificationGuideEntry
                     )
                 )
                 
@@ -252,20 +256,7 @@ struct AppCoordinator {
                 state.route = .auth(.init())
                 return .none
 
-            case let .route(.auth(.delegate(.moveToMainTab(
-                user,
-                shouldPresentMarketingConsentAlert,
-                didCompleteTermsAgreement,
-                marketingConsentStatus
-            )))):
-                if didCompleteTermsAgreement {
-                    if let marketingConsentStatus {
-                        markMarketingConsentManaged(
-                            for: user,
-                            status: marketingConsentStatus
-                        )
-                    }
-                }
+            case let .route(.auth(.delegate(.moveToMainTab(user, completion)))):
                 let signedInStatus = UserSessionStatus.signedIn(user)
                 state.pendingAnalyticsSessionStatus = signedInStatus
                 state.$userSessionStatus.withLock { $0 = signedInStatus }
@@ -274,24 +265,18 @@ struct AppCoordinator {
                     configureAnalyticsSession(
                         state: &state,
                         status: signedInStatus,
-                        shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                        notificationGuideEntry: NotificationGuideEntry(completion)
                     )
                 )
 
-            case let .route(.termsAgreement(.didFinishOnboarding(user, marketingConsentStatus))):
-                if let marketingConsentStatus {
-                    markMarketingConsentManaged(
-                        for: user,
-                        status: marketingConsentStatus
-                    )
-                }
+            case let .route(.termsAgreement(.didFinishOnboarding(user, isMarketingTermAgreed))):
                 let signedInStatus = UserSessionStatus.signedIn(user)
                 state.pendingAnalyticsSessionStatus = signedInStatus
                 state.$userSessionStatus.withLock { $0 = signedInStatus }
                 return configureAnalyticsSession(
                     state: &state,
                     status: signedInStatus,
-                    shouldPresentMarketingConsentAlert: false
+                    notificationGuideEntry: .afterTermsAgreement(isMarketingTermAgreed: isMarketingTermAgreed)
                 )
 
             case .checkPushNotificationAuthorization:
@@ -309,7 +294,7 @@ struct AppCoordinator {
                 .cancellable(id: CancelID.pushNotificationAuthorizationCheck, cancelInFlight: true)
 
             case let .checkPushNotificationAuthorizationResponse(.success(status)):
-                let currentAgreement = status.isPushNotificationAgreed
+                let currentAgreement = NotificationPermission(status) == .enabled
                 guard state.hasSynchronizedPushNotification == false ||
                       state.lastSynchronizedPushAgreement != currentAgreement
                 else { return .none }
@@ -335,7 +320,7 @@ struct AppCoordinator {
                 let shouldRetry = state.shouldRetryPushNotificationSynchronization
                 state.shouldRetryPushNotificationSynchronization = false
                 state.hasSynchronizedPushNotification = true
-                state.lastSynchronizedPushAgreement = status.isPushNotificationAgreed
+                state.lastSynchronizedPushAgreement = NotificationPermission(status) == .enabled
                 Logger.presentation.debug("Push notification synchronization succeeded")
                 guard shouldRetry else { return .none }
                 state.hasSynchronizedPushNotification = false
@@ -373,15 +358,14 @@ struct AppCoordinator {
     }
 }
 
-private extension UNAuthorizationStatus {
-    var isPushNotificationAgreed: Bool {
-        switch self {
-        case .authorized, .provisional, .ephemeral:
-            true
-        case .notDetermined, .denied:
-            false
-        @unknown default:
-            false
+private extension NotificationGuideEntry {
+    /// 로그인 결과를 알림 안내 진입 경로로 바꿉니다.
+    init(_ completion: LoginCoordinator.Completion) {
+        switch completion {
+        case .loggedIn:
+            self = .regular
+        case let .agreedToTerms(isMarketingTermAgreed):
+            self = .afterTermsAgreement(isMarketingTermAgreed: isMarketingTermAgreed)
         }
     }
 }
@@ -429,7 +413,7 @@ private extension AppCoordinator {
     func configureAnalyticsSession(
         state: inout State,
         status: UserSessionStatus,
-        shouldPresentMarketingConsentAlert: Bool = false
+        notificationGuideEntry: NotificationGuideEntry = .regular
     ) -> Effect<Action> {
         state.pendingAnalyticsSessionStatus = status
         let userID = extractUserID(from: status)
@@ -439,7 +423,7 @@ private extension AppCoordinator {
             guard Task.isCancelled == false else { return }
             await send(.analyticsSessionConfigured(
                 status,
-                shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert
+                notificationGuideEntry: notificationGuideEntry
             ))
         }
         .cancellable(id: CancelID.analyticsSessionConfiguration, cancelInFlight: true)
@@ -470,13 +454,12 @@ private extension AppCoordinator {
     func navigateToNextScreen(
         state: inout State,
         sessionStatus: UserSessionStatus,
-        shouldPresentMarketingConsentAlert: Bool = false
+        notificationGuideEntry: NotificationGuideEntry = .regular
     ) -> Effect<Action> {
         appRouter.navigateToNextScreen(
             state: &state,
             sessionStatus: sessionStatus,
-            shouldPresentMarketingConsentAlert: shouldPresentMarketingConsentAlert,
-            isMarketingConsentAlertEligible: { isMarketingConsentAlertEligible(for: $0) }
+            notificationGuideEntry: notificationGuideEntry
         )
     }
     
@@ -497,45 +480,15 @@ private extension AppCoordinator {
         return .send(.synchronizePushNotification)
     }
 
+    /// 설정 앱에서 돌아온 것을 알림 안내가 알 수 있도록 메인 탭에 앱 활성화를 알립니다.
+    func forwardSceneActivationToMainTab(state: State) -> Effect<Action> {
+        guard case .mainTab = state.route else { return .none }
+        return .send(.route(.mainTab(.sceneDidBecomeActive)))
+    }
+
     func isAPNSTokenRegistered(_ state: inout State) -> Bool {
         state.isAPNSTokenRegistered = state.isAPNSTokenRegistered || pushNotificationClient.checkAPNSTokenRegistration()
         return state.isAPNSTokenRegistered
-    }
-
-    func isMarketingConsentAlertEligible(for user: User) -> Bool {
-        guard user.marketingTermAgreed == false else { return false }
-        let statusKey = AppStorageKey.marketingConsentManagementStatus(userID: user.id)
-        let status = UserDefaults.standard.string(forKey: statusKey)
-            .flatMap(MarketingConsentManagementStatus.init(rawValue:)) ?? .unconfirmed
-        guard status == .unconfirmed else { return false }
-
-        let countKey = AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
-        guard UserDefaults.standard.integer(forKey: countKey) < 2 else { return false }
-
-        let managedAtKey = AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
-        guard let lastManagedAt = UserDefaults.standard.object(forKey: managedAtKey) as? Date else { return true }
-
-        return now.timeIntervalSince(lastManagedAt) >= Constants.marketingConsentAlertRevisitInterval
-    }
-
-    func markMarketingConsentManaged(
-        for user: User,
-        status: MarketingConsentManagementStatus
-    ) {
-        UserDefaults.standard.set(
-            now,
-            forKey: AppStorageKey.marketingConsentLastManagedAt(userID: user.id)
-        )
-        UserDefaults.standard.set(
-            status.rawValue,
-            forKey: AppStorageKey.marketingConsentManagementStatus(userID: user.id)
-        )
-        if status != .unconfirmed {
-            UserDefaults.standard.set(
-                2,
-                forKey: AppStorageKey.marketingConsentAlertPresentationCount(userID: user.id)
-            )
-        }
     }
 
 }

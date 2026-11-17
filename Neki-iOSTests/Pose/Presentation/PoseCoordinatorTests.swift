@@ -95,6 +95,309 @@ struct PoseCoordinatorTests {
         #expect(startCount == 1)
         #expect(otherEvents == [.randomPoseSuggestionEnd(totalSwipeCount: 0)])
     }
+
+    @Test("북마크하지 않은 포즈의 상세를 열고 넘겨도 북마크 개수는 그대로다")
+    func poseDetail_fetchingUnbookmarkedPoses_keepsBookmarkCount() async throws {
+        let poses = (101...104).map { makePose(id: $0) }
+        let posesByID = Dictionary(uniqueKeysWithValues: poses.map { ($0.id, $0) })
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: poses)) {
+            $0.poseClient.fetchPoseDetail = { id in
+                guard let pose = posesByID[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+        }
+
+        store.send(.root(.delegate(.didTapImage(poses[0]))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        for poseID in [102, 103, 104, 101] {
+            await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(poseID))))).finish()
+        }
+
+        #expect(store.root.scrappedTotalCount == 51)
+        #expect(store.root.scrappedPoses.map(\.id) == Array(1...20))
+    }
+
+    @Test("받지 않은 뒷페이지에 있는 북마크의 상세를 열어도 북마크 목록과 개수는 그대로다")
+    func poseDetail_fetchingUnloadedBookmark_keepsBookmarkList() async throws {
+        let laterBookmark = makePose(id: 35, isScrapped: true)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [laterBookmark])) {
+            $0.poseClient.fetchPoseDetail = { _ in laterBookmark }
+        }
+
+        store.send(.root(.delegate(.didTapImage(laterBookmark))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+
+        #expect(store.root.scrappedTotalCount == 51)
+        #expect(store.root.scrappedPoses.map(\.id) == Array(1...20))
+    }
+
+    @Test("랜덤 포즈에서 연 상세가 포즈를 받아도 북마크 개수는 그대로다")
+    func randomPoseDetail_fetchingPose_keepsBookmarkCount() async throws {
+        let randomPose = makePose(id: 500)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [])) {
+            $0.poseClient.fetchPoseDetail = { _ in randomPose }
+        }
+
+        store.send(.root(.delegate(.didTapStartRandomPose(.solo))))
+        // 랜덤 포즈 화면의 상세 버튼이 보내는 화면 전환입니다. 화면을 띄우는 액션의 효과는 화면이 닫힐 때까지 끝나지 않아 기다리지 않습니다.
+        store.send(.routeToDetail(randomPose))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+
+        #expect(store.root.scrappedTotalCount == 51)
+        #expect(store.root.scrappedPoses.map(\.id) == Array(1...20))
+    }
+
+    @Test("북마크 탭에서 연 상세에서 북마크를 해제하고 넘겼다 돌아와도 북마크 개수는 하나만 준다")
+    func bookmarkDetail_unbookmarkingThenRevisiting_decrementsBookmarkCountOnce() async throws {
+        let bookmarkedPoses = Dictionary(uniqueKeysWithValues: (1...20).map { ($0, makePose(id: $0, isScrapped: true)) })
+        let unbookmarkedPose = makePose(id: 5)
+        let isServerBookmarked = LockIsolated(true)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [], isBookmarkTab: true)) {
+            $0.poseClient.scrapPose = { _ in isServerBookmarked.setValue(false) }
+            $0.poseClient.fetchPoseDetail = { id in
+                if id == unbookmarkedPose.id, isServerBookmarked.value == false { return unbookmarkedPose }
+                guard let pose = bookmarkedPoses[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+        }
+
+        let pose = try #require(store.root.scrappedPoses[id: 5])
+        store.send(.root(.delegate(.didTapImage(pose))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.onTapScrap)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(6))))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(5))))).finish()
+
+        #expect(store.root.scrappedTotalCount == 50)
+        #expect(store.root.scrappedPoses[id: 5] == nil)
+    }
+
+    @Test("상세에서 하트로 북마크하면 북마크 목록 맨 앞에 넣고 개수가 하나 는다")
+    func poseDetail_bookmarking_insertsAtTopAndIncrementsCount() async throws {
+        let pose = makePose(id: 101)
+        let store = makeStore(events: LockIsolated([]), initialState: makeBookmarkLoadedState(general: [pose])) {
+            $0.poseClient.fetchPoseDetail = { _ in pose }
+            $0.poseClient.scrapPose = { _ in }
+        }
+
+        store.send(.root(.delegate(.didTapImage(pose))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.onTapScrap)))).finish()
+
+        #expect(store.root.scrappedTotalCount == 52)
+        #expect(store.root.scrappedPoses.first?.id == 101)
+        #expect(store.root.generalPoses[id: 101]?.isScrapped == true)
+    }
+
+    @Test("그리드에서 연 상세를 끝까지 넘기면 다음 페이지를 받아 이어 넘기고, 마지막 페이지 뒤로는 더 받지 않는다")
+    func gridDetail_swipingToEnd_loadsNextPages() async throws {
+        let poses = (1...45).map { makePose(id: $0) }
+        let posesByID = Dictionary(uniqueKeysWithValues: poses.map { ($0.id, $0) })
+        let requestedPages = LockIsolated<[Int]>([])
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(poses, page: 0, size: 20), isBookmarkTab: false)) {
+            $0.poseClient.fetchPoseDetail = { id in
+                guard let pose = posesByID[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+            $0.poseClient.fetchPoseList = { page, size, _, _ in
+                requestedPages.withValue { $0.append(page) }
+                return makeListPage(poses, page: page, size: size)
+            }
+        }
+
+        store.send(.root(.delegate(.didTapImage(poses[0]))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(5))))).finish()
+
+        #expect(requestedPages.value.isEmpty)
+
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(20))))).finish()
+
+        #expect(requestedPages.value == [1])
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == Array(1...40))
+
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(40))))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(45))))).finish()
+
+        #expect(requestedPages.value == [1, 2])
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == Array(1...45))
+    }
+
+    @Test("끝 가까이에 있는 포즈의 상세를 열면 바로 다음 페이지를 받는다")
+    func gridDetail_openedNearEnd_loadsNextPage() async throws {
+        let poses = (1...45).map { makePose(id: $0) }
+        let posesByID = Dictionary(uniqueKeysWithValues: poses.map { ($0.id, $0) })
+        let requestedPages = LockIsolated<[Int]>([])
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(poses, page: 0, size: 20), isBookmarkTab: false)) {
+            $0.poseClient.fetchPoseDetail = { id in
+                guard let pose = posesByID[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+            $0.poseClient.fetchPoseList = { page, size, _, _ in
+                requestedPages.withValue { $0.append(page) }
+                return makeListPage(poses, page: page, size: size)
+            }
+        }
+
+        // 화면처럼 카드 탭은 기다리지 않고 보냅니다. 다음 페이지는 상세를 여는 자리에서 요청합니다.
+        store.send(.root(.delegate(.didTapImage(poses[19]))))
+        let detailID = try #require(store.path.ids.last)
+        #expect(await waitUntil { store.path[id: detailID]?.detail?.poses.count == 40 })
+        // 상세가 나타날 때는 자기 포즈 정보만 받고, 다음 페이지를 다시 요청하지 않습니다.
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+
+        #expect(requestedPages.value == [1])
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == Array(1...40))
+        #expect(store.path[id: detailID]?.detail?.selectedID == 20)
+    }
+
+    @Test("끝 가까이에서 연 상세를 다음 페이지 응답 전에 닫아도, 그리드 목록이 그 페이지를 받고 이어서 더 받는다")
+    func gridDetail_openedNearEnd_closedBeforeResponse_gridKeepsLoading() async throws {
+        let poses = (1...45).map { makePose(id: $0) }
+        let requestedPages = LockIsolated<[Int]>([])
+        let (requestStarted, requestStartedContinuation) = AsyncStream<Void>.makeStream()
+        let (firstResponse, firstResponseContinuation) = AsyncStream<Void>.makeStream()
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(poses, page: 0, size: 20), isBookmarkTab: false)) {
+            // 상세가 자기 포즈 정보를 받았는지 알 수 있도록 크기를 채워 돌려줍니다.
+            $0.poseClient.fetchPoseDetail = { id in
+                Pose(id: id, peopleCountOption: .solo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: 300, height: 400)
+            }
+            $0.poseClient.fetchPoseList = { page, size, _, _ in
+                requestedPages.withValue { $0.append(page) }
+                // 첫 다음 페이지의 응답은 테스트가 상세를 닫은 뒤에 보냅니다.
+                if page == 1 {
+                    requestStartedContinuation.yield()
+                    for await _ in firstResponse { break }
+                }
+                try Task.checkCancellation()
+                return makeListPage(poses, page: page, size: size)
+            }
+        }
+
+        // 화면처럼 카드 탭은 기다리지 않고 보내고, 상세는 나타날 때 `.task`로 보냅니다.
+        let tapTask = store.send(.root(.delegate(.didTapImage(poses[19]))))
+        let detailID = try #require(store.path.ids.last)
+        let appearTask = store.send(.path(.element(id: detailID, action: .detail(.onAppear))))
+        for await _ in requestStarted { break }
+        // 상세가 자기 포즈 정보를 받아 화면에 보인 뒤에 뒤로 갑니다.
+        #expect(await waitUntil { store.path[id: detailID]?.detail?.poses[id: 20]?.width == 300 })
+        // 다음 페이지 응답 전에 뒤로 가면 상세가 스택에서 빠지고, 화면이 사라지며 `.task`가 취소됩니다.
+        store.send(.path(.popFrom(id: detailID)))
+        appearTask.cancel()
+        firstResponseContinuation.yield()
+        // 상세가 빠졌으므로 카드 탭의 효과도 다음 페이지 응답을 받으면 끝납니다.
+        await tapTask.finish()
+
+        #expect(store.root.isGeneralLoading == false)
+        #expect(store.root.visiblePoses.map(\.id) == Array(1...40))
+
+        // 그리드를 끝까지 내리면 다음 페이지를 이어 받습니다.
+        await store.send(.root(.loadMoreItems)).finish()
+
+        #expect(requestedPages.value == [1, 2])
+        #expect(store.root.visiblePoses.map(\.id) == Array(1...45))
+    }
+
+    @Test("조건을 바꾼 직후 첫 페이지가 오기 전에 연 상세도, 첫 페이지가 오면 그 포즈를 이어 받는다")
+    func gridDetail_openedBeforeNewConditionFirstPage_receivesFirstPage() async throws {
+        // 받아 둔 전체 목록 20개 중 2인 포즈는 5번 하나뿐입니다.
+        let allPoses = (1...20).map { id in
+            Pose(id: id, peopleCountOption: id == 5 ? .duo : .solo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: nil, height: nil)
+        }
+        // 서버의 2인 목록은 30개이고, 첫 페이지에 5번이 들어 있습니다.
+        let duoPoses = ([5] + Array(101...129)).map { id in
+            Pose(id: id, peopleCountOption: .duo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: nil, height: nil)
+        }
+        let requestedPages = LockIsolated<[Int]>([])
+        let requestedFilters = LockIsolated<[PoseListFilter]>([])
+        let (firstResponse, firstResponseContinuation) = AsyncStream<Void>.makeStream()
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(allPoses, page: 0, size: 20), isBookmarkTab: false)) {
+            $0.poseClient.fetchPoseList = { page, size, filter, _ in
+                requestedPages.withValue { $0.append(page) }
+                requestedFilters.withValue { $0.append(filter) }
+                // 2인 첫 페이지의 응답은 상세를 연 뒤에 보냅니다.
+                for await _ in firstResponse { break }
+                return makeListPage(duoPoses, page: page, size: size)
+            }
+        }
+
+        // 2인을 고르면 새 첫 페이지가 오기 전까지 받아 둔 목록에서 2인 포즈만 먼저 보입니다.
+        let selectTask = store.send(.root(.selectPeopleCount(.duo)))
+        #expect(store.root.visiblePoses.map(\.id) == [5])
+        // 그 카드로 상세를 엽니다. 끝이라 다음 페이지가 필요하지만, 새 조건의 첫 페이지가 오기 전이라 요청하지 않습니다.
+        let pose = try #require(store.root.visiblePoses.first)
+        store.send(.root(.delegate(.didTapImage(pose))))
+        let detailID = try #require(store.path.ids.last)
+        firstResponseContinuation.yield()
+        await selectTask.finish()
+
+        #expect(requestedPages.value == [0])
+        #expect(requestedFilters.value == [PoseListFilter(peopleCount: .duo, relation: nil)])
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == [5] + Array(101...119))
+        #expect(store.path[id: detailID]?.detail?.selectedID == 5)
+    }
+
+    @Test("북마크 탭에서 연 상세에서 북마크를 해제하고 끝까지 넘겨도 빠지거나 겹치는 포즈가 없다")
+    func bookmarkDetail_unbookmarkingThenSwipingToEnd_keepsListComplete() async throws {
+        let server = OffsetBookmarkServer(ids: Array(1...45))
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(server.page(0, size: 20), isBookmarkTab: true)) {
+            $0.poseClient.scrapPose = { server.toggle($0) }
+            $0.poseClient.fetchPoseDetail = { id in
+                Pose(id: id, peopleCountOption: .solo, imageURL: nil, isScrapped: server.ids.value.contains(id), contentType: .jpeg, width: nil, height: nil)
+            }
+            $0.poseClient.fetchScrappedPoseList = { page, size, _ in server.page(page, size: size) }
+        }
+
+        let firstPose = try #require(store.root.scrappedPoses.first)
+        store.send(.root(.delegate(.didTapImage(firstPose))))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        // 3·7번째 포즈의 북마크를 해제하면 서버에서는 뒤 포즈가 앞 페이지 자리로 당겨집니다.
+        for poseID in [3, 7] {
+            await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(poseID))))).finish()
+            await store.send(.path(.element(id: detailID, action: .detail(.onTapScrap)))).finish()
+        }
+        for poseID in [20, 42, 45] {
+            await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(poseID))))).finish()
+        }
+
+        // 상세는 해제한 포즈도 제자리에 두고, 서버 목록의 나머지 포즈를 한 번씩 이어 붙입니다.
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == Array(1...45))
+        #expect(store.root.scrappedPoses.map(\.id) == server.ids.value)
+    }
+
+    @Test("랜덤 포즈에서 연 상세는 끝에 와도 다음 페이지를 받지 않는다")
+    func randomPoseDetail_nearEnd_doesNotLoadNextPage() async throws {
+        let poses = (1...45).map { makePose(id: $0) }
+        let randomPose = makePose(id: 500)
+        let posesByID = Dictionary(uniqueKeysWithValues: (poses + [randomPose]).map { ($0.id, $0) })
+        let requestedPages = LockIsolated<[Int]>([])
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(poses, page: 0, size: 20), isBookmarkTab: false)) {
+            $0.poseClient.fetchPoseDetail = { id in
+                guard let pose = posesByID[id] else { throw UnknownPoseFailure() }
+                return pose
+            }
+            $0.poseClient.fetchPoseList = { page, size, _, _ in
+                requestedPages.withValue { $0.append(page) }
+                return makeListPage(poses, page: page, size: size)
+            }
+        }
+
+        // 랜덤 포즈 화면의 상세 버튼이 보내는 화면 전환입니다. 화면을 띄우는 액션의 효과는 화면이 닫힐 때까지 끝나지 않아 기다리지 않습니다.
+        store.send(.routeToDetail(randomPose))
+        let detailID = try #require(store.path.ids.last)
+        await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
+        await store.send(.path(.element(id: detailID, action: .detail(.pageChanged(20))))).finish()
+
+        #expect(requestedPages.value.isEmpty)
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == Array(1...20) + [500])
+    }
 }
 
 
@@ -106,9 +409,10 @@ private extension PoseCoordinatorTests {
     /// `PoseCoordinator.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     func makeStore(
         events: LockIsolated<[PoseAnalyticsEvent]>,
+        initialState: PoseCoordinator.State = PoseCoordinator.State(),
         dependencies updateDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> StoreOf<PoseCoordinator> {
-        Store(initialState: PoseCoordinator.State()) {
+        Store(initialState: initialState) {
             PoseCoordinator()
         } withDependencies: {
             $0.analyticsClient.logEvent = { event in
@@ -119,6 +423,17 @@ private extension PoseCoordinatorTests {
         }
     }
 
+    /// 조건이 참이 될 때까지 10초 동안 기다립니다.
+    ///
+    /// 화면을 스택에 넣는 액션은 화면이 빠질 때까지 끝나지 않아, 그 액션의 효과는 `finish()` 대신 이것으로 기다립니다.
+    func waitUntil(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<1_000 {
+            guard condition() == false else { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
     /// 랜덤 포즈 시작 수와 그 밖의 이벤트로 나눕니다.
     ///
     /// 시작은 화면을 띄우는 액션의 효과가, 종료는 화면을 빼는 액션의 효과가 따로 남겨 둘 사이의 기록 순서는 보장되지 않습니다.
@@ -127,17 +442,64 @@ private extension PoseCoordinatorTests {
         return (startCount, events.filter { $0 != .randomPoseSuggestionStart })
     }
 
-    func makePose(id: PoseID) -> Pose {
+    func makePose(id: PoseID, isScrapped: Bool = false) -> Pose {
         Pose(
             id: id,
             peopleCountOption: .solo,
             imageURL: nil,
-            isScrapped: false,
+            isScrapped: isScrapped,
             contentType: .jpeg,
             width: nil,
             height: nil
         )
     }
+
+    /// 북마크 51개 중 앞 20개(1~20)를 받은 포즈 화면입니다.
+    ///
+    /// 전체 탭에는 `general`이 전부 보이고(다음 페이지 없음), `isBookmarkTab`이면 북마크 탭을 보고 있습니다.
+    func makeBookmarkLoadedState(general: [Pose], isBookmarkTab: Bool = false) -> PoseCoordinator.State {
+        var state = PoseCoordinator.State()
+        state.root.generalPoses = IdentifiedArray(uniqueElements: general)
+        state.root.loadedGeneralFilter = PoseListFilter()
+        state.root.isLastGeneralPage = true
+        state.root.scrappedPoses = IdentifiedArray(uniqueElements: (1...20).map { makePose(id: $0, isScrapped: true) })
+        state.root.scrappedTotalCount = 51
+        state.root.isScrappedListLoaded = true
+        state.root.isSelectedScrap = isBookmarkTab
+        state.root.visiblePoses = isBookmarkTab ? state.root.scrappedPoses.elements : general
+        return state
+    }
+
+    /// 서버 목록의 첫 페이지만 받은 포즈 화면입니다. `isBookmarkTab`이면 북마크 탭, 아니면 전체 탭의 목록입니다.
+    func makeFirstPageLoadedState(_ firstPage: PoseListPage, isBookmarkTab: Bool) -> PoseCoordinator.State {
+        var state = PoseCoordinator.State()
+        if isBookmarkTab {
+            state.root.isSelectedScrap = true
+            state.root.scrappedPoses = IdentifiedArray(uniqueElements: firstPage.poses)
+            state.root.scrappedTotalCount = firstPage.totalCount
+            state.root.isScrappedListLoaded = true
+            state.root.scrappedPage = 1
+            state.root.isLastScrappedPage = firstPage.hasNext == false
+        } else {
+            state.root.generalPoses = IdentifiedArray(uniqueElements: firstPage.poses)
+            state.root.loadedGeneralFilter = PoseListFilter()
+            state.root.requestedGeneralFilter = PoseListFilter()
+            state.root.generalTotalCount = firstPage.totalCount
+            state.root.generalPage = 1
+            state.root.isLastGeneralPage = firstPage.hasNext == false
+        }
+        state.root.visiblePoses = firstPage.poses
+        return state
+    }
+}
+
+/// `poses`를 서버처럼 자리로 잘라 `page`번째 페이지를 만듭니다.
+private func makeListPage(_ poses: [Pose], page: Int, size: Int) -> PoseListPage {
+    let start = min(page * size, poses.count)
+    let end = min(start + size, poses.count)
+    return PoseListPage(poses: Array(poses[start..<end]), hasNext: end < poses.count, totalCount: poses.count)
 }
 
 private struct RandomPoseFailure: Error {}
+
+private struct UnknownPoseFailure: Error {}

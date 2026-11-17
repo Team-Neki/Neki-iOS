@@ -895,6 +895,43 @@ struct MapFeatureTests {
         #expect(events.value.isEmpty)
     }
 
+    @Test("지도 핀이나 목록에서 부스를 고르면 지점 상세를 연 것을 알린다")
+    func didTapBooth_notifiesPhotoBoothDetailOpened() async {
+        let openedPhotoBoothDetails = LockIsolated(0)
+        let store = makeStore(openedPhotoBoothDetails: openedPhotoBoothDetails)
+
+        await store.send(.didTapBooth(searchedPhotoBooth)).finish()
+        await store.send(.photoBoothListAction(.didTapBooth(searchedPhotoBooth))).finish()
+
+        #expect(openedPhotoBoothDetails.value == 2)
+    }
+
+    @Test("부스 하나로 좁혀진 검색 결과로 상세를 띄워도 지점 상세를 연 것을 알린다")
+    func searchResultResponse_withSinglePhotoBooth_notifiesPhotoBoothDetailOpened() async {
+        let openedPhotoBoothDetails = LockIsolated(0)
+        let store = makeStore(openedPhotoBoothDetails: openedPhotoBoothDetails)
+        selectCandidate(photoBoothCandidate, in: store)
+
+        await store.send(.searchResultResponse(
+            .success(photoBoothResult),
+            candidate: photoBoothCandidate,
+            generation: store.searchResultFetchGeneration
+        )).finish()
+
+        #expect(openedPhotoBoothDetails.value == 1)
+    }
+
+    @Test("이미 연 상세 카드를 눌러도 지점 상세를 새로 연 것으로 알리지 않는다")
+    func didTapBoothCard_doesNotNotifyPhotoBoothDetailOpened() async {
+        let openedPhotoBoothDetails = LockIsolated(0)
+        let store = makeStore(openedPhotoBoothDetails: openedPhotoBoothDetails)
+        await store.send(.didTapBooth(searchedPhotoBooth)).finish()
+
+        await store.send(.didTapBoothCard).finish()
+
+        #expect(openedPhotoBoothDetails.value == 1)
+    }
+
     @Test("검색창을 눌러 닫혀 있던 검색 화면을 열면 검색 진입 이벤트를 보내고, 검색 화면이 열린 채로 다시 눌러도 더 보내지 않는다")
     func didTapSearchField_logsSearchViewOnlyWhenEnteringSearch() async {
         let events = LockIsolated<[MapAnalyticsEvent]>([])
@@ -1036,9 +1073,10 @@ private extension MapFeatureTests {
     /// `MapFeature.State`가 `Equatable`이 아니어서 `TestStore` 대신 `Store`로 액션을 보냅니다.
     /// 리듀서가 곧바로 바꾸는 상태만 확인하므로 이펙트가 뒤이어 보내는 액션은 기다리지 않습니다.
     /// 후보를 고른 뒤의 조회와 영역 조회는 응답을 붙잡아 두므로, 조회 결과는 테스트가 직접 보냅니다.
-    /// 보낸 분석 이벤트는 `events`에 차례로 모읍니다.
+    /// 보낸 분석 이벤트는 `events`에 차례로 모읍니다. 지점 상세를 새로 열었다고 알린 횟수는 `openedPhotoBoothDetails`에 셉니다.
     func makeStore(
         events: LockIsolated<[MapAnalyticsEvent]> = .init([]),
+        openedPhotoBoothDetails: LockIsolated<Int> = .init(0),
         dependencies updateDependencies: @escaping (inout DependencyValues) -> Void = { _ in }
     ) -> StoreOf<MapFeature> {
         var state = MapFeature.State()
@@ -1048,6 +1086,12 @@ private extension MapFeatureTests {
 
         return Store(initialState: state) {
             MapFeature()
+            Reduce { _, action in
+                if case .delegate(.didOpenPhotoBoothDetail) = action {
+                    openedPhotoBoothDetails.withValue { $0 += 1 }
+                }
+                return .none
+            }
         } withDependencies: {
             $0.analyticsClient.logEvent = { event in
                 guard let event = event as? MapAnalyticsEvent else { return }

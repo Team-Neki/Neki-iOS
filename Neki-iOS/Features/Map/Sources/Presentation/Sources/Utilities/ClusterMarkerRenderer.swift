@@ -77,6 +77,7 @@ struct ClusterMarkerRenderer {
             
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: UIFont.neki(.title20SemiBold),
+                .kern: FontStyle.title20SemiBold.letterSpacing,
                 .foregroundColor: UIColor.white,
                 .paragraphStyle: paragraphStyle
             ]

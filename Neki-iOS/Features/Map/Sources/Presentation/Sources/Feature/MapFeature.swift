@@ -297,6 +297,8 @@ public struct MapFeature {
         public enum Delegate {
             case showToast(NekiToastItem)
             case routeToBrandReorder(IdentifiedArrayOf<PhotoBoothBrand>)
+            /// 지점 상세를 새로 열었습니다. 지도 핀, 목록, 부스 하나로 좁혀진 검색에서 부스를 골랐을 때 보냅니다.
+            case didOpenPhotoBoothDetail
         }
     }
     
@@ -846,7 +848,10 @@ public struct MapFeature {
                     entryPoint: .map,
                     source: state.boothSelectionSource
                 )
-                return .run { _ in await analytics.logEvent(event) }
+                return .merge(
+                    .run { _ in await analytics.logEvent(event) },
+                    .send(.delegate(.didOpenPhotoBoothDetail))
+                )
                 
             case .didTapBoothCard:
                 state.isUserTrackingMode = false
@@ -1034,7 +1039,10 @@ public struct MapFeature {
                     entryPoint: .bottomSheet,
                     source: state.boothSelectionSource
                 )
-                return .run { _ in await analytics.logEvent(event) }
+                return .merge(
+                    .run { _ in await analytics.logEvent(event) },
+                    .send(.delegate(.didOpenPhotoBoothDetail))
+                )
                 
             default:
                 return .none
@@ -1265,7 +1273,10 @@ private extension MapFeature {
             state.photoBoothListState.isSearchResultPresented = false
             selectPhotoBooth(&state, photoBooth: photoBooth)
             state.photoBooths = [photoBooth]
-            return .send(.startBackgroundCalculation)
+            return .merge(
+                .send(.startBackgroundCalculation),
+                .send(.delegate(.didOpenPhotoBoothDetail))
+            )
         }
 
         // 지역과 지하철역은 응답 자체가 지도에 그릴 목록이므로 영역 조회를 대신합니다.

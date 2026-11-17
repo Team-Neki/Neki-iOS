@@ -69,7 +69,6 @@ private struct VersionUpdateAlertModifier: ViewModifier {
         content.nekiAlert(
             isPresented: $store.isAlertPresented,
             style: alert?.style ?? NekiAlertStyle.cancelable,
-            contentStyle: .standard,
             title: alert?.title ?? "",
             subtitle: alert?.subtitle ?? "",
             confirmText: alert?.confirmText ?? "",

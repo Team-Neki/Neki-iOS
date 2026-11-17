@@ -15,6 +15,8 @@ struct PoseDTO: Decodable {
     let contentType: String
     let width: Int?
     let height: Int?
+    /// 2인 포즈의 관계(`FRIEND`·`COUPLE`·`SSUM`)입니다. 관계가 없는 포즈는 null입니다.
+    let relationValue: String?
     
     enum CodingKeys: String, CodingKey {
         case id = "poseId"
@@ -24,6 +26,7 @@ struct PoseDTO: Decodable {
         case contentType
         case width
         case height
+        case relationValue = "relation"
     }
     
     func toEntity() -> Pose {
@@ -39,6 +42,13 @@ struct PoseDTO: Decodable {
         
         let imageURL = URL(string: imageURLString)
         let imageContentType = ImageContentType(contentType) ?? .jpeg
+        // 모르는 관계 값은 관계 없는 포즈로 둡니다. 목록 전체를 실패로 만들지 않습니다.
+        let relation: PoseRelation? = switch relationValue {
+        case "FRIEND": .friend
+        case "COUPLE": .couple
+        case "SSUM": .crush
+        default: nil
+        }
         
         return Pose(
             id: id,
@@ -47,7 +57,8 @@ struct PoseDTO: Decodable {
             isScrapped: isScrapped ?? false,
             contentType: imageContentType,
             width: width,
-            height: height
+            height: height,
+            relation: relation
         )
     }
 }

@@ -27,8 +27,7 @@ struct AppRouter {
     func navigateToNextScreen(
         state: inout AppCoordinator.State,
         sessionStatus: UserSessionStatus,
-        shouldPresentMarketingConsentAlert: Bool = false,
-        isMarketingConsentAlertEligible: (User) -> Bool
+        notificationGuideEntry: NotificationGuideEntry = .regular
     ) -> Effect<AppCoordinator.Action> {
         switch sessionStatus {
         case let .signedIn(user):
@@ -37,8 +36,7 @@ struct AppRouter {
                 return .none
             }
 
-            let shouldPresentConsentAlert = shouldPresentMarketingConsentAlert || isMarketingConsentAlertEligible(user)
-            state.route = .mainTab(.init(shouldPresentMarketingConsentAlert: shouldPresentConsentAlert))
+            state.route = .mainTab(.init(notificationGuideEntry: notificationGuideEntry))
             return .merge(
                 .send(.checkPushNotificationAuthorization),
                 executePendingRouteIfNeeded(state: &state)

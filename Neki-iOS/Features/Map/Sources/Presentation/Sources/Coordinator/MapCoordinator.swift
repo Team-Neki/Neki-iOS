@@ -31,6 +31,8 @@ struct MapCoordinator {
         // 상위 코디네이터(MainTab)로 보낼 신호
         enum Delegate {
             case showToast(NekiToastItem)
+            /// 지점 상세를 새로 열었습니다.
+            case didOpenPhotoBoothDetail
         }
     }
     
@@ -44,6 +46,9 @@ struct MapCoordinator {
             switch action {
             case let .root(.delegate(.showToast(item))):
                 return .send(.delegate(.showToast(item)))
+
+            case .root(.delegate(.didOpenPhotoBoothDetail)):
+                return .send(.delegate(.didOpenPhotoBoothDetail))
 
             case let .root(.delegate(.routeToBrandReorder(brands))):
                 state.path.append(.brandReorder(PhotoBoothBrandReorderFeature.State(brands: brands)))

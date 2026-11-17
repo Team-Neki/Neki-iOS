@@ -9,8 +9,8 @@ import Foundation
 
 /// 한국 시간(Asia/Seoul) 기준 날짜입니다.
 ///
-/// "하루 한 번"처럼 날짜로 정하는 규칙을 기기 시간대와 상관없이 같은 날로 판단할 때 씁니다.
-struct KSTDay: Codable, Hashable, Sendable {
+/// 이벤트·혜택 알림 동의 토스트처럼, 기기 시간대와 상관없이 한국 날짜를 보여 줄 때 씁니다.
+struct KSTDay: Hashable, Sendable {
     let year: Int
     let month: Int
     let day: Int

@@ -16,10 +16,10 @@ import UserNotifications
 struct NotificationGuideFeatureTests {
     // MARK: - 업데이트 후 첫 진입
 
-    @Test("오늘 다른 자동 안내를 띄웠으면 모달 없이 넘기고 기록을 바꾸지 않는다")
-    func mainTabAppeared_guideShownToday_skipsWithoutRecording() async {
+    @Test("하루 안에 다른 자동 안내를 띄웠으면 모달 없이 넘기고 기록을 바꾸지 않는다")
+    func mainTabAppeared_guideShownWithinOneDay_skipsWithoutRecording() async {
         let records = LockIsolated<[String]>([])
-        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: "1.4.0")
+        let seeded = NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.hourAgo, updateEntryJudgedVersion: "1.4.0")
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
@@ -33,7 +33,7 @@ struct NotificationGuideFeatureTests {
     @Test("이번 버전을 이미 판단했으면 넘긴다")
     func mainTabAppeared_versionJudged_skips() async {
         let records = LockIsolated<[String]>([])
-        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: Fixture.version)
+        let seeded = NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.twoDaysAgo, updateEntryJudgedVersion: Fixture.version)
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
@@ -57,7 +57,7 @@ struct NotificationGuideFeatureTests {
 
     /// 인자들이 같은 저장소를 쓰므로 순서대로 돌립니다.
     @Test(
-        "알림 권한과 동의 상태에 맞는 모달을 띄우고 버전과 오늘 날짜를 남긴다",
+        "알림 권한과 동의 상태에 맞는 모달을 띄우고 버전과 안내한 시각을 남긴다",
         .serialized,
         arguments: [
             (UNAuthorizationStatus.authorized, false, NotificationGuideKind.consentOnly),
@@ -75,7 +75,7 @@ struct NotificationGuideFeatureTests {
         let records = LockIsolated<[String]>([])
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(
-            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: "1.4.0"),
+            guideRecord: NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.twoDaysAgo, updateEntryJudgedVersion: "1.4.0"),
             isMarketingAgreed: isMarketingAgreed,
             authorizationStatus: status,
             records: records
@@ -84,7 +84,7 @@ struct NotificationGuideFeatureTests {
         await store.send(.mainTabAppeared(isFirstScreenCovered: false)) { $0.hasStarted = true }
         await store.receive(\.updateEntryAuthorizationResponse.success) { $0.modal = expected }
 
-        #expect(record == NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version))
+        #expect(record == NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.now, updateEntryJudgedVersion: Fixture.version))
     }
 
     @Test("첫 화면이 다른 화면에 가려져 있으면 판단하지 않고 기록도 남기지 않는다")
@@ -383,7 +383,7 @@ struct NotificationGuideFeatureTests {
             $0.modal = nil
         }
 
-        #expect(record == NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version))
+        #expect(record == NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.now, updateEntryJudgedVersion: Fixture.version))
     }
 
     @Test("동의를 저장하는 중에 공유가 들어오면 모달을 닫지 않고 저장 결과를 기다린다")
@@ -423,7 +423,7 @@ struct NotificationGuideFeatureTests {
         await store.receive(\.authorizationRequestFinished) { $0.isProcessing = false }
 
         #expect(records.value == ["check", "request"])
-        #expect(record == NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version))
+        #expect(record == NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.now, updateEntryJudgedVersion: Fixture.version))
     }
 
     @Test("약관에서 이벤트·혜택 알림에 동의하지 않았으면 아무것도 띄우지 않고 이 버전을 판단한 것으로 남긴다")
@@ -464,11 +464,11 @@ struct NotificationGuideFeatureTests {
     // MARK: - 지점 상세 진입
 
     @Test("지점 상세에 들어오면 상태에 맞는 모달을 띄우고 하루 한 번 기록과 이 경로 기록을 남긴다")
-    func photoBoothDetailEntered_presentsModalAndRecordsDays() async {
+    func photoBoothDetailEntered_presentsModalAndRecordsGuidedTime() async {
         let records = LockIsolated<[String]>([])
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(
-            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: Fixture.yesterday, updateEntryJudgedVersion: Fixture.version),
+            guideRecord: NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.twoDaysAgo, updateEntryJudgedVersion: Fixture.version),
             records: records
         )
 
@@ -477,7 +477,7 @@ struct NotificationGuideFeatureTests {
 
         #expect(records.value == ["check"])
         #expect(record == NotificationGuideRecord(
-            lastAutomaticGuideDay: Fixture.today,
+            lastAutomaticGuidedAt: Fixture.now,
             updateEntryJudgedVersion: Fixture.version,
             photoBoothDetailGuidedAt: Fixture.now
         ))
@@ -487,7 +487,7 @@ struct NotificationGuideFeatureTests {
     func photoBoothDetailEntered_withinSevenDays_skips() async {
         let records = LockIsolated<[String]>([])
         let guidedAt = Fixture.now.addingTimeInterval(-6 * 86_400)
-        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: guidedAt.kstDay, photoBoothDetailGuidedAt: guidedAt)
+        let seeded = NotificationGuideRecord(lastAutomaticGuidedAt: guidedAt, photoBoothDetailGuidedAt: guidedAt)
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
@@ -502,7 +502,7 @@ struct NotificationGuideFeatureTests {
         let records = LockIsolated<[String]>([])
         let guidedAt = Fixture.now.addingTimeInterval(-7 * 86_400)
         let store = makeStore(
-            guideRecord: NotificationGuideRecord(lastAutomaticGuideDay: guidedAt.kstDay, photoBoothDetailGuidedAt: guidedAt),
+            guideRecord: NotificationGuideRecord(lastAutomaticGuidedAt: guidedAt, photoBoothDetailGuidedAt: guidedAt),
             records: records
         )
 
@@ -510,10 +510,10 @@ struct NotificationGuideFeatureTests {
         await store.receive(\.photoBoothDetailAuthorizationResponse.success) { $0.modal = .consentAndEnable }
     }
 
-    @Test("오늘 다른 자동 안내를 띄웠으면 지점 상세에서 모달을 띄우지 않는다")
-    func photoBoothDetailEntered_guideShownToday_skips() async {
+    @Test("하루 안에 다른 자동 안내를 띄웠으면 지점 상세에서 모달을 띄우지 않는다")
+    func photoBoothDetailEntered_guideShownWithinOneDay_skips() async {
         let records = LockIsolated<[String]>([])
-        let seeded = NotificationGuideRecord(lastAutomaticGuideDay: Fixture.today, updateEntryJudgedVersion: Fixture.version)
+        let seeded = NotificationGuideRecord(lastAutomaticGuidedAt: Fixture.hourAgo, updateEntryJudgedVersion: Fixture.version)
         @Shared(.appStorage(NotificationGuideRecord.storageKey(userID: Fixture.userID))) var record = NotificationGuideRecord()
         let store = makeStore(guideRecord: seeded, records: records)
 
@@ -605,8 +605,10 @@ private enum Fixture {
     static let version = "1.4.1"
     /// 2026-11-10 10:00 한국 시간
     static let now = Date(timeIntervalSince1970: 1_794_272_400)
-    static let today = KSTDay(year: 2026, month: 11, day: 10)
-    static let yesterday = KSTDay(year: 2026, month: 11, day: 9)
+    /// 하루 안에 자동 안내를 띄운 시각입니다.
+    static let hourAgo = now.addingTimeInterval(-60 * 60)
+    /// 마지막 자동 안내로부터 하루가 넘게 지난 시각입니다.
+    static let twoDaysAgo = now.addingTimeInterval(-2 * 86_400)
     static let agreedToastMessage = "11.10 이벤트·혜택 알림에 동의했어요."
 
     static func user(isMarketingAgreed: Bool) -> User {

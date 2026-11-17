@@ -24,16 +24,6 @@ struct KSTDayTests {
         #expect(KSTDay(year: 2026, month: 3, day: 5).monthDayText == "03.05")
         #expect(KSTDay(year: 2026, month: 10, day: 20).monthDayText == "10.20")
     }
-
-    @Test("저장했다가 다시 읽어도 같은 날짜다")
-    func codable_roundTrip_keepsDay() throws {
-        let day = KSTDay(year: 2026, month: 11, day: 10)
-
-        let data = try JSONEncoder().encode(day)
-        let decoded = try JSONDecoder().decode(KSTDay.self, from: data)
-
-        #expect(decoded == day)
-    }
 }
 
 private extension KSTDayTests {

@@ -14,7 +14,7 @@ import UserNotifications
 /// 알림 권한과 이벤트·혜택 알림 동의를 안내합니다.
 ///
 /// - 약관 동의를 마치고 들어오면, 이벤트·혜택 알림에 동의한 경우 모달 없이 OS 알림 팝업을 띄웁니다.
-/// - 그 밖에는 앱 버전마다 한 번 상태에 맞는 모달을 띄웁니다. 자동 안내는 하루에 한 번만 띄웁니다.
+/// - 그 밖에는 앱 버전마다 한 번 상태에 맞는 모달을 띄웁니다. 자동 안내는 마지막 자동 안내로부터 하루가 지나야 다시 띄웁니다.
 /// - 지점 상세에 들어오면, 이 경로에서 안내한 지 7일이 지났을 때 상태에 맞는 모달을 띄웁니다. 허용하든 취소하든 상세는 그대로 둡니다.
 /// - 공유로 사진을 가져오는 실행에서는 모달이 앨범 선택 화면을 막지 않도록 띄우지 않습니다.
 @Reducer
@@ -105,8 +105,8 @@ struct NotificationGuideFeature {
 
             case let .termsEntryAuthorizationResponse(.success(status)):
                 guard NotificationPermission(status) == .requestable, let user = state.user else { return .none }
-                let today = now.kstDay
-                guideRecord(for: user).withLock { $0.lastAutomaticGuideDay = today }
+                let currentDate = now
+                guideRecord(for: user).withLock { $0.lastAutomaticGuidedAt = currentDate }
                 state.isProcessing = true
                 return requestAuthorization()
 
@@ -117,17 +117,17 @@ struct NotificationGuideFeature {
             case let .updateEntryAuthorizationResponse(.success(status)):
                 // 권한을 확인하는 사이에 공유가 들어왔으면 기록 없이 넘깁니다.
                 guard state.isSuppressedByShare == false, let user = state.user else { return .none }
-                let today = now.kstDay
+                let currentDate = now
                 let appVersion = appVersionClient.currentVersion().value
                 let record = guideRecord(for: user)
                 let decision = NotificationGuideDecision.updateEntry(
                     record: record.wrappedValue,
-                    today: today,
+                    now: currentDate,
                     appVersion: appVersion,
                     permission: NotificationPermission(status),
                     isMarketingAgreed: user.marketingTermAgreed
                 )
-                record.withLock { $0.applyUpdateEntry(decision, today: today, appVersion: appVersion) }
+                record.withLock { $0.applyUpdateEntry(decision, now: currentDate, appVersion: appVersion) }
                 if case let .guide(kind) = decision { state.modal = kind }
                 return .none
 

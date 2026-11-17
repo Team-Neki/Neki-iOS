@@ -46,12 +46,15 @@ struct PoseCoordinator {
                 
                 // MARK: - Navigation Triggers from Root
             case let .root(.delegate(.didTapImage(pose))):
-                state.path.append(.detail(PoseDetailFeature.State(
+                let detail = PoseDetailFeature.State(
                     poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
                     selectedID: pose.id,
                     followsList: true
-                )))
-                return .none
+                )
+                state.path.append(.detail(detail))
+                // 끝 가까이에서 열면 여는 자리에서 그리드 목록에 다음 페이지를 요청합니다.
+                // 상세 화면이 나타날 때 요청하면 그 화면의 `.task`에 묶여, 응답 전에 뒤로 가면 요청이 취소되고 그리드가 받는 중으로 남습니다.
+                return detail.needsMorePoses ? .send(.root(.loadMoreItems)) : .none
                 
             case let .root(.delegate(.didTapStartRandomPose(option))):
                 // 랜덤 포즈 시작은 랜덤 포즈 화면을 띄울 때 한 번 기록합니다. 첫 포즈를 불러오기 전에 보내므로 불러오기에 실패해도 남습니다.

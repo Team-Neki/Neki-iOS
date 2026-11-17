@@ -102,7 +102,8 @@ struct PoseDetailFeature {
             switch action {
                 // MARK: - Lifecycle Actions
             case .onAppear:
-                return .merge(fetchPoseDetail(id: state.selectedID), requestMorePosesIfNeeded(state))
+                // 끝 가까이에서 열었을 때의 다음 페이지는 상세를 여는 포즈 코디네이터가 요청합니다. 화면의 `.task`에 묶이지 않도록 여기서는 보내지 않습니다.
+                return fetchPoseDetail(id: state.selectedID)
 
                 // MARK: - View Actions
             case .onTapScrap:

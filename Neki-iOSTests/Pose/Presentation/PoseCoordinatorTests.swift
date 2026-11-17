@@ -245,13 +245,63 @@ struct PoseCoordinatorTests {
             }
         }
 
+        // 화면처럼 카드 탭은 기다리지 않고 보냅니다. 다음 페이지는 상세를 여는 자리에서 요청합니다.
         store.send(.root(.delegate(.didTapImage(poses[19]))))
         let detailID = try #require(store.path.ids.last)
+        #expect(await waitUntil { store.path[id: detailID]?.detail?.poses.count == 40 })
+        // 상세가 나타날 때는 자기 포즈 정보만 받고, 다음 페이지를 다시 요청하지 않습니다.
         await store.send(.path(.element(id: detailID, action: .detail(.onAppear)))).finish()
 
         #expect(requestedPages.value == [1])
         #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == Array(1...40))
         #expect(store.path[id: detailID]?.detail?.selectedID == 20)
+    }
+
+    @Test("끝 가까이에서 연 상세를 다음 페이지 응답 전에 닫아도, 그리드 목록이 그 페이지를 받고 이어서 더 받는다")
+    func gridDetail_openedNearEnd_closedBeforeResponse_gridKeepsLoading() async throws {
+        let poses = (1...45).map { makePose(id: $0) }
+        let requestedPages = LockIsolated<[Int]>([])
+        let (requestStarted, requestStartedContinuation) = AsyncStream<Void>.makeStream()
+        let (firstResponse, firstResponseContinuation) = AsyncStream<Void>.makeStream()
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(poses, page: 0, size: 20), isBookmarkTab: false)) {
+            // 상세가 자기 포즈 정보를 받았는지 알 수 있도록 크기를 채워 돌려줍니다.
+            $0.poseClient.fetchPoseDetail = { id in
+                Pose(id: id, peopleCountOption: .solo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: 300, height: 400)
+            }
+            $0.poseClient.fetchPoseList = { page, size, _, _ in
+                requestedPages.withValue { $0.append(page) }
+                // 첫 다음 페이지의 응답은 테스트가 상세를 닫은 뒤에 보냅니다.
+                if page == 1 {
+                    requestStartedContinuation.yield()
+                    for await _ in firstResponse { break }
+                }
+                try Task.checkCancellation()
+                return makeListPage(poses, page: page, size: size)
+            }
+        }
+
+        // 화면처럼 카드 탭은 기다리지 않고 보내고, 상세는 나타날 때 `.task`로 보냅니다.
+        let tapTask = store.send(.root(.delegate(.didTapImage(poses[19]))))
+        let detailID = try #require(store.path.ids.last)
+        let appearTask = store.send(.path(.element(id: detailID, action: .detail(.onAppear))))
+        for await _ in requestStarted { break }
+        // 상세가 자기 포즈 정보를 받아 화면에 보인 뒤에 뒤로 갑니다.
+        #expect(await waitUntil { store.path[id: detailID]?.detail?.poses[id: 20]?.width == 300 })
+        // 다음 페이지 응답 전에 뒤로 가면 상세가 스택에서 빠지고, 화면이 사라지며 `.task`가 취소됩니다.
+        store.send(.path(.popFrom(id: detailID)))
+        appearTask.cancel()
+        firstResponseContinuation.yield()
+        // 상세가 빠졌으므로 카드 탭의 효과도 다음 페이지 응답을 받으면 끝납니다.
+        await tapTask.finish()
+
+        #expect(store.root.isGeneralLoading == false)
+        #expect(store.root.visiblePoses.map(\.id) == Array(1...40))
+
+        // 그리드를 끝까지 내리면 다음 페이지를 이어 받습니다.
+        await store.send(.root(.loadMoreItems)).finish()
+
+        #expect(requestedPages.value == [1, 2])
+        #expect(store.root.visiblePoses.map(\.id) == Array(1...45))
     }
 
     @Test("북마크 탭에서 연 상세에서 북마크를 해제하고 끝까지 넘겨도 빠지거나 겹치는 포즈가 없다")
@@ -332,6 +382,17 @@ private extension PoseCoordinatorTests {
             }
             updateDependencies(&$0)
         }
+    }
+
+    /// 조건이 참이 될 때까지 10초 동안 기다립니다.
+    ///
+    /// 화면을 스택에 넣는 액션은 화면이 빠질 때까지 끝나지 않아, 그 액션의 효과는 `finish()` 대신 이것으로 기다립니다.
+    func waitUntil(_ condition: () -> Bool) async -> Bool {
+        for _ in 0..<1_000 {
+            guard condition() == false else { return true }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
     }
 
     /// 랜덤 포즈 시작 수와 그 밖의 이벤트로 나눕니다.

@@ -109,6 +109,9 @@ struct PoseFeature {
         case onAppear
         /// QR·알림 목록처럼 이 화면을 덮은 전체 화면이 닫혀 다시 보일 때 받습니다. 이때는 onAppear가 다시 불리지 않아 메인 탭이 알립니다.
         case fullScreenCoverDismissed
+        /// 지금 목록의 다음 페이지를 받습니다. 받는 중이면 다시 부르지 않습니다.
+        ///
+        /// 화면이 `.task`로 기다리는 액션에서 이어 부르지 않습니다. 화면이 사라질 때 요청이 같이 취소되면 받는 중 표시가 남아 더 받지 못합니다.
         case loadMoreItems
         case onTapFilter
         case onTapScrapMode

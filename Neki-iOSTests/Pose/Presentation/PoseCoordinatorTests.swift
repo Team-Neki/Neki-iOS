@@ -304,6 +304,45 @@ struct PoseCoordinatorTests {
         #expect(store.root.visiblePoses.map(\.id) == Array(1...45))
     }
 
+    @Test("조건을 바꾼 직후 첫 페이지가 오기 전에 연 상세도, 첫 페이지가 오면 그 포즈를 이어 받는다")
+    func gridDetail_openedBeforeNewConditionFirstPage_receivesFirstPage() async throws {
+        // 받아 둔 전체 목록 20개 중 2인 포즈는 5번 하나뿐입니다.
+        let allPoses = (1...20).map { id in
+            Pose(id: id, peopleCountOption: id == 5 ? .duo : .solo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: nil, height: nil)
+        }
+        // 서버의 2인 목록은 30개이고, 첫 페이지에 5번이 들어 있습니다.
+        let duoPoses = ([5] + Array(101...129)).map { id in
+            Pose(id: id, peopleCountOption: .duo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: nil, height: nil)
+        }
+        let requestedPages = LockIsolated<[Int]>([])
+        let requestedFilters = LockIsolated<[PoseListFilter]>([])
+        let (firstResponse, firstResponseContinuation) = AsyncStream<Void>.makeStream()
+        let store = makeStore(events: LockIsolated([]), initialState: makeFirstPageLoadedState(makeListPage(allPoses, page: 0, size: 20), isBookmarkTab: false)) {
+            $0.poseClient.fetchPoseList = { page, size, filter, _ in
+                requestedPages.withValue { $0.append(page) }
+                requestedFilters.withValue { $0.append(filter) }
+                // 2인 첫 페이지의 응답은 상세를 연 뒤에 보냅니다.
+                for await _ in firstResponse { break }
+                return makeListPage(duoPoses, page: page, size: size)
+            }
+        }
+
+        // 2인을 고르면 새 첫 페이지가 오기 전까지 받아 둔 목록에서 2인 포즈만 먼저 보입니다.
+        let selectTask = store.send(.root(.selectPeopleCount(.duo)))
+        #expect(store.root.visiblePoses.map(\.id) == [5])
+        // 그 카드로 상세를 엽니다. 끝이라 다음 페이지가 필요하지만, 새 조건의 첫 페이지가 오기 전이라 요청하지 않습니다.
+        let pose = try #require(store.root.visiblePoses.first)
+        store.send(.root(.delegate(.didTapImage(pose))))
+        let detailID = try #require(store.path.ids.last)
+        firstResponseContinuation.yield()
+        await selectTask.finish()
+
+        #expect(requestedPages.value == [0])
+        #expect(requestedFilters.value == [PoseListFilter(peopleCount: .duo, relation: nil)])
+        #expect(store.path[id: detailID]?.detail?.poses.map(\.id) == [5] + Array(101...119))
+        #expect(store.path[id: detailID]?.detail?.selectedID == 5)
+    }
+
     @Test("북마크 탭에서 연 상세에서 북마크를 해제하고 끝까지 넘겨도 빠지거나 겹치는 포즈가 없다")
     func bookmarkDetail_unbookmarkingThenSwipingToEnd_keepsListComplete() async throws {
         let server = OffsetBookmarkServer(ids: Array(1...45))

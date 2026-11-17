@@ -148,7 +148,9 @@ struct PoseFeature {
             case didTapStartRandomPose(PeopleCountOption)
             case qrScanButtonTapped
             case requestNotificationList
-            /// 다음 페이지를 받아 보이는 목록에 붙였을 때 보냅니다. 열린 상세 화면이 늘어난 목록을 이어 넘깁니다.
+            /// 목록 페이지를 받아 보이는 목록을 바꿨을 때 보냅니다. 열린 상세 화면이 받은 목록을 이어 넘깁니다.
+            ///
+            /// 첫 페이지도 보냅니다. 조건을 바꾼 직후 새 첫 페이지가 오기 전에 연 상세는 다음 페이지를 요청하지 못하므로, 첫 페이지를 받아야 이어 넘깁니다.
             case didLoadMorePoses
         }
         
@@ -312,8 +314,8 @@ struct PoseFeature {
                     if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
-                // 다음 페이지를 받았으면 열린 상세 화면이 이어 넘기도록 알립니다.
-                return page == .zero ? .none : .send(.delegate(.didLoadMorePoses))
+                // 첫 페이지를 포함해 받은 목록을 열린 상세 화면이 이어 넘기도록 알립니다.
+                return .send(.delegate(.didLoadMorePoses))
                 
             case let .fetchListResponse(scope, page, .failure(error)):
                 switch scope {

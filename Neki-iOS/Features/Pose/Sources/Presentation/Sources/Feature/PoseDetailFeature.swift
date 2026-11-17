@@ -71,7 +71,7 @@ struct PoseDetailFeature {
         case didTapBackButton
         
         // Internal Actions
-        /// 그리드 목록이 다음 페이지를 받으면 늘어난 목록을 받습니다. 상세에 없는 포즈만 끝에 붙입니다.
+        /// 그리드 목록이 페이지를 받으면(첫 페이지 포함) 보이는 목록을 받습니다. 상세에 없는 포즈만 끝에 붙입니다.
         case appendPoses([Pose])
         case poseDetailResponse(PoseID, Result<Pose, Error>)
         case scrapResponse(Pose, Result<Void, Error>)

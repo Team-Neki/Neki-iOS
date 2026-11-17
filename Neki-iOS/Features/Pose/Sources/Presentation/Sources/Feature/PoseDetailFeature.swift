@@ -15,23 +15,40 @@ struct PoseDetailFeature {
     struct State: Equatable {
         var poses: IdentifiedArrayOf<Pose>
         var selectedID: PoseID
+        /// 그리드 목록을 이어 넘기는 상세인지입니다.
+        ///
+        /// 그리드에서 연 상세는 끝 가까이 넘기면 다음 페이지를 요청하고, 그리드 목록이 받은 포즈를 끝에 붙입니다.
+        /// 랜덤 포즈에서 연 상세는 그리드 목록을 잇지 않습니다. 랜덤 포즈 화면의 상세 버튼이 #247로 막혀 지금은 열리지 않고, 되살릴 때를 위해 남긴 경로라 이전 동작을 그대로 둡니다.
+        let followsList: Bool
         var currentPose: Pose? { poses[id: selectedID] }
         var isScrapped: Bool { currentPose?.isScrapped ?? false }
 
-        init(
-            poses: IdentifiedArrayOf<Pose>,
-            selectedID: PoseID
-        ) {
-            self.poses = poses
-            self.selectedID = selectedID
+        /// 지금 포즈 뒤에 남은 포즈가 이 수 이하가 되면 다음 페이지를 요청합니다. 한 장씩 넘기므로 끝에 닿기 전에 미리 받습니다.
+        static let paginationPrefetchCount = 3
+        /// 다음 페이지를 요청할 때인지입니다. 그리드 목록을 이어 넘기는 상세가 끝 가까이에 오면 참입니다.
+        var needsMorePoses: Bool {
+            guard followsList, let index = poses.index(id: selectedID) else { return false }
+            return poses.count - 1 - index <= Self.paginationPrefetchCount
         }
 
         init(
             poses: IdentifiedArrayOf<Pose>,
-            selectedPose: Pose
+            selectedID: PoseID,
+            followsList: Bool
+        ) {
+            self.poses = poses
+            self.selectedID = selectedID
+            self.followsList = followsList
+        }
+
+        init(
+            poses: IdentifiedArrayOf<Pose>,
+            selectedPose: Pose,
+            followsList: Bool
         ) {
             self.poses = poses
             self.selectedID = selectedPose.id
+            self.followsList = followsList
             updatePose(selectedPose)
         }
 
@@ -54,6 +71,8 @@ struct PoseDetailFeature {
         case didTapBackButton
         
         // Internal Actions
+        /// 그리드 목록이 페이지를 받으면(첫 페이지 포함) 보이는 목록을 받습니다. 상세에 없는 포즈만 끝에 붙입니다.
+        case appendPoses([Pose])
         case poseDetailResponse(PoseID, Result<Pose, Error>)
         case scrapResponse(Pose, Result<Void, Error>)
         
@@ -64,6 +83,8 @@ struct PoseDetailFeature {
             case poseUpdated(Pose)
             /// 서버에서 포즈 정보를 받았을 때 보냅니다. 북마크를 바꾼 것이 아니어서 하트 변경과 나눠 알립니다.
             case poseFetched(Pose)
+            /// 그리드 목록을 이어 넘기는 상세가 끝 가까이에 오면 보냅니다. 그리드 목록이 다음 페이지를 받습니다.
+            case requestMorePoses
         }
     }
     
@@ -81,6 +102,7 @@ struct PoseDetailFeature {
             switch action {
                 // MARK: - Lifecycle Actions
             case .onAppear:
+                // 끝 가까이에서 열었을 때의 다음 페이지는 상세를 여는 포즈 코디네이터가 요청합니다. 화면의 `.task`에 묶이지 않도록 여기서는 보내지 않습니다.
                 return fetchPoseDetail(id: state.selectedID)
 
                 // MARK: - View Actions
@@ -101,12 +123,19 @@ struct PoseDetailFeature {
                 
             case let .pageChanged(newID):
                 state.selectedID = newID
-                return fetchPoseDetail(id: newID)
+                return .merge(fetchPoseDetail(id: newID), requestMorePosesIfNeeded(state))
                 
             case .didTapBackButton:
                 return .run { _ in await dismiss() }
                 
                 // MARK: - Internal Actions
+            case let .appendPoses(poses):
+                guard state.followsList else { return .none }
+                // 이미 있는 포즈는 건너뛰므로, 북마크를 해제해 그리드 목록에서 빠진 포즈도 상세에서는 제자리에 남습니다.
+                state.poses.append(contentsOf: poses)
+                // 붙인 포즈가 적어 아직 끝 가까이면 다시 요청합니다. 마지막 페이지까지 받았으면 그리드 목록이 더 받지 않습니다.
+                return requestMorePosesIfNeeded(state)
+                
             case let .poseDetailResponse(requestID, .success(pose)):
                 guard state.selectedID == requestID || state.poses[id: pose.id] != nil else { return .none }
                 state.updatePose(pose)
@@ -146,5 +175,10 @@ private extension PoseDetailFeature {
             }))
         }
         .cancellable(id: CancelID.detail, cancelInFlight: true)
+    }
+    
+    /// 다음 페이지를 요청할 때면 그리드 목록에 요청합니다.
+    func requestMorePosesIfNeeded(_ state: State) -> Effect<Action> {
+        state.needsMorePoses ? .send(.delegate(.requestMorePoses)) : .none
     }
 }

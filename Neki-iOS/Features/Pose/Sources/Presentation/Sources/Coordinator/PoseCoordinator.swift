@@ -46,11 +46,15 @@ struct PoseCoordinator {
                 
                 // MARK: - Navigation Triggers from Root
             case let .root(.delegate(.didTapImage(pose))):
-                state.path.append(.detail(PoseDetailFeature.State(
+                let detail = PoseDetailFeature.State(
                     poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
-                    selectedID: pose.id
-                )))
-                return .none
+                    selectedID: pose.id,
+                    followsList: true
+                )
+                state.path.append(.detail(detail))
+                // 끝 가까이에서 열면 여는 자리에서 그리드 목록에 다음 페이지를 요청합니다.
+                // 상세 화면이 나타날 때 요청하면 그 화면의 `.task`에 묶여, 응답 전에 뒤로 가면 요청이 취소되고 그리드가 받는 중으로 남습니다.
+                return detail.needsMorePoses ? .send(.root(.loadMoreItems)) : .none
                 
             case let .root(.delegate(.didTapStartRandomPose(option))):
                 // 랜덤 포즈 시작은 랜덤 포즈 화면을 띄울 때 한 번 기록합니다. 첫 포즈를 불러오기 전에 보내므로 불러오기에 실패해도 남습니다.
@@ -70,6 +74,15 @@ struct PoseCoordinator {
             case let .path(.element(_, action: .detail(.delegate(.poseFetched(pose))))):
                 return .send(.root(.syncPoseInList(pose)))
                 
+            case .path(.element(_, action: .detail(.delegate(.requestMorePoses)))):
+                return .send(.root(.loadMoreItems))
+                
+            case .root(.delegate(.didLoadMorePoses)):
+                // 그리드 목록이 페이지를 받으면(첫 페이지 포함) 열린 상세 화면에 보이는 목록을 넘깁니다. 이어 붙일지는 상세 화면이 정합니다.
+                let poses = state.root.visiblePoses
+                let detailIDs = state.path.ids.filter { state.path[id: $0]?.detail != nil }
+                return .merge(detailIDs.map { .send(.path(.element(id: $0, action: .detail(.appendPoses(poses))))) })
+                
             case let .path(.element(_, action: .randomPose(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 
@@ -78,9 +91,11 @@ struct PoseCoordinator {
                 return .send(.routeToDetail(pose))
                 
             case let .routeToDetail(pose):
+                // 랜덤 포즈 화면의 상세 버튼이 #247로 막혀 지금은 불리지 않습니다. 되살릴 때를 위해 남긴 경로라 이전처럼 그리드 목록을 잇지 않습니다.
                 state.path.append(.detail(PoseDetailFeature.State(
                     poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
-                    selectedPose: pose
+                    selectedPose: pose,
+                    followsList: false
                 )))
                 return .none
                 

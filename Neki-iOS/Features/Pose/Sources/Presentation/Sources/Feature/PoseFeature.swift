@@ -109,6 +109,9 @@ struct PoseFeature {
         case onAppear
         /// QR·알림 목록처럼 이 화면을 덮은 전체 화면이 닫혀 다시 보일 때 받습니다. 이때는 onAppear가 다시 불리지 않아 메인 탭이 알립니다.
         case fullScreenCoverDismissed
+        /// 지금 목록의 다음 페이지를 받습니다. 받는 중이면 다시 부르지 않습니다.
+        ///
+        /// 화면이 `.task`로 기다리는 액션에서 이어 부르지 않습니다. 화면이 사라질 때 요청이 같이 취소되면 받는 중 표시가 남아 더 받지 못합니다.
         case loadMoreItems
         case onTapFilter
         case onTapScrapMode
@@ -145,6 +148,10 @@ struct PoseFeature {
             case didTapStartRandomPose(PeopleCountOption)
             case qrScanButtonTapped
             case requestNotificationList
+            /// 목록 페이지를 받아 보이는 목록을 바꿨을 때 보냅니다. 열린 상세 화면이 받은 목록을 이어 넘깁니다.
+            ///
+            /// 첫 페이지도 보냅니다. 조건을 바꾼 직후 새 첫 페이지가 오기 전에 연 상세는 다음 페이지를 요청하지 못하므로, 첫 페이지를 받아야 이어 넘깁니다.
+            case didLoadMorePoses
         }
         
         // Binding Action
@@ -307,7 +314,8 @@ struct PoseFeature {
                     if result.hasNext { state.scrappedPage = page + 1 }
                 }
                 refreshVisiblePoses(&state)
-                return .none
+                // 첫 페이지를 포함해 받은 목록을 열린 상세 화면이 이어 넘기도록 알립니다.
+                return .send(.delegate(.didLoadMorePoses))
                 
             case let .fetchListResponse(scope, page, .failure(error)):
                 switch scope {

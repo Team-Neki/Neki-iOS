@@ -37,6 +37,31 @@ struct PoseDetailFeatureTests {
         #expect(state.needsMorePoses == false)
     }
 
+    @Test("끝 가까이에서 연 상세가 나타나면 자기 포즈 정보만 받고 다음 페이지는 요청하지 않는다")
+    func onAppear_nearEnd_fetchesOnlyPoseDetail() async {
+        let state = PoseDetailFeature.State(poses: makePoses(1...20), selectedID: 20, followsList: true)
+        #expect(state.needsMorePoses)
+        let fetchedPose = Pose(id: 20, peopleCountOption: .solo, imageURL: nil, isScrapped: false, contentType: .jpeg, width: 300, height: 400)
+        let store = TestStore(initialState: state) {
+            PoseDetailFeature()
+        } withDependencies: {
+            $0.poseClient.fetchPoseDetail = { _ in fetchedPose }
+        }
+
+        // 다음 페이지는 상세를 여는 코디네이터가 요청합니다. 상세가 나타날 때 요청하면 화면의 `.task`에 묶여, 응답 전에 뒤로 가면 요청이 취소됩니다.
+        await store.send(.onAppear)
+        await store.receive { action in
+            guard case .poseDetailResponse(_, .success) = action else { return false }
+            return true
+        } assert: {
+            $0.poses[id: 20] = fetchedPose
+        }
+        await store.receive { action in
+            guard case .delegate(.poseFetched) = action else { return false }
+            return true
+        }
+    }
+
     @Test("그리드 목록이 받은 포즈 중 상세에 없는 포즈만 끝에 붙이고, 그리드 목록에서 빠진 포즈는 상세의 제자리에 둔다")
     func appendPoses_appendsOnlyMissingPosesInOrder() async {
         let store = TestStore(initialState: PoseDetailFeature.State(poses: makePoses(1...20), selectedID: 10, followsList: true)) {

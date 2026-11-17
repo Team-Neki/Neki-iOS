@@ -15,23 +15,40 @@ struct PoseDetailFeature {
     struct State: Equatable {
         var poses: IdentifiedArrayOf<Pose>
         var selectedID: PoseID
+        /// 그리드 목록을 이어 넘기는 상세인지입니다.
+        ///
+        /// 그리드에서 연 상세는 끝 가까이 넘기면 다음 페이지를 요청합니다.
+        /// 랜덤 포즈에서 연 상세는 그 랜덤 포즈가 목록에 없으면 목록 끝에 붙여 열기 때문에, 그 뒤로 그리드 목록을 잇지 않습니다.
+        let followsList: Bool
         var currentPose: Pose? { poses[id: selectedID] }
         var isScrapped: Bool { currentPose?.isScrapped ?? false }
 
-        init(
-            poses: IdentifiedArrayOf<Pose>,
-            selectedID: PoseID
-        ) {
-            self.poses = poses
-            self.selectedID = selectedID
+        /// 지금 포즈 뒤에 남은 포즈가 이 수 이하가 되면 다음 페이지를 요청합니다. 한 장씩 넘기므로 끝에 닿기 전에 미리 받습니다.
+        static let paginationPrefetchCount = 3
+        /// 다음 페이지를 요청할 때인지입니다. 그리드 목록을 이어 넘기는 상세가 끝 가까이에 오면 참입니다.
+        var needsMorePoses: Bool {
+            guard followsList, let index = poses.index(id: selectedID) else { return false }
+            return poses.count - 1 - index <= Self.paginationPrefetchCount
         }
 
         init(
             poses: IdentifiedArrayOf<Pose>,
-            selectedPose: Pose
+            selectedID: PoseID,
+            followsList: Bool
+        ) {
+            self.poses = poses
+            self.selectedID = selectedID
+            self.followsList = followsList
+        }
+
+        init(
+            poses: IdentifiedArrayOf<Pose>,
+            selectedPose: Pose,
+            followsList: Bool
         ) {
             self.poses = poses
             self.selectedID = selectedPose.id
+            self.followsList = followsList
             updatePose(selectedPose)
         }
 
@@ -64,6 +81,8 @@ struct PoseDetailFeature {
             case poseUpdated(Pose)
             /// 서버에서 포즈 정보를 받았을 때 보냅니다. 북마크를 바꾼 것이 아니어서 하트 변경과 나눠 알립니다.
             case poseFetched(Pose)
+            /// 그리드 목록을 이어 넘기는 상세가 끝 가까이에 오면 보냅니다. 그리드 목록이 다음 페이지를 받습니다.
+            case requestMorePoses
         }
     }
     
@@ -81,7 +100,7 @@ struct PoseDetailFeature {
             switch action {
                 // MARK: - Lifecycle Actions
             case .onAppear:
-                return fetchPoseDetail(id: state.selectedID)
+                return .merge(fetchPoseDetail(id: state.selectedID), requestMorePosesIfNeeded(state))
 
                 // MARK: - View Actions
             case .onTapScrap:
@@ -101,7 +120,7 @@ struct PoseDetailFeature {
                 
             case let .pageChanged(newID):
                 state.selectedID = newID
-                return fetchPoseDetail(id: newID)
+                return .merge(fetchPoseDetail(id: newID), requestMorePosesIfNeeded(state))
                 
             case .didTapBackButton:
                 return .run { _ in await dismiss() }
@@ -146,5 +165,10 @@ private extension PoseDetailFeature {
             }))
         }
         .cancellable(id: CancelID.detail, cancelInFlight: true)
+    }
+    
+    /// 다음 페이지를 요청할 때면 그리드 목록에 요청합니다.
+    func requestMorePosesIfNeeded(_ state: State) -> Effect<Action> {
+        state.needsMorePoses ? .send(.delegate(.requestMorePoses)) : .none
     }
 }

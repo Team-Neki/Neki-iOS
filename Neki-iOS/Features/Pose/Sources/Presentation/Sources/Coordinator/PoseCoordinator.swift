@@ -48,7 +48,8 @@ struct PoseCoordinator {
             case let .root(.delegate(.didTapImage(pose))):
                 state.path.append(.detail(PoseDetailFeature.State(
                     poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
-                    selectedID: pose.id
+                    selectedID: pose.id,
+                    followsList: true
                 )))
                 return .none
                 
@@ -70,6 +71,9 @@ struct PoseCoordinator {
             case let .path(.element(_, action: .detail(.delegate(.poseFetched(pose))))):
                 return .send(.root(.syncPoseInList(pose)))
                 
+            case .path(.element(_, action: .detail(.delegate(.requestMorePoses)))):
+                return .send(.root(.loadMoreItems))
+                
             case let .path(.element(_, action: .randomPose(.delegate(.poseUpdated(pose))))):
                 return .send(.root(.updatePoseInList(pose)))
                 
@@ -78,9 +82,11 @@ struct PoseCoordinator {
                 return .send(.routeToDetail(pose))
                 
             case let .routeToDetail(pose):
+                // 랜덤 포즈가 그리드 목록에 없으면 목록 끝에 붙어 열리므로, 그 뒤로 그리드의 다음 페이지를 잇지 않습니다.
                 state.path.append(.detail(PoseDetailFeature.State(
                     poses: IdentifiedArray(uniqueElements: state.root.visiblePoses),
-                    selectedPose: pose
+                    selectedPose: pose,
+                    followsList: false
                 )))
                 return .none
                 

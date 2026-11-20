@@ -162,7 +162,7 @@ private extension DefaultNetworkProvider {
     ) async throws -> Data {
         let (data, response) = try await executeSession(with: request, networkLogPolicy: networkLogPolicy)
         try Task.checkCancellation()
-        switch validateResponse(response, authorizationType: authorizationType) {
+        switch validateResponse(response, data: data, authorizationType: authorizationType) {
         case .success: return data
         case .unauthorized: throw NetworkError.unauthorizedError
         case .failure(let error): throw error
@@ -287,12 +287,13 @@ private extension DefaultNetworkProvider {
         case failure(NetworkError)
     }
     
-    func validateResponse(_ response: URLResponse, authorizationType: AuthorizationType) -> ResponseStatus {
+    func validateResponse(_ response: URLResponse, data: Data, authorizationType: AuthorizationType) -> ResponseStatus {
         guard let httpResponse = response as? HTTPURLResponse else { return .failure(.responseError) }
         
         switch httpResponse.statusCode {
         case 200..<300: return .success
-        case 400: return .failure(.badRequestError)
+        // 같은 400이라도 업무 오류마다 처리가 다를 수 있어, 본문의 결과 코드를 함께 넘깁니다.
+        case 400: return .failure(.badRequestError(resultCode: resultCode(in: data)))
         case 401: return .unauthorized
         // 재발급 API는 Refresh Token 만료를 403으로 반환합니다. 일반 API의 403과 구분합니다.
         case 403 where authorizationType == .reissue: return .unauthorized
@@ -309,6 +310,16 @@ private extension DefaultNetworkProvider {
             Logger.network.error("❌ Decoding Error: \(error.localizedDescription)")
             throw NetworkError.responseDecodingError
         }
+    }
+    
+    /// 실패 응답 본문의 결과 코드입니다. 본문을 읽을 수 없거나 결과 코드가 없으면 `nil`입니다.
+    func resultCode(in data: Data) -> String? {
+        try? decoder.decode(ResultCodeBody.self, from: data).resultCode
+    }
+    
+    /// 실패 응답에서 결과 코드만 읽습니다. 메시지나 데이터가 없어도 결과 코드는 읽습니다.
+    struct ResultCodeBody: Decodable {
+        let resultCode: String
     }
 }
 

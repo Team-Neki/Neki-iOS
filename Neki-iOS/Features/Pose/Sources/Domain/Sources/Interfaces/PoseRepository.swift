@@ -12,6 +12,8 @@ import DependenciesMacros
 public enum PoseRepositoryError: Error {
     case noHistory
     case networkError(NetworkError)
+    /// 이번 랜덤 포즈 화면에서 더 받을 포즈가 없습니다. 서버가 남은 포즈가 없다고 답한 뒤에 씁니다.
+    case noMoreRandomPose
 }
 
 public typealias PoseID = Int

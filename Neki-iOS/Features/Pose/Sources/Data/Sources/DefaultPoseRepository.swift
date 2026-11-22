@@ -198,7 +198,7 @@ private extension DefaultPoseRepository {
     func startRandomPosePrefetchIfNeeded() {
         guard randomPosePrefetchTask == nil, isRandomPoseExhausted == false else { return }
         let peopleCount = activeRandomPosePeopleCount
-        let excludedIDs = recentPoseIDs(limit: maxRetryCount)
+        let excludedIDs = excludedRandomPoseIDs
         randomPosePrefetchTask = Task { [weak self] in
             guard let self else { throw PoseRepositoryError.noHistory }
             return try await self.fetchRandomPose(
@@ -255,7 +255,7 @@ private extension DefaultPoseRepository {
         // 남은 포즈가 없다는 답을 받은 뒤에는 이 화면을 닫을 때까지 서버에 묻지 않습니다.
         guard isRandomPoseExhausted == false else { throw PoseRepositoryError.noMoreRandomPose }
         let peopleCountValue = convertToRawValue(peopleCount)
-        // 최근 본 포즈를 제외 ID로 보내 서버가 그 포즈를 빼고 고르게 합니다.
+        // 이번 화면에서 본 포즈를 제외 ID로 보내 서버가 그 포즈를 빼고 고르게 합니다.
         // 서버가 제외를 지키지 않거나 요청이 실패할 때를 위해 아래의 겹침 확인과 앱 메모리 대체는 그대로 둡니다.
         let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue, excludedPoseIDs: excludedIDs.sorted())
         
@@ -302,10 +302,9 @@ private extension DefaultPoseRepository {
         }
     }
     
-    func recentPoseIDs(limit: Int) -> Set<PoseID> {
-        guard let currentIndex = currentRandomPoseIndex else { return [] }
-        let lowerBound = max(randomPoseHistoryIDs.startIndex, currentIndex - limit)
-        return Set(randomPoseHistoryIDs[lowerBound...currentIndex])
+    /// 랜덤 포즈를 요청할 때 제외할 포즈입니다. 이번 화면에서 보여 준 포즈 전체입니다.
+    var excludedRandomPoseIDs: Set<PoseID> {
+        Set(shownRandomPoseIDs)
     }
 
     /// 이번 화면에서 보여 준 포즈로 남깁니다. 이미 있으면 맨 뒤로 옮겨, 본 지 오래된 순서를 지킵니다.
@@ -465,7 +464,7 @@ private extension DefaultPoseRepository {
         randomPoseHistoryIDs.removeAll(keepingCapacity: true)
         currentRandomPoseIndex = nil
 
-        let pose = try await fetchRandomPose(peopleCount: peopleCount, excluding: [])
+        let pose = try await fetchRandomPose(peopleCount: peopleCount, excluding: excludedRandomPoseIDs)
         let handled = appendRandomPoseToHistory(pose)
         startRandomPosePrefetchIfNeeded()
         return handled
@@ -477,7 +476,7 @@ private extension DefaultPoseRepository {
             return task
         }
 
-        let excludedIDs = recentPoseIDs(limit: maxRetryCount)
+        let excludedIDs = excludedRandomPoseIDs
         return Task { [weak self] in
             guard let self else { throw PoseRepositoryError.noHistory }
             return try await self.fetchRandomPose(
@@ -491,11 +490,11 @@ private extension DefaultPoseRepository {
         var candidate = pose
         var retryCount: Int = .zero
 
-        while recentPoseIDs(limit: maxRetryCount).contains(candidate.id), retryCount < maxRetryCount {
+        while excludedRandomPoseIDs.contains(candidate.id), retryCount < maxRetryCount {
             retryCount += 1
             candidate = try await fetchRandomPose(
                 peopleCount: peopleCount,
-                excluding: recentPoseIDs(limit: maxRetryCount)
+                excluding: excludedRandomPoseIDs
             )
         }
 

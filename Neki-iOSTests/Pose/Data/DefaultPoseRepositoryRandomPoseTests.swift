@@ -11,8 +11,8 @@ import Testing
 @testable import Neki_iOS
 
 struct DefaultPoseRepositoryRandomPoseTests {
-    @Test("랜덤 포즈는 처음 받을 때 제외 ID 없이 요청하고, 다음부터 지금 포즈와 그 앞 3개를 제외 ID로 보낸다")
-    func randomPose_sendsRecentPoseIDsAsExcludeIDs() async throws {
+    @Test("랜덤 포즈는 처음 받을 때 제외 ID 없이 요청하고, 다음부터 이번 화면에서 본 포즈를 모두 제외 ID로 보낸다")
+    func randomPose_sendsShownPoseIDsAsExcludeIDs() async throws {
         let networkProvider = RandomPoseNetworkProviderStub()
         var requests = networkProvider.requests.makeAsyncIterator()
         let repository = makeRepository(networkProvider)
@@ -29,7 +29,7 @@ struct DefaultPoseRepositoryRandomPoseTests {
 
         let queries = await networkProvider.requestedQueries
         #expect(queries.map { $0?["headCount"] } == Array(repeating: "ONE", count: 6))
-        #expect(queries.map { $0?["excludeIds"] } == [nil, "1", "1,2", "1,2,3", "1,2,3,4", "2,3,4,5"])
+        #expect(queries.map { $0?["excludeIds"] } == [nil, "1", "1,2", "1,2,3", "1,2,3,4", "1,2,3,4,5"])
     }
 
     @Test("남은 포즈가 없다는 응답을 받으면 화면을 닫을 때까지 다시 묻지 않고, 본 포즈를 본 지 오래된 순서로 보여 준다")

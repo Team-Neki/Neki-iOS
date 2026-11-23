@@ -136,6 +136,11 @@ public final actor DefaultPoseRepository {
     private var randomPoseCommitSequence: Int = .zero
     private var pendingRandomPoseTasks: [Int: Task<Pose, Error>] = [:]
     private var committedRandomPoseIDs: [Int: PoseID] = [:]
+    /// 이번 랜덤 포즈 화면에서 보여 준 포즈입니다. 본 지 오래된 포즈가 앞에 오고, 다시 보여 주면 맨 뒤로 옮깁니다.
+    /// 기록은 50장까지만 남고 앞으로 갔다가 새 포즈를 받으면 뒤가 잘리므로, 기록과 따로 둡니다.
+    private var shownRandomPoseIDs: [PoseID] = []
+    /// 서버가 남은 포즈가 없다고 답했는지입니다. 켜지면 이 화면을 닫을 때까지 랜덤 포즈를 다시 묻지 않습니다.
+    private var isRandomPoseExhausted: Bool = false
     private var scrapTasks: [PoseID: Task<Void, Error>] = [:]
     
     private let maxRetryCount: Int = 3
@@ -145,6 +150,8 @@ public final actor DefaultPoseRepository {
     private let latestFirstSort: String = "LATEST"
     /// 북마크 목록을 최신순으로 요청하는 `sortOrder` 값입니다. 북마크 목록 API는 정렬 기준 없이 방향만 받습니다.
     private let latestFirstSortOrder: String = "DESC"
+    /// 제외할 포즈를 빼면 남은 랜덤 포즈가 없을 때, 서버가 400과 함께 보내는 결과 코드입니다.
+    private let noMoreRandomPoseResultCode: String = "D-09"
     
     @Dependency(\.networkProvider) private var networkProvider
     
@@ -189,9 +196,9 @@ private extension DefaultPoseRepository {
     }
     
     func startRandomPosePrefetchIfNeeded() {
-        guard randomPosePrefetchTask == nil else { return }
+        guard randomPosePrefetchTask == nil, isRandomPoseExhausted == false else { return }
         let peopleCount = activeRandomPosePeopleCount
-        let excludedIDs = recentPoseIDs(limit: maxRetryCount)
+        let excludedIDs = excludedRandomPoseIDs
         randomPosePrefetchTask = Task { [weak self] in
             guard let self else { throw PoseRepositoryError.noHistory }
             return try await self.fetchRandomPose(
@@ -210,6 +217,7 @@ private extension DefaultPoseRepository {
         randomPoseHistoryIDs.append(handled.id)
         trimRandomPoseHistoryIfNeeded()
         currentRandomPoseIndex = randomPoseHistoryIDs.index(before: randomPoseHistoryIDs.endIndex)
+        markRandomPoseShown(handled.id)
         trimPoseCacheIfNeeded()
         return handled
     }
@@ -244,13 +252,17 @@ private extension DefaultPoseRepository {
         peopleCount: PeopleCountOption,
         excluding excludedIDs: Set<PoseID>
     ) async throws -> Pose {
+        // 남은 포즈가 없다는 답을 받은 뒤에는 이 화면을 닫을 때까지 서버에 묻지 않습니다.
+        guard isRandomPoseExhausted == false else { throw PoseRepositoryError.noMoreRandomPose }
         let peopleCountValue = convertToRawValue(peopleCount)
-        // 최근 본 포즈를 제외 ID로 보내 서버가 그 포즈를 빼고 고르게 합니다.
+        // 이번 화면에서 본 포즈를 제외 ID로 보내 서버가 그 포즈를 빼고 고르게 합니다.
         // 서버가 제외를 지키지 않거나 요청이 실패할 때를 위해 아래의 겹침 확인과 앱 메모리 대체는 그대로 둡니다.
         let endpoint = PoseEndpoint.fetchRandomPose(peopleCount: peopleCountValue, excludedPoseIDs: excludedIDs.sorted())
         
         @Sendable func requestSinglePose() async throws -> Pose {
             try Task.checkCancellation()
+            // 겹쳐 진행 중인 다른 요청이 남은 포즈 없음을 받았으면, 첫 요청이든 다시 묻기든 보내지 않습니다.
+            guard await isRandomPoseExhausted == false else { throw PoseRepositoryError.noMoreRandomPose }
             let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
             try Task.checkCancellation()
             guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
@@ -275,7 +287,17 @@ private extension DefaultPoseRepository {
                 Logger.data.debug("All parallel retries were duplicates. Fallback to cache.")
                 throw PoseRepositoryError.noHistory
             }
+        } catch PoseRepositoryError.noMoreRandomPose {
+            // 다른 요청이 먼저 남은 포즈 없음을 받아 보내지 않은 경우입니다. 앱 메모리 대체 없이 그대로 넘깁니다.
+            throw PoseRepositoryError.noMoreRandomPose
         } catch {
+            if isNoMoreRandomPoseError(error) {
+                // 닫힌 화면의 늦은 응답이 새 화면을 멈추지 않게, 취소된 요청이면 표시를 켜지 않습니다.
+                try Task.checkCancellation()
+                Logger.data.debug("No more random poses. Stop requesting until the random pose screen closes.")
+                isRandomPoseExhausted = true
+                throw PoseRepositoryError.noMoreRandomPose
+            }
             Logger.data.error("Random Pose Fetch Failed or Duplicated: \(error)")
             guard cache.isEmpty == false else { throw error }
             
@@ -285,10 +307,30 @@ private extension DefaultPoseRepository {
         }
     }
     
-    func recentPoseIDs(limit: Int) -> Set<PoseID> {
-        guard let currentIndex = currentRandomPoseIndex else { return [] }
-        let lowerBound = max(randomPoseHistoryIDs.startIndex, currentIndex - limit)
-        return Set(randomPoseHistoryIDs[lowerBound...currentIndex])
+    /// 랜덤 포즈를 요청할 때 제외할 포즈입니다. 이번 화면에서 보여 준 포즈 전체입니다.
+    var excludedRandomPoseIDs: Set<PoseID> {
+        Set(shownRandomPoseIDs)
+    }
+
+    /// 이번 화면에서 보여 준 포즈로 남깁니다. 이미 있으면 맨 뒤로 옮겨, 본 지 오래된 순서를 지킵니다.
+    func markRandomPoseShown(_ id: PoseID) {
+        shownRandomPoseIDs.removeAll { $0 == id }
+        shownRandomPoseIDs.append(id)
+    }
+
+    /// 남은 포즈가 없을 때 대신 보여 줄 포즈입니다. 이번 화면에서 본 포즈 중 지금 포즈가 아니고 본 지 가장 오래된 포즈를 고릅니다.
+    func leastRecentlyShownRandomPose() -> Pose? {
+        let currentPoseID = currentRandomPoseIndex.flatMap { randomPoseHistoryIDs.indices.contains($0) ? randomPoseHistoryIDs[$0] : nil }
+        for id in shownRandomPoseIDs where id != currentPoseID {
+            if let pose = cachedPose(id: id) { return pose }
+        }
+        return nil
+    }
+
+    /// 서버가 남은 랜덤 포즈가 없다고 답한 오류인지 봅니다. 사진 정보 없음(`D-04`) 같은 다른 400과 구분합니다.
+    func isNoMoreRandomPoseError(_ error: Error) -> Bool {
+        guard case let NetworkError.badRequestError(resultCode) = error else { return false }
+        return resultCode == noMoreRandomPoseResultCode
     }
 
     func resetRandomPoseBuffer() {
@@ -301,6 +343,8 @@ private extension DefaultPoseRepository {
         randomPosePrefetchTask = nil
         randomPoseHistoryIDs.removeAll(keepingCapacity: true)
         currentRandomPoseIndex = nil
+        shownRandomPoseIDs.removeAll(keepingCapacity: true)
+        isRandomPoseExhausted = false
     }
 
     func updateCachedPose(_ pose: Pose) {
@@ -425,7 +469,7 @@ private extension DefaultPoseRepository {
         randomPoseHistoryIDs.removeAll(keepingCapacity: true)
         currentRandomPoseIndex = nil
 
-        let pose = try await fetchRandomPose(peopleCount: peopleCount, excluding: [])
+        let pose = try await fetchRandomPose(peopleCount: peopleCount, excluding: excludedRandomPoseIDs)
         let handled = appendRandomPoseToHistory(pose)
         startRandomPosePrefetchIfNeeded()
         return handled
@@ -437,7 +481,7 @@ private extension DefaultPoseRepository {
             return task
         }
 
-        let excludedIDs = recentPoseIDs(limit: maxRetryCount)
+        let excludedIDs = excludedRandomPoseIDs
         return Task { [weak self] in
             guard let self else { throw PoseRepositoryError.noHistory }
             return try await self.fetchRandomPose(
@@ -451,11 +495,11 @@ private extension DefaultPoseRepository {
         var candidate = pose
         var retryCount: Int = .zero
 
-        while recentPoseIDs(limit: maxRetryCount).contains(candidate.id), retryCount < maxRetryCount {
+        while excludedRandomPoseIDs.contains(candidate.id), retryCount < maxRetryCount {
             retryCount += 1
             candidate = try await fetchRandomPose(
                 peopleCount: peopleCount,
-                excluding: recentPoseIDs(limit: maxRetryCount)
+                excluding: excludedRandomPoseIDs
             )
         }
 
@@ -584,6 +628,7 @@ extension DefaultPoseRepository: PoseRepository {
            randomPoseHistoryIDs.indices.contains(nextIndex),
            let pose = cachedPose(id: randomPoseHistoryIDs[nextIndex]) {
             currentRandomPoseIndex = nextIndex
+            markRandomPoseShown(pose.id)
             startRandomPosePrefetchIfNeeded()
             return pose
         }
@@ -607,9 +652,12 @@ extension DefaultPoseRepository: PoseRepository {
                 continue
             }
 
-            let pose: Pose
+            // 남은 포즈가 없다는 답이면 `nil`로 받아, 아래에서 이번 화면에서 본 포즈 중에서 고릅니다.
+            let fetchedPose: Pose?
             do {
-                pose = try await task.value
+                fetchedPose = try await task.value
+            } catch PoseRepositoryError.noMoreRandomPose {
+                fetchedPose = nil
             } catch {
                 pendingRandomPoseTasks[nextSequence] = nil
                 randomPoseCommitSequence = nextSequence
@@ -620,18 +668,30 @@ extension DefaultPoseRepository: PoseRepository {
             guard pendingRandomPoseTasks[nextSequence] != nil else { continue }
 
             pendingRandomPoseTasks[nextSequence] = nil
-            let uniquePose: Pose
+            let uniquePose: Pose?
             do {
-                uniquePose = try await fetchReplacementIfNeeded(
-                    pose,
-                    peopleCount: peopleCount
-                )
+                if let fetchedPose {
+                    uniquePose = try await fetchReplacementIfNeeded(
+                        fetchedPose,
+                        peopleCount: peopleCount
+                    )
+                } else {
+                    uniquePose = nil
+                }
+            } catch PoseRepositoryError.noMoreRandomPose {
+                uniquePose = nil
             } catch {
                 randomPoseCommitSequence = nextSequence
                 guard nextSequence != sequence else { throw error }
                 continue
             }
-            let handled = appendRandomPoseToHistory(uniquePose)
+            // 고르기와 기록에 더하기 사이에 기다림이 없어, 빠르게 여러 번 넘겨도 같은 포즈를 연달아 고르지 않습니다.
+            guard let nextPose = uniquePose ?? leastRecentlyShownRandomPose() else {
+                randomPoseCommitSequence = nextSequence
+                guard nextSequence != sequence else { throw PoseRepositoryError.noMoreRandomPose }
+                continue
+            }
+            let handled = appendRandomPoseToHistory(nextPose)
             committedRandomPoseIDs[nextSequence] = handled.id
             randomPoseCommitSequence = nextSequence
             trimCommittedRandomPoseIDs()
@@ -659,6 +719,7 @@ extension DefaultPoseRepository: PoseRepository {
         guard let pose = cachedPose(id: randomPoseHistoryIDs[previousIndex]) else { throw PoseRepositoryError.noHistory }
 
         currentRandomPoseIndex = previousIndex
+        markRandomPoseShown(pose.id)
         startRandomPosePrefetchIfNeeded()
         return pose
     }

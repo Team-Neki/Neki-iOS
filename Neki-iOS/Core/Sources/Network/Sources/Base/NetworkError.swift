@@ -17,7 +17,8 @@ public enum NetworkError: LocalizedError {
     case networkFail
     case unknownError(Error)
     case invalidURLError
-    case badRequestError
+    /// 400 응답입니다. 서버가 본문에 보낸 결과 코드를 함께 담습니다(예: 남은 랜덤 포즈 없음 `D-09`).
+    case badRequestError(resultCode: String?)
     case unauthorizedError
     case unsupportedResponseContentType
     case responseTooLarge

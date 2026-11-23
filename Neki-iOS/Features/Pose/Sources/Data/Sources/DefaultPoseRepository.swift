@@ -261,6 +261,8 @@ private extension DefaultPoseRepository {
         
         @Sendable func requestSinglePose() async throws -> Pose {
             try Task.checkCancellation()
+            // 겹쳐 진행 중인 다른 요청이 남은 포즈 없음을 받았으면, 첫 요청이든 다시 묻기든 보내지 않습니다.
+            guard await isRandomPoseExhausted == false else { throw PoseRepositoryError.noMoreRandomPose }
             let responseDTO: BaseResponseDTO<PoseDTO> = try await networkProvider.request(endpoint: endpoint)
             try Task.checkCancellation()
             guard let newPose = responseDTO.data?.toEntity() else { throw PoseRepositoryError.networkError(.responseDecodingError) }
@@ -285,6 +287,9 @@ private extension DefaultPoseRepository {
                 Logger.data.debug("All parallel retries were duplicates. Fallback to cache.")
                 throw PoseRepositoryError.noHistory
             }
+        } catch PoseRepositoryError.noMoreRandomPose {
+            // 다른 요청이 먼저 남은 포즈 없음을 받아 보내지 않은 경우입니다. 앱 메모리 대체 없이 그대로 넘깁니다.
+            throw PoseRepositoryError.noMoreRandomPose
         } catch {
             if isNoMoreRandomPoseError(error) {
                 // 닫힌 화면의 늦은 응답이 새 화면을 멈추지 않게, 취소된 요청이면 표시를 켜지 않습니다.
